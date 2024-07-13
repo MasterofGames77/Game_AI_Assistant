@@ -1,3 +1,4 @@
+// assistant.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import OpenAI from 'openai';
 import axios from 'axios';
@@ -8,6 +9,7 @@ console.log("OPENAI_API_KEY:", process.env.OPENAI_API_KEY ? "SET" : "NOT SET");
 console.log("TWITCH_CLIENT_ID:", process.env.TWITCH_CLIENT_ID ? "SET" : "NOT SET");
 console.log("TWITCH_CLIENT_SECRET:", process.env.TWITCH_CLIENT_SECRET ? "SET" : "NOT SET");
 console.log("TWITCH_TOKEN_URL:", process.env.TWITCH_TOKEN_URL ? "SET" : "NOT SET");
+console.log("RAWG_API_KEY:", process.env.RAWG_API_KEY ? "SET" : "NOT SET");
 
 // Initialize the OpenAI client with the provided API key
 const openai = new OpenAI({
@@ -20,13 +22,11 @@ const getAccessToken = async (): Promise<string> => {
   const clientId = process.env.TWITCH_CLIENT_ID;
   const clientSecret = process.env.TWITCH_CLIENT_SECRET;
 
-  // Ensure that all necessary environment variables are set
   if (!tokenUrl || !clientId || !clientSecret) {
     throw new Error('Missing environment variables');
   }
 
   try {
-    // Make a POST request to get the access token
     const response = await axios.post(tokenUrl, {
       client_id: clientId,
       client_secret: clientSecret,
@@ -43,14 +43,13 @@ const getAccessToken = async (): Promise<string> => {
 // Function to get a chat completion from the OpenAI API
 const getChatCompletion = async (question: string) => {
   try {
-    // Make a request to the OpenAI API to generate a completion
     const completion = await openai.chat.completions.create({
       model: 'gpt-4',
       messages: [
-        { role: 'system', content: 'You are an AI assistant specializing in video game. You can provide detailed analytics and insights into gameplay, helping players track their progress and identify areas for improvement.' },
+        { role: 'system', content: 'You are an AI assistant specializing in video games. You can provide detailed analytics and insights into gameplay, helping players track their progress and identify areas for improvement.' },
         { role: 'user', content: question }
       ],
-      max_tokens: 700, // Increased max_tokens to allow for longer responses
+      max_tokens: 700,
     });
     console.log("OpenAI Response:", completion.choices[0].message.content);
     return completion.choices[0].message.content;
@@ -60,19 +59,40 @@ const getChatCompletion = async (question: string) => {
   }
 };
 
-// The main handler function for the API route
+// Function to fetch games based on a search query from RAWG
+const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
+  const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&search=${encodeURIComponent(searchQuery)}`;
+
+  try {
+    const response = await axios.get(url);
+    if (response.data && response.data.results.length > 0) {
+      const games = response.data.results.map((game: any) => game.name);
+      return `Games related to ${searchQuery}: ${games.join(', ')}`;
+    } else {
+      return `No games found related to ${searchQuery}.`;
+    }
+  } catch (error: any) {
+    console.error("Error fetching data from RAWG:", error.message);
+    return "Failed to fetch data from RAWG.";
+  }
+};
+
+// Unified handler function for the API route
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { question } = req.body;
 
   try {
     console.log("Received question:", question);
-    // Get the chat completion from OpenAI
-    const openAIResponse = await getChatCompletion(question);
-    // Send the response back to the client
-    res.status(200).json({ answer: openAIResponse });
+    let answer;
+    if (question.toLowerCase().includes("similar to")) {
+      const gameName = question.split("similar to ")[1]; // Simplified example
+      answer = await fetchGamesFromRAWG(gameName);
+    } else {
+      answer = await getChatCompletion(question);
+    }
+    res.status(200).json({ answer });
   } catch (error: any) {
     console.error("Error in API route:", error.message);
-    // Send an error response back to the client
     res.status(500).json({ error: error.message });
   }
 }
