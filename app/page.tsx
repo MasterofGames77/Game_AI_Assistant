@@ -5,16 +5,18 @@ import axios from "axios";
 
 // Main component function for the Home page
 export default function Home() {
-  // State variables to manage question, response, and loading state
+  // State variables to manage question, response, loading, and error state
   const [question, setQuestion] = useState("");
   const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   // Function to handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); // Prevent default form submission behavior
     console.log("Form submitted with question:", question);
     setLoading(true); // Set loading state to true
+    setError(""); // Reset error state
 
     try {
       // Make a POST request to the API endpoint with the question
@@ -23,31 +25,35 @@ export default function Home() {
       setResponse(res.data.answer); // Set the response state with the server's answer
     } catch (error) {
       console.error("Error submitting form:", error); // Log any errors
+      setError("There was an error processing your request. Please try again."); // Set error state
     } finally {
       setLoading(false); // Set loading state to false
     }
   };
 
+  // Function to clear the response, question, and error
+  const handleClear = () => {
+    setQuestion("");
+    setResponse("");
+    setError("");
+  };
+
   // Function to format the response from the server
   const formatResponse = (response: string) => {
-    // Split the response into sentences
-    const sentences = response.split(". ").map((sentence) => sentence.trim());
+    const sentences = response.split("\n").map((sentence) => sentence.trim());
     let stepCounter = 1;
-    // Map each sentence to a formatted paragraph
     return sentences.map((sentence, index) => {
-      // If the sentence starts with "Step", format it with a step number
-      if (sentence.match(/^Step\s*\d*:/i)) {
+      if (sentence.match(/^\d+\.\s/)) {
         return (
           <p key={index} className="mt-2">
-            <strong>{stepCounter++}.</strong>{" "}
-            {sentence.replace(/Step\s*\d*:/i, "").trim()}.
+            <strong>{stepCounter++}. </strong>
+            {sentence.replace(/^\d+\.\s/, "").trim()}
           </p>
         );
       } else {
-        // Otherwise, format it as a regular paragraph with indentation
         return (
-          <p key={index} className="ml-4">
-            {sentence}.
+          <p key={index} className="mt-2">
+            {sentence}
           </p>
         );
       }
@@ -68,14 +74,24 @@ export default function Home() {
           placeholder="Enter your gameplay data or question for analysis"
           className="w-full p-2 border border-gray-300 rounded mb-4"
         />
-        <button
-          type="submit"
-          className="w-full p-2 bg-blue-500 text-white rounded"
-        >
-          Submit
-        </button>
+        <div className="flex space-x-4">
+          <button
+            type="submit"
+            className="w-full p-2 bg-blue-500 text-white rounded"
+          >
+            Submit
+          </button>
+          <button
+            type="button"
+            onClick={handleClear}
+            className="w-full p-2 bg-red-500 text-white rounded"
+          >
+            Clear
+          </button>
+        </div>
       </form>
       {loading && <div className="spinner mt-4"></div>}
+      {error && <div className="mt-4 text-red-500">{error}</div>}
       {response && (
         <div className="mt-8 w-full max-w-3xl">
           <h2 className="text-2xl font-bold">Response</h2>
