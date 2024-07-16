@@ -1,9 +1,9 @@
-// assistant.ts
+// Import necessary modules
 import type { NextApiRequest, NextApiResponse } from 'next';
 import OpenAI from 'openai';
 import axios from 'axios';
 
-// Log environment variables (only for debugging purposes, remove in production)
+// Log environment variables for debugging purposes
 console.log("Environment Variables:");
 console.log("OPENAI_API_KEY:", process.env.OPENAI_API_KEY ? "SET" : "NOT SET");
 console.log("TWITCH_CLIENT_ID:", process.env.TWITCH_CLIENT_ID ? "SET" : "NOT SET");
@@ -22,7 +22,6 @@ const getAccessToken = async (): Promise<string> => {
   const clientId = process.env.TWITCH_CLIENT_ID;
   const clientSecret = process.env.TWITCH_CLIENT_SECRET;
 
-  // Check if necessary environment variables are set
   if (!tokenUrl || !clientId || !clientSecret) {
     throw new Error('Missing environment variables');
   }
@@ -62,6 +61,30 @@ const getChatCompletion = async (question: string) => {
   }
 };
 
+// Function to fetch data from IGDB API
+const fetchGamesFromIGDB = async (query: string): Promise<string | null> => {
+  const accessToken = await getAccessToken();  // Ensure this handles token refresh correctly
+  const headers = {
+    'Client-ID': process.env.TWITCH_CLIENT_ID,
+    'Authorization': `Bearer ${accessToken}`
+  };
+  const body = `fields name,genres.name,platforms.name,release_dates.date; search "${query}"; limit 10;`;
+
+  try {
+    // Make a POST request to fetch data from IGDB
+    const response = await axios.post('https://api.igdb.com/v4/games', body, { headers });
+    if (response.data.length > 0) {
+      const games = response.data.map((game: any) => game.name);
+      return `Games related to your query: ${games.join(', ')}`;
+    } else {
+      return null;  // No data found
+    }
+  } catch (error: any) {
+    console.error("Error fetching data from IGDB:", error.message);
+    return null;  // Handle as no data found
+  }
+};
+
 // Function to fetch games based on a search query from RAWG
 const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
   const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&search=${encodeURIComponent(searchQuery)}`;
@@ -81,50 +104,24 @@ const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
   }
 };
 
-// Function to fetch data from IGDB API
-const fetchGamesFromIGDB = async (query: string): Promise<string> => {
-  const accessToken = await getAccessToken();  // Ensure this handles token refresh correctly
-  const headers = {
-    'Client-ID': process.env.TWITCH_CLIENT_ID,
-    'Authorization': `Bearer ${accessToken}`
-  };
-  const body = `fields name,genres.name,platforms.name,release_dates.date; search "${query}"; limit 10;`;
-
-  try {
-    // Make a POST request to fetch data from IGDB
-    const response = await axios.post('https://api.igdb.com/v4/games', body, { headers });
-    if (response.data.length > 0) {
-      const games = response.data.map((game: any) => game.name);
-      return `Games related to your query: ${games.join(', ')}`;
-    } else {
-      return `No games found related to ${query}.`;
-    }
-  } catch (error: any) {
-    console.error("Error fetching data from IGDB:", error.message);
-    return "Failed to fetch data from IGDB.";
-  }
-};
-
 // Function to fetch data from both RAWG and IGDB
 async function fetchDataFromBothAPIs(gameName: string): Promise<string> {
   try {
     // Start both fetch operations concurrently
     const rawgPromise = fetchGamesFromRAWG(gameName);
     const igdbPromise = fetchGamesFromIGDB(gameName);
-
-    // Wait for both promises to resolve
     const [rawgResponse, igdbResponse] = await Promise.all([rawgPromise, igdbPromise]);
 
     // Analyze and combine the responses
     let finalResponse = "";
-    if (rawgResponse.includes("No games found") && igdbResponse.includes("No games found")) {
+    if (rawgResponse.includes("No games found") && igdbResponse?.includes("No games found")) {
       finalResponse = "No relevant game information found in any database.";
     } else {
       finalResponse = "Combined Game Information: \n";
       if (!rawgResponse.includes("No games found")) {
         finalResponse += `\nFrom RAWG: ${rawgResponse}`;
       }
-      if (!igdbResponse.includes("No games found")) {
+      if (igdbResponse && !igdbResponse.includes("No games found")) {
         finalResponse += `\nFrom IGDB: ${igdbResponse}`;
       }
     }
@@ -143,12 +140,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     console.log("Received question:", question);
     let answer;
+
     if (question.toLowerCase().includes("similar to")) {
-      const gameName = question.split("similar to ")[1]; // Simplified example
+      const gameName = question.split("similar to ")[1];
       answer = await fetchDataFromBothAPIs(gameName);
     } else {
       answer = await getChatCompletion(question);
     }
+
     res.status(200).json({ answer });
   } catch (error: any) {
     console.error("Error in API route:", error.message);
