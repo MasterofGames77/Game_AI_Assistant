@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/assistant.ts": {
+    "pages/api/assistant.ts": {
       "maxDuration": 10
     }
   }
