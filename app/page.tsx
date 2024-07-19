@@ -10,6 +10,7 @@ export default function Home() {
   const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [userId, setUserId] = useState("user123"); // Hardcoded for demonstration, replace with actual user ID logic
 
   // Function to handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -19,8 +20,8 @@ export default function Home() {
     setError(""); // Reset error state
 
     try {
-      // Make a POST request to the API endpoint with the question
-      const res = await axios.post("/api/assistant", { question });
+      // Make a POST request to the API endpoint with the question and userId
+      const res = await axios.post("/api/assistant", { userId, question });
       console.log("Response from server:", res.data);
       setResponse(res.data.answer); // Set the response state with the server's answer
     } catch (error) {
