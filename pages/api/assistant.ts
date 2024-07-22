@@ -3,8 +3,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import OpenAI from 'openai';
 import axios from 'axios';
 import mongoose from 'mongoose';
-//import User from '../../models/User'; // Ensure this import path is correct
-//import Question from '../../models/Question'; // Import Question model
+import User from '../../models/User'; // Ensure this import path is correct
+import Question from '../../models/Question'; // Import Question model
 
 // Log environment variables for debugging purposes
 console.log("Environment Variables:");
@@ -231,7 +231,6 @@ const fetchRecommendations = async (genre: string): Promise<string[]> => {
   }
 };
 
-
 // Unified handler function for the API route (updated)
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { userId, question } = req.body;
@@ -243,34 +242,49 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await connectToMongoDB();
 
     // Fetch previous questions and responses for the user
-    //const previousQuestions = await Question.find({ userId });
+    const previousQuestions = await Question.find({ userId });
 
     let answer;
 
-    if (question.toLowerCase().includes("recommendations")) {
-      //const genres = analyzeUserQuestions(previousQuestions);
+    if (question.toLowerCase().includes("similar to")) {
+      const gameName = question.split("similar to ")[1].trim();
+      answer = await fetchDataFromBothAPIs(gameName);
 
-    //   if (genres.length > 0) {
-    //     // Fetch recommendations for the most frequent genre
-    //     const recommendations = await fetchRecommendations(genres[0]);
-    //     if (recommendations.length > 0) {
-    //       answer = `Based on your previous questions, I recommend these games: ${recommendations.join(', ')}.`;
-    //     } else {
-    //       answer = "I couldn't find any recommendations based on your preferences.";
-    //     }
-    //   } else {
-    //     answer = "I couldn't determine your preferences based on your previous questions.";
-    //   }
-    // } else {
-    //   answer = await getChatCompletion(question);
+      // Save interaction in MongoDB
+      const newQuestion = new Question({
+        userId,
+        question,
+        response: answer,
+      });
+      await newQuestion.save();
+    } else {
+      answer = await getChatCompletion(question);
 
-      // // Store the question and response
-      // const newQuestion = new Question({
-      //   userId,
-      //   question,
-      //   response: answer,
-      // });
-      // await newQuestion.save();
+      // Save interaction in MongoDB
+      const newQuestion = new Question({
+        userId,
+        question,
+        response: answer,
+      });
+      await newQuestion.save();
+    }
+
+    // Retrieve and analyze previous interactions
+    const previousInteractions = previousQuestions.map((doc: any) => ({
+      question: doc.question,
+      response: doc.response,
+    }));
+    const recommendations = analyzeUserQuestions(previousInteractions);
+    if (recommendations.length > 0) {
+      const genre = recommendations[0];
+      const recommendationGames = await fetchRecommendations(genre);
+      if (recommendationGames.length > 0) {
+        answer += `\n\nRecommendations based on your previous interactions: ${recommendationGames.join(', ')}`;
+      } else {
+        answer += "\n\nNo recommendations found based on your previous interactions.";
+      }
+    } else {
+      answer += "\n\nNo recommendations found based on your previous interactions.";
     }
 
     res.status(200).json({ answer });

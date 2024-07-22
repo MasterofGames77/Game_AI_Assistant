@@ -64,9 +64,7 @@ export default function Home() {
   // Return the JSX to render the component
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-2">
-      <h1 className="text-4xl font-bold mb-6">
-        Video Game Analytics Assistant
-      </h1>
+      <h1 className="text-4xl font-bold mb-6">Video Game Wingman</h1>
       <form onSubmit={handleSubmit} className="w-full max-w-md">
         <input
           type="text"
