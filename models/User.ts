@@ -1,25 +1,10 @@
-// models/User.ts
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import mongoose from 'mongoose';
 
-interface IUser extends Document {
-  userId: string;
-  conversations: Array<{
-    question: string;
-    response: string;
-    timestamp: Date;
-  }>;
-}
+const UserSchema = new mongoose.Schema({
+  userId: { type: String, required: true },
+  conversations: { type: Array, required: true },
+}, { collection: 'userID_JS' });
 
-const UserSchema: Schema = new Schema({
-  userId: { type: String, required: true, unique: true },
-  conversations: [
-    {
-      question: { type: String, required: true },
-      response: { type: String, required: true },
-      timestamp: { type: Date, default: Date.now }
-    }
-  ]
-});
+const User = mongoose.models.User || mongoose.model('User', UserSchema);
 
-const User: Model<IUser> = mongoose.models.User || mongoose.model('User', UserSchema);
 export default User;
