@@ -1,5 +1,3 @@
-// app/page.tsx
-
 "use client"; // client-side component
 
 import { useState, useEffect } from "react";
