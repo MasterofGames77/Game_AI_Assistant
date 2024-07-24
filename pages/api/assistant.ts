@@ -2,9 +2,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import connectToMongoDB from '../../utils/mongodb';
 import Question from '../../models/Question';
-import User from '../../models/User';
+//import User from '../../models/User';
 import { getChatCompletion, fetchRecommendations, analyzeUserQuestions } from '../../utils/aiHelper';
 import OpenAI from 'openai';
+//import { getSteamNews, getSteamUserStats, getOwnedGames } from '../../lib/steamAPI';
 
 console.log("Environment Variables:");
 console.log("OPENAI_API_KEY:", process.env.OPENAI_API_KEY ? "SET" : "NOT SET");
@@ -12,6 +13,7 @@ console.log("TWITCH_CLIENT_ID:", process.env.TWITCH_CLIENT_ID ? "SET" : "NOT SET
 console.log("TWITCH_CLIENT_SECRET:", process.env.TWITCH_CLIENT_SECRET ? "SET" : "NOT SET");
 console.log("TWITCH_TOKEN_URL:", process.env.TWITCH_TOKEN_URL ? "SET" : "NOT SET");
 console.log("RAWG_API_KEY:", process.env.RAWG_API_KEY ? "SET" : "NOT SET");
+console.log("STEAM_API_KEY", process.env.STEAM_API_KEY ? "SET" :"NOT SET");
 console.log("MONGODB_URI:", process.env.MONGODB_URI ? "SET" : "NOT SET");
 
 const openai = new OpenAI({
