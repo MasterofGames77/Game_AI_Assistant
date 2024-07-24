@@ -1,11 +1,11 @@
 import React from "react";
 import useSocket from "../hooks/useSocket";
 
-const hookComponent: React.FC = () => {
+const HookComponent: React.FC = () => {
   const socket = useSocket("http://localhost:3000");
 
   const sendMessage = () => {
-    socket.emit("message", "Hello!");
+    socket.emit("message", "Hello from the client!");
   };
 
   return (
@@ -15,4 +15,4 @@ const hookComponent: React.FC = () => {
   );
 };
 
-export default hookComponent;
+export default HookComponent;
