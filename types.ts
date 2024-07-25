@@ -9,4 +9,5 @@ export interface Conversation {
 export interface SideBarProps {
   userId: string;
   onSelectConversation: (conversation: Conversation) => void;
+  onDeleteConversation: () => void;
 }

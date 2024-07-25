@@ -3,7 +3,11 @@ import axios from "axios";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Conversation, SideBarProps } from "../types";
 
-const Sidebar = ({ userId, onSelectConversation }: SideBarProps) => {
+const Sidebar = ({
+  userId,
+  onSelectConversation,
+  onDeleteConversation,
+}: SideBarProps) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
 
   useEffect(() => {
@@ -23,6 +27,7 @@ const Sidebar = ({ userId, onSelectConversation }: SideBarProps) => {
     try {
       await axios.post(`/api/deleteInteraction`, { id });
       setConversations(conversations.filter((convo) => convo._id !== id));
+      onDeleteConversation();
     } catch (error) {
       console.error("Error deleting conversation:", error);
     }
@@ -392,7 +397,7 @@ const Sidebar = ({ userId, onSelectConversation }: SideBarProps) => {
     const gameTitle = gameTitles.find((title) => question.includes(title));
 
     // Extract context words from the question (first 2-3 significant words)
-    const contextWords = words.slice(0, 8).filter((word) => word.length > 4); // Adjust the slice range and filter condition as needed
+    const contextWords = words.slice(0, 5).filter((word) => word.length > 4); // Adjust the slice range and filter condition as needed
 
     // Combine the game title with context words
     let shortened = `${gameTitle} ${contextWords.join(" ")}`;

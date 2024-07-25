@@ -4,15 +4,49 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import Sidebar from "../components/Sidebar";
 import { Conversation } from "../types"; // Adjust the import path as necessary
+import { v4 as uuidv4 } from "uuid";
 
 export default function Home() {
   const [question, setQuestion] = useState("");
   const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [userId, setUserId] = useState("user123"); // Hardcoded for demonstration, replace with actual user ID logic
+  const [userId, setUserId] = useState<string | null>(null); // Initialize userId as null
   const [selectedConversation, setSelectedConversation] =
     useState<Conversation | null>(null); // Ensure correct type
+  const [conversations, setConversations] = useState<Conversation[]>([]); // Track conversations
+
+  // Prompt user for userId or generate a new one
+  useEffect(() => {
+    let storedUserId = localStorage.getItem("userId");
+    if (!storedUserId || storedUserId === "null") {
+      storedUserId = prompt("Enter your user ID or create a new one:");
+      if (!storedUserId) {
+        storedUserId = uuidv4();
+        alert(
+          `Your new user ID is: ${storedUserId}. Please save it for future use.`
+        );
+      }
+      localStorage.setItem("userId", storedUserId);
+    }
+    setUserId(storedUserId);
+  }, [userId]); // Add userId as a dependency
+
+  // Fetch conversations when userId changes
+  useEffect(() => {
+    if (userId) {
+      fetchConversations();
+    }
+  }, [userId]);
+
+  const fetchConversations = async () => {
+    try {
+      const res = await axios.get(`/api/getConversation?userId=${userId}`);
+      setConversations(res.data);
+    } catch (error) {
+      console.error("Error fetching conversations:", error);
+    }
+  };
 
   useEffect(() => {
     if (selectedConversation) {
@@ -32,6 +66,7 @@ export default function Home() {
       const res = await axios.post("/api/assistant", { userId, question });
       console.log("Response from server:", res.data);
       setResponse(res.data.answer); // Set the response state with the server's answer
+      fetchConversations(); // Refresh conversations list
     } catch (error) {
       console.error("Error submitting form:", error); // Log any errors
       setError("There was an error processing your request. Please try again."); // Set error state
@@ -45,6 +80,18 @@ export default function Home() {
     setResponse("");
     setError("");
     setSelectedConversation(null); // Clear selected conversation
+  };
+
+  const handleDeleteConversation = () => {
+    handleClear(); // Clear the input and response fields
+    fetchConversations(); // Refresh the conversation list
+  };
+
+  const handleResetUserId = () => {
+    localStorage.removeItem("userId");
+    setUserId(null);
+    setConversations([]);
+    handleClear();
   };
 
   const formatResponse = (response: string) => {
@@ -70,44 +117,60 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex">
-      <Sidebar userId={userId} onSelectConversation={setSelectedConversation} />
-      <div className="flex-1 flex flex-col items-center justify-center py-2">
-        <h1 className="text-4xl font-bold mb-6">Video Game Wingman</h1>
-        <form onSubmit={handleSubmit} className="w-full max-w-md">
-          <input
-            type="text"
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Enter your gameplay data or question for analysis"
-            className="w-full p-2 border border-gray-300 rounded mb-4"
+      {userId ? (
+        <>
+          <Sidebar
+            userId={userId}
+            onSelectConversation={setSelectedConversation}
+            onDeleteConversation={handleDeleteConversation} // Pass delete handler
           />
-          <div className="flex space-x-4">
+          <div className="flex-1 flex flex-col items-center justify-center py-2">
+            <h1 className="text-4xl font-bold mb-6">Video Game Wingman</h1>
+            <form onSubmit={handleSubmit} className="w-full max-w-md">
+              <input
+                type="text"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                placeholder="Enter your gameplay data or question for analysis"
+                className="w-full p-2 border border-gray-300 rounded mb-4"
+              />
+              <div className="flex space-x-4">
+                <button
+                  type="submit"
+                  className="w-full p-2 bg-blue-500 text-white rounded"
+                >
+                  Submit
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="w-full p-2 bg-red-500 text-white rounded"
+                >
+                  Clear
+                </button>
+              </div>
+            </form>
             <button
-              type="submit"
-              className="w-full p-2 bg-blue-500 text-white rounded"
+              onClick={handleResetUserId}
+              className="mt-4 p-2 bg-yellow-500 text-white rounded"
             >
-              Submit
+              Reset User ID
             </button>
-            <button
-              type="button"
-              onClick={handleClear}
-              className="w-full p-2 bg-red-500 text-white rounded"
-            >
-              Clear
-            </button>
+            {loading && <div className="spinner mt-4"></div>}
+            {error && <div className="mt-4 text-red-500">{error}</div>}
+            {response && (
+              <div className="mt-8 w-full max-w-3xl">
+                <h2 className="text-2xl font-bold">Response</h2>
+                <div className="bg-gray-100 p-4 rounded response-box">
+                  {formatResponse(response)}
+                </div>
+              </div>
+            )}
           </div>
-        </form>
-        {loading && <div className="spinner mt-4"></div>}
-        {error && <div className="mt-4 text-red-500">{error}</div>}
-        {response && (
-          <div className="mt-8 w-full max-w-3xl">
-            <h2 className="text-2xl font-bold">Response</h2>
-            <div className="bg-gray-100 p-4 rounded response-box">
-              {formatResponse(response)}
-            </div>
-          </div>
-        )}
-      </div>
+        </>
+      ) : (
+        <p>Loading user ID...</p>
+      )}
     </div>
   );
 }
