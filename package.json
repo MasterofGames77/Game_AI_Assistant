@@ -2,11 +2,13 @@
   "name": "ai_assistant_nextjs",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node testConnection.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.1",
@@ -28,7 +30,6 @@
     "uuid": "^10.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.14.12",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@types/uuid": "^10.0.0",
