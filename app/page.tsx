@@ -94,6 +94,13 @@ export default function Home() {
     handleClear();
   };
 
+  const handleTwitchAuth = () => {
+    window.open(
+      "https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=zqfnjt4w34tlrxpmv4qprz5m41aqfo&redirect_uri=http://localhost:3000/api/callback&scope=user:read:email",
+      "_blank"
+    );
+  };
+
   const formatResponse = (response: string) => {
     const sentences = response.split("\n").map((sentence) => sentence.trim());
     let stepCounter = 1;
@@ -150,6 +157,12 @@ export default function Home() {
                 </button>
               </div>
             </form>
+            <button
+              onClick={handleTwitchAuth}
+              className="mt-4 p-2 bg-purple-500 text-white rounded"
+            >
+              Login with Twitch
+            </button>
             <button
               onClick={handleResetUserId}
               className="mt-4 p-2 bg-yellow-500 text-white rounded"

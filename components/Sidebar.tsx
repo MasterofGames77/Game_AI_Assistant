@@ -34,10 +34,28 @@ const Sidebar = ({
   };
 
   const shortenQuestion = (question: string): string => {
-    // Split the question into words
-    const words = question.split(" ");
+    const keywords = [
+      "release",
+      "complete",
+      "unlock",
+      "time",
+      "finish",
+      "strategy",
+    ];
+    const titlePattern = new RegExp(keywords.join("|"), "i");
+    const match = question.match(titlePattern);
 
-    // Find the index of the game title
+    let context = match ? match[0] : "Question";
+    let title = question.split(/\s+/).slice(0, 5).join(" "); // Get first few words for more context
+
+    // Try to extract the game or significant subject from the question
+    let gameTitle = extractGameTitle(question);
+    let summary = gameTitle ? `${gameTitle}: ${context}` : `${title}`;
+
+    return summary.length > 50 ? `${summary.substring(0, 47)}...` : summary;
+  };
+
+  const extractGameTitle = (question: string): string | null => {
     const gameTitles = [
       "A Hat in Time",
       "Ace Attorney",
@@ -306,6 +324,7 @@ const Sidebar = ({
       "SOCOM",
       "Sonic the Hedgehog",
       "Soulcalibur",
+      "Soulcalibur 2",
       "Space Channel 5",
       "Spider-Man",
       "Splatoon",
@@ -313,6 +332,8 @@ const Sidebar = ({
       "Stardew Valley",
       "StarCraft",
       "Star Fox",
+      "Star Fox 64",
+      "Star Fox Assault",
       "Star Ocean",
       "Star Wars",
       "State of Decay",
@@ -321,11 +342,22 @@ const Sidebar = ({
       "Strider",
       "Stumble Guys",
       "Subway Surfers",
-      "Super Mario",
+      "Super Mario Bros.",
+      "Super Mario World",
+      "Super Mario 64",
+      "Super Mario Sunshine",
+      "Super Mario Galaxy",
+      "Super Mario Odyssey",
+      "Super Mario Bros. Wonder",
       "Super Meat Boy",
       "Super Mega Baseball",
       "Super Monkey Ball",
-      "Super Smash Bros",
+      "Super Smash Bros.",
+      "Super Smash Bros. Melee",
+      "Super Smash Bros. Brawl",
+      "Super Smash Bros. for Wii U",
+      "Super Smash Bros. for Nintendo 3DS",
+      "Super Smash Bros. Ultimate",
       "Syndicate",
       "System Shock",
       "Tak",
@@ -339,6 +371,22 @@ const Sidebar = ({
       "The Binding of Issac",
       "The Elder Scrolls",
       "The Legend of Zelda",
+      "The Legend of Zelda: A Link to the Past",
+      "The Legend of Zelda: Ocarina of Time",
+      "The Legend of Zelda: Majora's Mask",
+      "The Legend of Zelda: The Wind Waker",
+      "The Legend of Zelda: Twilight Princess",
+      "The Legend of Zelda: Skyward Sword",
+      "The Legend of Zelda: Breath of the Wild",
+      "The Legend of Zelda: Tears of the Kingdom",
+      "The Legend of Zelda: Link's Awakening",
+      "The Legend of Zelda: Four Swords",
+      "The Legend of Zelda: The Minish Cap",
+      "The Legend of Zelda: Oracle of Seasons",
+      "The Legend of Zelda: Oracle of Ages",
+      "The Legend of Zelda: Phantom Hourglass",
+      "The Legend of Zelda: Spirit Tracks",
+      "The Legend of Zelda: A Link Between Worlds",
       "The Last of Us",
       "The Sims",
       "The Stanley Parable",
@@ -383,6 +431,9 @@ const Sidebar = ({
       "X-COM",
       "X-Men",
       "Xenoblade Chronicles",
+      "Xenoblade Chronicles 2",
+      "Xenoblade Chronicles 3",
+      "Xenoblade Chronicles X",
       "Xenogears",
       "Xenosaga",
       "Yakuza",
@@ -394,18 +445,7 @@ const Sidebar = ({
       "Zone of the Enders",
       "Zoo Tycoon",
     ]; // Add more game titles as needed
-    const gameTitle = gameTitles.find((title) => question.includes(title));
-
-    // Extract context words from the question (first 2-3 significant words)
-    const contextWords = words.slice(0, 5).filter((word) => word.length > 4); // Adjust the slice range and filter condition as needed
-
-    // Combine the game title with context words
-    let shortened = `${gameTitle} ${contextWords.join(" ")}`;
-
-    // Ensure the length is reasonable
-    return shortened.length > 50
-      ? `${shortened.substring(0, 47)}...`
-      : shortened;
+    return gameTitles.find((title) => question.includes(title)) || null;
   };
 
   return (

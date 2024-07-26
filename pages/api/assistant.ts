@@ -3,7 +3,7 @@ import axios from 'axios';
 import connectToMongoDB from '../../utils/mongodb';
 import Question from '../../models/Question';
 import { getChatCompletion, fetchRecommendations, analyzeUserQuestions } from '../../utils/aiHelper';
-import { getAccessToken, getTwitchUserData, redirectToTwitch } from './twitchAuth';
+import { getAccessToken, getTwitchUserData, redirectToTwitch } from '../../utils/twitchAuth';
 import OpenAI from 'openai';
 import path from 'path';
 import { readCSVFile } from '@/utils/csvHelper';
