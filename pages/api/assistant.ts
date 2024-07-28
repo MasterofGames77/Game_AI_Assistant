@@ -158,10 +158,10 @@ const checkAndUpdateGameInfo = async (question: string, answer: string): Promise
 };
 
 const genreMapping: { [key: string]: string } = {
-  "Xenoblade Chronicles": "Action RPG",
-  "Devil May Cry 3": "Hack and Slash",
+  "Xenoblade Chronicles 3": "Action RPG",
+  "Devil May Cry 5": "Hack and Slash",
   "Fortnite": "Battle Royale",
-  "The Legend of Zelda": "Adventure",
+  "The Legend of Zelda: Ocarina of Time": "Adventure",
   "Super Mario 64": "Platformer",
   "Resident Evil 2": "Survival Horror",
   "Splatoon 2": "Third-Person Shooter",
