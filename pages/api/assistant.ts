@@ -6,7 +6,8 @@ import { getChatCompletion, fetchRecommendations, analyzeUserQuestions } from '.
 import { getAccessToken, getTwitchUserData, redirectToTwitch } from '../../utils/twitchAuth';
 import OpenAI from 'openai';
 import path from 'path';
-import { readCSVFile } from '@/utils/csvHelper';
+import { readFile } from 'fs/promises';
+import { parse } from 'csv-parse/sync';
 
 console.log("Environment Variables:");
 console.log("OPENAI_API_KEY:", process.env.OPENAI_API_KEY ? "SET" : "NOT SET");
@@ -32,12 +33,40 @@ const filterAndFormatGameData = (games: any[], query: string) => {
     }));
 };
 
+const CSV_FILE_PATH = path.join(process.cwd(), 'data/Video Games Data.csv');
+
+const readCSVFile = async (filePath: string) => {
+  const fileContent = await readFile(filePath, 'utf8');
+  return parse(fileContent, { columns: true });
+};
+
+const getCSVData = async () => {
+  try {
+    const data = await readCSVFile(CSV_FILE_PATH);
+    return data;
+  } catch (error) {
+    console.error('Error reading CSV file:', error);
+    throw new Error('Failed to read CSV file');
+  }
+};
+
+const formatReleaseDate = (dateString: string): string => {
+  const [day, month, year] = dateString.split('-');
+  return `${month}/${day}/${year}`;
+};
+
+const formatGameInfo = (gameInfo: any): string => {
+  const formattedReleaseDate = formatReleaseDate(gameInfo.release_date);
+  return `${gameInfo.title} was released on ${formattedReleaseDate} for ${gameInfo.console}. It is a ${gameInfo.genre} game developed by ${gameInfo.developer} and published by ${gameInfo.publisher}.`;
+};
+
 interface IGDBGame {
   name: string;
   release_dates?: { date: string }[];
   genres?: { name: string }[];
   platforms?: { name: string }[];
-  url?: string; // This property might not exist, so we mark it as optional
+  involved_companies?: { company: { name: string }, publisher: boolean, developer: boolean }[];
+  url?: string;
 }
 
 const fetchGamesFromIGDB = async (query: string): Promise<string | null> => {
@@ -46,19 +75,22 @@ const fetchGamesFromIGDB = async (query: string): Promise<string | null> => {
     'Client-ID': process.env.TWITCH_CLIENT_ID,
     'Authorization': `Bearer ${accessToken}`
   };
-  const body = `fields name,genres.name,platforms.name,release_dates.date,url; search "${query}"; limit 10;`;
+  const body = `fields name,genres.name,platforms.name,release_dates.date,involved_companies.company.name,involved_companies.publisher,involved_companies.developer,url; search "${query}"; limit 10;`;
 
   try {
     const response = await axios.post('https://api.igdb.com/v4/games', body, { headers });
+    console.log("IGDB API Response:", response.data); // Log the IGDB response data
     if (response.data.length > 0) {
       const games = response.data.map((game: IGDBGame) => ({
         name: game.name,
         releaseDate: game.release_dates?.[0]?.date,
         genres: game.genres?.map((genre) => genre.name).join(', '),
         platforms: game.platforms?.map((platform) => platform.name).join(', '),
+        developers: game.involved_companies?.filter((company) => company.developer).map((company) => company.company.name).join(', '),
+        publishers: game.involved_companies?.filter((company) => company.publisher).map((company) => company.company.name).join(', '),
         url: game.url || 'URL not available'
       }));
-      return games.map((game: { name: string; releaseDate: string | number | Date; genres: string; platforms: string; url: string }) => `${game.name} (Released: ${game.releaseDate ? new Date(game.releaseDate).toLocaleDateString() : 'N/A'}, Genres: ${game.genres}, Platforms: ${game.platforms}, URL: ${game.url})`).join('\n');
+      return games.map((game: { name: string; releaseDate: string | number | Date; genres: string; platforms: string; developers: string; publishers: string; url: string }) => `${game.name} (Released: ${game.releaseDate ? new Date(game.releaseDate).toLocaleDateString() : 'N/A'}, Genres: ${game.genres}, Platforms: ${game.platforms}, Developers: ${game.developers}, Publishers: ${game.publishers}, URL: ${game.url})`).join('\n');
     } else {
       return `No games found related to ${query}.`;
     }
@@ -81,6 +113,7 @@ const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
 
   try {
     const response = await axios.get(url);
+    console.log("RAWG API Response:", response.data); // Log the RAWG response data
     if (response.data && response.data.results.length > 0) {
       const games = response.data.results.map((game: RAWGGame) => ({
         name: game.name,
@@ -133,50 +166,49 @@ const fetchDataFromBothAPIs = async (gameName: string): Promise<string> => {
   }
 };
 
-const CSV_FILE_PATH = path.join(process.cwd(), 'data/Video Games Data.csv');
-
-const getCSVData = async () => {
-  try {
-    const data = await readCSVFile(CSV_FILE_PATH);
-    return data;
-  } catch (error) {
-    console.error("Error reading CSV file:", error);
-    throw new Error('Failed to read CSV file');
-  }
-};
-
 const checkAndUpdateGameInfo = async (question: string, answer: string): Promise<string> => {
-  if (question.toLowerCase().includes("xenoblade chronicles 3")) {
-    const combinedResponse = await fetchDataFromBothAPIs("Xenoblade Chronicles 3");
+  const gameName = question.replace(/when (was|did) (.*?) (released|come out)/i, "$2").trim();
+  console.log("Extracted game name:", gameName); // Log the extracted game name
+  const combinedResponse = await fetchDataFromBothAPIs(gameName);
+  console.log("Combined API response:", combinedResponse); // Log the combined API response
 
-    if (!combinedResponse.includes("No relevant game information found")) {
-      return `Xenoblade Chronicles 3 was released on Nintendo Switch on July 29, 2022. It is an Action Role-Playing game developed by Monolith Soft and Published by Nintendo. It is an installment in the open-world Xenoblade Chronicles series, itself a part of the larger Xeno franchise. The game depicts the futures of the worlds featured in Xenoblade Chronicles (2010) and Xenoblade Chronicles 2 (2017) and concludes the trilogy's narrative.\n\nAdditional Information:\n${combinedResponse}`;
+  if (!combinedResponse.includes("No relevant game information found")) {
+    const csvData = await getCSVData();
+    const gameInfo = csvData.find((game: any) => game.title.toLowerCase() === gameName.toLowerCase());
+    console.log("Game Info from CSV:", gameInfo); // Log the game info from CSV
+
+    if (gameInfo) {
+      const formattedDate = new Date(gameInfo.release_date).toLocaleDateString('en-US');
+      return `${gameInfo.title} was released on ${formattedDate} for ${gameInfo.console}. It is an ${gameInfo.genre} game developed by ${gameInfo.developer} and published by ${gameInfo.publisher}.\n\nAdditional Information:\n${combinedResponse}`;
+    } else {
+      return answer;
     }
+  } else {
+    return answer;
   }
-
-  return answer;
 };
 
 const genreMapping: { [key: string]: string } = {
   "Xenoblade Chronicles 3": "Action RPG",
+  "Final Fantasy VII": "Role-Playing Game",
   "Devil May Cry 5": "Hack and Slash",
   "Fortnite": "Battle Royale",
   "The Legend of Zelda: Ocarina of Time": "Adventure",
   "Super Mario 64": "Platformer",
-  "Resident Evil 2": "Survival Horror",
+  "Resident Evil 4": "Survival Horror",
   "Splatoon 2": "Third-Person Shooter",
   "Castlevania: Symphony of the Night": "Metroidvania",
   "Bioshock Infinite": "First-Person Shooter",
   "Minecraft": "Sandbox",
   "Hades": "Roguelike",
-  "The Last of Us": "Action-Adventure",
+  "Grand Theft Auto V": "Action-Adventure",
   "Animal Crossing": "Social Simulation",
   "World of Warcraft": "Massively Multiplayer Online Role-Playing Game",
   "Dota 2": "Multiplayer Online Battle Arena",
   "Braid": "Puzzle-Platformer",
-  "Super Smash Bros. Brawl": "Fighting Game",
+  "Super Smash Bros. Ultimate": "Fighting Game",
   "Fire Emblem: Awakening": "Tactical Role-Playing Game",
-  "Plants vs. Zombies": "Tower Defense",
+  "Bloons TD 6": "Tower Defense",
   "Forza Horizon 5": "Racing",
   "Mario Kart 8": "Kart Racing",
   "Star Fox": "Rail Shooter",
@@ -184,13 +216,14 @@ const genreMapping: { [key: string]: string } = {
   "Gunstar Heroes": "Run and Gun",
   "Advance Wars": "Turn-Based Strategy",
   "Sid Meier's Civilization VI": "4X",
+  "Hotline Miami": "Top-down Shooter",
   "Fifa 18": "Sports",
   "Super Mario Party": "Party",
   "Guitar Hero": "Rhythm",
   "Five Night's at Freddy's": "Point and Click",
   "Phoenix Wright: Ace Attorney": "Visual Novel",
   "Command & Conquer": "Real Time Strategy",
-  "Streets of Rage 2": "Beat 'em up",
+  "Streets of Rage 4": "Beat 'em up",
   "Tetris": "Puzzle",
   "XCOM: Enemy Unknown": "Turn-Based Tactics",
   "The Stanley Parable": "Interactive Story",
@@ -201,7 +234,8 @@ const genreMapping: { [key: string]: string } = {
   "Yu-Gi-Oh! Master Duel": "Digital Collectible Card Game",
   "Wii Fit": "Exergaming",
   "Deathloop": "Immersive Sim",
-  "Bejeweled": "Tile-Matching"
+  "Bejeweled": "Tile-Matching",
+  "Shellshock Live": "Artillery"
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -229,19 +263,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } else {
         answer = "I couldn't determine your preferences based on your previous questions.";
       }
-    } else if (question.toLowerCase().includes("xenoblade chronicles 3")) {
-      // Check and update game info using CSV data
-      const csvData = await getCSVData();
-      const gameInfo = csvData.find(game => game.title.toLowerCase() === "xenoblade chronicles 3");
-      if (gameInfo) {
-        answer = `Title: ${gameInfo.title}, Platform: ${gameInfo.platform}, Release Year: ${gameInfo.release_year}, Genre: ${gameInfo.genre}, Publisher: ${gameInfo.publisher}`;
+    } else if (question.toLowerCase().includes("when was") || question.toLowerCase().includes("when did")) {
+      answer = await getChatCompletion(question);
+      if (answer) {
+        answer = await checkAndUpdateGameInfo(question, answer);
       } else {
-        answer = await getChatCompletion(question);
-        if (answer) {
-          answer = await checkAndUpdateGameInfo(question, answer);
-        } else {
-          answer = "I'm sorry, I couldn't generate a response. Please try again.";
-        }
+        answer = "I'm sorry, I couldn't generate a response. Please try again.";
       }
     } else if (question.toLowerCase().includes("twitch user data")) {
       if (!code) {
