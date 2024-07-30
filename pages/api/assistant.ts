@@ -181,7 +181,7 @@ const genreMapping: { [key: string]: string } = {
   "Devil May Cry 5": "Hack and Slash",
   "Fortnite": "Battle Royale",
   "The Legend of Zelda: Ocarina of Time": "Adventure",
-  "Super Mario 64": "Platformer",
+  "Super Mario Galaxy": "Platformer",
   "Resident Evil 4": "Survival Horror",
   "Splatoon 2": "Third-Person Shooter",
   "Castlevania: Symphony of the Night": "Metroidvania",
@@ -225,6 +225,15 @@ const genreMapping: { [key: string]: string } = {
   "Shellshock Live": "Artillery"
 };
 
+const getGenreFromMapping = (gameTitle: string): string | null => {
+  return genreMapping[gameTitle] || null;
+};
+
+const extractGameTitle = (question: string): string => {
+  const match = question.match(/(?:guide|walkthrough|progress|unlock|strategy|find).*?\s(.*?)(?:\s(?:chapter|level|stage|part|area|boss|item|character|section))/i);
+  return match ? match[1].trim() : '';
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { userId, question, code } = req.body;
 
@@ -266,6 +275,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const userData = await getTwitchUserData(accessToken);
         answer = `Twitch User Data: ${JSON.stringify(userData)}`;
       }
+    } else if (question.toLowerCase().includes("genre")) {
+      const gameTitle = extractGameTitle(question); // Implement this function to extract game title from question
+      const genre = getGenreFromMapping(gameTitle);
+      if (genre) {
+        answer = `${gameTitle} is categorized as ${genre}.`;
+      } else {
+        answer = `I couldn't find genre information for ${gameTitle}.`;
+      }
     } else {
       answer = await getChatCompletion(question);
 
@@ -289,4 +306,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error("Error in API route:", error.message);
     res.status(500).json({ error: error.message });
   }
-}
+};
