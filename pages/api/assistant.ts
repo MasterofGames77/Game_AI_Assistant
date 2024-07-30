@@ -21,18 +21,6 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const filterAndFormatGameData = (games: any[], query: string) => {
-  return games
-    .filter((game: any) => game.name.toLowerCase().includes(query.toLowerCase()))
-    .map((game: any) => ({
-      name: game.name,
-      released: game.released ? new Date(game.released).toLocaleDateString() : 'N/A',
-      genres: game.genres?.map((genre: any) => genre.name).join(', ') || 'Genres not available',
-      platforms: game.platforms?.map((platform: any) => platform.platform?.name).join(', ') || 'Platforms not available',
-      url: game.url || 'URL not available',
-    }));
-};
-
 const CSV_FILE_PATH = path.join(process.cwd(), 'data/Video Games Data.csv');
 
 const readCSVFile = async (filePath: string) => {
@@ -178,8 +166,7 @@ const checkAndUpdateGameInfo = async (question: string, answer: string): Promise
     console.log("Game Info from CSV:", gameInfo); // Log the game info from CSV
 
     if (gameInfo) {
-      const formattedDate = new Date(gameInfo.release_date).toLocaleDateString('en-US');
-      return `${gameInfo.title} was released on ${formattedDate} for ${gameInfo.console}. It is an ${gameInfo.genre} game developed by ${gameInfo.developer} and published by ${gameInfo.publisher}.\n\nAdditional Information:\n${combinedResponse}`;
+      return `${formatGameInfo(gameInfo)}\n\nAdditional Information:\n${combinedResponse}`;
     } else {
       return answer;
     }
