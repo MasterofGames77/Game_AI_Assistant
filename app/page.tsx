@@ -101,6 +101,13 @@ export default function Home() {
     );
   };
 
+  // Handle Steam login
+  const handleSteamAuth = () => {
+    const steamLoginUrl = `https://steamcommunity.com/openid/login?openid.ns=http://specs.openid.net/auth/2.0&openid.mode=checkid_setup&openid.return_to=http://localhost:3000/api/steamCallback&openid.realm=http://localhost:3000&openid.identity=http://specs.openid.net/auth/2.0/identifier_select`;
+
+    window.open(steamLoginUrl, "_blank");
+  };
+
   const formatResponse = (response: string) => {
     const sentences = response.split("\n").map((sentence) => sentence.trim());
     let stepCounter = 1;
@@ -162,6 +169,12 @@ export default function Home() {
               className="mt-4 p-2 bg-purple-500 text-white rounded"
             >
               Login with Twitch
+            </button>
+            <button
+              onClick={handleSteamAuth} // This button triggers Steam login
+              className="mt-4 p-2 bg-green-500 text-white rounded"
+            >
+              Login with Steam
             </button>
             <button
               onClick={handleResetUserId}

@@ -9,7 +9,6 @@ const Sidebar = ({
   onDeleteConversation,
 }: SideBarProps) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [gameTitles, setGameTitles] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchConversations = async () => {
@@ -23,30 +22,6 @@ const Sidebar = ({
 
     fetchConversations();
   }, [userId]);
-
-  // Fetch game titles from the CSV file or databases
-  useEffect(() => {
-    const fetchGameTitles = async () => {
-      try {
-        const res = await axios.get(`/api/getGameTitles`);
-        setGameTitles(res.data);
-      } catch (error) {
-        console.error("Error fetching game titles:", error);
-      }
-    };
-
-    fetchGameTitles();
-  }, []);
-
-  const handleDelete = async (id: string) => {
-    try {
-      await axios.post(`/api/deleteInteraction`, { id });
-      setConversations(conversations.filter((convo) => convo._id !== id));
-      onDeleteConversation();
-    } catch (error) {
-      console.error("Error deleting conversation:", error);
-    }
-  };
 
   const shortenQuestion = (question: string): string => {
     const keywords = [
@@ -66,27 +41,30 @@ const Sidebar = ({
       "100%",
       "character",
       "class",
+      "search",
+      "fast",
     ];
+
     const titlePattern = new RegExp(keywords.join("|"), "i");
     const match = question.match(titlePattern);
 
-    let context = match ? match[0] : "Question";
-    let title = question.split(/\s+/).slice(0, 8).join(" "); // Get first few words for more context
+    let context = match ? match[0] : null; // Capture the context if found
+    let title = question.split(/\s+/).slice(0, 8).join(" "); // Get the first few words of the question
 
-    // Try to extract the game or significant subject from the question
-    let gameTitle = extractGameTitle(question);
-    let summary = gameTitle ? `${gameTitle}: ${context}` : `${title}`;
+    // Create the summary based on whether a context is found or not
+    let summary = context ? title : title; // Only use the title if context is null
 
     return summary.length > 50 ? `${summary.substring(0, 47)}...` : summary;
   };
 
-  const extractGameTitle = (question: string): string | null => {
-    for (let title of gameTitles) {
-      if (question.toLowerCase().includes(title.toLowerCase())) {
-        return title;
-      }
+  const handleDelete = async (id: string) => {
+    try {
+      await axios.post(`/api/deleteInteraction`, { id });
+      setConversations(conversations.filter((convo) => convo._id !== id));
+      onDeleteConversation();
+    } catch (error) {
+      console.error("Error deleting conversation:", error);
     }
-    return null;
   };
 
   return (
