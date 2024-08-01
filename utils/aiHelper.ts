@@ -125,15 +125,34 @@ function filterGameSeries(games: any[], seriesPrefix: string): any[] {
 // Get chat completion for user questions
 export const getChatCompletion = async (question: string): Promise<string | null> => {
   try {
-    let response: string | null = null;
+    if (question.toLowerCase().includes("list all of the games in the")) {
+      const seriesTitle = extractSeriesName(question);
+      if (seriesTitle) {
+        let games = await fetchSeriesFromIGDB(seriesTitle);
+        if (!games) {
+          games = await fetchSeriesFromRAWG(seriesTitle);
+        }
 
-    // Handle specific game queries
-    if (question.toLowerCase().includes("released")) {
-      response = await fetchFromIGDB(question);
-      if (!response) {
-        response = await fetchFromRAWG(question);
+        if (games && games.length > 0) {
+          const filteredGames = filterGameSeries(games, seriesTitle);
+          if (filteredGames.length > 0) {
+            const gameList = filteredGames.map((game, index) => 
+              `${index + 1}. ${game.name} (Released: ${game.release_dates ? new Date(game.release_dates[0].date * 1000).toLocaleDateString() : "Unknown release date"}, Platforms: ${game.platforms ? game.platforms.map((p: any) => p.name).join(", ") : "Unknown platforms"})`
+            );
+            return gameList.join("\n");
+          }
+        }
+        return "Sorry, I couldn't find any information about that series.";
+      } else {
+        return "Sorry, I couldn't identify the series name from your question.";
       }
     }
+
+    let response = await fetchFromIGDB(question);
+    if (!response) {
+      response = await fetchFromRAWG(question);
+    }
+
 
     // If no response from APIs, fall back to OpenAI completion
     if (!response) {
