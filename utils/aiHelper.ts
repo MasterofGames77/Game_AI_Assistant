@@ -1,5 +1,8 @@
 import axios from 'axios';
 import OpenAI from 'openai';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -17,16 +20,17 @@ export const getChatCompletion = async (question: string): Promise<string | null
     });
     return completion.choices[0].message.content;
   } catch (error: any) {
-    throw new Error('Failed to get completion from OpenAI');
+    console.error('Failed to get completion from OpenAI:', error.message);
+    return null;
   }
-};
-
-const genreMapping: { [key: string]: string } = {
-  // ... (genreMapping object remains unchanged)
 };
 
 export const analyzeUserQuestions = (questions: Array<{ question: string, response: string }>): string[] => {
   const genres: { [key: string]: number } = {};
+
+  const genreMapping: { [key: string]: string } = {
+    // Add your genre mappings here
+  };
 
   questions.forEach(({ question }) => {
     Object.keys(genreMapping).forEach(keyword => {

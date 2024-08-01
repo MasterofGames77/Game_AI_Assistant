@@ -2,7 +2,6 @@ import { createServer } from "http";
 import { parse, UrlWithParsedQuery } from "url";
 import next, { NextApiRequest, NextApiResponse } from "next";
 import { initSocket } from "./middleware/realtime";
-import { setupOpenAIAssistant } from "./utils/assistantSetup";
 
 const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev });
@@ -19,24 +18,6 @@ app.prepare().then(async () => {
 
   // Initialize the Socket.IO server
   initSocket(server);
-
-  // Define the assistant's prompt
-  const prompt = `
-    You are an AI assistant specializing in video games. Your main role is to provide detailed analytics and insights into gameplay, help players track their progress, and offer advice on improving their skills.
-    You can answer questions about game completion times, strategies to progress past difficult sections, the fastest speedrun times, and provide general tips and tricks.
-  `;
-
-  // Call the setup function for the AI Assistant
-  try {
-    const assistant = await setupOpenAIAssistant(prompt);
-    if (assistant) {
-      console.log("> Assistant created successfully.");
-    } else {
-      console.error("> Failed to create assistant.");
-    }
-  } catch (error) {
-    console.error("> Error setting up assistant:", error);
-  }
 
   // Start the server
   server.listen(3000, () => {
