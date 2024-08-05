@@ -187,7 +187,7 @@ const checkAndUpdateGameInfo = async (question: string, answer: string): Promise
   const combinedResponse = await fetchDataFromBothAPIs(gameName);
   console.log("Combined API response:", combinedResponse); // Log the combined API response
 
-  if (!combinedResponse.includes("No relevant game information found")) {
+  try {
     const csvData = await getCSVData();
     const gameInfo = csvData.find((game: any) => game.title.toLowerCase() === gameName.toLowerCase());
     console.log("Game Info from CSV:", gameInfo); // Log the game info from CSV
@@ -197,8 +197,9 @@ const checkAndUpdateGameInfo = async (question: string, answer: string): Promise
     } else {
       return answer;
     }
-  } else {
-    return answer;
+  } catch (error) {
+    console.error('CSV Data is unavailable, continuing without it:', error);
+    return `${answer}\n\nAdditional Information:\n${combinedResponse}`;
   }
 };
 
