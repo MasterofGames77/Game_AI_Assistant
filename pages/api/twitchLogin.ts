@@ -1,8 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  const isProduction = process.env.NODE_ENV === 'production';
-  const domain = process.env.NODE_ENV === 'production' ? 'https://game-ai-assistant.vercel.app' : 'http://localhost:3000';
+    const isProduction = process.env.NODE_ENV === 'production';
+    const domain = isProduction ? 'https://game-ai-assistant.vercel.app' : 'http://localhost:3000';
 
   const clientId = process.env.TWITCH_CLIENT_ID || '';
   const redirectUri = `${domain}/api/twitchCallback`;
