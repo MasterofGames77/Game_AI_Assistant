@@ -9,9 +9,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const authUrl = process.env.TWITCH_AUTH_URL || 'https://id.twitch.tv/oauth2/authorize';
   const scopes = process.env.TWITCH_SCOPES || 'user:read:email';
 
-  console.log('isProduction:', isProduction);
-  console.log('Twitch Redirect URI:', redirectUri);
-
   const twitchLoginUrl = `${authUrl}?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}`;
   
   if (!clientId) {
