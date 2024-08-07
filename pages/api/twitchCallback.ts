@@ -2,7 +2,8 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-    console.log('Twitch callback received with query:', req.query); // Log the query parameters
+    // Log the incoming query parameters to debug the issue
+    console.log('Twitch callback received with query:', req.query);
 
     const { code } = req.query;
 
@@ -15,6 +16,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const clientSecret = process.env.TWITCH_CLIENT_SECRET;
     const redirectUri = process.env.TWITCH_REDIRECT_URI;
     const tokenUrl = process.env.TWITCH_TOKEN_URL;
+
+    // Log the environment variables used
+    console.log("Twitch OAuth2 environment variables:", { clientId, clientSecret, redirectUri, tokenUrl });
 
     if (!clientId || !clientSecret || !redirectUri || !tokenUrl) {
         console.error("Missing environment variables for Twitch OAuth2.");
@@ -30,7 +34,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     try {
+        // Log the parameters used in the token request
+        console.log("OAuth token request parameters:", params);
+
         const tokenResponse = await axios.post(tokenUrl, null, { params });
+
+        // Log the entire token response
+        console.log("Access Token Response:", tokenResponse.data);
+
         const { access_token } = tokenResponse.data;
 
         if (!access_token) {
@@ -45,6 +56,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 'Client-Id': clientId
             }
         });
+
+        // Log the user data received from Twitch
+        console.log("Twitch user data response:", userResponse.data);
 
         res.status(200).json(userResponse.data);
     } catch (error) {
