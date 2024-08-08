@@ -6,32 +6,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Discover the OpenID configuration for Steam
         const steamIssuer = await Issuer.discover('https://steamcommunity.com/openid');
 
-        // Create a new OpenID client using the discovered configuration
+        // Create a client instance using the discovered configuration
         const client = new steamIssuer.Client({
-            client_id: process.env.STEAM_OPENID_REALM || 'https://game-ai-assistant.vercel.app', // Set the realm (client ID)
-            redirect_uris: [process.env.STEAM_OPENID_RETURN_URL || 'https://game-ai-assistant.vercel.app/api/steamCallback'], // Set the callback URL
-            response_types: ['id_token'], // Define the response type
+            client_id: process.env.STEAM_OPENID_REALM || 'https://game-ai-assistant.vercel.app', // Realm is the application domain
+            redirect_uris: [process.env.STEAM_OPENID_RETURN_URL || 'https://game-ai-assistant.vercel.app/api/steamCallback'], // Redirect URI after login
+            response_types: ['id_token'], // The type of response expected
         });
 
-        // Ensure the state parameter is handled correctly if it's an array
+        // Handle the state parameter (used to maintain the state between request and callback)
         const state = Array.isArray(req.query.state) ? req.query.state[0] : req.query.state;
 
-        // Extract the parameters from the OpenID callback request
+        // Extract OpenID callback parameters from the request
         const params = client.callbackParams(req);
 
-        // Handle the OpenID callback and retrieve the token set, verifying the state
+        // Check if Steam returned an error in the OpenID response
+        if (req.query.openid_mode === 'error') {
+            console.error('Steam OpenID Error:', req.query);
+            return res.status(400).send('Steam OpenID Error'); // Send a 400 error response if there's an OpenID error
+        }
+
+        // Validate the OpenID response using the client instance and callback parameters
         const tokenSet = await client.callback(process.env.STEAM_OPENID_RETURN_URL || 'https://game-ai-assistant.vercel.app/api/steamCallback', params, { state });
 
-        // Extract the Steam ID from the token set
+        // Extract the Steam ID from the token set claims
         const steamId = tokenSet.claims().sub;
+        console.log(`Steam ID: ${steamId}`); // Log the Steam ID for debugging
 
-        console.log(`Steam ID: ${steamId}`);
-
-        // Redirect the user to a dashboard page with the Steam ID as a query parameter
+        // Redirect the user to a dashboard or other page with the Steam ID as a query parameter
         res.redirect(`/some-dashboard-page?steamId=${steamId}`);
-    } catch (error) {
+    } catch (error: any) { // Handle any errors that occur during the process
         console.error('Error in Steam callback:', error);
-        // Send an internal server error response in case of failure
-        res.status(500).send('Internal Server Error');
+        if (error.response && error.response.data) {
+            console.error('Steam OpenID Response Error:', error.response.data); // Log detailed error information if available
+        }
+        res.status(500).send('Internal Server Error'); // Send a 500 error response for any other issues
     }
 }
