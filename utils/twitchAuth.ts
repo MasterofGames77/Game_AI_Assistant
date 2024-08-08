@@ -7,7 +7,7 @@ let tokenExpiryTime: number | null = null;
 export const getAccessToken = async (code?: string): Promise<string> => {
   const clientId = process.env.TWITCH_CLIENT_ID;
   const clientSecret = process.env.TWITCH_CLIENT_SECRET;
-  const redirectUri = process.env.TWITCH_REDIRECT_URI;
+  const redirectUri = encodeURIComponent(process.env.TWITCH_REDIRECT_URI || '');
   const tokenUrl = process.env.TWITCH_TOKEN_URL;
 
   console.log("Attempting to fetch access token with the following details:", { clientId, clientSecret, redirectUri, tokenUrl });
@@ -67,8 +67,8 @@ export const getTwitchUserData = async (accessToken: string) => {
 
 export const redirectToTwitch = (res: NextApiResponse) => {
   const clientId = process.env.TWITCH_CLIENT_ID;
-  const redirectUri = process.env.TWITCH_REDIRECT_URI;
+  const redirectUri = encodeURIComponent(process.env.TWITCH_REDIRECT_URI || '');
   const scope = process.env.TWITCH_SCOPES;
-  const authorizationUrl = `https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scope}`;
+  const authorizationUrl = `https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${encodeURIComponent(scope || '')}`;
   res.redirect(authorizationUrl);
 };
