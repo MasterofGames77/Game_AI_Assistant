@@ -11,7 +11,7 @@ import { parse } from 'csv-parse/sync';
 
 console.log("Environment Variables:");
 console.log("OPENAI_API_KEY:", process.env.OPENAI_API_KEY ? "SET" : "NOT SET");
-console.log("TWITCH_CLIENT_ID:", process.env.TWITCH_CLIENT_ID ? "SET" : "NOT SET");
+console.log("NEXT_PUBLIC_TWITCH_CLIENT_ID:", process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID ? "SET" : "NOT SET");
 console.log("TWITCH_CLIENT_SECRET:", process.env.TWITCH_CLIENT_SECRET ? "SET" : "NOT SET");
 console.log("TWITCH_TOKEN_URL:", process.env.TWITCH_TOKEN_URL ? "SET" : "NOT SET");
 console.log("RAWG_API_KEY:", process.env.RAWG_API_KEY ? "SET" : "NOT SET");
@@ -61,7 +61,7 @@ interface IGDBGame {
 const fetchGamesFromIGDB = async (query: string): Promise<string | null> => {
   const accessToken = await getAccessToken(); // No argument needed here
   const headers = {
-    'Client-ID': process.env.TWITCH_CLIENT_ID,
+    'Client-ID': process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID,
     'Authorization': `Bearer ${accessToken}`
   };
   const body = `fields name,genres.name,platforms.name,release_dates.date,involved_companies.company.name,involved_companies.publisher,involved_companies.developer,url; search "${query}"; limit 10;`;

@@ -5,7 +5,7 @@ let cachedAccessToken: string | null = null;
 let tokenExpiryTime: number | null = null;
 
 export const getAccessToken = async (code?: string): Promise<string> => {
-  const clientId = process.env.TWITCH_CLIENT_ID;
+  const clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID;
   const clientSecret = process.env.TWITCH_CLIENT_SECRET;
   const redirectUri = encodeURIComponent(process.env.TWITCH_REDIRECT_URI || '');
   const tokenUrl = process.env.TWITCH_TOKEN_URL;
@@ -54,7 +54,7 @@ export const getTwitchUserData = async (accessToken: string) => {
     const response = await axios.get('https://api.twitch.tv/helix/users', {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
-        'Client-Id': process.env.TWITCH_CLIENT_ID,
+        'Client-Id': process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID,
       },
     });
     console.log('Twitch user data response:', response.data);
@@ -66,7 +66,7 @@ export const getTwitchUserData = async (accessToken: string) => {
 };
 
 export const redirectToTwitch = (res: NextApiResponse) => {
-  const clientId = process.env.TWITCH_CLIENT_ID;
+  const clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID;
   const redirectUri = encodeURIComponent(process.env.TWITCH_REDIRECT_URI || '');
   const scope = process.env.TWITCH_SCOPES;
   const authorizationUrl = `https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${encodeURIComponent(scope || '')}`;

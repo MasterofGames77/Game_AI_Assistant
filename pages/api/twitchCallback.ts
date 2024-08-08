@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'No code provided' });
     }
 
-    const clientId = process.env.TWITCH_CLIENT_ID;
+    const clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID;
     const clientSecret = process.env.TWITCH_CLIENT_SECRET;
     const redirectUri = process.env.TWITCH_REDIRECT_URI;
     const tokenUrl = process.env.TWITCH_TOKEN_URL;
