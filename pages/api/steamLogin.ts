@@ -1,10 +1,23 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+import { Issuer, generators } from 'openid-client';
+import type { NextApiRequest, NextApiResponse } from 'next';
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
-    const isProduction = process.env.NODE_ENV === 'production';
-    const domain = isProduction ? 'https://game-ai-assistant.vercel.app' : 'http://localhost:3000';
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    // Discover the OpenID configuration for Steam
+    const steamIssuer = await Issuer.discover('https://steamcommunity.com/openid');
 
-    const steamLoginUrl = `https://steamcommunity.com/openid/login?openid.ns=http://specs.openid.net/auth/2.0&openid.mode=checkid_setup&openid.return_to=${encodeURIComponent(domain + '/api/steamCallback')}&openid.realm=${encodeURIComponent(domain)}&openid.identity=http://specs.openid.net/auth/2.0/identifier_select&openid.claimed_id=http://specs.openid.net/auth/2.0/identifier_select`;
+    // Create a new OpenID client using the discovered configuration
+    const client = new steamIssuer.Client({
+        client_id: process.env.STEAM_OPENID_REALM || 'https://game-ai-assistant.vercel.app', // Set the realm (client ID)
+        redirect_uris: [process.env.STEAM_OPENID_RETURN_URL || 'https://game-ai-assistant.vercel.app/api/steamCallback'], // Set the callback URL
+        response_types: ['id_token'], // Define the response type
+    });
 
-    res.redirect(steamLoginUrl);
+    // Generate the authorization URL with OpenID scope and state parameter
+    const url = client.authorizationUrl({
+        scope: 'openid',
+        state: generators.state(), // Generate a random state to prevent CSRF attacks
+    });
+
+    // Redirect the user to the Steam authorization URL
+    res.redirect(url);
 }

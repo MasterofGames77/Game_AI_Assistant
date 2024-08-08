@@ -1,55 +1,37 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import axios from 'axios';
+import { Issuer } from 'openid-client';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-    console.log('Steam callback received with query:', req.query);
-
-    const { openid_claimed_id, openid_identity } = req.query;
-
-    if (!openid_claimed_id || !openid_identity) {
-        console.error("Missing claimed_id or identity in the OpenID response.");
-        return res.status(400).send('Invalid Steam login attempt');
-    }
-
-    const steamIdMatch = (Array.isArray(openid_claimed_id) ? openid_claimed_id[0] : openid_claimed_id).match(/https:\/\/steamcommunity\.com\/openid\/id\/(\d+)/);
-    if (!steamIdMatch) {
-      return res.status(400).send('Invalid Steam ID');
-    }
-
-    const steamId = steamIdMatch[1];
-
-    // Verify the OpenID response
-    const verifyUrl = `https://steamcommunity.com/openid/login`;
-    const params = {
-      'openid.ns': 'http://specs.openid.net/auth/2.0',
-      'openid.mode': 'check_authentication',
-      'openid.return_to': process.env.STEAM_REDIRECT_URI ?? '',
-      'openid.realm': process.env.STEAM_REALM ?? '',
-      'openid.claimed_id': Array.isArray(openid_claimed_id) ? openid_claimed_id[0] : openid_claimed_id,
-      'openid.identity': Array.isArray(openid_identity) ? openid_identity[0] : openid_identity,
-      ...Object.fromEntries(
-        Object.entries(req.query).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value])
-      ),
-    };
-
-    console.log("Verifying OpenID with params:", params);
-
     try {
-        const verifyResponse = await axios.post(verifyUrl, new URLSearchParams(params).toString(), {
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-        });
-        const isValid = verifyResponse.data.includes('is_valid:true');
+        // Discover the OpenID configuration for Steam
+        const steamIssuer = await Issuer.discover('https://steamcommunity.com/openid');
 
-        if (!isValid) {
-            return res.status(400).send('Steam login verification failed');
-        }
+        // Create a new OpenID client using the discovered configuration
+        const client = new steamIssuer.Client({
+            client_id: process.env.STEAM_OPENID_REALM || 'https://game-ai-assistant.vercel.app', // Set the realm (client ID)
+            redirect_uris: [process.env.STEAM_OPENID_RETURN_URL || 'https://game-ai-assistant.vercel.app/api/steamCallback'], // Set the callback URL
+            response_types: ['id_token'], // Define the response type
+        });
+
+        // Ensure the state parameter is handled correctly if it's an array
+        const state = Array.isArray(req.query.state) ? req.query.state[0] : req.query.state;
+
+        // Extract the parameters from the OpenID callback request
+        const params = client.callbackParams(req);
+
+        // Handle the OpenID callback and retrieve the token set, verifying the state
+        const tokenSet = await client.callback(process.env.STEAM_OPENID_RETURN_URL || 'https://game-ai-assistant.vercel.app/api/steamCallback', params, { state });
+
+        // Extract the Steam ID from the token set
+        const steamId = tokenSet.claims().sub;
 
         console.log(`Steam ID: ${steamId}`);
+
+        // Redirect the user to a dashboard page with the Steam ID as a query parameter
         res.redirect(`/some-dashboard-page?steamId=${steamId}`);
     } catch (error) {
-        console.error('Error handling Steam callback:', error);
+        console.error('Error in Steam callback:', error);
+        // Send an internal server error response in case of failure
         res.status(500).send('Internal Server Error');
     }
 }
