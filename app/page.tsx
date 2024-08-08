@@ -95,15 +95,31 @@ export default function Home() {
   };
 
   const handleTwitchAuth = () => {
-    window.open(
-      "https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=zqfnjt4w34tlrxpmv4qprz5m41aqfo&redirect_uri=http://localhost:3000/api/callback&scope=user:read:email",
-      "_blank"
-    );
+    const domain =
+      process.env.NODE_ENV === "production"
+        ? "https://game-ai-assistant.vercel.app"
+        : "http://localhost:3000";
+
+    const twitchLoginUrl = `https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${
+      process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID
+    }&redirect_uri=${encodeURIComponent(
+      domain + "/api/twitchCallback"
+    )}&scope=user:read:email`;
+
+    window.open(twitchLoginUrl, "_blank");
   };
 
-  // Handle Steam login
   const handleSteamAuth = () => {
-    const steamLoginUrl = `https://steamcommunity.com/openid/login?openid.ns=http://specs.openid.net/auth/2.0&openid.mode=checkid_setup&openid.return_to=http://localhost:3000/api/steamCallback&openid.realm=http://localhost:3000&openid.identity=http://specs.openid.net/auth/2.0/identifier_select`;
+    const domain =
+      process.env.NODE_ENV === "production"
+        ? "https://game-ai-assistant.vercel.app"
+        : "http://localhost:3000";
+
+    const steamLoginUrl = `https://steamcommunity.com/openid/login?openid.ns=http://specs.openid.net/auth/2.0&openid.mode=checkid_setup&openid.return_to=${encodeURIComponent(
+      domain + "/api/steamCallback"
+    )}&openid.realm=${encodeURIComponent(
+      domain
+    )}&openid.identity=http://specs.openid.net/auth/2.0/identifier_select`;
 
     window.open(steamLoginUrl, "_blank");
   };
