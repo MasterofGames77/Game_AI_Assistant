@@ -109,20 +109,21 @@ export default function Home() {
     window.open(twitchLoginUrl, "_blank");
   };
 
-  const handleSteamAuth = () => {
-    const domain =
-      process.env.NODE_ENV === "production"
-        ? "https://game-ai-assistant.vercel.app"
-        : "http://localhost:3000";
+  // Comment out Steam functionality until I can get it working properly.
+  // const handleSteamAuth = () => {
+  //   const domain =
+  //     process.env.NODE_ENV === "production"
+  //       ? "https://game-ai-assistant.vercel.app"
+  //       : "http://localhost:3000";
 
-    const steamLoginUrl = `https://steamcommunity.com/openid/login?openid.ns=http://specs.openid.net/auth/2.0&openid.mode=checkid_setup&openid.return_to=${encodeURIComponent(
-      domain + "/api/steamCallback"
-    )}&openid.realm=${encodeURIComponent(
-      domain
-    )}&openid.identity=http://specs.openid.net/auth/2.0/identifier_select`;
+  //   const steamLoginUrl = `https://steamcommunity.com/openid/login?openid.ns=http://specs.openid.net/auth/2.0&openid.mode=checkid_setup&openid.return_to=${encodeURIComponent(
+  //     domain + "/api/steamCallback"
+  //   )}&openid.realm=${encodeURIComponent(
+  //     domain
+  //   )}&openid.identity=http://specs.openid.net/auth/2.0/identifier_select`;
 
-    window.open(steamLoginUrl, "_blank");
-  };
+  //   window.open(steamLoginUrl, "_blank");
+  // };
 
   const formatResponse = (response: string) => {
     const sentences = response.split("\n").map((sentence) => sentence.trim());
@@ -186,12 +187,12 @@ export default function Home() {
             >
               Login with Twitch
             </button>
-            <button
+            {/* <button
               onClick={handleSteamAuth} // This button triggers Steam login
               className="mt-4 p-2 bg-green-500 text-white rounded"
             >
               Login with Steam
-            </button>
+            </button> */}
             <button
               onClick={handleResetUserId}
               className="mt-4 p-2 bg-yellow-500 text-white rounded"

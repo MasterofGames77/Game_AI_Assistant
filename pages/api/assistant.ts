@@ -129,31 +129,31 @@ const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
   }
 };
 
-const fetchSteamGameDetails = async (gameId: string): Promise<any> => {
-  const apiKey = process.env.STEAM_API_KEY;
+// const fetchSteamGameDetails = async (gameId: string): Promise<any> => {
+//   const apiKey = process.env.STEAM_API_KEY;
 
-  try {
-    const [gameSchema, achievementStats, gameNews] = await Promise.all([
-      axios.get(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${gameId}`),
-      axios.get(`http://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${gameId}&key=${apiKey}`),
-      axios.get(`http://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${gameId}&count=5&maxlength=300`)
-    ]);
+//   try {
+//     const [gameSchema, achievementStats, gameNews] = await Promise.all([
+//       axios.get(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${gameId}`),
+//       axios.get(`http://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${gameId}&key=${apiKey}`),
+//       axios.get(`http://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${gameId}&count=5&maxlength=300`)
+//     ]);
 
-    return {
-      gameSchema: gameSchema.data,
-      achievementStats: achievementStats.data.achievementpercentages.achievements,
-      gameNews: gameNews.data.appnews.newsitems
-    };
-  } catch (error: any) {
-    // Narrow the error type
-    if (error instanceof Error) {
-      console.error("Error fetching data from Steam API:", error.message);
-    } else {
-      console.error("An unexpected error occurred:", error);
-    }
-    return null;
-  }
-};
+//     return {
+//       gameSchema: gameSchema.data,
+//       achievementStats: achievementStats.data.achievementpercentages.achievements,
+//       gameNews: gameNews.data.appnews.newsitems
+//     };
+//   } catch (error: any) {
+//     // Narrow the error type
+//     if (error instanceof Error) {
+//       console.error("Error fetching data from Steam API:", error.message);
+//     } else {
+//       console.error("An unexpected error occurred:", error);
+//     }
+//     return null;
+//   }
+// };
 
 const fetchDataFromBothAPIs = async (gameName: string): Promise<string> => {
   try {
@@ -318,21 +318,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } else {
         answer = `I couldn't find genre information for ${gameTitle}.`;
       }
-    } else if (question.toLowerCase().includes("steam game details")) {
-      const gameId = extractSteamGameId(question);
-      if (gameId) {
-        const steamData = await fetchSteamGameDetails(gameId);
-        if (steamData) {
-          console.log("Steam Game Schema:", steamData.gameSchema);
-          console.log("Steam Achievements:", steamData.achievementStats);
-          console.log("Steam Game News:", steamData.gameNews);
-          answer = `Steam Game Details:\n\nSchema: ${JSON.stringify(steamData.gameSchema)}\n\nAchievements: ${JSON.stringify(steamData.achievementStats)}\n\nNews: ${JSON.stringify(steamData.gameNews)}`;
-        } else {
-          answer = "Failed to fetch Steam game details. Please try again later.";
-        }
-      } else {
-        answer = "I couldn't identify the game ID for the Steam request.";
-      }
+    // } else if (question.toLowerCase().includes("steam game details")) {
+    //   const gameId = extractSteamGameId(question);
+    //   if (gameId) {
+    //     const steamData = await fetchSteamGameDetails(gameId);
+    //     if (steamData) {
+    //       console.log("Steam Game Schema:", steamData.gameSchema);
+    //       console.log("Steam Achievements:", steamData.achievementStats);
+    //       console.log("Steam Game News:", steamData.gameNews);
+    //       answer = `Steam Game Details:\n\nSchema: ${JSON.stringify(steamData.gameSchema)}\n\nAchievements: ${JSON.stringify(steamData.achievementStats)}\n\nNews: ${JSON.stringify(steamData.gameNews)}`;
+    //     } else {
+    //       answer = "Failed to fetch Steam game details. Please try again later.";
+    //     }
+    //   } else {
+    //     answer = "I couldn't identify the game ID for the Steam request.";
+    //   }
     } else {
       answer = await getChatCompletion(question);
 

@@ -1,6 +1,7 @@
 import axios from 'axios';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
+import { getAccessToken } from './twitchAuth';
 
 dotenv.config();
 
@@ -23,19 +24,20 @@ function cleanAndMatchTitle(queryTitle: string, recordTitle: string): boolean {
 // Example IGDB Fetch Function with Improved Filtering
 async function fetchFromIGDB(gameTitle: string): Promise<string | null> {
   try {
+    const accessToken = await getAccessToken(); // Get the access token
+
     const response = await axios.post(
       'https://api.igdb.com/v4/games',
       `fields name,release_dates.date,platforms.name,developers.name,publishers.name; where name ~ "${gameTitle}";`,
       {
         headers: {
-          'Client-ID': process.env.IGDB_CLIENT_ID,
-          'Authorization': `Bearer ${process.env.IGDB_ACCESS_TOKEN}`
+          'Client-ID': process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID,
+          'Authorization': `Bearer ${accessToken}`, // Use the dynamic access token
         }
       }
     );
 
     if (response.data.length > 0) {
-      // Filter the response data to find the most relevant game
       const game = response.data.find((g: any) => cleanAndMatchTitle(gameTitle, g.name));
       if (game) {
         return `The game ${game.name} was released on ${new Date(game.release_dates[0].date * 1000).toLocaleDateString()}. It was developed by ${game.developers?.map((d: any) => d.name).join(", ") || "unknown developers"} and published by ${game.publishers?.map((p: any) => p.name).join(", ") || "unknown publishers"} and was released on ${game.platforms?.map((p: any) => p.name).join(", ") || "unknown platforms"}.`;
@@ -51,13 +53,15 @@ async function fetchFromIGDB(gameTitle: string): Promise<string | null> {
 // Fetch series data from IGDB
 async function fetchSeriesFromIGDB(seriesTitle: string): Promise<any[] | null> {
   try {
+    const accessToken = await getAccessToken(); // Get the access token
+
     const response = await axios.post(
       'https://api.igdb.com/v4/games',
       `fields name, release_dates.date, platforms.name; where series.name ~ "${seriesTitle}";`,
       {
         headers: {
-          'Client-ID': process.env.IGDB_CLIENT_ID,
-          'Authorization': `Bearer ${process.env.IGDB_ACCESS_TOKEN}`
+          'Client-ID': process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID,
+          'Authorization': `Bearer ${accessToken}`, // Use the dynamic access token
         }
       }
     );
@@ -174,8 +178,6 @@ export const getChatCompletion = async (question: string): Promise<string | null
     return null;
   }
 };
-
-
 
 // Analyze user questions and map them to game genres
 export const analyzeUserQuestions = (questions: Array<{ question: string, response: string }>): string[] => {

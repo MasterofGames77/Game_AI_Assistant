@@ -4,16 +4,13 @@ import { NextApiResponse } from 'next';
 let cachedAccessToken: string | null = null;
 let tokenExpiryTime: number | null = null;
 
-export const getAccessToken = async (code?: string): Promise<string> => {
+export const getAccessToken = async (code?: string, refreshToken?: string): Promise<string> => {
   const clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID;
   const clientSecret = process.env.TWITCH_CLIENT_SECRET;
-  const redirectUri = encodeURIComponent(process.env.TWITCH_REDIRECT_URI || '');
+  const redirectUri = process.env.TWITCH_REDIRECT_URI;
   const tokenUrl = process.env.TWITCH_TOKEN_URL;
 
-  console.log("Attempting to fetch access token with the following details:", { clientId, clientSecret, redirectUri, tokenUrl });
-
   if (!clientId || !clientSecret || !redirectUri || !tokenUrl) {
-    console.error('Missing required environment variables');
     throw new Error('Missing environment variables');
   }
 
@@ -26,19 +23,17 @@ export const getAccessToken = async (code?: string): Promise<string> => {
     const params = {
       client_id: clientId,
       client_secret: clientSecret,
-      grant_type: code ? 'authorization_code' : 'client_credentials',
-      code,
-      redirect_uri: redirectUri
+      grant_type: refreshToken ? 'refresh_token' : 'authorization_code',
+      code: refreshToken ? undefined : code,
+      refresh_token: refreshToken,
+      redirect_uri: redirectUri,
     };
 
-    console.log("OAuth token request parameters:", params);
     const response = await axios.post(tokenUrl, null, { params });
-
-    console.log("Access Token Response:", response.data);
 
     // Cache the access token and set expiry time
     cachedAccessToken = response.data.access_token;
-    tokenExpiryTime = Date.now() + (response.data.expires_in * 1000);
+    tokenExpiryTime = Date.now() + response.data.expires_in * 1000;
 
     // Ensure the token is not null before returning
     return cachedAccessToken || '';
