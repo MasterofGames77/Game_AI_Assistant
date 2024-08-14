@@ -1,5 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 
-export default (req: NextApiRequest, res: NextApiResponse) => {
+const testHandler = (req: NextApiRequest, res: NextApiResponse) => {
   res.status(200).json({ message: 'API is working' });
 };
+
+export default testHandler;

@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAccessToken, getTwitchUserData } from '../../utils/twitchAuth';
 
-export default async (req: NextApiRequest, res: NextApiResponse) => {
+const handleCallback = async (req: NextApiRequest, res: NextApiResponse) => {
   const { code } = req.query;
   console.log("Received OAuth code:", code);
 
@@ -25,3 +25,5 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
     res.status(500).json({ error: 'Failed to exchange authorization code for access token or fetch user data' });
   }
 };
+
+export default handleCallback;

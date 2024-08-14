@@ -269,7 +269,7 @@ const extractSteamGameId = (question: string): string | null => {
 };
 
 // Handler function
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
   const { userId, question, code } = req.body;
 
   try {
@@ -357,3 +357,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(500).json({ error: error.message });
   }
 };
+
+export default assistantHandler;

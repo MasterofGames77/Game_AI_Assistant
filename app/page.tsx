@@ -1,6 +1,6 @@
 "use client"; // client-side component
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import Sidebar from "../components/Sidebar";
 import { Conversation } from "../types"; // Adjust the import path as necessary
@@ -11,10 +11,10 @@ export default function Home() {
   const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [userId, setUserId] = useState<string | null>(null); // Initialize userId as null
+  const [userId, setUserId] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] =
-    useState<Conversation | null>(null); // Ensure correct type
-  const [conversations, setConversations] = useState<Conversation[]>([]); // Track conversations
+    useState<Conversation | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
 
   // Prompt user for userId or generate a new one
   useEffect(() => {
@@ -30,23 +30,23 @@ export default function Home() {
       localStorage.setItem("userId", storedUserId);
     }
     setUserId(storedUserId);
-  }, [userId]); // Add userId as a dependency
+  }, []);
 
-  // Fetch conversations when userId changes
-  useEffect(() => {
-    if (userId) {
-      fetchConversations();
-    }
-  }, [userId]);
-
-  const fetchConversations = async () => {
+  // Fetch conversations
+  const fetchConversations = useCallback(async () => {
     try {
       const res = await axios.get(`/api/getConversation?userId=${userId}`);
       setConversations(res.data);
     } catch (error) {
       console.error("Error fetching conversations:", error);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    if (userId) {
+      fetchConversations();
+    }
+  }, [userId, fetchConversations]);
 
   useEffect(() => {
     if (selectedConversation) {
@@ -56,22 +56,21 @@ export default function Home() {
   }, [selectedConversation]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); // Prevent default form submission behavior
+    e.preventDefault();
     console.log("Form submitted with question:", question);
-    setLoading(true); // Set loading state to true
-    setError(""); // Reset error state
+    setLoading(true);
+    setError("");
 
     try {
-      // Make a POST request to the API endpoint with the question and userId
       const res = await axios.post("/api/assistant", { userId, question });
       console.log("Response from server:", res.data);
-      setResponse(res.data.answer); // Set the response state with the server's answer
+      setResponse(res.data.answer);
       fetchConversations(); // Refresh conversations list
     } catch (error) {
-      console.error("Error submitting form:", error); // Log any errors
-      setError("There was an error processing your request. Please try again."); // Set error state
+      console.error("Error submitting form:", error);
+      setError("There was an error processing your request. Please try again.");
     } finally {
-      setLoading(false); // Set loading state to false
+      setLoading(false);
     }
   };
 
@@ -79,11 +78,11 @@ export default function Home() {
     setQuestion("");
     setResponse("");
     setError("");
-    setSelectedConversation(null); // Clear selected conversation
+    setSelectedConversation(null);
   };
 
   const handleDeleteConversation = () => {
-    handleClear(); // Clear the input and response fields
+    handleClear();
     fetchConversations(); // Refresh the conversation list
   };
 
@@ -108,22 +107,6 @@ export default function Home() {
 
     window.open(twitchLoginUrl, "_blank");
   };
-
-  // Comment out Steam functionality until I can get it working properly.
-  // const handleSteamAuth = () => {
-  //   const domain =
-  //     process.env.NODE_ENV === "production"
-  //       ? "https://game-ai-assistant.vercel.app"
-  //       : "http://localhost:3000";
-
-  //   const steamLoginUrl = `https://steamcommunity.com/openid/login?openid.ns=http://specs.openid.net/auth/2.0&openid.mode=checkid_setup&openid.return_to=${encodeURIComponent(
-  //     domain + "/api/steamCallback"
-  //   )}&openid.realm=${encodeURIComponent(
-  //     domain
-  //   )}&openid.identity=http://specs.openid.net/auth/2.0/identifier_select`;
-
-  //   window.open(steamLoginUrl, "_blank");
-  // };
 
   const formatResponse = (response: string) => {
     const sentences = response.split("\n").map((sentence) => sentence.trim());
@@ -153,7 +136,7 @@ export default function Home() {
           <Sidebar
             userId={userId}
             onSelectConversation={setSelectedConversation}
-            onDeleteConversation={handleDeleteConversation} // Pass delete handler
+            onDeleteConversation={handleDeleteConversation}
           />
           <div className="flex-1 flex flex-col items-center justify-center py-2">
             <h1 className="text-4xl font-bold mb-6">Video Game Wingman</h1>
@@ -187,12 +170,6 @@ export default function Home() {
             >
               Login with Twitch
             </button>
-            {/* <button
-              onClick={handleSteamAuth} // This button triggers Steam login
-              className="mt-4 p-2 bg-green-500 text-white rounded"
-            >
-              Login with Steam
-            </button> */}
             <button
               onClick={handleResetUserId}
               className="mt-4 p-2 bg-yellow-500 text-white rounded"
