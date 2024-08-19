@@ -85,3 +85,34 @@ body {
 .text-white {
   color: white;
 }
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.flex-1 {
+  margin-top: 30px; /* Adjust for proper spacing */
+}
+
+/* Adjustments to ensure the sidebar is on the side and logo is centered */
+.sidebar {
+  flex-basis: 250px; /* Control width of sidebar */
+  min-width: 250px;
+  max-width: 250px;
+}
+
+.main-content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.logo {
+  margin-bottom: 30px; /* Add space below the logo */
+}

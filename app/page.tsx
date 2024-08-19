@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import Sidebar from "../components/Sidebar";
-import { Conversation } from "../types"; // Adjust the import path as necessary
+import Image from "next/image";
+import { Conversation } from "../types";
 import { v4 as uuidv4 } from "uuid";
 
 export default function Home() {
@@ -16,7 +17,6 @@ export default function Home() {
     useState<Conversation | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
 
-  // Prompt user for userId or generate a new one
   useEffect(() => {
     let storedUserId = localStorage.getItem("userId");
     if (!storedUserId || storedUserId === "null") {
@@ -32,7 +32,6 @@ export default function Home() {
     setUserId(storedUserId);
   }, []);
 
-  // Fetch conversations
   const fetchConversations = useCallback(async () => {
     try {
       const res = await axios.get(`/api/getConversation?userId=${userId}`);
@@ -65,7 +64,7 @@ export default function Home() {
       const res = await axios.post("/api/assistant", { userId, question });
       console.log("Response from server:", res.data);
       setResponse(res.data.answer);
-      fetchConversations(); // Refresh conversations list
+      fetchConversations();
     } catch (error) {
       console.error("Error submitting form:", error);
       setError("There was an error processing your request. Please try again.");
@@ -83,7 +82,7 @@ export default function Home() {
 
   const handleDeleteConversation = () => {
     handleClear();
-    fetchConversations(); // Refresh the conversation list
+    fetchConversations();
   };
 
   const handleResetUserId = () => {
@@ -138,8 +137,15 @@ export default function Home() {
             onSelectConversation={setSelectedConversation}
             onDeleteConversation={handleDeleteConversation}
           />
-          <div className="flex-1 flex flex-col items-center justify-center py-2">
-            <h1 className="text-4xl font-bold mb-6">Video Game Wingman</h1>
+          <div className="flex-1 flex flex-col items-center justify-center py-2 main-content">
+            <Image
+              src="/assets/video-game-wingman-logo.png"
+              alt="Video Game Wingman Logo"
+              className="logo"
+              width={400}
+              height={400}
+            />
+            {/* <h1 className="text-4xl font-bold mb-6">Video Game Wingman</h1> */}
             <form onSubmit={handleSubmit} className="w-full max-w-md">
               <input
                 type="text"
