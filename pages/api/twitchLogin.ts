@@ -3,7 +3,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const isProduction = process.env.NODE_ENV === 'production';
   console.log(process.env.NODE_ENV)
-  const domain = isProduction ? 'https://game-ai-assistant.vercel.app' : 'http://localhost:3000';
+  const domain = isProduction ? 'https://video-game-wingman-57d61bef9e61.herokuapp.com/' : 'http://localhost:3000';
 
   const clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID || '';
   const redirectUri = encodeURIComponent(process.env.TWITCH_REDIRECT_URI || `${domain}/api/twitchCallback`);

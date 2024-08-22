@@ -2,10 +2,15 @@ import React from "react";
 import useSocket from "../hooks/useSocket";
 
 const HookComponent: React.FC = () => {
-  const socket = useSocket("http://localhost:3000");
+  const socketURL =
+    process.env.NODE_ENV === "production"
+      ? "https://video-game-wingman-57d61bef9e61.herokuapp.com"
+      : "http://localhost:3000";
+
+  const socket = useSocket(socketURL);
 
   const sendMessage = () => {
-    socket.emit("message", "Hello from the client!");
+    socket.emit("message", "Hello from Video Game Wingman!");
   };
 
   return (

@@ -95,7 +95,7 @@ export default function Home() {
   const handleTwitchAuth = () => {
     const domain =
       process.env.NODE_ENV === "production"
-        ? "https://game-ai-assistant.vercel.app"
+        ? "https://video-game-wingman-57d61bef9e61.herokuapp.com/"
         : "http://localhost:3000";
 
     const twitchLoginUrl = `https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${

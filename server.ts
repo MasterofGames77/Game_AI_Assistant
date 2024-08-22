@@ -4,6 +4,7 @@ import next, { NextApiRequest, NextApiResponse } from "next";
 import { initSocket } from "./middleware/realtime";
 
 const dev = process.env.NODE_ENV !== "production";
+const port = process.env.PORT || 3000;
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
@@ -20,7 +21,7 @@ app.prepare().then(async () => {
   initSocket(server);
 
   // Start the server
-  server.listen(3000, () => {
-    console.log("> Ready on http://localhost:3000");
+  server.listen(port, () => {
+    console.log(`> Ready on http://localhost:${port}`);
   });
 });
