@@ -162,16 +162,20 @@ const fetchDataFromBothAPIs = async (gameName: string): Promise<string> => {
     const [rawgResponse, igdbResponse] = await Promise.all([rawgPromise, igdbPromise]);
 
     let finalResponse = "";
-    if (rawgResponse.includes("No games found") && igdbResponse?.includes("No games found")) {
-      finalResponse = "No relevant game information found in any database.";
-    } else {
-      finalResponse = "Combined Game Information: \n";
+
+    const isMainResponseShort = rawgResponse.length < 150 && (igdbResponse ? igdbResponse.length < 150 : true);
+
+    if (isMainResponseShort) {
+      finalResponse = "Combined Game Information:\n";
       if (!rawgResponse.includes("No games found")) {
         finalResponse += `\nFrom RAWG: ${rawgResponse}`;
       }
       if (igdbResponse && !igdbResponse.includes("No games found")) {
         finalResponse += `\nFrom IGDB: ${igdbResponse}`;
       }
+    } else {
+      // Skip adding irrelevant or extraneous combined data
+      finalResponse = "Detailed game information is already provided in the main response.";
     }
 
     return finalResponse;
@@ -190,12 +194,11 @@ const checkAndUpdateGameInfo = async (question: string, answer: string): Promise
   try {
     const csvData = await getCSVData();
     const gameInfo = csvData.find((game: any) => game.title.toLowerCase() === gameName.toLowerCase());
-    console.log("Game Info from CSV:", gameInfo); // Log the game info from CSV
 
     if (gameInfo) {
       return `${formatGameInfo(gameInfo)}\n\nAdditional Information:\n${combinedResponse}`;
     } else {
-      return answer;
+      return `${answer}\n\nAdditional Information:\n${combinedResponse}`;
     }
   } catch (error) {
     console.error('CSV Data is unavailable, continuing without it:', error);
@@ -334,6 +337,7 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     //     answer = "I couldn't identify the game ID for the Steam request.";
     //   }
     } else {
+      // For General Questions
       answer = await getChatCompletion(question);
 
       if (answer) {
@@ -343,6 +347,7 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
       }
     }
 
+    // Save to MongoDB
     const newQuestion = new Question({
       userId,
       question,
