@@ -8,7 +8,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   : 'http://localhost:3000';
   
   const clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID || '';
-  const redirectUri = encodeURIComponent(process.env.TWITCH_REDIRECT_URI || `${domain}/api/twitchCallback`);
+  const redirectUri = encodeURIComponent(`${domain}/api/twitchCallback`);
   console.log("Encoded Redirect URI:", redirectUri);
   
   const authUrl = process.env.TWITCH_AUTH_URL || 'https://id.twitch.tv/oauth2/authorize';

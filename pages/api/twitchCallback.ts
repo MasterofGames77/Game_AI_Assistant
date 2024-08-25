@@ -19,6 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Log the environment variables used
     console.log("Twitch OAuth2 environment variables:", { clientId, clientSecret, redirectUri, tokenUrl });
+    console.log("Using redirect_uri:", redirectUri); // Log the redirect_uri being used
 
     if (!clientId || !clientSecret || !redirectUri || !tokenUrl) {
         console.error("Missing environment variables for Twitch OAuth2.");

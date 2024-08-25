@@ -29,6 +29,8 @@ export const getAccessToken = async (code?: string, refreshToken?: string): Prom
       redirect_uri: redirectUri,
     };
 
+    console.log("Requesting access token with parameters:", params);
+
     const response = await axios.post(tokenUrl, null, { params });
 
     // Cache the access token and set expiry time
@@ -36,9 +38,10 @@ export const getAccessToken = async (code?: string, refreshToken?: string): Prom
     tokenExpiryTime = Date.now() + response.data.expires_in * 1000;
 
     // Ensure the token is not null before returning
+    console.log("Access token retrieved successfully:", cachedAccessToken);
     return cachedAccessToken || '';
   } catch (error: any) {
-    console.error("Error fetching access token:", error.message);
+    console.error("Error fetching access token:", error.response?.data || error.message);
     throw new Error('Failed to fetch access token');
   }
 };
@@ -64,6 +67,13 @@ export const redirectToTwitch = (res: NextApiResponse) => {
   const clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID;
   const redirectUri = encodeURIComponent(process.env.TWITCH_REDIRECT_URI || '');
   const scope = process.env.TWITCH_SCOPES;
+
+  // Construct the authorization URL
   const authorizationUrl = `https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&scope=${encodeURIComponent(scope || '')}`;
+  
+  // Log the authorization URL
+  console.log('Redirecting to Twitch authorization URL:', authorizationUrl);
+  
+  // Redirect the user to Twitch's OAuth2 login page
   res.redirect(authorizationUrl);
 };
