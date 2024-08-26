@@ -1,7 +1,7 @@
 import axios from 'axios';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
-import { getAccessToken } from './twitchAuth';
+import { getClientCredentialsAccessToken } from './twitchAuth';
 
 dotenv.config();
 
@@ -24,7 +24,7 @@ function cleanAndMatchTitle(queryTitle: string, recordTitle: string): boolean {
 // Example IGDB Fetch Function with Improved Filtering
 async function fetchFromIGDB(gameTitle: string): Promise<string | null> {
   try {
-    const accessToken = await getAccessToken(); // Get the access token
+    const accessToken = await getClientCredentialsAccessToken(); // Use the correct function
 
     const response = await axios.post(
       'https://api.igdb.com/v4/games',
@@ -53,7 +53,7 @@ async function fetchFromIGDB(gameTitle: string): Promise<string | null> {
 // Fetch series data from IGDB
 async function fetchSeriesFromIGDB(seriesTitle: string): Promise<any[] | null> {
   try {
-    const accessToken = await getAccessToken(); // Get the access token
+    const accessToken = await getClientCredentialsAccessToken(); // Use the correct function
 
     const response = await axios.post(
       'https://api.igdb.com/v4/games',

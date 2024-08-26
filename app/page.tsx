@@ -95,14 +95,16 @@ export default function Home() {
   const handleTwitchAuth = () => {
     const domain =
       process.env.NODE_ENV === "production"
-        ? "https://video-game-wingman-57d61bef9e61.herokuapp.com/"
+        ? "https://video-game-wingman-57d61bef9e61.herokuapp.com"
         : "http://localhost:3000";
 
+    // Construct the redirect URI without double slashes
+    const redirectUri = `${domain}/api/twitchCallback`;
+
+    // Construct the full Twitch login URL
     const twitchLoginUrl = `https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${
       process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID
-    }&redirect_uri=${encodeURIComponent(
-      domain + "/api/twitchCallback"
-    )}&scope=user:read:email`;
+    }&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:read:email`;
 
     window.open(twitchLoginUrl, "_blank");
   };

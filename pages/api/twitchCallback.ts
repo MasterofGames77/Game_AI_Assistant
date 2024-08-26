@@ -2,7 +2,6 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-    // Log the incoming query parameters to debug the issue
     console.log('Twitch callback received with query:', req.query);
 
     const { code } = req.query;
@@ -14,33 +13,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID;
     const clientSecret = process.env.TWITCH_CLIENT_SECRET;
-    const redirectUri = process.env.TWITCH_REDIRECT_URI;
-    const tokenUrl = process.env.TWITCH_TOKEN_URL;
+    let redirectUri = process.env.TWITCH_REDIRECT_URI || '';
 
-    // Log the environment variables used
-    console.log("Twitch OAuth2 environment variables:", { clientId, clientSecret, redirectUri, tokenUrl });
-    console.log("Using redirect_uri:", redirectUri); // Log the redirect_uri being used
+    // Ensure no trailing slash and correct encoding
+    redirectUri = redirectUri.replace(/\/$/, '').replace(/([^:]\/)\/+/g, "$1");
+    const encodedRedirectUri = encodeURIComponent(redirectUri);
 
-    if (!clientId || !clientSecret || !redirectUri || !tokenUrl) {
+    const tokenUrl = process.env.TWITCH_TOKEN_URL || 'https://id.twitch.tv/oauth2/token';
+
+    console.log("Twitch OAuth2 environment variables:", { clientId, clientSecret, encodedRedirectUri, tokenUrl });
+    console.log("Using encoded redirect_uri:", encodedRedirectUri);
+
+    if (!clientId || !clientSecret || !encodedRedirectUri || !tokenUrl) {
         console.error("Missing environment variables for Twitch OAuth2.");
         return res.status(500).json({ error: 'Missing environment variables' });
     }
 
-    const params = {
+    const params = new URLSearchParams({
         client_id: clientId,
         client_secret: clientSecret,
         grant_type: 'authorization_code',
-        code: code,
-        redirect_uri: redirectUri,
-    };
+        code: code as string,
+        redirect_uri: redirectUri, // This should match exactly what was sent initially
+    });
 
     try {
-        // Log the parameters used in the token request
-        console.log("OAuth token request parameters:", params);
+        console.log("OAuth token request parameters:", params.toString());
 
-        const tokenResponse = await axios.post(tokenUrl, null, { params });
+        const tokenResponse = await axios.post(tokenUrl, params);
 
-        // Log the entire token response
         console.log("Access Token Response:", tokenResponse.data);
 
         const { access_token } = tokenResponse.data;
@@ -50,20 +51,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(400).json({ error: 'Failed to obtain access token' });
         }
 
-        // Fetch user information
+        // Fetch user information using the access token
         const userResponse = await axios.get('https://api.twitch.tv/helix/users', {
             headers: {
                 'Authorization': `Bearer ${access_token}`,
-                'Client-Id': clientId
-            }
+                'Client-Id': clientId,
+            },
         });
 
-        // Log the user data received from Twitch
         console.log("Twitch user data response:", userResponse.data);
 
+        // Return the user data as JSON to the frontend
         res.status(200).json(userResponse.data);
     } catch (error) {
-        console.error('Error in Twitch callback:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
+        if (error instanceof Error) {
+            console.error('Error in Twitch callback:', error.message);
+            res.status(500).json({ error: 'Internal Server Error' });
+        } else {
+            console.error('Unexpected error in Twitch callback:', error);
+            res.status(500).json({ error: 'Unexpected Error' });
+        }
     }
 }

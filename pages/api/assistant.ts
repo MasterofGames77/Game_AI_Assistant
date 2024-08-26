@@ -3,7 +3,7 @@ import axios from 'axios';
 import connectToMongoDB from '../../utils/mongodb';
 import Question from '../../models/Question';
 import { getChatCompletion, fetchRecommendations, analyzeUserQuestions } from '../../utils/aiHelper';
-import { getAccessToken, getTwitchUserData, redirectToTwitch } from '../../utils/twitchAuth';
+import { getClientCredentialsAccessToken, getAccessToken, getTwitchUserData, redirectToTwitch } from '../../utils/twitchAuth';
 import OpenAI from 'openai';
 import path from 'path';
 import { readFile } from 'fs/promises';
@@ -17,6 +17,7 @@ console.log("TWITCH_TOKEN_URL:", process.env.TWITCH_TOKEN_URL ? "SET" : "NOT SET
 console.log("RAWG_API_KEY:", process.env.RAWG_API_KEY ? "SET" : "NOT SET");
 console.log("STEAM_API_KEY:", process.env.STEAM_API_KEY ? "SET" : "NOT SET");
 console.log("MONGODB_URI:", process.env.MONGODB_URI ? "SET" : "NOT SET");
+console.log("TWITCH_REDIRECT_URI:", process.env.TWITCH_REDIRECT_URI);
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -59,7 +60,8 @@ interface IGDBGame {
 }
 
 const fetchGamesFromIGDB = async (query: string): Promise<string | null> => {
-  const accessToken = await getAccessToken(); // No argument needed here
+  // Use getClientCredentialsAccessToken instead of getAccessToken
+  const accessToken = await getClientCredentialsAccessToken(); // No code needed here
   const headers = {
     'Client-ID': process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID,
     'Authorization': `Bearer ${accessToken}`
@@ -88,6 +90,7 @@ const fetchGamesFromIGDB = async (query: string): Promise<string | null> => {
     return "Failed to fetch data from IGDB.";
   }
 };
+
 
 interface RAWGGame {
   name: string;
@@ -266,10 +269,10 @@ const extractGameTitle = (question: string): string => {
 };
 
 // Extract Steam Game ID from the question
-const extractSteamGameId = (question: string): string | null => {
-  const match = question.match(/\b\d{4,10}\b/); // Example regex to find a number that looks like a Steam game ID
-  return match ? match[0] : null;
-};
+// const extractSteamGameId = (question: string): string | null => {
+//   const match = question.match(/\b\d{4,10}\b/); // Example regex to find a number that looks like a Steam game ID
+//   return match ? match[0] : null;
+// };
 
 // Handler function
 const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
@@ -305,13 +308,24 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
         answer = "I'm sorry, I couldn't generate a response. Please try again.";
       }
     } else if (question.toLowerCase().includes("twitch user data")) {
-      if (!code) {
-        redirectToTwitch(res);
-        return;
-      } else {
-        const accessToken = await getAccessToken(code);
-        const userData = await getTwitchUserData(accessToken);
-        answer = `Twitch User Data: ${JSON.stringify(userData)}`;
+      try {
+        if (!code) {
+          redirectToTwitch(res);
+          return;
+        } else {
+          const accessToken = await getAccessToken(code);
+          const userData = await getTwitchUserData(accessToken);
+          answer = `Twitch User Data: ${JSON.stringify(userData)}`;
+        }
+      } catch (error) {
+        if (error instanceof Error) {
+            console.error('Failed to retrieve Twitch user data:', error.message);
+            answer = 'There was an issue retrieving your Twitch data. Please try again later.';
+        } else {
+            // Handle non-Error exceptions
+            console.error('An unexpected error occurred:', error);
+            answer = 'An unexpected error occurred. Please try again later.';
+        }
       }
     } else if (question.toLowerCase().includes("genre")) {
       const gameTitle = extractGameTitle(question); 
