@@ -9,8 +9,8 @@
 
 //     // Create a new OpenID client using the discovered configuration
 //     const client = new steamIssuer.Client({
-//         client_id: process.env.STEAM_OPENID_REALM || 'https://game-ai-assistant.vercel.app', // Set the realm (client ID)
-//         redirect_uris: [process.env.STEAM_OPENID_RETURN_URL || 'https://game-ai-assistant.vercel.app/api/steamCallback'], // Set the callback URL
+//         client_id: process.env.STEAM_OPENID_REALM || 'https://video-game-wingman-57d61bef9e61.herokuapp.com/', // Set the realm (client ID)
+//         redirect_uris: [process.env.STEAM_OPENID_RETURN_URL || 'https://video-game-wingman-57d61bef9e61.herokuapp.com/api/steamCallback'], // Set the callback URL
 //         response_types: ['id_token'], // Define the response type
 //     });
 

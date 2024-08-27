@@ -10,8 +10,8 @@
 
 //         // Create a client instance using the discovered configuration
 //         const client = new steamIssuer.Client({
-//             client_id: process.env.STEAM_OPENID_REALM || 'https://game-ai-assistant.vercel.app', // Realm is the application domain
-//             redirect_uris: [process.env.STEAM_OPENID_RETURN_URL || 'https://game-ai-assistant.vercel.app/api/steamCallback'], // Redirect URI after login
+//             client_id: process.env.STEAM_OPENID_REALM || 'https://video-game-wingman-57d61bef9e61.herokuapp.com/', // Realm is the application domain
+//             redirect_uris: [process.env.STEAM_OPENID_RETURN_URL || 'https://video-game-wingman-57d61bef9e61.herokuapp.com/api/steamCallback'], // Redirect URI after login
 //             response_types: ['id_token'], // The type of response expected
 //         });
 
