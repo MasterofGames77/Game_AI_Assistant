@@ -18,7 +18,6 @@ console.log("RAWG_API_KEY:", process.env.RAWG_API_KEY ? "SET" : "NOT SET");
 console.log("STEAM_API_KEY:", process.env.STEAM_API_KEY ? "SET" : "NOT SET");
 console.log("MONGODB_URI:", process.env.MONGODB_URI ? "SET" : "NOT SET");
 console.log("TWITCH_REDIRECT_URI:", process.env.TWITCH_REDIRECT_URI);
-console.log("STEAM_API_KEY:", process.env.STEAM_API_KEY ? "SET" : "NOT SET");
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
