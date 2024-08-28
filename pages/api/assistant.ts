@@ -18,6 +18,7 @@ console.log("RAWG_API_KEY:", process.env.RAWG_API_KEY ? "SET" : "NOT SET");
 console.log("STEAM_API_KEY:", process.env.STEAM_API_KEY ? "SET" : "NOT SET");
 console.log("MONGODB_URI:", process.env.MONGODB_URI ? "SET" : "NOT SET");
 console.log("TWITCH_REDIRECT_URI:", process.env.TWITCH_REDIRECT_URI);
+console.log("STEAM_API_KEY:", process.env.STEAM_API_KEY ? "SET" : "NOT SET");
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -132,31 +133,30 @@ const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
   }
 };
 
-// const fetchSteamGameDetails = async (gameId: string): Promise<any> => {
-//   const apiKey = process.env.STEAM_API_KEY;
+  // const fetchSteamGameDetails = async (gameId: string): Promise<any> => {
+  //   const apiKey = process.env.STEAM_API_KEY;
 
-//   try {
-//     const [gameSchema, achievementStats, gameNews] = await Promise.all([
-//       axios.get(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${gameId}`),
-//       axios.get(`http://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${gameId}&key=${apiKey}`),
-//       axios.get(`http://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${gameId}&count=5&maxlength=300`)
-//     ]);
+  //   try {
+  //     const [gameSchema, achievementStats, gameNews] = await Promise.all([
+  //       axios.get(`http://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${apiKey}&appid=${gameId}`),
+  //       axios.get(`http://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v0002/?gameid=${gameId}&key=${apiKey}`),
+  //       axios.get(`http://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${gameId}&count=5&maxlength=300`)
+  //     ]);
 
-//     return {
-//       gameSchema: gameSchema.data,
-//       achievementStats: achievementStats.data.achievementpercentages.achievements,
-//       gameNews: gameNews.data.appnews.newsitems
-//     };
-//   } catch (error: any) {
-//     // Narrow the error type
-//     if (error instanceof Error) {
-//       console.error("Error fetching data from Steam API:", error.message);
-//     } else {
-//       console.error("An unexpected error occurred:", error);
-//     }
-//     return null;
-//   }
-// };
+  //     return {
+  //       gameSchema: gameSchema.data,
+  //       achievementStats: achievementStats.data.achievementpercentages.achievements,
+  //       gameNews: gameNews.data.appnews.newsitems
+  //     };
+  //   } catch (error: any) {
+  //     if (error instanceof Error) {
+  //       console.error("Error fetching data from Steam API:", error.message);
+  //     } else {
+  //       console.error("An unexpected error occurred:", error);
+  //     }
+  //     return null;
+  //   }
+  // };
 
 const fetchDataFromBothAPIs = async (gameName: string): Promise<string> => {
   try {
@@ -268,7 +268,6 @@ const extractGameTitle = (question: string): string => {
   return match ? match[1].trim() : '';
 };
 
-// Extract Steam Game ID from the question
 // const extractSteamGameId = (question: string): string | null => {
 //   const match = question.match(/\b\d{4,10}\b/); // Example regex to find a number that looks like a Steam game ID
 //   return match ? match[0] : null;

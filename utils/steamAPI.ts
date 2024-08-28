@@ -1,9 +1,12 @@
-// Commented out until I can get Steam API working properly
-
 // import axios from 'axios';
 
 // export const fetchSteamGameDetails = async (gameId: string): Promise<any> => {
 //   const apiKey = process.env.STEAM_API_KEY;
+
+//   if (!apiKey) {
+//     console.error("STEAM_API_KEY environment variable is missing.");
+//     return null;
+//   }
 
 //   try {
 //     const [gameSchema, achievementStats, gameNews] = await Promise.all([
