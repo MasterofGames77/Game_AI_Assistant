@@ -116,3 +116,15 @@ img {
 .logo {
   margin-bottom: 30px; /* Add space below the logo */
 }
+ul {
+  margin-top: 20px;
+  padding: 0;
+  list-style: none;
+  text-align: center;
+}
+
+ul li {
+  margin-bottom: 10px;
+  font-size: 18px;
+  color: #1e1e1e;
+}

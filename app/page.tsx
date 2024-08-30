@@ -162,6 +162,12 @@ export default function Home() {
               width={400}
               height={400}
             />
+            <ul className="mt-4 text-lg text-center">
+              <li>Discover a game&apos;s hidden secrets.</li>
+              <li>Get personalized game recommendations.</li>
+              <li>Analyze gameplay data to improve your strategies.</li>
+              <li>Access detailed game guides.</li>
+            </ul>
             {/* <h1 className="text-4xl font-bold mb-6">Video Game Wingman</h1> */}
             <form onSubmit={handleSubmit} className="w-full max-w-md">
               <input
