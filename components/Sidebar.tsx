@@ -43,6 +43,14 @@ const Sidebar = ({
       "class",
       "search",
       "fast",
+      "tips",
+      "hidden",
+      "secret",
+      "gameplay",
+      "obtain",
+      "collect",
+      "area",
+      "level",
     ];
 
     const titlePattern = new RegExp(keywords.join("|"), "i");

@@ -109,21 +109,6 @@ export default function Home() {
     window.open(twitchLoginUrl, "_blank");
   };
 
-  // const handleSteamAuth = () => {
-  //   const domain =
-  //     process.env.NODE_ENV === "production"
-  //       ? "https://video-game-wingman-57d61bef9e61.herokuapp.com"
-  //       : "http://localhost:3000";
-
-  //   // Avoid double encoding by ensuring `encodeURIComponent` is used once
-  //   const returnToUrl = encodeURIComponent(domain + "/api/steamCallback");
-  //   const realmUrl = encodeURIComponent(domain);
-
-  //   const steamLoginUrl = `https://steamcommunity.com/openid/login?openid.ns=http://specs.openid.net/auth/2.0&openid.mode=checkid_setup&openid.return_to=${returnToUrl}&openid.realm=${realmUrl}&openid.identity=http://specs.openid.net/auth/2.0/identifier_select`;
-
-  //   window.open(steamLoginUrl, "_blank");
-  // };
-
   const formatResponse = (response: string) => {
     const sentences = response.split("\n").map((sentence) => sentence.trim());
     let stepCounter = 1;
@@ -168,7 +153,6 @@ export default function Home() {
               <li>Analyze gameplay data to improve your strategies.</li>
               <li>Access detailed game guides.</li>
             </ul>
-            {/* <h1 className="text-4xl font-bold mb-6">Video Game Wingman</h1> */}
             <form onSubmit={handleSubmit} className="w-full max-w-md">
               <input
                 type="text"
@@ -199,13 +183,6 @@ export default function Home() {
             >
               Login with Twitch
             </button>
-
-            {/* <button
-              onClick={handleSteamAuth} // This button triggers Steam login
-              className="mt-4 p-2 bg-green-500 text-white rounded"
-            >
-              Login with Steam
-            </button> */}
 
             <button
               onClick={handleResetUserId}
