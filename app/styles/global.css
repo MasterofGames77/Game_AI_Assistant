@@ -102,6 +102,13 @@ img {
   flex-basis: 250px; /* Control width of sidebar */
   min-width: 250px;
   max-width: 250px;
+  background-color: #1e1e1e; /* Dark background for sidebar */
+  color: white; /* Make sidebar text white for better contrast */
+}
+
+.sidebar h2,
+.sidebar div {
+  color: white; /* Ensure headings and text are white */
 }
 
 .main-content {
