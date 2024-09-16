@@ -30,6 +30,7 @@ export default function Home() {
       localStorage.setItem("userId", storedUserId);
     }
     setUserId(storedUserId);
+    console.log("User ID set:", storedUserId);
   }, []);
 
   const fetchConversations = useCallback(async () => {
@@ -86,10 +87,22 @@ export default function Home() {
   };
 
   const handleResetUserId = () => {
-    localStorage.removeItem("userId");
-    setUserId(null);
-    setConversations([]);
-    handleClear();
+    console.log("Resetting User ID.");
+
+    // Prompt the user to enter a new user ID
+    const newUserId = prompt("Enter your new user ID or create a new one:");
+
+    if (newUserId) {
+      localStorage.setItem("userId", newUserId);
+      setUserId(newUserId);
+      setConversations([]);
+      handleClear();
+      alert(
+        `Your new user ID is: ${newUserId}. Please save it for future use.`
+      );
+    } else {
+      alert("User ID reset canceled.");
+    }
   };
 
   const handleTwitchAuth = () => {
