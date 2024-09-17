@@ -157,21 +157,22 @@ export default function Home() {
               src="/assets/video-game-wingman-logo.png"
               alt="Video Game Wingman Logo"
               className="logo"
-              width={400}
-              height={400}
+              width={350}
+              height={350}
             />
+
             <ul className="mt-4 text-lg text-center">
               <li>Discover a game&apos;s hidden secrets.</li>
               <li>Get personalized game recommendations.</li>
               <li>Analyze gameplay data to improve your strategies.</li>
               <li>Access detailed game guides.</li>
             </ul>
-            <form onSubmit={handleSubmit} className="w-full max-w-md">
+            <form onSubmit={handleSubmit} className="w-full max-w-md mt-2">
               <input
                 type="text"
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
-                placeholder="Enter your gameplay data or question for analysis"
+                placeholder="Message Video Game Wingman"
                 className="w-full p-2 border border-gray-300 rounded mb-4"
               />
               <div className="flex space-x-4">
@@ -192,14 +193,13 @@ export default function Home() {
             </form>
             <button
               onClick={handleTwitchAuth}
-              className="mt-4 p-2 bg-purple-500 text-white rounded"
+              className="mt-2 p-2 bg-purple-500 text-white rounded"
             >
               Login with Twitch
             </button>
-
             <button
               onClick={handleResetUserId}
-              className="mt-4 p-2 bg-yellow-500 text-white rounded"
+              className="mt-2 p-2 bg-yellow-500 text-white rounded"
             >
               Reset User ID
             </button>

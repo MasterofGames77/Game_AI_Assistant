@@ -116,16 +116,17 @@ img {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 20px;
+  justify-content: flex-start; /* Move elements to the top */
+  padding: 10px; /* Reduce padding to move content higher */
 }
 
 .logo {
-  margin-bottom: 30px; /* Add space below the logo */
+  margin-bottom: 20px; /* Reduce space below the logo */
+  margin-top: 10px; /* Add some margin at the top */
 }
 
 ul {
-  margin-top: 20px;
+  margin-top: 10px; /* Reduce space above the list */
   padding: 0;
   list-style: none;
   text-align: center;
