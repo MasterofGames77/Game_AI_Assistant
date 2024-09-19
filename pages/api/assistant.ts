@@ -99,6 +99,7 @@ interface RAWGGame {
   slug?: string;
 }
 
+// Fetch game data from RAWG API
 const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
   const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&search=${encodeURIComponent(searchQuery)}`;
 
