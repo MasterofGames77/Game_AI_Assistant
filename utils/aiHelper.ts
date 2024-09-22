@@ -245,7 +245,8 @@ export const analyzeUserQuestions = (questions: Array<{ question: string, respon
     "survival horror": "Survival Horror",
     "action rpg": "Action Role-Playing Game",
     "action role-playing game": "Action Role-Playing Game",
-    "immersive sim": "Immersive Sim"
+    "immersive sim": "Immersive Sim",
+    "Construction and management simulation": "Construction and Management Simulation"
   };
 
   // Loop through each question and count the occurrences of each genre based on keywords
