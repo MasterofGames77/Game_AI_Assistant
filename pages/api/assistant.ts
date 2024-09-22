@@ -230,7 +230,8 @@ const genreMapping: { [key: string]: string } = {
   "Wii Fit": "Exergaming",
   "Deathloop": "Immersive Sim",
   "Bejeweled": "Tile-Matching",
-  "Shellshock Live": "Artillery"
+  "Shellshock Live": "Artillery",
+  "Roller Coaster Tycoon 3": "Construction and Management Simulation"
 };
 
 const getGenreFromMapping = (gameTitle: string): string | null => {
