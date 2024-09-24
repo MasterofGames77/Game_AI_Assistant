@@ -185,24 +185,12 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="w-full p-2 bg-red-500 text-white rounded"
+                  className="w-full p-2 bg-blue-500 text-white rounded"
                 >
                   Clear
                 </button>
               </div>
             </form>
-            <button
-              onClick={handleTwitchAuth}
-              className="mt-2 p-2 bg-purple-500 text-white rounded"
-            >
-              Login with Twitch
-            </button>
-            <button
-              onClick={handleResetUserId}
-              className="mt-2 p-2 bg-yellow-500 text-white rounded"
-            >
-              Reset User ID
-            </button>
             {loading && <div className="spinner mt-4"></div>}
             {error && <div className="mt-4 text-red-500">{error}</div>}
             {response && (
@@ -210,6 +198,22 @@ export default function Home() {
                 <h2 className="text-2xl font-bold">Response</h2>
                 <div className="bg-gray-100 p-4 rounded response-box">
                   {formatResponse(response)}
+                </div>
+
+                {/* Move buttons below the response */}
+                <div className="mt-4 footer-buttons">
+                  <button
+                    onClick={handleTwitchAuth}
+                    className="mt-2 p-2 bg-blue-500 text-white rounded"
+                  >
+                    Login with Twitch
+                  </button>
+                  <button
+                    onClick={handleResetUserId}
+                    className="mt-2 p-2 bg-blue-500 text-white rounded"
+                  >
+                    Reset User ID
+                  </button>
                 </div>
               </div>
             )}
