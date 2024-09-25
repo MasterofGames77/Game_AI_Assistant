@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import connectToMongoDB from '../../utils/mongodb';
 import Question from '../../models/Question';
+import User from '../../models/User';
 import { getChatCompletion, fetchRecommendations, analyzeUserQuestions } from '../../utils/aiHelper';
 import { getClientCredentialsAccessToken, getAccessToken, getTwitchUserData, redirectToTwitch } from '../../utils/twitchAuth';
 import OpenAI from 'openai';
@@ -257,6 +258,7 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     let answer: string | null;
 
     if (question.toLowerCase().includes("recommendations")) {
+      const previousQuestions = await Question.find({ userId });
       const genres = analyzeUserQuestions(previousQuestions);
 
       if (genres.length > 0) {
@@ -282,22 +284,22 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
           redirectToTwitch(res);
           return;
         } else {
-          const accessToken = await getAccessToken(code);
+          let codeString = Array.isArray(code) ? code[0] : (code as string); // Ensure code is a string
+          const accessToken = await getAccessToken(codeString);
           const userData = await getTwitchUserData(accessToken);
           answer = `Twitch User Data: ${JSON.stringify(userData)}`;
         }
-      } catch (error) {
+      } catch (error: any) {
         if (error instanceof Error) {
-            console.error('Failed to retrieve Twitch user data:', error.message);
-            answer = 'There was an issue retrieving your Twitch data. Please try again later.';
+          console.error('Failed to retrieve Twitch user data:', error.message);
+          answer = 'There was an issue retrieving your Twitch data. Please try again later.';
         } else {
-            // Handle non-Error exceptions
-            console.error('An unexpected error occurred:', error);
-            answer = 'An unexpected error occurred. Please try again later.';
+          console.error('An unexpected error occurred:', error);
+          answer = 'An unexpected error occurred. Please try again later.';
         }
       }
     } else if (question.toLowerCase().includes("genre")) {
-      const gameTitle = extractGameTitle(question); 
+      const gameTitle = extractGameTitle(question);
       const genre = getGenreFromMapping(gameTitle);
       if (genre) {
         answer = `${gameTitle} is categorized as ${genre}.`;
@@ -315,7 +317,7 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
       }
     }
 
-    // Save to MongoDB
+    // Save the new question to the `questions` collection
     const newQuestion = new Question({
       userId,
       question,
@@ -323,6 +325,23 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     });
     await newQuestion.save();
     console.log("Saving question to MongoDB:", { userId, question, response: answer });
+
+    // Update or create the user entry in the `userID` collection
+    const user = await User.findOne({ userId });
+    if (user) {
+      // Increment the conversation count
+      user.conversationCount += 1;
+      await user.save();
+      console.log("Updated user conversation count:", user.conversationCount);
+    } else {
+      // Create a new user if none exists
+      const newUser = new User({
+        userId,
+        conversationCount: 1,
+      });
+      await newUser.save();
+      console.log("New user created with conversation count:", newUser.conversationCount);
+    }
 
     res.status(200).json({ answer });
   } catch (error: any) {
