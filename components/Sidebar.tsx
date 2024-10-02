@@ -51,6 +51,10 @@ const Sidebar = ({
       "collect",
       "area",
       "level",
+      "create",
+      "build",
+      "upload",
+      "inventory",
     ];
 
     const titlePattern = new RegExp(keywords.join("|"), "i");
