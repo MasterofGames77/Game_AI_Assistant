@@ -17,6 +17,9 @@ export default function Home() {
     useState<Conversation | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
 
+  // Optional image-related states (commented for now)
+  // const [image, setImage] = useState<File | null>(null);
+
   useEffect(() => {
     let storedUserId = localStorage.getItem("userId");
     if (!storedUserId || storedUserId === "null") {
@@ -62,6 +65,13 @@ export default function Home() {
     setError("");
 
     try {
+      // If image upload is added, use FormData (commented for now)
+      // const formData = new FormData();
+      // formData.append("question", question);
+      // if (image) {
+      //   formData.append("image", image);
+      // }
+
       const res = await axios.post("/api/assistant", { userId, question });
       console.log("Response from server:", res.data);
       setResponse(res.data.answer);
@@ -73,6 +83,12 @@ export default function Home() {
       setLoading(false);
     }
   };
+
+  // const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   if (e.target.files && e.target.files[0]) {
+  //     setImage(e.target.files[0]);
+  //   }
+  // };
 
   const handleClear = () => {
     setQuestion("");
@@ -89,7 +105,6 @@ export default function Home() {
   const handleResetUserId = () => {
     console.log("Resetting User ID.");
 
-    // Prompt the user to enter a new user ID
     const newUserId = prompt("Enter your new user ID or create a new one:");
 
     if (newUserId) {
@@ -111,10 +126,8 @@ export default function Home() {
         ? "https://video-game-wingman-57d61bef9e61.herokuapp.com"
         : "http://localhost:3000";
 
-    // Construct the redirect URI without double slashes
     const redirectUri = `${domain}/api/twitchCallback`;
 
-    // Construct the full Twitch login URL
     const twitchLoginUrl = `https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${
       process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID
     }&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:read:email`;
@@ -167,6 +180,8 @@ export default function Home() {
               <li>Analyze gameplay data to improve your strategies.</li>
               <li>Access detailed game guides.</li>
             </ul>
+
+            {/* Form to submit question */}
             <form onSubmit={handleSubmit} className="w-full max-w-md mt-2">
               <input
                 type="text"
@@ -175,6 +190,20 @@ export default function Home() {
                 placeholder="Message Video Game Wingman"
                 className="w-full p-2 border border-gray-300 rounded mb-4"
               />
+
+              {/* Commenting the image upload input */}
+              {/* 
+              <label className="cursor-pointer">
+                <FontAwesomeIcon icon={faPaperclip} size="2x" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  style={{ display: "none" }}
+                />
+              </label>
+              */}
+
               <div className="flex space-x-4">
                 <button
                   type="submit"
@@ -191,6 +220,7 @@ export default function Home() {
                 </button>
               </div>
             </form>
+
             {loading && <div className="spinner mt-4"></div>}
             {error && <div className="mt-4 text-red-500">{error}</div>}
             {response && (
