@@ -1,30 +1,48 @@
-// import formidable from 'formidable';
 // import type { NextApiRequest, NextApiResponse } from 'next';
+// import formidable, { File } from 'formidable';
 // import fs from 'fs';
+// import path from 'path';
 
 // export const config = {
 //   api: {
-//     bodyParser: false, // Important: Disabling bodyParser for file uploads
+//     bodyParser: false, // Disable bodyParser to handle file uploads
 //   },
 // };
 
-// const uploadImageHandler = (req: NextApiRequest, res: NextApiResponse) => {
-//   const form = formidable({ multiples: false });
+// // Utility to ensure the uploads directory exists
+// const ensureUploadsDir = (uploadsPath: string) => {
+//   if (!fs.existsSync(uploadsPath)) {
+//     fs.mkdirSync(uploadsPath, { recursive: true });
+//   }
+// };
 
-//   form.parse(req, async (err, fields, files) => {
+// // Handler for the image upload
+// const uploadImageHandler = async (req: NextApiRequest, res: NextApiResponse) => {
+//   const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+//   ensureUploadsDir(uploadsDir);
+
+//   const form = new formidable.IncomingForm({
+//     uploadDir: uploadsDir,     // Set upload directory
+//     keepExtensions: true,      // Preserve file extensions
+//     multiples: false           // Only accept a single file upload
+//   });
+
+//   form.parse(req, (err, fields, files) => {
 //     if (err) {
-//       res.status(500).json({ message: 'File upload error', error: err.message });
-//       return;
+//       console.error("Error parsing form:", err);
+//       return res.status(500).json({ error: "Error uploading file" });
 //     }
 
-//     const file = files.image as unknown as formidable.File; // Assuming the file is named 'image'
+//     // Type assertion for accessing the uploaded file
+//     const uploadedFile = files.file as File | File[]; // Allowing for File or File[] type
+//     if (!uploadedFile || Array.isArray(uploadedFile)) {
+//       return res.status(400).json({ error: "No file uploaded or multiple files provided" });
+//     }
 
-//     // Optional: Save the file somewhere (e.g., local file system or cloud)
-//     const data = fs.readFileSync(file.filepath);
-//     fs.writeFileSync(`./uploads/${file.originalFilename}`, data); // Example saving locally
+//     // Access the file path properly
+//     const filePath = uploadedFile.filepath; // Access filepath safely
 
-//     // TODO: Pass the file for image analysis here (e.g., AWS Rekognition or OpenAI)
-//     res.status(200).json({ message: 'File uploaded successfully' });
+//     return res.status(200).json({ message: "File uploaded successfully", filePath });
 //   });
 // };
 
