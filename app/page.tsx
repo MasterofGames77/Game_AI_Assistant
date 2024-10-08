@@ -6,6 +6,8 @@ import Sidebar from "../components/Sidebar";
 import Image from "next/image";
 import { Conversation } from "../types";
 import { v4 as uuidv4 } from "uuid";
+// import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+// import { faPaperclip } from "@fortawesome/free-solid-svg-icons";
 
 export default function Home() {
   const [question, setQuestion] = useState("");
@@ -23,13 +25,10 @@ export default function Home() {
   useEffect(() => {
     let storedUserId = localStorage.getItem("userId");
     if (!storedUserId || storedUserId === "null") {
-      storedUserId = prompt("Enter your user ID or create a new one:");
-      if (!storedUserId) {
-        storedUserId = uuidv4();
-        alert(
-          `Your new user ID is: ${storedUserId}. Please save it for future use.`
-        );
-      }
+      storedUserId = uuidv4();
+      alert(
+        `Your new user ID is: ${storedUserId}. Please save it for future use.`
+      );
       localStorage.setItem("userId", storedUserId);
     }
     setUserId(storedUserId);
@@ -84,6 +83,7 @@ export default function Home() {
     }
   };
 
+  // Optional image handler (commented for now)
   // const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   //   if (e.target.files && e.target.files[0]) {
   //     setImage(e.target.files[0]);
@@ -95,6 +95,7 @@ export default function Home() {
     setResponse("");
     setError("");
     setSelectedConversation(null);
+    // setImage(null); // Clear file input if using image
   };
 
   const handleDeleteConversation = () => {
@@ -191,7 +192,7 @@ export default function Home() {
                 className="w-full p-2 border border-gray-300 rounded mb-4"
               />
 
-              {/* Commenting the image upload input */}
+              {/* Optional file upload input (commented for now) */}
               {/* 
               <label className="cursor-pointer">
                 <FontAwesomeIcon icon={faPaperclip} size="2x" />
