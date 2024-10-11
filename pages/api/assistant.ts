@@ -9,6 +9,8 @@ import OpenAI from 'openai';
 import path from 'path';
 import { readFile } from 'fs/promises';
 import { parse } from 'csv-parse/sync';
+// import formidable, { IncomingForm } from 'formidable';
+// import fs from 'fs';
 
 console.log("Environment Variables:");
 console.log("OPENAI_API_KEY:", process.env.OPENAI_API_KEY ? "SET" : "NOT SET");
@@ -244,30 +246,66 @@ const extractGameTitle = (question: string): string => {
   return match ? match[1].trim() : '';
 };
 
-// Handler function
+// Define the analyzeImage function
+// async function analyzeImage(filePath: string): Promise<string> {
+//   try {
+//     // Step 1: Read image from file system
+//     const imageFile = fs.readFileSync(filePath);
+
+//     // Step 2: Send image to OpenAI or another image analysis API
+//     const response = await openai.createImageAnalysis({ image: imageFile }); // Hypothetical API call for image analysis
+//     console.log("Image Analysis Response:", response.data.result);
+
+//     // Step 3: Extract insights from response
+//     return response.data.result || "No insights available from the image.";
+//   } catch (error) {
+//     console.error("Error analyzing image:", error);
+//     return "Image analysis failed. Please try again.";
+//   }
+// }
+
+// Updated assistantHandler to process both text and images
 const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
+  // Initialize formidable for parsing files (commented out for now)
+  // const form = new IncomingForm();
+  // form.uploadDir = './uploads';
+  // form.keepExtensions = true;
+
   const { userId, question, code } = req.body;
 
   try {
     console.log("Received question:", question);
-
     await connectToMongoDB();
 
-    const previousQuestions = await Question.find({ userId });
-
     let answer: string | null;
+    let imageAnalysisResult = '';
 
+    // Commented code to handle file parsing and analysis
+    /*
+    await new Promise<void>((resolve, reject) => {
+      form.parse(req, async (err, fields, files) => {
+        if (err) return reject(err);
+
+        const uploadedFile = files.image;
+        if (uploadedFile) {
+          const filePath = Array.isArray(uploadedFile) ? uploadedFile[0].filepath : uploadedFile.filepath;
+          imageAnalysisResult = await analyzeImage(filePath);
+        }
+        resolve();
+      });
+    });
+    */
+
+    // Primary question processing
     if (question.toLowerCase().includes("recommendations")) {
       const previousQuestions = await Question.find({ userId });
       const genres = analyzeUserQuestions(previousQuestions);
 
       if (genres.length > 0) {
         const recommendations = await fetchRecommendations(genres[0]);
-        if (recommendations.length > 0) {
-          answer = `Based on your previous questions, I recommend these games: ${recommendations.join(', ')}.`;
-        } else {
-          answer = "I couldn't find any recommendations based on your preferences.";
-        }
+        answer = recommendations.length > 0
+          ? `Based on your previous questions, I recommend these games: ${recommendations.join(', ')}.`
+          : "I couldn't find any recommendations based on your preferences.";
       } else {
         answer = "I couldn't determine your preferences based on your previous questions.";
       }
@@ -284,32 +322,23 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
           redirectToTwitch(res);
           return;
         } else {
-          let codeString = Array.isArray(code) ? code[0] : (code as string); // Ensure code is a string
+          const codeString = Array.isArray(code) ? code[0] : (code as string);
           const accessToken = await getAccessToken(codeString);
           const userData = await getTwitchUserData(accessToken);
           answer = `Twitch User Data: ${JSON.stringify(userData)}`;
         }
-      } catch (error: any) {
-        if (error instanceof Error) {
-          console.error('Failed to retrieve Twitch user data:', error.message);
-          answer = 'There was an issue retrieving your Twitch data. Please try again later.';
-        } else {
-          console.error('An unexpected error occurred:', error);
-          answer = 'An unexpected error occurred. Please try again later.';
-        }
+      } catch (error) {
+        console.error("Error retrieving Twitch user data:", error);
+        answer = 'There was an issue retrieving your Twitch data. Please try again later.';
       }
     } else if (question.toLowerCase().includes("genre")) {
       const gameTitle = extractGameTitle(question);
       const genre = getGenreFromMapping(gameTitle);
-      if (genre) {
-        answer = `${gameTitle} is categorized as ${genre}.`;
-      } else {
-        answer = `I couldn't find genre information for ${gameTitle}.`;
-      }
+      answer = genre
+        ? `${gameTitle} is categorized as ${genre}.`
+        : `I couldn't find genre information for ${gameTitle}.`;
     } else {
-      // For General Questions
       answer = await getChatCompletion(question);
-
       if (answer) {
         answer = await checkAndUpdateGameInfo(question, answer);
       } else {
@@ -317,7 +346,12 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
       }
     }
 
-    // Save the new question to the `questions` collection
+    // Append image analysis result if present
+    if (imageAnalysisResult) {
+      answer = `${answer}\n\nImage Analysis: ${imageAnalysisResult}`;
+    }
+
+    // Save to MongoDB
     const newQuestion = new Question({
       userId,
       question,
@@ -326,27 +360,21 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     await newQuestion.save();
     console.log("Saving question to MongoDB:", { userId, question, response: answer });
 
-    // Update or create the user entry in the `userID` collection
     const user = await User.findOne({ userId });
     if (user) {
-      // Increment the conversation count
       user.conversationCount += 1;
       await user.save();
       console.log("Updated user conversation count:", user.conversationCount);
     } else {
-      // Create a new user if none exists
-      const newUser = new User({
-        userId,
-        conversationCount: 1,
-      });
+      const newUser = new User({ userId, conversationCount: 1 });
       await newUser.save();
       console.log("New user created with conversation count:", newUser.conversationCount);
     }
 
     res.status(200).json({ answer });
-  } catch (error: any) {
-    console.error("Error in API route:", error.message);
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error("Error in API route:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
