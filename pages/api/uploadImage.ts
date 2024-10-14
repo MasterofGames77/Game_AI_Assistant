@@ -2,30 +2,28 @@
 // import formidable, { File } from 'formidable';
 // import fs from 'fs';
 // import path from 'path';
-// import axios from 'axios';
+// import { analyzeImage } from './analyzeImage';  // Import the utility function
 
 // export const config = {
 //   api: {
-//     bodyParser: false, // Disable bodyParser to handle file uploads
+//     bodyParser: false,
 //   },
 // };
 
-// // Utility to ensure the uploads directory exists
 // const ensureUploadsDir = (uploadsPath: string) => {
 //   if (!fs.existsSync(uploadsPath)) {
 //     fs.mkdirSync(uploadsPath, { recursive: true });
 //   }
 // };
 
-// // Handler for the image upload
 // const uploadImageHandler = async (req: NextApiRequest, res: NextApiResponse) => {
 //   const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
 //   ensureUploadsDir(uploadsDir);
 
 //   const form = new formidable.IncomingForm({
-//     uploadDir: uploadsDir,     // Set upload directory
-//     keepExtensions: true,      // Preserve file extensions
-//     multiples: false           // Only accept a single file upload
+//     uploadDir: uploadsDir,
+//     keepExtensions: true,
+//     multiples: false,
 //   });
 
 //   form.parse(req, async (err, fields, files) => {
@@ -34,26 +32,22 @@
 //       return res.status(500).json({ error: "Error uploading file" });
 //     }
 
-//     // Type assertion for accessing the uploaded file
 //     const uploadedFile = files.file as File | File[];
 //     if (!uploadedFile || Array.isArray(uploadedFile)) {
 //       return res.status(400).json({ error: "No file uploaded or multiple files provided" });
 //     }
 
-//     // Access the file path properly
 //     const filePath = uploadedFile.filepath;
 
 //     try {
-//       // Send the file path to analyzeImage.ts for analysis
-//       const analysisResponse = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/analyzeImage`, {
-//         filePath,
-//       });
+//       // Perform analysis directly using analyzeImage
+//       const analysisResult = await analyzeImage(filePath);
 
 //       // Respond with both file path and analysis result
 //       return res.status(200).json({ 
 //         message: "File uploaded successfully", 
 //         filePath, 
-//         analysis: analysisResponse.data 
+//         analysis: analysisResult 
 //       });
 //     } catch (analysisError) {
 //       console.error("Error analyzing image:", analysisError);
