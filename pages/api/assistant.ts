@@ -319,31 +319,52 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
 
     if (question.toLowerCase().includes("recommendations")) {
       const previousQuestions = await Question.find({ userId });
+
       const genres = analyzeUserQuestions(previousQuestions);
+
       const recommendations = genres.length > 0 ? await fetchRecommendations(genres[0]) : [];
+
       answer = recommendations.length > 0 ? `Based on your previous questions, I recommend these games: ${recommendations.join(', ')}.` : "I couldn't find any recommendations based on your preferences.";
     } else if (question.toLowerCase().includes("when was") || question.toLowerCase().includes("when did")) {
       answer = await getChatCompletion(question);
+
       answer = answer ? await checkAndUpdateGameInfo(question, answer) : "I'm sorry, I couldn't generate a response. Please try again.";
+      
     } else if (question.toLowerCase().includes("twitch user data")) {
       if (!code) {
         redirectToTwitch(res);
         return;
       }
       const accessToken = await getAccessToken(Array.isArray(code) ? code[0] : code);
+
       const userData = await getTwitchUserData(accessToken);
+
       answer = `Twitch User Data: ${JSON.stringify(userData)}`;
+
     } else if (question.toLowerCase().includes("genre")) {
       const gameTitle = extractGameTitle(question);
+
       const genre = getGenreFromMapping(gameTitle);
+
       answer = genre ? `${gameTitle} is categorized as ${genre}.` : `I couldn't find genre information for ${gameTitle}.`;
     } else {
       answer = await getChatCompletion(question);
+
       answer = answer ? await checkAndUpdateGameInfo(question, answer) : "I'm sorry, I couldn't generate a response. Please try again.";
     }
 
     await Question.create({ userId, question, response: answer });
     await User.findOneAndUpdate({ userId }, { $inc: { conversationCount: 1 } }, { upsert: true });
+
+    // Check the question type (e.g., RPG, Boss Fight, etc.)
+    // const questionType = checkQuestionType(question);
+    // if (questionType) {
+    //   // Increment the relevant progress field
+    //   await User.updateOne({ userId }, { $inc: { [`progress.${questionType}`]: 1 } });
+
+    //   // Check and award achievements if criteria are met
+    //   await checkAndAwardAchievements(userId, user.progress);
+    // }
 
     res.status(200).json({ answer });
   } catch (error) {
