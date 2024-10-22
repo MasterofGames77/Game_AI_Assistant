@@ -9,6 +9,7 @@ import OpenAI from 'openai';
 import path from 'path';
 import { readFile } from 'fs/promises';
 import { parse } from 'csv-parse/sync';
+import { getIO } from '../../middleware/realtime';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -304,6 +305,10 @@ const extractGameTitle = (question: string): string => {
 //   if (achievements.length > 0) {
 //     // Update the user with the new achievements
 //     await User.updateOne({ userId }, { $push: { achievements: { $each: achievements } } });
+
+       // Emit a Socket.IO event to notify the user
+       // const io = getIO();
+       // io.emit('achievementEarned', { userId, achievements });
 //   }
 // };
 
