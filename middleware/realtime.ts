@@ -12,17 +12,17 @@ const initSocket = (server: HttpServer): void => {
   });
 
   io.on("connection", (socket) => {
-    console.log("a user connected");
+    console.log("A user connected");
 
     socket.on("disconnect", () => {
-      console.log("user disconnected");
+      console.log("User disconnected");
     });
   });
 };
 
 const getIO = (): Server => {
   if (!io) {
-    throw new Error("Socket.io not initialized");
+    throw new Error("Socket.IO not initialized");
   }
   return io;
 };
