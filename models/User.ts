@@ -1,44 +1,81 @@
-import mongoose from 'mongoose';
+import mongoose, { Document, Schema } from 'mongoose';
 
-const UserSchema = new mongoose.Schema({
+interface Progress {
+  firstQuestion?: number;
+  frequentAsker?: number;
+  rpgEnthusiast?: number;
+  bossBuster?: number;
+  strategySpecialist?: number;
+  actionAficionado?: number;
+  battleRoyale?: number;
+  sportsChampion?: number;
+  adventureAddict?: number;
+  shooterSpecialist?: number;
+  puzzlePro?: number;
+  racingExpert?: number;
+  stealthSpecialist?: number;
+  horrorHero?: number;
+  triviaMaster?: number;
+  totalQuestions?: number;
+  dailyExplorer?: number;
+  speedrunner?: number;
+  collectorPro?: number;
+  dataDiver?: number;
+  performanceTweaker?: number;
+  conversationalist?: number;
+}
+
+interface Achievement {
+  name: string;
+  dateEarned: Date;
+}
+
+export interface IUser extends Document {
+  userId: string;
+  email: string;
+  conversationCount: number;
+  hasProAccess: boolean;
+  achievements: Achievement[];
+  progress: Progress;
+}
+
+const UserSchema = new Schema<IUser>({
   userId: { type: String, required: true },
   email: { type: String, required: true },
-  conversationCount: { type: Number, required: true, default: 0 },  // Track the number of conversations
-  hasProAccess: { type: Boolean, default: false },  // Whether the user has Pro Access
-
+  conversationCount: { type: Number, required: true, default: 0 },
+  hasProAccess: { type: Boolean, default: false },
   achievements: [
     {
-      name: { type: String, required: true },         // Name of the achievement (e.g., "RPG Enthusiast")
-      dateEarned: { type: Date, required: true },     // Date the achievement was earned
+      name: { type: String, required: true },
+      dateEarned: { type: Date, required: true },
     },
   ],
-
   progress: {
-    firstQuestion: { type: Number, default: 0 },          // Ask a question for the first time (First Question Achievement)
-    frequentAsker: { type: Number, default: 0 },          // Ask 10 questions in a single day (Frequent Asker Achievement)
-    rpgEnthusiast: { type: Number, default: 0 },          // Ask 5 questions about of RPG's (RPG Enthusiast Achievement)
-    bossBuster: { type: Number, default: 0 },             // Ask 10 questions specifically about boss fights (Boss Battle Achievement)
-    strategySpecialist: {type: Number, default: 0 },      // Ask 5 questions about strategy games (Strategy Specialist Achievement)
-    actionAficionado: { type: Number, default: 0 },       // Ask 5 questiions about action games (Action Aficionado Achievement)
-    battleRoyale: { type: Number, default: 0 },           // Ask 5 questions about Battle Royale Games 
-    sportsChampion: { type: Number, default: 0 },         // Ask 5 questions about Sports Games (Sports Champion Achievement)
-    adventureAddict: { type: Number, default: 0 },        // Ask 5 questions about adventure games (Adventure Addict Achievement)
-    shooterSpecialist: { type: Number, default: 0 },      // Ask 5 questions about First-Person or Third-Person Shooter Games (Shooter Specialist Achievement)
-    puzzlePro: { type: Number, default: 0 },              // Ask 5 questions about puzzle games (Puzzle Pro Achievement)
-    racingExpert: { type: Number, default: 0 },           // Ask 5 questions about racing games (Racing Expert Achievement)
-    stealthSpecialist: { type: Number, default: 0 },      // Ask 5 questions about stealth games (Stealth Specialist Achievement)
-    horrorHero: { type: Number, default: 0 },             // Ask 5 questions about horror games (Horror Hero Achievement)
-    triviaMaster: { type: Number, default: 0 },           // Ask trivia-related questions about 5 different games (Trivia Master Achievement)
-    totalQuestions: { type: Number, default: 0 },         // Track total questions asked for general achievements
-    dailyExplorer: { type: Number, default: 0 },          // Ask a question each day in the week (Daily Explorer Achievement)
-    speedrunner: { type: Number, default: 0 },            // Track questions related to speedrunning (Speedrunner Achievement)
-    collectorPro: { type: Number, default: 0 },           // Track questions about finding collectibles (Collector Pro Achievement)
-    dataDiver: { type: Number, default: 0 },              // Request gameplay analytics or insights 5 times (Data Diver Achievement)
-    performanceTweaker: { type: Number, default: 0 },     // Ask questions about improving game performance (Performance Tweaker Achievement)
-    conversationalist: { type: Number, default: 0 },      // Ask 50 questions over time (Conversationalist Achievement)
+    firstQuestion: { type: Number, default: 0 },
+    frequentAsker: { type: Number, default: 0 },
+    rpgEnthusiast: { type: Number, default: 0 },
+    bossBuster: { type: Number, default: 0 },
+    strategySpecialist: { type: Number, default: 0 },
+    actionAficionado: { type: Number, default: 0 },
+    battleRoyale: { type: Number, default: 0 },
+    sportsChampion: { type: Number, default: 0 },
+    adventureAddict: { type: Number, default: 0 },
+    shooterSpecialist: { type: Number, default: 0 },
+    puzzlePro: { type: Number, default: 0 },
+    racingExpert: { type: Number, default: 0 },
+    stealthSpecialist: { type: Number, default: 0 },
+    horrorHero: { type: Number, default: 0 },
+    triviaMaster: { type: Number, default: 0 },
+    totalQuestions: { type: Number, default: 0 },
+    dailyExplorer: { type: Number, default: 0 },
+    speedrunner: { type: Number, default: 0 },
+    collectorPro: { type: Number, default: 0 },
+    dataDiver: { type: Number, default: 0 },
+    performanceTweaker: { type: Number, default: 0 },
+    conversationalist: { type: Number, default: 0 },
   },
 }, { collection: 'userID' });
 
-const User = mongoose.models.User || mongoose.model('User', UserSchema);
+const User = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
 
 export default User;
