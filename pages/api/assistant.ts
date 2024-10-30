@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import connectToMongoDB from '../../utils/mongodb';
 import Question from '../../models/Question';
-import User from '../../models/User';
+import User, { IUser } from '../../models/User';
 import { getChatCompletion, fetchRecommendations, analyzeUserQuestions } from '../../utils/aiHelper';
 import { getClientCredentialsAccessToken, getAccessToken, getTwitchUserData, redirectToTwitch } from '../../utils/twitchAuth';
 import OpenAI from 'openai';
@@ -227,90 +227,90 @@ const extractGameTitle = (question: string): string => {
   return match ? match[1].trim() : '';
 };
 
-// const checkQuestionType = (question: string): string | null => {
-//   if (question.toLowerCase().includes("rpg")) return "rpgEnthusiast";
-//   if (question.toLowerCase().includes("boss fight")) return "bossBuster";
-//   if (question.toLowerCase().includes("strategy")) return "strategySpecialist";
-//   if (question.toLowerCase().includes("action")) return "actionAficionado";
-//   if (question.toLowerCase().includes("battle royale")) return "battleRoyale";
-//   if (question.toLowerCase().includes("sports")) return "sportsChampion";
-//   if (question.toLowerCase().includes("adventure")) return "adventureAddict";
-//   if (question.toLowerCase().includes("shooter")) return "shooterSpecialist";
-//   if (question.toLowerCase().includes("puzzle")) return "puzzlePro";
-//   if (question.toLowerCase().includes("racing")) return "racingPro";
-//   if (question.toLowerCase().includes("stealth")) return "stealthSpecialist";
-//   if (question.toLowerCase().includes("horror")) return "horrorHero";
-//   if (question.toLowerCase().includes("trivia")) return "triviaMaster";
-//   if (question.toLowerCase().includes("speed run")) return "speedrunner";
-//   if (question.toLowerCase().includes("collect")) return "collectorPro";
-//   if (question.toLowerCase().includes("analytics")) return "dataDiver";
-//   if (question.toLowerCase().includes("performance")) return "performanceTweaker";
-//   return null;
-// };
+const checkQuestionType = (question: string): string | null => {
+  if (question.toLowerCase().includes("rpg")) return "rpgEnthusiast";
+  if (question.toLowerCase().includes("boss fight")) return "bossBuster";
+  if (question.toLowerCase().includes("strategy")) return "strategySpecialist";
+  if (question.toLowerCase().includes("action")) return "actionAficionado";
+  if (question.toLowerCase().includes("battle royale")) return "battleRoyale";
+  if (question.toLowerCase().includes("sports")) return "sportsChampion";
+  if (question.toLowerCase().includes("adventure")) return "adventureAddict";
+  if (question.toLowerCase().includes("shooter")) return "shooterSpecialist";
+  if (question.toLowerCase().includes("puzzle")) return "puzzlePro";
+  if (question.toLowerCase().includes("racing")) return "racingPro";
+  if (question.toLowerCase().includes("stealth")) return "stealthSpecialist";
+  if (question.toLowerCase().includes("horror")) return "horrorHero";
+  if (question.toLowerCase().includes("trivia")) return "triviaMaster";
+  if (question.toLowerCase().includes("speed run")) return "speedrunner";
+  if (question.toLowerCase().includes("collect")) return "collectorPro";
+  if (question.toLowerCase().includes("analytics")) return "dataDiver";
+  if (question.toLowerCase().includes("performance")) return "performanceTweaker";
+  return null;
+};
 
-// const checkAndAwardAchievements = async (userId: string, progress: any) => {
-//   const achievements: any[] = [];
+const checkAndAwardAchievements = async (userId: string, progress: any) => {
+  const achievements: any[] = [];
 
-//   if (progress.rpgEnthusiast >= 5 && !progress.achievements.includes("RPG Enthusiast")) {
-//     achievements.push({ name: "RPG Enthusiast", dateEarned: new Date() });
-//   }
-//   if (progress.bossBuster >= 10 && !progress.achievements.includes("Boss Buster")) {
-//     achievements.push({ name: "Boss Buster", dateEarned: new Date() });
-//   }
-//   if (progress.strategySpecialist >= 5 && !progress.achievements.includes("Strategy Specialist")) {
-//     achievements.push({ name: "Strategy Specialist", dateEarned: new Date() });
-//   }
-//   if (progress.actionAficionado >= 5 && !progress.achievements.includes("Action Aficionado")) {
-//     achievements.push({ name: "Action Aficionado", dateEarned: new Date() });
-//   }
-//   if (progress.battleRoyale >= 5 && !progress.achievements.includes("Battle Royale")) {
-//     achievements.push({ name: "Battle Royale Master", dateEarned: new Date() });
-//   }
-//   if (progress.sportsChampion >= 5 && !progress.achievements.includes("Sports Champion")) {
-//     achievements.push({ name: "Sports Champion", dateEarned: new Date() });
-//   }
-//   if (progress.adventureAddict >= 5 && !progress.achievements.includes("Adventure Addict")) {
-//     achievements.push({ name: "Adventure Addict", dateEarned: new Date() });
-//   }
-//   if (progress.shooterSpecialist >= 5 && !progress.achievements.includes("Shooter Specialist")) {
-//     achievements.push({ name: "Shooter Specialist", dateEarned: new Date() });
-//   }
-//   if (progress.puzzlePro >= 5 && !progress.achievements.includes("Puzzle Pro")) {
-//     achievements.push({ name: "Puzzle Pro", dateEarned: new Date() });
-//   }
-//   if (progress.racingExpert >= 5 && !progress.achievements.includes("Racing Expert")) {
-//     achievements.push({ name: "Racing Expert", dateEarned: new Date() });
-//   }
-//   if (progress.stealthSpecialist >= 5 && !progress.achievements.includes("Stealth Specialist")) {
-//     achievements.push({ name: "Stealth Specialist", dateEarned: new Date() });
-//   }
-//   if (progress.horrorHero >= 5 && !progress.achievements.includes("Horror Hero")) {
-//     achievements.push({ name: "Horror Hero", dateEarned: new Date() });
-//   }
-//   if (progress.triviaMaster >= 5 && !progress.achievements.includes("Trivia Master")) {
-//     achievements.push({ name: "Trivia Master", dateEarned: new Date() });
-//   }
-//   if (progress.speedrunner >= 10 && !progress.achievements.includes("Speedrunner")) {
-//     achievements.push({ name: "Speedrunner", dateEarned: new Date() });
-//   }
-//   if (progress.collectorPro >= 10 && !progress.achievements.includes("Collector Pro")) {
-//     achievements.push({ name: "Collector Pro", dateEarned: new Date() });
-//   }
-//   if (progress.dataDiver >= 10 && !progress.achievements.includes("Data Diver")) {
-//     achievements.push({ name: "Data Diver", dateEarned: new Date() });
-//   }
-//   if (progress.performanceTweaker >= 10 && !progress.achievements.includes("Performance Tweaker")) {
-//     achievements.push({ name: "Performance Tweaker", dateEarned: new Date() });
-//   }
-//   if (achievements.length > 0) {
-//     // Update the user with the new achievements
-//     await User.updateOne({ userId }, { $push: { achievements: { $each: achievements } } });
+  if (progress.rpgEnthusiast >= 5 && !progress.achievements.includes("RPG Enthusiast")) {
+    achievements.push({ name: "RPG Enthusiast", dateEarned: new Date() });
+  }
+  if (progress.bossBuster >= 10 && !progress.achievements.includes("Boss Buster")) {
+    achievements.push({ name: "Boss Buster", dateEarned: new Date() });
+  }
+  if (progress.strategySpecialist >= 5 && !progress.achievements.includes("Strategy Specialist")) {
+    achievements.push({ name: "Strategy Specialist", dateEarned: new Date() });
+  }
+  if (progress.actionAficionado >= 5 && !progress.achievements.includes("Action Aficionado")) {
+    achievements.push({ name: "Action Aficionado", dateEarned: new Date() });
+  }
+  if (progress.battleRoyale >= 5 && !progress.achievements.includes("Battle Royale")) {
+    achievements.push({ name: "Battle Royale Master", dateEarned: new Date() });
+  }
+  if (progress.sportsChampion >= 5 && !progress.achievements.includes("Sports Champion")) {
+    achievements.push({ name: "Sports Champion", dateEarned: new Date() });
+  }
+  if (progress.adventureAddict >= 5 && !progress.achievements.includes("Adventure Addict")) {
+    achievements.push({ name: "Adventure Addict", dateEarned: new Date() });
+  }
+  if (progress.shooterSpecialist >= 5 && !progress.achievements.includes("Shooter Specialist")) {
+    achievements.push({ name: "Shooter Specialist", dateEarned: new Date() });
+  }
+  if (progress.puzzlePro >= 5 && !progress.achievements.includes("Puzzle Pro")) {
+    achievements.push({ name: "Puzzle Pro", dateEarned: new Date() });
+  }
+  if (progress.racingExpert >= 5 && !progress.achievements.includes("Racing Expert")) {
+    achievements.push({ name: "Racing Expert", dateEarned: new Date() });
+  }
+  if (progress.stealthSpecialist >= 5 && !progress.achievements.includes("Stealth Specialist")) {
+    achievements.push({ name: "Stealth Specialist", dateEarned: new Date() });
+  }
+  if (progress.horrorHero >= 5 && !progress.achievements.includes("Horror Hero")) {
+    achievements.push({ name: "Horror Hero", dateEarned: new Date() });
+  }
+  if (progress.triviaMaster >= 5 && !progress.achievements.includes("Trivia Master")) {
+    achievements.push({ name: "Trivia Master", dateEarned: new Date() });
+  }
+  if (progress.speedrunner >= 10 && !progress.achievements.includes("Speedrunner")) {
+    achievements.push({ name: "Speedrunner", dateEarned: new Date() });
+  }
+  if (progress.collectorPro >= 10 && !progress.achievements.includes("Collector Pro")) {
+    achievements.push({ name: "Collector Pro", dateEarned: new Date() });
+  }
+  if (progress.dataDiver >= 10 && !progress.achievements.includes("Data Diver")) {
+    achievements.push({ name: "Data Diver", dateEarned: new Date() });
+  }
+  if (progress.performanceTweaker >= 10 && !progress.achievements.includes("Performance Tweaker")) {
+    achievements.push({ name: "Performance Tweaker", dateEarned: new Date() });
+  }
+  if (achievements.length > 0) {
+    // Update the user with the new achievements
+    await User.updateOne({ userId }, { $push: { achievements: { $each: achievements } } });
 
-       // Emit a Socket.IO event to notify the user
-       // const io = getIO();
-       // io.emit('achievementEarned', { userId, achievements });
-//   }
-// };
+       //Emit a Socket.IO event to notify the user
+       const io = getIO();
+       io.emit('achievementEarned', { userId, achievements });
+  }
+};
 
 // Main handler
 const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
@@ -362,14 +362,17 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     await User.findOneAndUpdate({ userId }, { $inc: { conversationCount: 1 } }, { upsert: true });
 
     // Check the question type (e.g., RPG, Boss Fight, etc.)
-    // const questionType = checkQuestionType(question);
-    // if (questionType) {
-    //   // Increment the relevant progress field
-    //   await User.updateOne({ userId }, { $inc: { [`progress.${questionType}`]: 1 } });
+    const questionType = checkQuestionType(question);
+    if (questionType) {
+      // Increment the relevant progress field
+      await User.updateOne({ userId }, { $inc: { [`progress.${questionType}`]: 1 } });
 
-    //   // Check and award achievements if criteria are met
-    //   await checkAndAwardAchievements(userId, user.progress);
-    // }
+      // Fetch the updated user document to pass progress to the achievement check function
+      const updatedUser = await User.findOne({ userId }) as IUser;
+
+      // Check and award achievements if criteria are met
+      await checkAndAwardAchievements(userId, updatedUser.progress);
+    }
 
     res.status(200).json({ answer });
   } catch (error) {
