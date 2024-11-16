@@ -133,32 +133,49 @@ const fetchAndCombineGameData = async (question: string, answer: string): Promis
   const gameName = question.replace(/when (was|did) (.*?) (released|come out)/i, "$2").trim();
 
   try {
-    const rawgResponse = await fetchGamesFromRAWG(gameName);
-    const igdbResponse = await fetchGamesFromIGDB(gameName);
+    // Fetch data from all sources
+    const rawgResult = await fetchGamesFromRAWG(gameName);
+    const igdbResult = await fetchGamesFromIGDB(gameName);
+    const csvData = await getCSVData();
+    
+    const rawgResponse = rawgResult ?? "";
+    const igdbResponse = igdbResult ?? "";
+    const gameInfo = csvData.find((game: any) => game.title.toLowerCase() === gameName.toLowerCase());
 
     // Determine if the responses are suitable for combined output
-    const isMainResponseShort = rawgResponse.length < 150 && (igdbResponse ? igdbResponse.length < 150 : true);
-    let finalResponse = isMainResponseShort ? "Combined Game Information:\n" : "";
+    const isMainResponseShort = answer.length < 150;
+    const hasRelevantData = (
+      (rawgResponse && rawgResponse.toLowerCase().includes(gameName.toLowerCase())) ||
+      (igdbResponse && igdbResponse.toLowerCase().includes(gameName.toLowerCase())) ||
+      gameInfo
+    );
 
-    if (isMainResponseShort) {
-      if (!rawgResponse.includes("No games found")) {
+    if (isMainResponseShort && hasRelevantData) {
+      let finalResponse = "Game Information:\n";
+
+      // Add CSV data if available
+      if (gameInfo) {
+        finalResponse += `\nLocal Database: ${formatGameInfo(gameInfo)}`;
+      }
+
+      // Add API responses if they contain relevant data
+      if (rawgResponse && !rawgResponse.includes("No games found")) {
         finalResponse += `\nFrom RAWG: ${rawgResponse}`;
       }
+
       if (igdbResponse && !igdbResponse.includes("No games found")) {
         finalResponse += `\nFrom IGDB: ${igdbResponse}`;
       }
-    } else {
-      finalResponse += "Detailed game information is already provided in the main response.";
+
+      return `${answer}\n\nAdditional Information:\n${finalResponse}`;
     }
 
-    const csvData = await getCSVData();
-    const gameInfo = csvData.find((game: any) => game.title.toLowerCase() === gameName.toLowerCase());
-    const formattedGameInfo = gameInfo ? `${formatGameInfo(gameInfo)}\n\nAdditional Information:\n${finalResponse}` : `${answer}\n\nAdditional Information:\n${finalResponse}`;
+    // Return original answer if response isn't short or no relevant data found
+    return answer;
 
-    // Only return consolidated response
-    return formattedGameInfo;
   } catch (error) {
-    console.error('Error fetching game data or reading CSV:', error);
+    console.error('Error in fetchAndCombineGameData:', error);
+    // Maintain the original error message format
     return `${answer}\n\nAdditional Information:\nFailed to fetch data due to an error.`;
   }
 };

@@ -24,28 +24,45 @@ function cleanAndMatchTitle(queryTitle: string, recordTitle: string): boolean {
 // Example IGDB Fetch Function with Improved Filtering
 async function fetchFromIGDB(gameTitle: string): Promise<string | null> {
   try {
-    const accessToken = await getClientCredentialsAccessToken(); // Use the correct function
+    const accessToken = await getClientCredentialsAccessToken();
+    
+    // Escape special characters and quotes in the game title
+    const sanitizedTitle = gameTitle.replace(/"/g, '\\"');
 
     const response = await axios.post(
       'https://api.igdb.com/v4/games',
-      `fields name,release_dates.date,platforms.name,developers.name,publishers.name; where name ~ "${gameTitle}";`,
+      // Updated query format with proper escaping and simplified fields
+      `search "${sanitizedTitle}";
+       fields name,first_release_date,platforms.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher;
+       limit 1;`,
       {
         headers: {
-          'Client-ID': process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID,
-          'Authorization': `Bearer ${accessToken}`, // Use the dynamic access token
+          'Client-ID': process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID!,
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/json'
         }
       }
     );
 
-    if (response.data.length > 0) {
-      const game = response.data.find((g: any) => cleanAndMatchTitle(gameTitle, g.name));
-      if (game) {
-        return `The game ${game.name} was released on ${new Date(game.release_dates[0].date * 1000).toLocaleDateString()}. It was developed by ${game.developers?.map((d: any) => d.name).join(", ") || "unknown developers"} and published by ${game.publishers?.map((p: any) => p.name).join(", ") || "unknown publishers"} and was released on ${game.platforms?.map((p: any) => p.name).join(", ") || "unknown platforms"}.`;
-      }
+    if (response.data && response.data.length > 0) {
+      const game = response.data[0];
+      const developers = game.involved_companies?.filter((ic: any) => ic.developer)
+        .map((ic: any) => ic.company.name).join(", ") || "unknown developers";
+      const publishers = game.involved_companies?.filter((ic: any) => ic.publisher)
+        .map((ic: any) => ic.company.name).join(", ") || "unknown publishers";
+      const platforms = game.platforms?.map((p: any) => p.name).join(", ") || "unknown platforms";
+      const releaseDate = game.first_release_date 
+        ? new Date(game.first_release_date * 1000).toLocaleDateString()
+        : "unknown release date";
+
+      return `${game.name} was released on ${releaseDate}. It was developed by ${developers} and published by ${publishers} for ${platforms}.`;
     }
     return null;
   } catch (error) {
     console.error("Error fetching data from IGDB:", error);
+    if (axios.isAxiosError(error)) {
+      console.error("IGDB API Response:", error.response?.data);
+    }
     return null;
   }
 }
@@ -80,14 +97,24 @@ async function fetchSeriesFromIGDB(seriesTitle: string): Promise<any[] | null> {
 // Fetch data from RAWG with enhanced matching logic
 async function fetchFromRAWG(gameTitle: string): Promise<string | null> {
   try {
-    const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&search=${encodeURIComponent(gameTitle)}`;
+    // Sanitize and exact match the game title
+    const sanitizedTitle = gameTitle.toLowerCase().trim();
+    const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&search=${encodeURIComponent(sanitizedTitle)}&search_precise=true`;
+    
     const response = await axios.get(url);
 
     if (response.data && response.data.results.length > 0) {
-      // Filter the response data to find the most relevant game
-      const game = response.data.results.find((g: any) => cleanAndMatchTitle(gameTitle, g.name));
+      // Find exact match or close match using title comparison
+      const game = response.data.results.find((g: any) => {
+        const normalizedGameName = g.name.toLowerCase().trim();
+        return normalizedGameName === sanitizedTitle || 
+               normalizedGameName.includes(sanitizedTitle);
+      });
+
       if (game) {
-        return `The game ${game.name} was released on ${game.released}. It was developed by ${game.developers?.map((d: any) => d.name).join(", ") || "unknown developers"} and published by ${game.publishers?.map((p: any) => p.name).join(", ") || "unknown publishers"} and was released on ${game.platforms?.map((p: any) => p.platform.name).join(", ") || "unknown platforms"}.`;
+        return `${game.name} (Released: ${game.released}, Genres: ${game.genres.map((g: any) => g.name).join(', ')}, ` +
+               `Platforms: ${game.platforms.map((p: any) => p.platform.name).join(', ')}, ` +
+               `URL: https://rawg.io/games/${game.slug})`;
       }
     }
     return null;

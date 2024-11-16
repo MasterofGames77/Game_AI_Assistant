@@ -7,6 +7,7 @@ interface GameData {
   console: string;
   release_year: string;
   genre: string;
+  developer: string;
   publisher: string;
   critic_score: Decimal128;
   total_sales: Decimal128;
