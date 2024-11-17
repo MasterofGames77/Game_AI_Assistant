@@ -13,12 +13,7 @@ const openai = new OpenAI({
 function cleanAndMatchTitle(queryTitle: string, recordTitle: string): boolean {
   const cleanQuery = queryTitle.toLowerCase().trim();
   const cleanRecord = recordTitle.toLowerCase().trim();
-
-  // Basic exact match
-  if (cleanQuery === cleanRecord) return true;
-
-  // Additional matching logic can be added here (e.g., removing subtitles, ignoring special characters, etc.)
-  return false;
+  return cleanQuery === cleanRecord; // Simple exact match
 }
 
 // Example IGDB Fetch Function with Improved Filtering
@@ -45,7 +40,8 @@ async function fetchFromIGDB(gameTitle: string): Promise<string | null> {
     );
 
     if (response.data && response.data.length > 0) {
-      const game = response.data[0];
+      const game = response.data.find((g: any) => cleanAndMatchTitle(gameTitle, g.name));
+      
       const developers = game.involved_companies?.filter((ic: any) => ic.developer)
         .map((ic: any) => ic.company.name).join(", ") || "unknown developers";
       const publishers = game.involved_companies?.filter((ic: any) => ic.publisher)
