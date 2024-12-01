@@ -1,40 +1,58 @@
 // import mongoose from 'mongoose';
 
-// // Connection to Video Game Wingman Database (main MongoDB)
-// export const connectToWingmanDB = async () => {
+// let wingmanDB: mongoose.Connection;
+// let splashDB: mongoose.Connection;
+
+// // Connect to Wingman Database
+// export const connectToWingmanDB = async (): Promise<mongoose.Connection> => {
 //   const wingmanUri = process.env.MONGODB_URI_WINGMAN;
 
 //   if (!wingmanUri) {
 //     throw new Error('MONGODB_URI_WINGMAN is not defined in the environment variables');
 //   }
 
-//   if (mongoose.connection.readyState === 0) {
+//   if (!wingmanDB || wingmanDB.readyState === 0) {
 //     try {
-//       await mongoose.connect(wingmanUri);  // Main Wingman DB URI
-//       console.log('Connected to Wingman DB');
+//       wingmanDB = mongoose.createConnection(wingmanUri);
+
+//       wingmanDB.on('connected', () => {
+//         console.log('Connected to Wingman DB');
+//       });
+
+//       wingmanDB.on('error', (error) => {
+//         console.error('Error connecting to Wingman DB:', error);
+//       });
 //     } catch (error) {
-//       console.error('Error connecting to Wingman DB:', error);
+//       throw new Error(`Failed to connect to Wingman DB: ${(error as Error).message}`);
 //     }
 //   }
+
+//   return wingmanDB;
 // };
 
-// // Connection to Splash Page MongoDB
-// export const connectToSplashDB = async () => {
+// // Connect to Splash Page Database
+// export const connectToSplashDB = async (): Promise<mongoose.Connection> => {
 //   const splashUri = process.env.MONGO_URI;
 
 //   if (!splashUri) {
 //     throw new Error('MONGO_URI is not defined in the environment variables');
 //   }
 
-//   const splashConnection = mongoose.createConnection(splashUri);
+//   if (!splashDB || splashDB.readyState === 0) {
+//     try {
+//       splashDB = mongoose.createConnection(splashUri);
 
-//   splashConnection.on('connected', () => {
-//     console.log('Connected to Splash Page DB');
-//   });
+//       splashDB.on('connected', () => {
+//         console.log('Connected to Splash Page DB');
+//       });
 
-//   splashConnection.on('error', (error) => {
-//     console.error('Error connecting to Splash Page DB:', error);
-//   });
+//       splashDB.on('error', (error) => {
+//         console.error('Error connecting to Splash Page DB:', error);
+//       });
+//     } catch (error) {
+//       throw new Error(`Failed to connect to Splash Page DB: ${(error as Error).message}`);
+//     }
+//   }
 
-//   return splashConnection;
+//   return splashDB;
 // };
