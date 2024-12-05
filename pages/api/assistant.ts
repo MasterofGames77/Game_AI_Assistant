@@ -339,6 +339,21 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
 
     let answer: string | null;
 
+    // Add timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Request timeout')), 25000);
+    });
+
+    // Race between the actual request and timeout
+    answer = await Promise.race([
+      getChatCompletion(question),
+      timeoutPromise
+    ]) as string;
+
+    if (!answer) {
+      throw new Error('Failed to generate response');
+    }
+
     if (question.toLowerCase().includes("recommendations")) {
       const previousQuestions = await Question.find({ userId });
 
@@ -394,7 +409,11 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     res.status(200).json({ answer });
   } catch (error) {
     console.error("Error in API route:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    if (error instanceof Error) {
+      res.status(500).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: "Internal Server Error" });
+    }
   }
 };
 
