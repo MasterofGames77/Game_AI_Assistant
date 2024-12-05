@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const domain = process.env.NODE_ENV === 'production'
-    ? 'https://videogamewingman.com/api/twitchCallback'
+    ? 'https://assistant.videogamewingman.com/api/twitchCallback'
     : 'http://localhost:3000';
 
   const clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID || '';
