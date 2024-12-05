@@ -74,7 +74,7 @@ const UserSchema = new Schema<IUser>({
     performanceTweaker: { type: Number, default: 0 },
     conversationalist: { type: Number, default: 0 },
   },
-}, { collection: 'userID' });
+}, { collection: 'users' });
 
 const User = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
 
