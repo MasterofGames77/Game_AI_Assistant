@@ -180,11 +180,6 @@ const fetchAndCombineGameData = async (question: string, answer: string): Promis
   }
 };
 
-const checkAndUpdateGameInfo = async (question: string, answer: string): Promise<string> => {
-  const finalResponse = await fetchAndCombineGameData(question, answer);
-  return finalResponse;
-};
-
 const getGenreFromMapping = (gameTitle: string): string | null => {
   const genreMapping: { [key: string]: string } = {
     "Xenoblade Chronicles 3": "Action RPG",
@@ -344,28 +339,32 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
       setTimeout(() => reject(new Error('Request timeout')), 25000);
     });
 
-    // Race between the actual request and timeout
-    answer = await Promise.race([
-      getChatCompletion(question),
-      timeoutPromise
-    ]) as string;
-
-    if (!answer) {
-      throw new Error('Failed to generate response');
-    }
-
     if (question.toLowerCase().includes("recommendations")) {
       const previousQuestions = await Question.find({ userId });
-
       const genres = analyzeUserQuestions(previousQuestions);
-
       const recommendations = genres.length > 0 ? await fetchRecommendations(genres[0]) : [];
+      
+      answer = recommendations.length > 0 
+        ? `Based on your previous questions, I recommend these games: ${recommendations.join(', ')}.` 
+        : "I couldn't find any recommendations based on your preferences.";
 
-      answer = recommendations.length > 0 ? `Based on your previous questions, I recommend these games: ${recommendations.join(', ')}.` : "I couldn't find any recommendations based on your preferences.";
     } else if (question.toLowerCase().includes("when was") || question.toLowerCase().includes("when did")) {
-      answer = await getChatCompletion(question);
+      // Race between the actual request and timeout for release date questions
+      answer = await Promise.race([
+        getChatCompletion(question),
+        timeoutPromise
+      ]) as string;
 
-      answer = answer ? await checkAndUpdateGameInfo(question, answer) : "I'm sorry, I couldn't generate a response. Please try again.";
+      if (answer) {
+        try {
+          answer = await fetchAndCombineGameData(question, answer);
+        } catch (dataError) {
+          console.error('Error fetching additional game data:', dataError);
+          // Continue with the original answer if additional data fetch fails
+        }
+      } else {
+        throw new Error('Failed to generate response for release date question');
+      }
       
     } else if (question.toLowerCase().includes("twitch user data")) {
       if (!code) {
@@ -373,46 +372,70 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
         return;
       }
       const accessToken = await getAccessToken(Array.isArray(code) ? code[0] : code);
-
       const userData = await getTwitchUserData(accessToken);
-
       answer = `Twitch User Data: ${JSON.stringify(userData)}`;
 
     } else if (question.toLowerCase().includes("genre")) {
       const gameTitle = extractGameTitle(question);
-
       const genre = getGenreFromMapping(gameTitle);
+      answer = genre 
+        ? `${gameTitle} is categorized as ${genre}.` 
+        : `I couldn't find genre information for ${gameTitle}.`;
 
-      answer = genre ? `${gameTitle} is categorized as ${genre}.` : `I couldn't find genre information for ${gameTitle}.`;
     } else {
-      answer = await getChatCompletion(question);
+      // Race between the actual request and timeout for general questions
+      answer = await Promise.race([
+        getChatCompletion(question),
+        timeoutPromise
+      ]) as string;
 
-      answer = answer ? await checkAndUpdateGameInfo(question, answer) : "I'm sorry, I couldn't generate a response. Please try again.";
+      if (!answer) {
+        throw new Error('Failed to generate response');
+      }
+
+      // Try to fetch additional data for general questions
+      try {
+        answer = await fetchAndCombineGameData(question, answer);
+      } catch (dataError) {
+        console.error('Error fetching additional data:', dataError);
+        // Continue with the original answer if additional data fetch fails
+      }
     }
 
+    // Save the question and update user stats
     await Question.create({ userId, question, response: answer });
-    await User.findOneAndUpdate({ userId }, { $inc: { conversationCount: 1 } }, { upsert: true });
+    await User.findOneAndUpdate(
+      { userId }, 
+      { $inc: { conversationCount: 1 } }, 
+      { upsert: true }
+    );
 
-    // Check the question type (e.g., RPG, Boss Fight, etc.)
+    // Handle achievements and progress
     const questionType = checkQuestionType(question);
     if (questionType) {
-      // Increment the relevant progress field
-      await User.updateOne({ userId }, { $inc: { [`progress.${questionType}`]: 1 } });
+      await User.updateOne(
+        { userId }, 
+        { $inc: { [`progress.${questionType}`]: 1 } }
+      );
 
-      // Fetch the updated user document to pass progress to the achievement check function
       const updatedUser = await User.findOne({ userId }) as IUser;
-
-      // Check and award achievements if criteria are met
       await checkAndAwardAchievements(userId, updatedUser.progress);
     }
 
     res.status(200).json({ answer });
+
   } catch (error) {
     console.error("Error in API route:", error);
     if (error instanceof Error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ 
+        error: error.message,
+        details: 'An error occurred while processing your request'
+      });
     } else {
-      res.status(500).json({ error: "Internal Server Error" });
+      res.status(500).json({ 
+        error: "Internal Server Error",
+        details: 'An unexpected error occurred'
+      });
     }
   }
 };
