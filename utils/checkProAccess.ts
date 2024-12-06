@@ -1,68 +1,125 @@
-// import { connectToSplashDB, connectToWingmanDB } from './databaseConnections';
-// import { Schema, Document } from 'mongoose';
+import { connectToSplashDB, connectToWingmanDB } from './databaseConnections';
+import { Schema, Document } from 'mongoose';
 
-// // WingmanDB User interface
-// interface IWingmanUser extends Document {
-//   userId: string;
-//   email: string;
-//   hasProAccess: boolean;
-// }
+// WingmanDB User interface (from models/User.ts)
+interface IWingmanUser extends Document {
+    userId: string;
+    email: string;
+    conversationCount: number;
+    hasProAccess: boolean;
+    achievements: Array<{
+      name: string;
+      dateEarned: Date;
+    }>;
+    progress: {
+      firstQuestion: number;
+      frequentAsker: number;
+      rpgEnthusiast?: number;
+      bossBuster?: number;
+      strategySpecialist?: number;
+      actionAficionado?: number;
+      battleRoyale?: number;
+      sportsChampion?: number;
+      adventureAddict?: number;
+      shooterSpecialist?: number;
+      puzzlePro?: number;
+      racingExpert?: number;
+      stealthSpecialist?: number;
+      horrorHero?: number;
+      triviaMaster?: number;
+      totalQuestions?: number;
+      dailyExplorer?: number;
+      speedrunner?: number;
+      collectorPro?: number;
+      dataDiver?: number;
+      performanceTweaker?: number;
+      conversationalist?: number;
+  };
+}
 
-// // Splash Page User interface
-// interface ISplashUser extends Document {
-//   email: string;
-//   isApproved: boolean;
-// }
+// SplashDB User interface (from splash page backend)
+interface ISplashUser extends Document {
+    email: string;
+    userId: string;
+    position: number | null;
+    isApproved: boolean;
+    hasProAccess: boolean;
+}
 
-// // WingmanDB User schema
-// const wingmanUserSchema = new Schema<IWingmanUser>({
-//   userId: { type: String, required: true },
-//   email: { type: String, required: true },
-//   hasProAccess: { type: Boolean, default: false },
-// });
+// WingmanDB User schema
+const wingmanUserSchema = new Schema<IWingmanUser>({
+  userId: { type: String, required: true },
+  email: { type: String, required: true },
+  hasProAccess: { type: Boolean, default: false },
+});
 
-// // SplashDB User schema
-// const splashUserSchema = new Schema<ISplashUser>({
-//   email: { type: String, required: true, unique: true },
-//   isApproved: { type: Boolean, default: false },
-// });
+// SplashDB User schema
+const splashUserSchema = new Schema<ISplashUser>({
+  email: { type: String, required: true },
+  isApproved: { type: Boolean, default: false },
+  userId: { type: String, required: true },
+});
 
-// // Check and synchronize Pro Access
-// const checkProAccess = async (userId: string): Promise<void> => {
-//   try {
-//     // Connect to Wingman DB
-//     const wingmanDB = await connectToWingmanDB();
-//     const WingmanUserModel = wingmanDB.model<IWingmanUser>('User', wingmanUserSchema);
+export const syncUserData = async (userId: string, email?: string): Promise<void> => {
+  try {
+    const wingmanDB = await connectToWingmanDB();
+    const splashDB = await connectToSplashDB();
 
-//     // Find the user in Wingman DB
-//     const wingmanUser = await WingmanUserModel.findOne({ userId });
-//     if (!wingmanUser) {
-//       throw new Error(`User with ID ${userId} not found in Wingman DB.`);
-//     }
+    const WingmanUser = wingmanDB.model<IWingmanUser>('User', wingmanUserSchema);
+    const SplashUser = splashDB.model<ISplashUser>('User', splashUserSchema);
 
-//     // Connect to Splash Page DB
-//     const splashDB = await connectToSplashDB();
-//     const SplashUserModel = splashDB.model<ISplashUser>('User', splashUserSchema);
+    // First check Splash DB
+    const splashUser = email 
+      ? await SplashUser.findOne({ email })
+      : await SplashUser.findOne({ userId });
 
-//     // Find the user in Splash Page DB by email
-//     const splashUser = await SplashUserModel.findOne({ email: wingmanUser.email });
-//     if (!splashUser) {
-//       throw new Error(`User with email ${wingmanUser.email} not found in Splash Page DB.`);
-//     }
-
-//     // Check if the user is approved and grant Pro Access
-//     if (splashUser.isApproved && !wingmanUser.hasProAccess) {
-//       wingmanUser.hasProAccess = true;
-//       await wingmanUser.save();
-//       console.log(`${wingmanUser.email} has been granted Pro Access in Wingman DB.`);
-//     } else if (splashUser.isApproved) {
-//       console.log(`${wingmanUser.email} already has Pro Access.`);
-//     } else {
-//       console.log(`${wingmanUser.email} is not approved in Splash Page DB.`);
-//     }
-//   } catch (error) {
-//     console.error('Error checking Pro Access:', error);
-//   }
-// };
-
-// export default checkProAccess;
+    if (splashUser) {
+      // Update or create user in Wingman DB with all required fields
+      await WingmanUser.findOneAndUpdate(
+        { userId: splashUser.userId },
+        {
+          userId: splashUser.userId,
+          email: splashUser.email,
+          hasProAccess: splashUser.hasProAccess || splashUser.isApproved,
+          conversationCount: 0,
+          achievements: [],
+          progress: {
+            firstQuestion: 0,
+            frequentAsker: 0,
+            rpgEnthusiast: 0,
+            bossBuster: 0,
+            strategySpecialist: 0,
+            actionAficionado: 0,
+            battleRoyale: 0,
+            sportsChampion: 0,
+            adventureAddict: 0,
+            shooterSpecialist: 0,
+            puzzlePro: 0,
+            racingExpert: 0,
+            stealthSpecialist: 0,
+            horrorHero: 0,
+            triviaMaster: 0,
+            totalQuestions: 0,
+            dailyExplorer: 0,
+            speedrunner: 0,
+            collectorPro: 0,
+            dataDiver: 0,
+            performanceTweaker: 0,
+            conversationalist: 0,
+          }
+        },
+        { 
+          upsert: true, 
+          new: true,
+          setDefaultsOnInsert: true 
+        }
+      );
+      console.log('User data synced from Splash DB to Wingman DB');
+    } else {
+      console.log('User not found in Splash DB');
+    }
+  } catch (error) {
+    console.error('Error syncing user data:', error);
+    throw error;
+  }
+};

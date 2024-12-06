@@ -1,58 +1,40 @@
-// import mongoose from 'mongoose';
+import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// let wingmanDB: mongoose.Connection;
-// let splashDB: mongoose.Connection;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// // Connect to Wingman Database
-// export const connectToWingmanDB = async (): Promise<mongoose.Connection> => {
-//   const wingmanUri = process.env.MONGODB_URI_WINGMAN;
+dotenv.config({ path: path.resolve(__dirname, '.env.local') });
 
-//   if (!wingmanUri) {
-//     throw new Error('MONGODB_URI_WINGMAN is not defined in the environment variables');
-//   }
+let wingmanDB: mongoose.Connection;
+let splashDB: mongoose.Connection;
 
-//   if (!wingmanDB || wingmanDB.readyState === 0) {
-//     try {
-//       wingmanDB = mongoose.createConnection(wingmanUri);
+export const connectToWingmanDB = async (): Promise<mongoose.Connection> => {
+  if (!wingmanDB || wingmanDB.readyState === 0) {
+    try {
+      console.log('Connecting to Wingman DB...');
+      wingmanDB = await mongoose.createConnection(process.env.MONGODB_URI as string);
+      console.log('Connected to Wingman DB');
+    } catch (error) {
+      console.error('Error connecting to Wingman DB:', error);
+      throw error;
+    }
+  }
+  return wingmanDB;
+};
 
-//       wingmanDB.on('connected', () => {
-//         console.log('Connected to Wingman DB');
-//       });
-
-//       wingmanDB.on('error', (error) => {
-//         console.error('Error connecting to Wingman DB:', error);
-//       });
-//     } catch (error) {
-//       throw new Error(`Failed to connect to Wingman DB: ${(error as Error).message}`);
-//     }
-//   }
-
-//   return wingmanDB;
-// };
-
-// // Connect to Splash Page Database
-// export const connectToSplashDB = async (): Promise<mongoose.Connection> => {
-//   const splashUri = process.env.MONGO_URI;
-
-//   if (!splashUri) {
-//     throw new Error('MONGO_URI is not defined in the environment variables');
-//   }
-
-//   if (!splashDB || splashDB.readyState === 0) {
-//     try {
-//       splashDB = mongoose.createConnection(splashUri);
-
-//       splashDB.on('connected', () => {
-//         console.log('Connected to Splash Page DB');
-//       });
-
-//       splashDB.on('error', (error) => {
-//         console.error('Error connecting to Splash Page DB:', error);
-//       });
-//     } catch (error) {
-//       throw new Error(`Failed to connect to Splash Page DB: ${(error as Error).message}`);
-//     }
-//   }
-
-//   return splashDB;
-// };
+export const connectToSplashDB = async (): Promise<mongoose.Connection> => {
+  if (!splashDB || splashDB.readyState === 0) {
+    try {
+      console.log('Connecting to Splash DB...');
+      splashDB = await mongoose.createConnection(process.env.SPLASH_PAGE_MONGO_URI as string);
+      console.log('Connected to Splash DB');
+    } catch (error) {
+      console.error('Error connecting to Splash DB:', error);
+      throw error;
+    }
+  }
+  return splashDB;
+};

@@ -23,16 +23,45 @@ export default function Home() {
   // const [image, setImage] = useState<File | null>(null);
 
   useEffect(() => {
-    let storedUserId = localStorage.getItem("userId");
-    if (!storedUserId || storedUserId === "null") {
-      storedUserId = uuidv4();
-      alert(
-        `Your new user ID is: ${storedUserId}. Please save it for future use.`
-      );
-      localStorage.setItem("userId", storedUserId);
-    }
-    setUserId(storedUserId);
-    console.log("User ID set:", storedUserId);
+    const initializeUser = async () => {
+      let storedUserId = localStorage.getItem("userId");
+      let storedEmail = localStorage.getItem("userEmail");
+
+      // Check URL parameters for userId and email from splash page
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlUserId = urlParams.get("userId");
+      const urlEmail = urlParams.get("email");
+
+      if (urlUserId && urlEmail) {
+        // If we have parameters from the splash page, use those
+        storedUserId = urlUserId;
+        storedEmail = urlEmail;
+        localStorage.setItem("userId", urlUserId);
+        localStorage.setItem("userEmail", urlEmail);
+      } else if (!storedUserId || storedUserId === "null") {
+        // Only generate new ID if we don't have one from splash page or storage
+        storedUserId = uuidv4();
+        alert(
+          `Your new user ID is: ${storedUserId}. Please save it for future use.`
+        );
+        localStorage.setItem("userId", storedUserId);
+      }
+
+      try {
+        // Call API endpoint to sync user data
+        await axios.post("/api/syncUser", {
+          userId: storedUserId,
+          email: storedEmail,
+        });
+      } catch (error) {
+        console.error("Error syncing user data:", error);
+      }
+
+      setUserId(storedUserId);
+      console.log("User ID set:", storedUserId);
+    };
+
+    initializeUser();
   }, []);
 
   const fetchConversations = useCallback(async () => {
