@@ -153,7 +153,7 @@ export default function Home() {
   const handleTwitchAuth = () => {
     const domain =
       process.env.NODE_ENV === "production"
-        ? "https://video-game-wingman-57d61bef9e61.herokuapp.com"
+        ? "https://assistant.videogamewingman.com"
         : "http://localhost:3000";
 
     const redirectUri = `${domain}/api/twitchCallback`;
