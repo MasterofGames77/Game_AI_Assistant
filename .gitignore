@@ -6,7 +6,6 @@
 .pnp.js
 .yarn/install-state.gz
 next.config.js
-data
 launchInfo
 .env*
 

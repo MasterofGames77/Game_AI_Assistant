@@ -133,50 +133,48 @@ const fetchAndCombineGameData = async (question: string, answer: string): Promis
   const gameName = question.replace(/when (was|did) (.*?) (released|come out)/i, "$2").trim();
 
   try {
-    // Fetch data from all sources
-    const rawgResult = await fetchGamesFromRAWG(gameName);
-    const igdbResult = await fetchGamesFromIGDB(gameName);
-    const csvData = await getCSVData();
-    
-    const rawgResponse = rawgResult ?? "";
-    const igdbResponse = igdbResult ?? "";
-    const gameInfo = csvData.find((game: any) => game.title.toLowerCase() === gameName.toLowerCase());
+    // Fetch data from RAWG, IGDB, and CSV
+    const [rawgResult, igdbResult, csvData] = await Promise.allSettled([
+      fetchGamesFromRAWG(gameName),
+      fetchGamesFromIGDB(gameName),
+      getCSVData()
+    ]);
 
-    // Determine if the responses are suitable for combined output
+    const rawgResponse = rawgResult.status === 'fulfilled' ? rawgResult.value : null;
+    const igdbResponse = igdbResult.status === 'fulfilled' ? igdbResult.value : null;
+    const csvGameInfo =
+      csvData.status === 'fulfilled'
+        ? csvData.value.find((game: any) => game.title.toLowerCase() === gameName.toLowerCase())
+        : null;
+
     const isMainResponseShort = answer.length < 150;
-    const hasRelevantData = (
-      (rawgResponse && rawgResponse.toLowerCase().includes(gameName.toLowerCase())) ||
-      (igdbResponse && igdbResponse.toLowerCase().includes(gameName.toLowerCase())) ||
-      gameInfo
-    );
+    const hasRelevantData = rawgResponse || igdbResponse || csvGameInfo;
 
     if (isMainResponseShort && hasRelevantData) {
       let finalResponse = "Game Information:\n";
 
       // Add CSV data if available
-      if (gameInfo) {
-        finalResponse += `\nLocal Database: ${formatGameInfo(gameInfo)}`;
+      if (csvGameInfo) {
+        finalResponse += `\nLocal Database: ${formatGameInfo(csvGameInfo)}`;
       }
 
-      // Add API responses if they contain relevant data
-      if (rawgResponse && !rawgResponse.includes("No games found")) {
+      // Add RAWG data if available
+      if (rawgResponse && !rawgResponse.includes("Failed")) {
         finalResponse += `\nFrom RAWG: ${rawgResponse}`;
       }
 
-      if (igdbResponse && !igdbResponse.includes("No games found")) {
+      // Add IGDB data if available
+      if (igdbResponse && !igdbResponse.includes("Failed")) {
         finalResponse += `\nFrom IGDB: ${igdbResponse}`;
       }
 
       return `${answer}\n\nAdditional Information:\n${finalResponse}`;
     }
 
-    // Return original answer if response isn't short or no relevant data found
-    return answer;
-
+    return answer; // Return original answer if no additional data is available
   } catch (error) {
-    console.error('Error in fetchAndCombineGameData:', error);
-    // Maintain the original error message format
-    return `${answer}\n\nAdditional Information:\nFailed to fetch data due to an error.`;
+    console.error("Error combining game data:", error);
+    return `${answer}\n\nAdditional Information:\nFailed to fetch additional data due to an error.`;
   }
 };
 
