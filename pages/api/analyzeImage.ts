@@ -1,28 +1,42 @@
-// import fs from 'fs';
-// import OpenAI from 'openai';
-// import path from 'path';
+import type { NextApiRequest, NextApiResponse } from "next";
 
-// const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Mock question analysis function
+const analyzeQuestion = (question: string): string => {
+  if (question.toLowerCase().includes("sonic unleashed")) {
+    return "This image might be from the game Sonic Unleashed. Please provide more details.";
+  }
+  return "We couldn't identify the game from your question.";
+};
 
-// const analyzeImage = async (filePath: string): Promise<string> => {
-//   try {
-//     // Read image data
-//     const imageData = fs.readFileSync(filePath);
+const analyzeImage = async (req: NextApiRequest, res: NextApiResponse) => {
+  try {
+    const { question, imageFilePath } = req.body;
 
-//     // Placeholder for hypothetical image analysis model
-//     const prompt = "Analyze this image: Provide a description and insights.";
-//     const response = await openai.completions.create({
-//       model: "text-davinci-003",
-//       prompt,
-//       max_tokens: 150,
-//     });
+    // Validate input
+    if (!question) {
+      return res.status(400).json({ error: "Question is required." });
+    }
 
-//     // Extract and return result
-//     return response.choices?.[0]?.text?.trim() || "No insights available.";
-//   } catch (error) {
-//     console.error("Image analysis error:", error);
-//     return "Failed to analyze image.";
-//   }
-// };
+    // Placeholder for actual image analysis
+    let analysisResult = "No image provided for analysis.";
+    if (imageFilePath) {
+      // Simulated logic for analyzing the image
+      console.log(`Analyzing image at: ${imageFilePath}`);
+      analysisResult = `The image at ${imageFilePath} has been analyzed successfully.`;
+    }
 
-// export default analyzeImage;
+    // Analyze the question
+    const questionAnalysis = analyzeQuestion(question);
+
+    // Combine the image analysis and question analysis into a single response
+    const response = `Question: ${question}\n\nAnalysis: ${analysisResult}\n\nQuestion Analysis: ${questionAnalysis}`;
+
+    // Send the response
+    res.status(200).json({ analysis: response });
+  } catch (error) {
+    console.error("Error analyzing image:", error);
+    res.status(500).json({ error: "Failed to analyze image." });
+  }
+};
+
+export default analyzeImage;
