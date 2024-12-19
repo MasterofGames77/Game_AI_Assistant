@@ -1,4 +1,8 @@
 // import type { NextApiRequest, NextApiResponse } from "next";
+// import vision from "@google-cloud/vision";
+
+// Configure Google Vision API
+//const client = new vision.ImageAnnotatorClient();
 
 // // Mock question analysis function
 // const analyzeQuestion = (question: string): string => {
