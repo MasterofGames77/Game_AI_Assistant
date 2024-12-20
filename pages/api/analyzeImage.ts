@@ -1,16 +1,8 @@
 // import type { NextApiRequest, NextApiResponse } from "next";
 // import vision from "@google-cloud/vision";
 
-// Configure Google Vision API
-//const client = new vision.ImageAnnotatorClient();
-
-// // Mock question analysis function
-// const analyzeQuestion = (question: string): string => {
-//   if (question.toLowerCase().includes("sonic unleashed")) {
-//     return "This image might be from the game Sonic Unleashed. Please provide more details.";
-//   }
-//   return "We couldn't identify the game from your question.";
-// };
+// // Initialize the Vision API client
+// const client = new vision.ImageAnnotatorClient();
 
 // const analyzeImage = async (req: NextApiRequest, res: NextApiResponse) => {
 //   try {
@@ -21,21 +13,26 @@
 //       return res.status(400).json({ error: "Question is required." });
 //     }
 
-//     // Placeholder for actual image analysis
-//     let analysisResult = "No image provided for analysis.";
-//     if (imageFilePath) {
-//       // Simulated logic for analyzing the image
-//       console.log(`Analyzing image at: ${imageFilePath}`);
-//       analysisResult = `The image at ${imageFilePath} has been analyzed successfully.`;
+//     if (!imageFilePath) {
+//       return res.status(400).json({ error: "Image file path is required." });
 //     }
 
-//     // Analyze the question
-//     const questionAnalysis = analyzeQuestion(question);
+//     // Perform label detection on the image
+//     const [result] = await client.labelDetection(imageFilePath);
+//     const labels = result.labelAnnotations || [];
 
-//     // Combine the image analysis and question analysis into a single response
-//     const response = `Question: ${question}\n\nAnalysis: ${analysisResult}\n\nQuestion Analysis: ${questionAnalysis}`;
+//     // Extract labels
+//     const identifiedLabels = labels
+//       .map((label) => label.description)
+//       .join(", ");
 
-//     // Send the response
+//     const analysisResult = labels.length
+//       ? `Identified elements: ${identifiedLabels}`
+//       : "No identifiable elements found in the image.";
+
+//     // Combine the question with the analysis result
+//     const response = `Question: ${question}\n\nAnalysis: ${analysisResult}`;
+
 //     res.status(200).json({ analysis: response });
 //   } catch (error) {
 //     console.error("Error analyzing image:", error);
