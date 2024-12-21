@@ -6,6 +6,8 @@ import Sidebar from "../components/Sidebar";
 import Image from "next/image";
 import { Conversation } from "../types";
 import { v4 as uuidv4 } from "uuid";
+// import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+// import { faPaperclip } from "@fortawesome/free-solid-svg-icons";
 
 export default function Home() {
   const [question, setQuestion] = useState("");
@@ -16,23 +18,28 @@ export default function Home() {
   const [selectedConversation, setSelectedConversation] =
     useState<Conversation | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  //const [image, setImage] = useState<File | null>(null);
+
+  // Optional image-related states (commented for now)
+  // const [image, setImage] = useState<File | null>(null);
 
   useEffect(() => {
     const initializeUser = async () => {
       let storedUserId = localStorage.getItem("userId");
       let storedEmail = localStorage.getItem("userEmail");
 
+      // Check URL parameters for userId and email from splash page
       const urlParams = new URLSearchParams(window.location.search);
       const urlUserId = urlParams.get("userId");
       const urlEmail = urlParams.get("email");
 
       if (urlUserId && urlEmail) {
+        // If we have parameters from the splash page, use those
         storedUserId = urlUserId;
         storedEmail = urlEmail;
         localStorage.setItem("userId", urlUserId);
         localStorage.setItem("userEmail", urlEmail);
       } else if (!storedUserId || storedUserId === "null") {
+        // Only generate new ID if we don't have one from splash page or storage
         storedUserId = uuidv4();
         alert(
           `Your new user ID is: ${storedUserId}. Please save it for future use.`
@@ -41,6 +48,7 @@ export default function Home() {
       }
 
       try {
+        // Call API endpoint to sync user data
         await axios.post("/api/syncUser", {
           userId: storedUserId,
           email: storedEmail,
@@ -50,6 +58,7 @@ export default function Home() {
       }
 
       setUserId(storedUserId);
+      console.log("User ID set:", storedUserId);
     };
 
     initializeUser();
@@ -77,46 +86,23 @@ export default function Home() {
     }
   }, [selectedConversation]);
 
-  // const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  //   if (e.target.files && e.target.files[0]) {
-  //     setImage(e.target.files[0]);
-  //   }
-  // };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Form submitted with question:", question);
     setLoading(true);
     setError("");
 
     try {
-      let imageFilePath = null;
-
-      // Upload the image if provided
+      // If image upload is added, use FormData (commented for now)
+      // const formData = new FormData();
+      // formData.append("question", question);
       // if (image) {
-      //   const formData = new FormData();
       //   formData.append("image", image);
-
-      //   const uploadRes = await axios.post("/api/uploadImage", formData, {
-      //     headers: { "Content-Type": "multipart/form-data" },
-      //   });
-      //   imageFilePath = uploadRes.data.filePath; // Extract the file path from the response
       // }
 
-      // Send question and image file path to analyzeImage API
-      const analysisRes = await axios.post("/api/analyzeImage", {
-        question,
-        imageFilePath, // Include filePath if available
-      });
-
-      console.log("Payload to /api/analyzeImage:", {
-        question,
-        imageFilePath,
-      });
-
-      // Update the response
-      setResponse(
-        analysisRes.data.analysis || "Analysis complete. No details provided."
-      );
+      const res = await axios.post("/api/assistant", { userId, question });
+      console.log("Response from server:", res.data);
+      setResponse(res.data.answer);
       fetchConversations();
     } catch (error) {
       console.error("Error submitting form:", error);
@@ -126,15 +112,29 @@ export default function Home() {
     }
   };
 
+  // Optional image handler (commented for now)
+  // const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   if (e.target.files && e.target.files[0]) {
+  //     setImage(e.target.files[0]);
+  //   }
+  // };
+
   const handleClear = () => {
     setQuestion("");
     setResponse("");
     setError("");
     setSelectedConversation(null);
-    //setImage(null);
+    // setImage(null); // Clear file input if using image
+  };
+
+  const handleDeleteConversation = () => {
+    handleClear();
+    fetchConversations();
   };
 
   const handleResetUserId = () => {
+    console.log("Resetting User ID.");
+
     const newUserId = prompt("Enter your new user ID or create a new one:");
 
     if (newUserId) {
@@ -193,7 +193,7 @@ export default function Home() {
           <Sidebar
             userId={userId}
             onSelectConversation={setSelectedConversation}
-            onDeleteConversation={handleClear}
+            onDeleteConversation={handleDeleteConversation}
           />
           <div className="flex-1 flex flex-col items-center justify-center py-2 main-content">
             <Image
@@ -211,7 +211,7 @@ export default function Home() {
               <li>Access detailed game guides.</li>
             </ul>
 
-            {/* Form to submit question and upload image */}
+            {/* Form to submit question */}
             <form onSubmit={handleSubmit} className="w-full max-w-md mt-2">
               <input
                 type="text"
@@ -221,15 +221,18 @@ export default function Home() {
                 className="w-full p-2 border border-gray-300 rounded mb-4"
               />
 
-              <label className="block mb-4">
-                <span className="text-gray-700">Upload an Image:</span>
+              {/* Optional file upload input (commented for now) */}
+              {/* 
+              <label className="cursor-pointer">
+                <FontAwesomeIcon icon={faPaperclip} size="2x" />
                 <input
                   type="file"
                   accept="image/*"
-                  // onChange={handleImageChange}
-                  className="block mt-2"
+                  onChange={handleImageChange}
+                  style={{ display: "none" }}
                 />
               </label>
+              */}
 
               <div className="flex space-x-4">
                 <button
@@ -256,6 +259,8 @@ export default function Home() {
                 <div className="bg-gray-100 p-4 rounded response-box">
                   {formatResponse(response)}
                 </div>
+
+                {/* Move buttons below the response */}
                 <div className="mt-4 footer-buttons">
                   <button
                     onClick={handleTwitchAuth}

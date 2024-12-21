@@ -1,49 +1,44 @@
-// import formidable, { File } from "formidable";
-// import fs from "fs";
-// import path from "path";
-// import type { NextApiRequest, NextApiResponse } from "next";
+// import type { NextApiRequest, NextApiResponse } from 'next';
+// import formidable from 'formidable';
+// import path from 'path';
+// import fs from 'fs';
 
-// const uploadDir = path.join(process.cwd(), "/public/uploads");
-
-// // Ensure the upload directory exists
-// if (!fs.existsSync(uploadDir)) {
-//   fs.mkdirSync(uploadDir, { recursive: true });
-// }
-
-// // Disable Next.js's default body parsing
 // export const config = {
 //   api: {
 //     bodyParser: false,
 //   },
 // };
 
-// const uploadImage = async (req: NextApiRequest, res: NextApiResponse) => {
-//   const form = formidable({
-//     uploadDir, // Where files will be saved
-//     keepExtensions: true, // Keep file extensions
-//   });
+// const uploadDir = path.join(process.cwd(), 'public/uploads');
 
-//   form.parse(req, (err, fields, files) => {
-//     if (err) {
-//       console.error("Image upload error:", err);
-//       return res.status(500).json({ error: "Image upload failed" });
+// // Ensure upload directory exists
+// if (!fs.existsSync(uploadDir)) {
+//   fs.mkdirSync(uploadDir, { recursive: true });
+// }
+
+// export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+//   if (req.method !== 'POST') {
+//     return res.status(405).json({ error: 'Method not allowed' });
+//   }
+
+//   try {
+//     const form = formidable({
+//       uploadDir,
+//       keepExtensions: true,
+//       maxFileSize: 10 * 1024 * 1024, // 10MB limit
+//     });
+
+//     const [, files] = await form.parse(req);
+//     const file = files.image?.[0];
+
+//     if (!file) {
+//       return res.status(400).json({ error: 'No file uploaded' });
 //     }
 
-//     // Cast the `files` object to a known type
-//     const uploadedFile = files.image as File | File[] | undefined;
-
-//     if (!uploadedFile) {
-//       return res.status(400).json({ error: "No image provided" });
-//     }
-
-//     // Handle single or multiple files
-//     const filePath = Array.isArray(uploadedFile)
-//       ? uploadedFile[0].filepath
-//       : uploadedFile.filepath;
-
-//     const publicPath = `/uploads/${path.basename(filePath)}`;
-//     res.status(200).json({ filePath: publicPath, message: "Image uploaded successfully" });
-//   });
-// };
-
-// export default uploadImage;
+//     const relativePath = path.relative('./public', file.filepath);
+//     return res.status(200).json({ filePath: relativePath });
+//   } catch (error) {
+//     console.error('Error uploading file:', error);
+//     return res.status(500).json({ error: 'Error uploading file' });
+//   }
+// }
