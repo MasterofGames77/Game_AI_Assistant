@@ -2,11 +2,28 @@ import { createServer } from "http";
 import { parse, UrlWithParsedQuery } from "url";
 import next, { NextApiRequest, NextApiResponse } from "next";
 import { initSocket } from "./middleware/realtime";
+// import fs from "fs";
+// import path from "path";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = process.env.PORT || 3000;
 const app = next({ dev });
 const handle = app.getRequestHandler();
+
+// Function to set up Google Vision credentials
+// const setupGoogleCredentials = () => {
+//   const credentialsPath = path.join("/tmp", "service-account-key.json");
+//   const credentials = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+//   if (credentials) {
+//     // Write the JSON credentials to a file in the temporary directory
+//     fs.writeFileSync(credentialsPath, credentials);
+//     // Set the GOOGLE_APPLICATION_CREDENTIALS environment variable to point to the file
+//     process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
+//     console.log("Google Vision API credentials set up successfully.");
+//   } else {
+//     console.error("GOOGLE_APPLICATION_CREDENTIALS_JSON is not set.");
+//   }
+// };
 
 app.prepare().then(async () => {
   const server = createServer((req, res) => {
