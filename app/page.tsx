@@ -18,6 +18,7 @@ export default function Home() {
   const [selectedConversation, setSelectedConversation] =
     useState<Conversation | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [metrics, setMetrics] = useState<{ [key: string]: number }>({});
 
   // Optional image-related states (commented for now)
   // const [image, setImage] = useState<File | null>(null);
@@ -88,21 +89,21 @@ export default function Home() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form submitted with question:", question);
     setLoading(true);
     setError("");
+    const startTime = performance.now();
 
     try {
-      // If image upload is added, use FormData (commented for now)
-      // const formData = new FormData();
-      // formData.append("question", question);
-      // if (image) {
-      //   formData.append("image", image);
-      // }
-
       const res = await axios.post("/api/assistant", { userId, question });
-      console.log("Response from server:", res.data);
+      const endTime = performance.now();
+      console.log(
+        `Total frontend latency: ${(endTime - startTime).toFixed(2)}ms`
+      );
+
       setResponse(res.data.answer);
+      if (res.data.metrics) {
+        setMetrics(res.data.metrics);
+      }
       fetchConversations();
     } catch (error) {
       console.error("Error submitting form:", error);

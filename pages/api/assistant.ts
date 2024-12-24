@@ -11,6 +11,16 @@ import { readFile } from 'fs/promises';
 import { parse } from 'csv-parse/sync';
 import { getIO } from '../../middleware/realtime';
 
+// Add performance monitoring
+const measureLatency = async (operation: string, callback: () => Promise<any>) => {
+  const start = performance.now();
+  const result = await callback();
+  const end = performance.now();
+  const latency = end - start;
+  console.log(`${operation} latency: ${latency.toFixed(2)}ms`);
+  return { result, latency };
+};
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -325,10 +335,17 @@ const checkAndAwardAchievements = async (userId: string, progress: any) => {
 // Main handler
 const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
   const { userId, question, code } = req.body;
+  const metrics: { [key: string]: number } = {};
+  const startTime = performance.now();
 
   try {
     console.log("Received question:", question);
-    await connectToMongoDB();
+    
+    // Measure MongoDB connection
+    const { latency: dbLatency } = await measureLatency('MongoDB Connection', async () => {
+      await connectToMongoDB();
+    });
+    metrics.dbConnection = dbLatency;
 
     let answer: string | null;
 
@@ -337,102 +354,122 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
       setTimeout(() => reject(new Error('Request timeout')), 25000);
     });
 
-    if (question.toLowerCase().includes("recommendations")) {
-      const previousQuestions = await Question.find({ userId });
-      const genres = analyzeUserQuestions(previousQuestions);
-      const recommendations = genres.length > 0 ? await fetchRecommendations(genres[0]) : [];
-      
-      answer = recommendations.length > 0 
-        ? `Based on your previous questions, I recommend these games: ${recommendations.join(', ')}.` 
-        : "I couldn't find any recommendations based on your preferences.";
+    // Measure question processing time
+    const { result: processedAnswer, latency: processingLatency } = await measureLatency('Question Processing', async () => {
+      if (question.toLowerCase().includes("recommendations")) {
+        const previousQuestions = await Question.find({ userId });
+        const genres = analyzeUserQuestions(previousQuestions);
+        const recommendations = genres.length > 0 ? await fetchRecommendations(genres[0]) : [];
+        
+        return recommendations.length > 0 
+          ? `Based on your previous questions, I recommend these games: ${recommendations.join(', ')}.` 
+          : "I couldn't find any recommendations based on your preferences.";
 
-    } else if (question.toLowerCase().includes("when was") || question.toLowerCase().includes("when did")) {
-      // Race between the actual request and timeout for release date questions
-      answer = await Promise.race([
-        getChatCompletion(question),
-        timeoutPromise
-      ]) as string;
+      } else if (question.toLowerCase().includes("when was") || question.toLowerCase().includes("when did")) {
+        // Existing release date logic
+        const baseAnswer = await Promise.race([
+          getChatCompletion(question),
+          timeoutPromise
+        ]) as string;
 
-      if (answer) {
-        try {
-          answer = await fetchAndCombineGameData(question, answer);
-        } catch (dataError) {
-          console.error('Error fetching additional game data:', dataError);
-          // Continue with the original answer if additional data fetch fails
+        if (baseAnswer) {
+          try {
+            return await fetchAndCombineGameData(question, baseAnswer);
+          } catch (dataError) {
+            console.error('Error fetching additional game data:', dataError);
+            return baseAnswer;
+          }
         }
-      } else {
         throw new Error('Failed to generate response for release date question');
+      } else if (question.toLowerCase().includes("twitch user data")) {
+        // Existing Twitch logic
+        if (!code) {
+          redirectToTwitch(res);
+          return null;
+        }
+        const accessToken = await getAccessToken(Array.isArray(code) ? code[0] : code);
+        const userData = await getTwitchUserData(accessToken);
+        return `Twitch User Data: ${JSON.stringify(userData)}`;
+      } else if (question.toLowerCase().includes("genre")) {
+        // Existing genre logic
+        const gameTitle = extractGameTitle(question);
+        const genre = getGenreFromMapping(gameTitle);
+        return genre 
+          ? `${gameTitle} is categorized as ${genre}.` 
+          : `I couldn't find genre information for ${gameTitle}.`;
+      } else {
+        // General questions
+        const baseAnswer = await Promise.race([
+          getChatCompletion(question),
+          timeoutPromise
+        ]) as string;
+
+        if (!baseAnswer) {
+          throw new Error('Failed to generate response');
+        }
+
+        try {
+          return await fetchAndCombineGameData(question, baseAnswer);
+        } catch (dataError) {
+          console.error('Error fetching additional data:', dataError);
+          return baseAnswer;
+        }
       }
-      
-    } else if (question.toLowerCase().includes("twitch user data")) {
-      if (!code) {
-        redirectToTwitch(res);
-        return;
+    });
+    
+    answer = processedAnswer;
+    metrics.questionProcessing = processingLatency;
+
+    // Measure database operations
+    const { latency: dbOpsLatency } = await measureLatency('Database Operations', async () => {
+      await Promise.all([
+        Question.create({ userId, question, response: answer }),
+        User.findOneAndUpdate(
+          { userId }, 
+          { $inc: { conversationCount: 1 } }, 
+          { upsert: true }
+        )
+      ]);
+
+      // Handle achievements and progress
+      const questionType = checkQuestionType(question);
+      if (questionType) {
+        await User.updateOne(
+          { userId }, 
+          { $inc: { [`progress.${questionType}`]: 1 } }
+        );
+
+        const updatedUser = await User.findOne({ userId }) as IUser;
+        await checkAndAwardAchievements(userId, updatedUser.progress);
       }
-      const accessToken = await getAccessToken(Array.isArray(code) ? code[0] : code);
-      const userData = await getTwitchUserData(accessToken);
-      answer = `Twitch User Data: ${JSON.stringify(userData)}`;
+    });
+    metrics.dbOperations = dbOpsLatency;
 
-    } else if (question.toLowerCase().includes("genre")) {
-      const gameTitle = extractGameTitle(question);
-      const genre = getGenreFromMapping(gameTitle);
-      answer = genre 
-        ? `${gameTitle} is categorized as ${genre}.` 
-        : `I couldn't find genre information for ${gameTitle}.`;
+    // Calculate total processing time
+    const endTime = performance.now();
+    metrics.totalTime = endTime - startTime;
 
-    } else {
-      // Race between the actual request and timeout for general questions
-      answer = await Promise.race([
-        getChatCompletion(question),
-        timeoutPromise
-      ]) as string;
-
-      if (!answer) {
-        throw new Error('Failed to generate response');
-      }
-
-      // Try to fetch additional data for general questions
-      try {
-        answer = await fetchAndCombineGameData(question, answer);
-      } catch (dataError) {
-        console.error('Error fetching additional data:', dataError);
-        // Continue with the original answer if additional data fetch fails
-      }
-    }
-
-    // Save the question and update user stats
-    await Question.create({ userId, question, response: answer });
-    await User.findOneAndUpdate(
-      { userId }, 
-      { $inc: { conversationCount: 1 } }, 
-      { upsert: true }
-    );
-
-    // Handle achievements and progress
-    const questionType = checkQuestionType(question);
-    if (questionType) {
-      await User.updateOne(
-        { userId }, 
-        { $inc: { [`progress.${questionType}`]: 1 } }
-      );
-
-      const updatedUser = await User.findOne({ userId }) as IUser;
-      await checkAndAwardAchievements(userId, updatedUser.progress);
-    }
-
-    res.status(200).json({ answer });
+    res.status(200).json({ 
+      answer,
+      metrics 
+    });
 
   } catch (error) {
     console.error("Error in API route:", error);
+    const endTime = performance.now();
+    metrics.totalTime = endTime - startTime;
+    
     if (error instanceof Error) {
       res.status(500).json({ 
         error: error.message,
-        details: 'An error occurred while processing your request'
+        details: 'An error occurred while processing your request',
+        metrics
       });
     } else {
       res.status(500).json({ 
         error: "Internal Server Error",
-        details: 'An unexpected error occurred'
+        details: 'An unexpected error occurred',
+        metrics
       });
     }
   }
