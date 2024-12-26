@@ -269,6 +269,9 @@ const checkQuestionType = (question: string): string | null => {
 };
 
 const checkAndAwardAchievements = async (userId: string, progress: any) => {
+  // First get the user's current achievements
+  const user = await User.findOne({ userId });
+  const currentAchievements = user?.achievements?.map((a: { name: any; }) => a.name) || [];
   const achievements: any[] = [];
 
   if (progress.rpgEnthusiast >= 5 && !progress.achievements.includes("RPG Enthusiast")) {
@@ -426,8 +429,37 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
         Question.create({ userId, question, response: answer }),
         User.findOneAndUpdate(
           { userId }, 
-          { $inc: { conversationCount: 1 } }, 
-          { upsert: true }
+          { 
+            $inc: { conversationCount: 1 },
+            $setOnInsert: {
+              achievements: [],
+              progress: {
+                firstQuestion: 0,
+                frequentAsker: 0,
+                rpgEnthusiast: 0,
+                bossBuster: 0,
+                strategySpecialist: 0,
+                actionAficionado: 0,
+                battleRoyale: 0,
+                sportsChampion: 0,
+                adventureAddict: 0,
+                shooterSpecialist: 0,
+                puzzlePro: 0,
+                racingExpert: 0,
+                stealthSpecialist: 0,
+                horrorHero: 0,
+                triviaMaster: 0,
+                totalQuestions: 0,
+                dailyExplorer: 0,
+                speedrunner: 0,
+                collectorPro: 0,
+                dataDiver: 0,
+                performanceTweaker: 0,
+                conversationalist: 0
+              }
+            }
+          }, 
+          { upsert: true, new: true }
         )
       ]);
 
