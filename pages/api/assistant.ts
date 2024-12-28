@@ -10,6 +10,7 @@ import path from 'path';
 import { readFile } from 'fs/promises';
 import { parse } from 'csv-parse/sync';
 import { getIO } from '../../middleware/realtime';
+import mongoose from 'mongoose';
 
 // Add performance monitoring
 const measureLatency = async (operation: string, callback: () => Promise<any>) => {
@@ -268,13 +269,13 @@ const checkQuestionType = (question: string): string | null => {
   return null;
 };
 
-const checkAndAwardAchievements = async (userId: string, progress: any) => {
+const checkAndAwardAchievements = async (userId: string, progress: any, session: mongoose.ClientSession | null = null) => {
   // First get the user's current achievements
-  const user = await User.findOne({ userId });
+  const user = await User.findOne({ userId }).session(session);
   const currentAchievements = user?.achievements?.map((a: { name: any; }) => a.name) || [];
   const achievements: any[] = [];
 
-  if (progress.rpgEnthusiast >= 5 && !progress.achievements.includes("RPG Enthusiast")) {
+  if (progress.rpgEnthusiast >= 5 && !currentAchievements.includes("RPG Enthusiast")) {
     achievements.push({ name: "RPG Enthusiast", dateEarned: new Date() });
   }
   if (progress.bossBuster >= 10 && !progress.achievements.includes("Boss Buster")) {
@@ -327,11 +328,15 @@ const checkAndAwardAchievements = async (userId: string, progress: any) => {
   }
   if (achievements.length > 0) {
     // Update the user with the new achievements
-    await User.updateOne({ userId }, { $push: { achievements: { $each: achievements } } });
+    await User.updateOne(
+      { userId }, 
+      { $push: { achievements: { $each: achievements } } },
+      { session: session || undefined }
+    );
 
-       //Emit a Socket.IO event to notify the user
-       const io = getIO();
-       io.emit('achievementEarned', { userId, achievements });
+    // Emit a Socket.IO event to notify the user
+    const io = getIO();
+    io.emit('achievementEarned', { userId, achievements });
   }
 };
 
@@ -425,54 +430,73 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
 
     // Measure database operations
     const { latency: dbOpsLatency } = await measureLatency('Database Operations', async () => {
-      await Promise.all([
-        Question.create({ userId, question, response: answer }),
-        User.findOneAndUpdate(
-          { userId }, 
-          { 
-            $inc: { conversationCount: 1 },
-            $setOnInsert: {
-              achievements: [],
-              progress: {
-                firstQuestion: 0,
-                frequentAsker: 0,
-                rpgEnthusiast: 0,
-                bossBuster: 0,
-                strategySpecialist: 0,
-                actionAficionado: 0,
-                battleRoyale: 0,
-                sportsChampion: 0,
-                adventureAddict: 0,
-                shooterSpecialist: 0,
-                puzzlePro: 0,
-                racingExpert: 0,
-                stealthSpecialist: 0,
-                horrorHero: 0,
-                triviaMaster: 0,
-                totalQuestions: 0,
-                dailyExplorer: 0,
-                speedrunner: 0,
-                collectorPro: 0,
-                dataDiver: 0,
-                performanceTweaker: 0,
-                conversationalist: 0
+      const session = await mongoose.startSession();
+      session.startTransaction();
+
+      try {
+        // Create question and update user in parallel
+        const [questionDoc, userDoc] = await Promise.all([
+          Question.create([{ userId, question, response: answer }], { session }),
+          User.findOneAndUpdate(
+            { userId }, 
+            { 
+              $inc: { conversationCount: 1 },
+              $setOnInsert: {
+                achievements: [],
+                progress: {
+                  firstQuestion: 0,
+                  frequentAsker: 0,
+                  rpgEnthusiast: 0,
+                  bossBuster: 0,
+                  strategySpecialist: 0,
+                  actionAficionado: 0,
+                  battleRoyale: 0,
+                  sportsChampion: 0,
+                  adventureAddict: 0,
+                  shooterSpecialist: 0,
+                  puzzlePro: 0,
+                  racingExpert: 0,
+                  stealthSpecialist: 0,
+                  horrorHero: 0,
+                  triviaMaster: 0,
+                  totalQuestions: 0,
+                  dailyExplorer: 0,
+                  speedrunner: 0,
+                  collectorPro: 0,
+                  dataDiver: 0,
+                  performanceTweaker: 0,
+                  conversationalist: 0
+                }
               }
+            }, 
+            { upsert: true, new: true, session }
+          )
+        ]);
+
+        // Handle achievements after initial operations
+        if (userDoc) {
+          const questionType = checkQuestionType(question);
+          if (questionType) {
+            await User.updateOne(
+              { userId },
+              { $inc: { [`progress.${questionType}`]: 1 } },
+              { session }
+            );
+
+            // Get updated progress for achievement checks
+            const updatedUser = await User.findOne({ userId }).session(session);
+            if (updatedUser) {
+              await checkAndAwardAchievements(userId, updatedUser.progress, session);
             }
-          }, 
-          { upsert: true, new: true }
-        )
-      ]);
+          }
+        }
 
-      // Handle achievements and progress
-      const questionType = checkQuestionType(question);
-      if (questionType) {
-        await User.updateOne(
-          { userId }, 
-          { $inc: { [`progress.${questionType}`]: 1 } }
-        );
-
-        const updatedUser = await User.findOne({ userId }) as IUser;
-        await checkAndAwardAchievements(userId, updatedUser.progress);
+        await session.commitTransaction();
+      } catch (error) {
+        await session.abortTransaction();
+        throw error;
+      } finally {
+        session.endSession();
       }
     });
     metrics.dbOperations = dbOpsLatency;
