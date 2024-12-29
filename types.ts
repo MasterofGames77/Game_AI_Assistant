@@ -26,3 +26,19 @@ export interface ForumPost {
   message: string;
   timestamp: Date;
 }
+
+export interface DiscordRequest {
+  user_id: string;
+  guild_id: string;
+  permissions: string;
+}
+
+export interface VerificationResponse {
+  message: string;
+  status: 'ALLOW' | 'DENY';
+  userData?: {
+    id: string;
+    hasProAccess: boolean;
+    roles?: string[];
+  };
+}

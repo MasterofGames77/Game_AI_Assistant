@@ -41,3 +41,6 @@ next-env.d.ts
 #mjs
 testConnection.mjs
 dotenvTest.mjs
+
+logs/*
+!logs/.gitkeep

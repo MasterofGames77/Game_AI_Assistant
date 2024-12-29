@@ -1,57 +1,173 @@
 // import { NextApiRequest, NextApiResponse } from 'next';
-// import { verifyKey } from 'discord-interactions';  // Ensure this function verifies the authenticity of the request
-// import connectToMongoDB from '../../utils/mongodb';  // Import your MongoDB connection utility
-// import User from '../../models/User';  // Import the User model
+// import { verifyKey } from 'discord-interactions';
+// import connectToMongoDB from '../../utils/mongodb';
+// import User from '../../models/User';
+// import { createLogger } from '../../utils/logger';
 
 // const DISCORD_PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY!;
+// const logger = createLogger('verifyUser');
 
-// // Function to verify Discord's request
-// const verifyDiscordRequest = (req: NextApiRequest) => {
-//   const signature = req.headers['x-signature-ed25519'] as string;
-//   const timestamp = req.headers['x-signature-timestamp'] as string;
-//   const body = JSON.stringify(req.body);
+// // Define strict types for Discord requests
+// interface DiscordRequest {
+//   user_id: string;
+//   guild_id: string;
+//   permissions: string;
+// }
 
-//   return verifyKey(body, signature, timestamp, DISCORD_PUBLIC_KEY);
+// // Define response types for better type safety
+// interface VerificationResponse {
+//   message: string;
+//   status: 'ALLOW' | 'DENY';
+//   userData?: {
+//     id: string;
+//     hasProAccess: boolean;
+//     roles?: string[];
+//   };
+// }
+
+// // Verify Discord's request with proper error handling
+// const verifyDiscordRequest = async (req: NextApiRequest): Promise<boolean> => {
+//   try {
+//     const signature = req.headers['x-signature-ed25519'];
+//     const timestamp = req.headers['x-signature-timestamp'];
+    
+//     if (!signature || !timestamp || Array.isArray(signature) || Array.isArray(timestamp)) {
+//       logger.error('Invalid Discord signature headers', {
+//         signature: !!signature,
+//         timestamp: !!timestamp
+//       });
+//       return false;
+//     }
+
+//     const body = JSON.stringify(req.body);
+//     return await verifyKey(body, signature, timestamp, DISCORD_PUBLIC_KEY);
+//   } catch (error) {
+//     logger.error('Error verifying Discord request', { error });
+//     return false;
+//   }
 // };
 
-// export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-//   // Ensure it's a POST request
-//   if (req.method !== 'POST') {
-//     return res.status(405).send('Method Not Allowed');
-//   }
-
-//   // Verify the request authenticity
-//   if (!verifyDiscordRequest(req)) {
-//     return res.status(401).send('Bad request signature');
-//   }
-
-//   // Connect to MongoDB
-//   await connectToMongoDB();
+// // Main handler with improved error handling and validation
+// export default async function handler(
+//   req: NextApiRequest,
+//   res: NextApiResponse<VerificationResponse>
+// ) {
+//   const startTime = Date.now();
 
 //   try {
-//     const { user_id } = req.body;
+//     // Method validation
+//     if (req.method !== 'POST') {
+//       logger.warn('Invalid method used', { method: req.method });
+//       return res.status(405).json({
+//         message: 'Method Not Allowed',
+//         status: 'DENY'
+//       });
+//     }
 
-//     // Fetch user from MongoDB
+//     // Body validation
+//     const { user_id, guild_id } = req.body as DiscordRequest;
+    
+//     if (!user_id || typeof user_id !== 'string') {
+//       logger.warn('Invalid user_id in request', { user_id });
+//       return res.status(400).json({
+//         message: 'Invalid user ID provided',
+//         status: 'DENY'
+//       });
+//     }
+
+//     // Discord request verification
+//     if (!verifyDiscordRequest(req)) {
+//       logger.warn('Invalid Discord signature', { user_id });
+//       return res.status(401).json({
+//         message: 'Invalid request signature',
+//         status: 'DENY'
+//       });
+//     }
+
+//     // Database connection with retry logic
+//     let retries = 3;
+//     while (retries > 0) {
+//       try {
+//         await connectToMongoDB();
+//         break;
+//       } catch (error) {
+//         retries--;
+//         if (retries === 0) throw error;
+//         await new Promise(resolve => setTimeout(resolve, 1000));
+//       }
+//     }
+
+//     // User verification with detailed checks
 //     const user = await User.findOne({ userId: user_id });
 
 //     if (!user) {
-//       // User not found, deny role
-//       return res.status(200).json({ message: 'User not found', status: 'DENY' });
+//       logger.info('User not found', { user_id });
+//       return res.status(200).json({
+//         message: 'User not found or not verified',
+//         status: 'DENY'
+//       });
 //     }
 
-//     // You can add more detailed checks based on your application's needs,
-//     // such as checking specific roles, subscription status, etc.
+//     // Comprehensive verification checks
+//     const verificationChecks = {
+//       hasProAccess: user.hasProAccess,
+//       isActive: !user.isBanned,
+//       hasRequiredRole: user.roles?.includes('verified'),
+//       // Add more checks as needed
+//     };
 
-//     // If user is verified, grant role
-//     return res.status(200).json({ message: 'User verified', status: 'ALLOW' });
+//     if (!verificationChecks.hasProAccess || !verificationChecks.isActive) {
+//       logger.info('User verification failed', {
+//         user_id,
+//         checks: verificationChecks
+//       });
+      
+//       return res.status(200).json({
+//         message: 'User does not meet verification requirements',
+//         status: 'DENY',
+//         userData: {
+//           id: user.userId,
+//           hasProAccess: user.hasProAccess,
+//           roles: user.roles
+//         }
+//       });
+//     }
+
+//     // Log successful verification
+//     logger.info('User verified successfully', {
+//       user_id,
+//       processingTime: Date.now() - startTime
+//     });
+
+//     // Return successful verification
+//     return res.status(200).json({
+//       message: 'User verified successfully',
+//       status: 'ALLOW',
+//       userData: {
+//         id: user.userId,
+//         hasProAccess: user.hasProAccess,
+//         roles: user.roles
+//       }
+//     });
+
 //   } catch (error) {
-//     console.error('Error verifying user:', error);
-//     return res.status(500).json({ message: 'Internal Server Error' });
+//     // Enhanced error logging
+//     logger.error('Error in verification process', {
+//       error,
+//       user_id: req.body?.user_id,
+//       processingTime: Date.now() - startTime
+//     });
+
+//     return res.status(500).json({
+//       message: 'Internal Server Error',
+//       status: 'DENY'
+//     });
 //   }
 // }
 
+// // Proper body parsing configuration
 // export const config = {
 //   api: {
-//     bodyParser: false,  // Ensure body is parsed correctly
+//     bodyParser: true,
 //   },
 // };
