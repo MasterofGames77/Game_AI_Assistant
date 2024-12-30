@@ -1,21 +1,37 @@
 // import { Client, CommandInteraction, Interaction } from 'discord.js';
+// import { logger } from '../logger';
 
-// // Example of a command structure
-// const commands = new Map<string, { description: string, execute: (interaction: CommandInteraction) => void }>();
+// // Define command structure
+// interface Command {
+//   name: string;
+//   description: string;
+//   execute: (interaction: CommandInteraction) => Promise<void>;
+// }
 
-// // Define your commands
+// // Store commands in a Map for easy access
+// const commands = new Map<string, Command>();
+
+// // Register basic commands
 // commands.set('ping', {
+//   name: 'ping',
 //   description: 'Replies with Pong!',
 //   execute: async (interaction: CommandInteraction) => {
 //     await interaction.reply('Pong!');
 //   },
 // });
 
-// // You can add more commands like this:
-// commands.set('hello', {
-//   description: 'Replies with a greeting!',
+// commands.set('help', {
+//   name: 'help',
+//   description: 'Lists all available commands',
 //   execute: async (interaction: CommandInteraction) => {
-//     await interaction.reply(`Hello, ${interaction.user.username}!`);
+//     const commandList = Array.from(commands.values())
+//       .map(cmd => `**/${cmd.name}** - ${cmd.description}`)
+//       .join('\n');
+    
+//     await interaction.reply({
+//       content: `Available commands:\n${commandList}`,
+//       ephemeral: true
+//     });
 //   },
 // });
 
@@ -26,31 +42,68 @@
 //   const command = commands.get(interaction.commandName);
   
 //   if (!command) {
-//     await interaction.reply({ content: 'Command not recognized.', ephemeral: true });
+//     logger.warn('Unknown command received', { 
+//       command: interaction.commandName,
+//       user: interaction.user.id 
+//     });
+//     await interaction.reply({ 
+//       content: 'Command not recognized.', 
+//       ephemeral: true 
+//     });
 //     return;
 //   }
 
 //   try {
+//     logger.info('Executing command', { 
+//       command: interaction.commandName,
+//       user: interaction.user.id 
+//     });
 //     await command.execute(interaction);
 //   } catch (error) {
-//     console.error('Error executing command:', error);
-//     await interaction.reply({ content: 'There was an error executing this command.', ephemeral: true });
+//     logger.error('Error executing command:', { 
+//       error,
+//       command: interaction.commandName,
+//       user: interaction.user.id
+//     });
+//     await interaction.reply({ 
+//       content: 'There was an error executing this command.', 
+//       ephemeral: true 
+//     });
 //   }
 // };
 
 // // Function to register commands with Discord
-// export const registerCommands = (client: Client) => {
-//   client.on('ready', async () => {
-//     const guild = client.guilds.cache.get('your-guild-id');
-//     if (!guild) return;
+// export const registerCommands = async (client: Client) => {
+//   try {
+//     logger.info('Starting command registration');
+    
+//     const guild = client.guilds.cache.get(process.env.DISCORD_GUILD_ID!);
+//     if (!guild) {
+//       logger.error('Guild not found');
+//       return;
+//     }
 
-//     // Register the commands
-//     const commandsArray = Array.from(commands.keys()).map(name => ({
+//     // Convert commands to Discord API format
+//     const commandsData = Array.from(commands.values()).map(({ name, description }) => ({
 //       name,
-//       description: commands.get(name)!.description,
+//       description,
 //     }));
 
-//     await guild.commands.set(commandsArray);
-//     console.log('Commands registered with Discord.');
-//   });
+//     // Register commands with Discord
+//     await guild.commands.set(commandsData);
+//     logger.info('Commands registered successfully', { 
+//       commandCount: commandsData.length 
+//     });
+//   } catch (error) {
+//     logger.error('Error registering commands:', { error });
+//   }
+// };
+
+// // Export commands map for external use
+// export const getCommands = () => commands;
+
+// // Add new command helper function
+// export const addCommand = (command: Command) => {
+//   commands.set(command.name, command);
+//   logger.info('New command added', { command: command.name });
 // };

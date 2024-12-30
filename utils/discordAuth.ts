@@ -3,15 +3,18 @@
 
 // dotenv.config();
 
+// // Discord API configuration
 // const DISCORD_API_URL = 'https://discord.com/api/v10';
 // const CLIENT_ID = process.env.DISCORD_CLIENT_ID || '';
 // const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || '';
 // const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || '';
 
+// // Validate required environment variables
 // if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) {
 //   throw new Error('Missing required Discord OAuth2 environment variables.');
 // }
 
+// // Get OAuth2 token from Discord using authorization code
 // export const getDiscordOAuth2Token = async (code: string): Promise<string> => {
 //   try {
 //     const params = new URLSearchParams({
@@ -35,6 +38,7 @@
 //   }
 // };
 
+// // Fetch user information using access token
 // export const fetchDiscordUser = async (accessToken: string) => {
 //   try {
 //     const response = await axios.get(`${DISCORD_API_URL}/users/@me`, {
@@ -55,8 +59,8 @@
 //   }
 // };
 
-// // Example function to initiate the OAuth2 flow
+// // Generate OAuth2 URL for Discord login
 // export const getDiscordOAuth2Url = () => {
-//   const scope = 'identify email'; // Specify the scopes you need
+//   const scope = 'identify email guilds'; // Added 'guilds' scope for server access
 //   return `${DISCORD_API_URL}/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent(scope)}`;
 // };
