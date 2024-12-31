@@ -6,8 +6,8 @@
 // dotenv.config();
 
 // // Validate environment variables
-// if (!process.env.DISCORD_BOT_TOKEN) {
-//   throw new Error('DISCORD_BOT_TOKEN is not defined in environment variables');
+// if (!process.env.DISCORD_API_TOKEN) {
+//   throw new Error('DISCORD_API_TOKEN is not defined in environment variables');
 // }
 
 // // Create Discord client with required intents
@@ -76,7 +76,7 @@
 // });
 
 // // Login to Discord
-// client.login(process.env.DISCORD_BOT_TOKEN).catch((error) => {
+// client.login(process.env.DISCORD_API_TOKEN).catch((error) => {
 //   logger.error('Failed to login to Discord:', { error });
 //   process.exit(1);
 // });

@@ -11,7 +11,7 @@
 //         return res.status(400).json({ error: 'No code provided' });
 //     }
 
-//     const clientId = process.env.DISCORD_CLIENT_ID;
+//     const clientId = process.env.DISCORD_APPLICATION_ID;
 //     const clientSecret = process.env.DISCORD_CLIENT_SECRET;
 //     let redirectUri = process.env.DISCORD_REDIRECT_URI || '';
 
@@ -21,16 +21,16 @@
 
 //     const tokenUrl = 'https://discord.com/api/oauth2/token';
 
-//     console.log("Discord OAuth2 environment variables:", { clientId, clientSecret, encodedRedirectUri, tokenUrl });
+//     console.log("Discord OAuth2 environment variables:", { applicationId, clientSecret, encodedRedirectUri, tokenUrl });
 //     console.log("Using encoded redirect_uri:", encodedRedirectUri);
 
-//     if (!clientId || !clientSecret || !encodedRedirectUri || !tokenUrl) {
+//     if (!applicationId || !clientSecret || !encodedRedirectUri || !tokenUrl) {
 //         console.error("Missing environment variables for Discord OAuth2.");
 //         return res.status(500).json({ error: 'Missing environment variables' });
 //     }
 
 //     const params = new URLSearchParams({
-//         client_id: clientId,
+//         application_id: applicationId,
 //         client_secret: clientSecret,
 //         grant_type: 'authorization_code',
 //         code: code as string,

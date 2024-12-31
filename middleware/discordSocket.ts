@@ -39,7 +39,7 @@
 // // Handle other events as needed
 
 // // Connect to Discord using the bot token from the .env file
-// discordClient.login(process.env.DISCORD_BOT_TOKEN);
+// discordClient.login(process.env.DISCORD_API_TOKEN);
 
 // // Export the client for use in other parts of the application
 // export default discordClient;
