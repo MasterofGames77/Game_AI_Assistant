@@ -77,22 +77,20 @@
 //   try {
 //     logger.info('Starting command registration');
     
-//     const guild = client.guilds.cache.get(process.env.DISCORD_GUILD_ID!);
-//     if (!guild) {
-//       logger.error('Guild not found');
-//       return;
+//     const applicationId = process.env.DISCORD_APPLICATION_ID;
+//     if (!applicationId) {
+//       throw new Error('DISCORD_APPLICATION_ID is not defined');
 //     }
 
-//     // Convert commands to Discord API format
-//     const commandsData = Array.from(commands.values()).map(({ name, description }) => ({
+//     const commands = Array.from(getCommands().values()).map(({ name, description }) => ({
 //       name,
 //       description,
 //     }));
 
-//     // Register commands with Discord
-//     await guild.commands.set(commandsData);
+//     await client.application?.commands.set(commands);
+//     
 //     logger.info('Commands registered successfully', { 
-//       commandCount: commandsData.length 
+//       commandCount: commands.length 
 //     });
 //   } catch (error) {
 //     logger.error('Error registering commands:', { error });

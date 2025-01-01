@@ -11,7 +11,7 @@
 //         return res.status(400).json({ error: 'No code provided' });
 //     }
 
-//     const clientId = process.env.DISCORD_APPLICATION_ID;
+//     const applicationId = process.env.DISCORD_APPLICATION_ID;
 //     const clientSecret = process.env.DISCORD_CLIENT_SECRET;
 //     let redirectUri = process.env.DISCORD_REDIRECT_URI || '';
 
