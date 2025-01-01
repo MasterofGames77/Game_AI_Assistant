@@ -5,7 +5,7 @@ import { Decimal128 } from 'mongoose';
 interface GameData {
   title: string;
   console: string;
-  release_year: string;
+  release_date: string;
   genre: string;
   developer: string;
   publisher: string;
