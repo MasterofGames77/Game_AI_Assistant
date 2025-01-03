@@ -150,7 +150,7 @@ function filterGameSeries(games: any[], seriesPrefix: string): any[] {
 }
 
 // Get chat completion for user questions
-export const getChatCompletion = async (question: string): Promise<string | null> => {
+export const getChatCompletion = async (question: string, systemMessage?: string): Promise<string | null> => {
   try {
     if (question.toLowerCase().includes("list all of the games in the")) {
       const seriesTitle = extractSeriesName(question);
@@ -180,13 +180,15 @@ export const getChatCompletion = async (question: string): Promise<string | null
       response = await fetchFromRAWG(question);
     }
 
-
     // If no response from APIs, fall back to OpenAI completion
     if (!response) {
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
-          { role: 'system', content: 'You are an AI assistant specializing in video games. You can provide detailed analytics and insights into gameplay, helping players track their progress and identify areas for improvement.' },
+          { 
+            role: 'system', 
+            content: systemMessage || 'You are an AI assistant specializing in video games. You can provide detailed analytics and insights into gameplay, helping players track their progress and identify areas for improvement.' 
+          },
           { role: 'user', content: question }
         ],
         max_tokens: 800,
