@@ -88,7 +88,7 @@
 //     }));
 
 //     await client.application?.commands.set(commands);
-//     
+    
 //     logger.info('Commands registered successfully', { 
 //       commandCount: commands.length 
 //     });

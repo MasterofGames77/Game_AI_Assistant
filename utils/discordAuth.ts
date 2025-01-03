@@ -10,7 +10,7 @@
 // const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || '';
 
 // // Validate required environment variables
-// if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) {
+// if (!APPLICATION_ID || !CLIENT_SECRET || !REDIRECT_URI) {
 //   throw new Error('Missing required Discord OAuth2 environment variables.');
 // }
 
@@ -18,7 +18,7 @@
 // export const getDiscordOAuth2Token = async (code: string): Promise<string> => {
 //   try {
 //     const params = new URLSearchParams({
-//       client_id: CLIENT_ID,
+//       client_id: APPLICATION_ID,
 //       client_secret: CLIENT_SECRET,
 //       grant_type: 'authorization_code',
 //       code,
@@ -62,5 +62,5 @@
 // // Generate OAuth2 URL for Discord login
 // export const getDiscordOAuth2Url = () => {
 //   const scope = 'identify email guilds'; // Added 'guilds' scope for server access
-//   return `${DISCORD_API_URL}/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent(scope)}`;
+//   return `${DISCORD_API_URL}/oauth2/authorize?client_id=${APPLICATION_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent(scope)}`;
 // };
