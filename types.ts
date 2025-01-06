@@ -12,13 +12,27 @@ export interface SideBarProps {
   onDeleteConversation: () => void;
 }
 
+export interface Post {
+  userId: string;
+  message: string;
+  timestamp: Date;
+}
+
+export interface Forum {
+  _id: string;
+  title: string;
+  topics: ForumTopic[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface ForumTopic {
   _id: string;
-  forumId: string;
   topicTitle: string;
-  posts: ForumPost[];
+  posts: Post[];
   isPrivate: boolean;
   allowedUsers: string[];
+  createdAt: Date;
 }
 
 export interface ForumPost {

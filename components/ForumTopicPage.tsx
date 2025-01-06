@@ -20,18 +20,22 @@
 //   }, [forumId, topicId]);
 
 //   const handlePostSubmit = async () => {
-//     if (!newPost.trim()) return; // Ensure the post content is not empty
+//     if (!newPost.trim()) return;
 
 //     try {
-//       const response = await axios.post("/api/addPostToForum", {
+//       await axios.post("/api/addPostToForum", {
 //         forumId,
 //         topicId,
-//         userId: localStorage.getItem("userId"), // Assuming you store the userId in local storage
-//         content: newPost,
+//         userId: localStorage.getItem("userId"),
+//         message: newPost,
 //       });
-//       setForumTopic(response.data.forumTopic); // Update the topic with the new post
-//       setNewPost(""); // Clear the input field
-//       setError("");
+
+//       // Refresh the topic data after posting
+//       const response = await axios.get(
+//         `/api/getForumTopics?forumId=${forumId}&topicId=${topicId}`
+//       );
+//       setForumTopic(response.data);
+//       setNewPost("");
 //     } catch (err) {
 //       setError("Error adding post to the forum.");
 //     }

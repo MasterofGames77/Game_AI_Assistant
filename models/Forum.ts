@@ -9,13 +9,18 @@
 
 // // Define the schema for a forum topic
 // const ForumSchema = new mongoose.Schema({
-//   forumId: { type: String, required: true },       // Unique ID for the forum (specific to the game)
-//   topicTitle: { type: String, required: true },    // Title of the conversation topic
-//   posts: { type: [PostSchema], default: [] },      // Array of posts in the topic
-//   isPrivate: { type: Boolean, default: false },    // Whether the conversation is private
-//   allowedUsers: { type: [String], default: [] }    // List of userIds allowed to view private conversations
+//   _id: { type: String, required: true },         // Forum ID
+//   title: { type: String, required: true },       // Forum title
+//   topics: [{                                     // Array of topics within the forum
+//     _id: { type: String, required: true },
+//     topicTitle: { type: String, required: true },
+//     posts: [PostSchema],
+//     isPrivate: { type: Boolean, default: false },
+//     allowedUsers: [String],
+//     createdAt: { type: Date, default: Date.now }
+//   }]
 // }, {
-//   timestamps: true  // Automatically add createdAt and updatedAt timestamps
+//   timestamps: true
 // });
 
 // // Export the Forum model
