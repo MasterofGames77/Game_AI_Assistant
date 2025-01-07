@@ -11,6 +11,7 @@ import { readFile } from 'fs/promises';
 import { parse } from 'csv-parse/sync';
 import { getIO } from '../../middleware/realtime';
 import mongoose from 'mongoose';
+import winston from 'winston';
 
 // Add performance monitoring
 const measureLatency = async (operation: string, callback: () => Promise<any>) => {
@@ -22,10 +23,12 @@ const measureLatency = async (operation: string, callback: () => Promise<any>) =
   return { result, latency };
 };
 
+// Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Functions for reading and processing game data from CSV file
 const CSV_FILE_PATH = path.join(process.cwd(), 'data/Video Games Data.csv');
 
 const readCSVFile = async (filePath: string) => {
@@ -42,6 +45,7 @@ const getCSVData = async () => {
   }
 };
 
+// Utility functions for formatting game information
 const formatReleaseDate = (dateString: string): string => {
   const [day, month, year] = dateString.split('-');
   return `${month}/${day}/${year}`;
@@ -52,6 +56,7 @@ const formatGameInfo = (gameInfo: any): string => {
   return `${gameInfo.title} was released on ${formattedReleaseDate} for ${gameInfo.console}. It is a ${gameInfo.genre} game developed by ${gameInfo.developer} and published by ${gameInfo.publisher}.`;
 };
 
+// Function to fetch game information from IGDB API
 interface IGDBGame {
   name: string;
   release_dates?: { date: string }[];
@@ -101,6 +106,7 @@ const fetchGamesFromIGDB = async (query: string): Promise<string | null> => {
   }
 };
 
+// Function to fetch game information from RAWG API
 interface RAWGGame {
   name: string;
   released?: string;
@@ -140,6 +146,7 @@ const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
   }
 };
 
+// Function to combine game data from multiple sources (RAWG, IGDB, and local CSV)
 const fetchAndCombineGameData = async (question: string, answer: string): Promise<string> => {
   const gameName = question.replace(/when (was|did) (.*?) (released|come out)/i, "$2").trim();
 
@@ -189,6 +196,7 @@ const fetchAndCombineGameData = async (question: string, answer: string): Promis
   }
 };
 
+// Function to get game genre from predefined mapping
 const getGenreFromMapping = (gameTitle: string): string | null => {
   const genreMapping: { [key: string]: string } = {
     "Xenoblade Chronicles 3": "Action RPG",
@@ -243,11 +251,13 @@ const getGenreFromMapping = (gameTitle: string): string | null => {
   return genreMapping[gameTitle] || null;
 };
 
+// Utility function to extract game title from user questions
 const extractGameTitle = (question: string): string => {
-  const match = question.match(/(?:guide|walkthrough|progress|unlock|strategy|find).*?\s(.*?)(?:\s(?:chapter|level|stage|part|area|boss|item|character|section))/i);
+  const match = question.match(/(?:guide|walkthrough|progress|unlock|strategy|find).*?\s(.*?)(?:\s(?:chapter|level|stage|part|area|boss|item|character|section|location|quest))/i);
   return match ? match[1].trim() : '';
 };
 
+// Function to determine question category for achievement tracking
 const checkQuestionType = (question: string): string | null => {
   if (question.toLowerCase().includes("rpg")) return "rpgEnthusiast";
   if (question.toLowerCase().includes("boss fight")) return "bossBuster";
@@ -269,6 +279,7 @@ const checkQuestionType = (question: string): string | null => {
   return null;
 };
 
+// Function to check and award achievements based on user progress
 const checkAndAwardAchievements = async (userId: string, progress: any, session: mongoose.ClientSession | null = null) => {
   // First get the user's current achievements
   const user = await User.findOne({ userId }).session(session);
@@ -340,16 +351,96 @@ const checkAndAwardAchievements = async (userId: string, progress: any, session:
   }
 };
 
-// Main handler
-const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
-  const { userId, question, code } = req.body;
-  const metrics: { [key: string]: number } = {};
-  const startTime = performance.now();
+const measureMemoryUsage = () => {
+  const used = process.memoryUsage();
+  return {
+    heapTotal: Math.round(used.heapTotal / 1024 / 1024 * 100) / 100 + 'MB',
+    heapUsed: Math.round(used.heapUsed / 1024 / 1024 * 100) / 100 + 'MB',
+    rss: Math.round(used.rss / 1024 / 1024 * 100) / 100 + 'MB',
+    external: Math.round(used.external / 1024 / 1024 * 100) / 100 + 'MB'
+  };
+};
 
+const measureResponseSize = (data: any) => {
+  const size = Buffer.byteLength(JSON.stringify(data));
+  return {
+    bytes: size,
+    kilobytes: (size / 1024).toFixed(2) + 'KB'
+  };
+};
+
+const measureDBQuery = async (operation: string, query: () => Promise<any>) => {
+  const startMemory = process.memoryUsage().heapUsed;
+  const startTime = performance.now();
+  
+  const result = await query();
+  
+  const endTime = performance.now();
+  const endMemory = process.memoryUsage().heapUsed;
+  
+  return {
+    operation,
+    executionTime: `${(endTime - startTime).toFixed(2)}ms`,
+    memoryUsed: `${((endMemory - startMemory) / 1024 / 1024).toFixed(2)}MB`,
+    result
+  };
+};
+
+class RequestMonitor {
+  private requests: number = 0;
+  private startTime: number = Date.now();
+
+  incrementRequest() {
+    this.requests++;
+  }
+
+  getRequestRate() {
+    const elapsed = (Date.now() - this.startTime) / 1000; // seconds
+    return {
+      totalRequests: this.requests,
+      requestsPerSecond: (this.requests / elapsed).toFixed(2)
+    };
+  }
+}
+
+class CacheMetrics {
+  private hits: number = 0;
+  private misses: number = 0;
+
+  recordHit() { this.hits++; }
+  recordMiss() { this.misses++; }
+
+  getHitRate() {
+    const total = this.hits + this.misses;
+    return total ? (this.hits / total * 100).toFixed(2) + '%' : '0%';
+  }
+}
+
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.json(),
+  defaultMeta: { service: 'game-assistant' },
+  transports: [
+    new winston.transports.File({ filename: 'performance-metrics.log' })
+  ]
+});
+
+// Main API handler function that processes incoming requests
+const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
+  const startTime = performance.now();
+  const { userId, question, code } = req.body;
+  const metrics: any = {};
+  const requestMonitor = new RequestMonitor();
+  const cacheMetrics = new CacheMetrics();
+  
   try {
-    console.log("Received question:", question);
+    // Track request
+    requestMonitor.incrementRequest();
     
-    // Measure MongoDB connection
+    // Measure memory at start
+    metrics.initialMemory = measureMemoryUsage();
+    
+    // Existing MongoDB connection measurement
     const { latency: dbLatency } = await measureLatency('MongoDB Connection', async () => {
       await connectToMongoDB();
     });
@@ -428,8 +519,8 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     answer = processedAnswer;
     metrics.questionProcessing = processingLatency;
 
-    // Measure database operations
-    const { latency: dbOpsLatency } = await measureLatency('Database Operations', async () => {
+    // Measure database operations with enhanced metrics
+    const dbMetrics = await measureDBQuery('Create Question', async () => {
       const session = await mongoose.startSession();
       session.startTransaction();
 
@@ -499,17 +590,20 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
         session.endSession();
       }
     });
-    metrics.dbOperations = dbOpsLatency;
+    metrics.databaseMetrics = dbMetrics;
 
-    // Calculate total processing time
-    const endTime = performance.now();
-    metrics.totalTime = endTime - startTime;
-
-    res.status(200).json({ 
-      answer,
-      metrics 
-    });
-
+    // Measure final memory usage
+    metrics.finalMemory = measureMemoryUsage();
+    
+    // Measure response size
+    const responseData = { answer, metrics };
+    metrics.responseSize = measureResponseSize(responseData);
+    
+    // Add request rate
+    metrics.requestRate = requestMonitor.getRequestRate();
+    
+    res.status(200).json(responseData);
+    
   } catch (error) {
     console.error("Error in API route:", error);
     const endTime = performance.now();
