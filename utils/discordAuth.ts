@@ -21,20 +21,39 @@ export const getDiscordOAuth2Token = async (code: string): Promise<string> => {
       client_id: APPLICATION_ID,
       client_secret: CLIENT_SECRET,
       grant_type: 'authorization_code',
-      code,
+      code: code,
       redirect_uri: REDIRECT_URI,
     });
 
-    const response = await axios.post(`${DISCORD_API_URL}/oauth2/token`, params);
+    // Add proper headers for Discord API
+    const response = await axios.post(
+      `${DISCORD_API_URL}/oauth2/token`,
+      params.toString(),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json'
+        }
+      }
+    );
+
+    if (!response.data.access_token) {
+      throw new Error('No access token received from Discord');
+    }
+
     return response.data.access_token;
   } catch (error) {
-    if (error instanceof Error) {
-      console.error('Error during Discord OAuth2 flow:', error.message);
-      throw new Error('Failed to complete Discord OAuth2 flow');
-    } else {
-      console.error('Unknown error during Discord OAuth2 flow:', error);
-      throw new Error('An unknown error occurred during Discord OAuth2 flow');
+    if (axios.isAxiosError(error)) {
+      console.error('Discord OAuth2 error:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        config: {
+          url: error.config?.url,
+          params: error.config?.params
+        }
+      });
     }
+    throw error;
   }
 };
 
@@ -61,6 +80,16 @@ export const fetchDiscordUser = async (accessToken: string) => {
 
 // Generate OAuth2 URL for Discord login
 export const getDiscordOAuth2Url = () => {
-  const scope = 'identify email guilds'; // Added 'guilds' scope for server access
-  return `${DISCORD_API_URL}/oauth2/authorize?client_id=${APPLICATION_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=${encodeURIComponent(scope)}`;
+  const scope = 'identify email guilds';
+  const state = Math.random().toString(36).substring(7); // Add state for security
+  
+  const params = new URLSearchParams({
+    client_id: APPLICATION_ID,
+    redirect_uri: REDIRECT_URI,
+    response_type: 'code',
+    scope: scope,
+    state: state
+  });
+
+  return `${DISCORD_API_URL}/oauth2/authorize?${params.toString()}`;
 };
