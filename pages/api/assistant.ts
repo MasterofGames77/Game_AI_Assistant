@@ -165,7 +165,7 @@ const fetchAndCombineGameData = async (question: string, answer: string): Promis
         ? csvData.value.find((game: any) => game.title.toLowerCase() === gameName.toLowerCase())
         : null;
 
-    const isMainResponseShort = answer.length < 150;
+    const isMainResponseShort = answer.length < 100;
     const hasRelevantData = rawgResponse || igdbResponse || csvGameInfo;
 
     if (isMainResponseShort && hasRelevantData) {
