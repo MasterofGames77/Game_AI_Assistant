@@ -2,33 +2,89 @@ import connectToMongoDB from './mongodb';
 import User from '../models/User';
 import mongoose from 'mongoose';
 
+const updateAchievementsForUser = async (email: string) => {
+  await connectToMongoDB();
+
+  const update = {
+    $setOnInsert: {
+      achievements: [],
+      progress: {
+        firstQuestion: 0,
+        frequentAsker: 0,
+        rpgEnthusiast: 0,
+        bossBuster: 0,
+        strategySpecialist: 0,
+        actionAficionado: 0,
+        battleRoyale: 0,
+        sportsChampion: 0,
+        adventureAddict: 0,
+        shooterSpecialist: 0,
+        puzzlePro: 0,
+        racingExpert: 0,
+        stealthSpecialist: 0,
+        horrorHero: 0,
+        triviaMaster: 0,
+        totalQuestions: 0,
+        dailyExplorer: 0,
+        speedrunner: 0,
+        collectorPro: 0,
+        dataDiver: 0,
+        performanceTweaker: 0,
+        conversationalist: 0
+      }
+    }
+  };
+
+  try {
+    // Only update if achievements field doesn't exist
+    const result = await User.updateOne(
+      { 
+        email,
+        $or: [
+          { achievements: { $exists: false } },
+          { progress: { $exists: false } }
+        ]
+      }, 
+      update
+    );
+    console.log(`Updated user with email ${email}:`, result.modifiedCount ? 'Success' : 'No update needed');
+  } catch (error) {
+    console.error('Error updating user:', error);
+  } finally {
+    await mongoose.connection.close();
+  }
+};
+
 const updateAchievementsForAllUsers = async () => {
   await connectToMongoDB();
 
   const update = {
-    progress: {
-      firstQuestion: 0,
-      frequentAsker: 0,
-      rpgEnthusiast: 0,
-      bossBuster: 0,
-      strategySpecialist: 0,
-      actionAficionado: 0,
-      battleRoyale: 0,
-      sportsChampion: 0,
-      adventureAddict: 0,
-      shooterSpecialist: 0,
-      puzzlePro: 0,
-      racingExpert: 0,
-      stealthSpecialist: 0,
-      horrorHero: 0,
-      triviaMaster: 0,
-      totalQuestions: 0,
-      dailyExplorer: 0,
-      speedrunner: 0,
-      collectorPro: 0,
-      dataDiver: 0,
-      performanceTweaker: 0,
-      conversationalist: 0
+    $set: {
+      achievements: [],
+      progress: {
+        firstQuestion: 0,
+        frequentAsker: 0,
+        rpgEnthusiast: 0,
+        bossBuster: 0,
+        strategySpecialist: 0,
+        actionAficionado: 0,
+        battleRoyale: 0,
+        sportsChampion: 0,
+        adventureAddict: 0,
+        shooterSpecialist: 0,
+        puzzlePro: 0,
+        racingExpert: 0,
+        stealthSpecialist: 0,
+        horrorHero: 0,
+        triviaMaster: 0,
+        totalQuestions: 0,
+        dailyExplorer: 0,
+        speedrunner: 0,
+        collectorPro: 0,
+        dataDiver: 0,
+        performanceTweaker: 0,
+        conversationalist: 0
+      }
     }
   };
 
@@ -39,8 +95,12 @@ const updateAchievementsForAllUsers = async () => {
   } catch (error) {
     console.error('Error updating users:', error);
   } finally {
-    mongoose.connection.close();
+    await mongoose.connection.close();
   }
 };
 
-updateAchievementsForAllUsers();
+// Export both functions
+export { updateAchievementsForUser, updateAchievementsForAllUsers };
+
+// Run the update for your specific email
+updateAchievementsForUser("mgambardella16@gmail.com");
