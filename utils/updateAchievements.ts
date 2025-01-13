@@ -6,7 +6,7 @@ const updateAchievementsForUser = async (email: string) => {
   await connectToMongoDB();
 
   const update = {
-    $setOnInsert: {
+    $set: {
       achievements: [],
       progress: {
         firstQuestion: 0,
@@ -36,16 +36,11 @@ const updateAchievementsForUser = async (email: string) => {
   };
 
   try {
-    // Only update if achievements field doesn't exist
+    // Force update the user's achievements and progress
     const result = await User.updateOne(
-      { 
-        email,
-        $or: [
-          { achievements: { $exists: false } },
-          { progress: { $exists: false } }
-        ]
-      }, 
-      update
+      { email },
+      update,
+      { upsert: false } // Don't create if doesn't exist
     );
     console.log(`Updated user with email ${email}:`, result.modifiedCount ? 'Success' : 'No update needed');
   } catch (error) {

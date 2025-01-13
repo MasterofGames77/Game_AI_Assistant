@@ -253,6 +253,15 @@ const getGenreFromMapping = (gameTitle: string): string | null => {
 
 // Utility function to extract game title from user questions
 const extractGameTitle = (question: string): string => {
+  // First, handle titles with colons and apostrophes
+  const fullTitleMatch = question.match(/["']([^"']+)["']|[:]?\s([^:?]+?)(?:\s(?:chapter|level|stage|part|area|boss|item|character|section|location|quest)|\?|$)/i);
+  
+  if (fullTitleMatch) {
+    // Return the first captured group that isn't undefined
+    return (fullTitleMatch[1] || fullTitleMatch[2]).trim();
+  }
+  
+  // Fallback to the original pattern if no match
   const match = question.match(/(?:guide|walkthrough|progress|unlock|strategy|find).*?\s(.*?)(?:\s(?:chapter|level|stage|part|area|boss|item|character|section|location|quest))/i);
   return match ? match[1].trim() : '';
 };
