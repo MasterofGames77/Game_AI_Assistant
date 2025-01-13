@@ -443,6 +443,11 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
   const cacheMetrics = new CacheMetrics();
   
   try {
+    // Validate question
+    if (!question || typeof question !== 'string') {
+      throw new Error('Invalid question format - question must be a non-empty string');
+    }
+
     // Track request
     requestMonitor.incrementRequest();
     
