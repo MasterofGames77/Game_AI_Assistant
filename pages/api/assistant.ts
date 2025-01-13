@@ -298,52 +298,52 @@ const checkAndAwardAchievements = async (userId: string, progress: any, session:
   if (progress.rpgEnthusiast >= 5 && !currentAchievements.includes("RPG Enthusiast")) {
     achievements.push({ name: "RPG Enthusiast", dateEarned: new Date() });
   }
-  if (progress.bossBuster >= 10 && !progress.achievements.includes("Boss Buster")) {
+  if (progress.bossBuster >= 10 && !currentAchievements.includes("Boss Buster")) {
     achievements.push({ name: "Boss Buster", dateEarned: new Date() });
   }
-  if (progress.strategySpecialist >= 5 && !progress.achievements.includes("Strategy Specialist")) {
+  if (progress.strategySpecialist >= 5 && !currentAchievements.includes("Strategy Specialist")) {
     achievements.push({ name: "Strategy Specialist", dateEarned: new Date() });
   }
-  if (progress.actionAficionado >= 5 && !progress.achievements.includes("Action Aficionado")) {
+  if (progress.actionAficionado >= 5 && !currentAchievements.includes("Action Aficionado")) {
     achievements.push({ name: "Action Aficionado", dateEarned: new Date() });
   }
-  if (progress.battleRoyale >= 5 && !progress.achievements.includes("Battle Royale")) {
+  if (progress.battleRoyale >= 5 && !currentAchievements.includes("Battle Royale")) {
     achievements.push({ name: "Battle Royale Master", dateEarned: new Date() });
   }
-  if (progress.sportsChampion >= 5 && !progress.achievements.includes("Sports Champion")) {
+  if (progress.sportsChampion >= 5 && !currentAchievements.includes("Sports Champion")) {
     achievements.push({ name: "Sports Champion", dateEarned: new Date() });
   }
-  if (progress.adventureAddict >= 5 && !progress.achievements.includes("Adventure Addict")) {
+  if (progress.adventureAddict >= 5 && !currentAchievements.includes("Adventure Addict")) {
     achievements.push({ name: "Adventure Addict", dateEarned: new Date() });
   }
-  if (progress.shooterSpecialist >= 5 && !progress.achievements.includes("Shooter Specialist")) {
+  if (progress.shooterSpecialist >= 5 && !currentAchievements.includes("Shooter Specialist")) {
     achievements.push({ name: "Shooter Specialist", dateEarned: new Date() });
   }
-  if (progress.puzzlePro >= 5 && !progress.achievements.includes("Puzzle Pro")) {
+  if (progress.puzzlePro >= 5 && !currentAchievements.includes("Puzzle Pro")) {
     achievements.push({ name: "Puzzle Pro", dateEarned: new Date() });
   }
-  if (progress.racingExpert >= 5 && !progress.achievements.includes("Racing Expert")) {
+  if (progress.racingExpert >= 5 && !currentAchievements.includes("Racing Expert")) {
     achievements.push({ name: "Racing Expert", dateEarned: new Date() });
   }
-  if (progress.stealthSpecialist >= 5 && !progress.achievements.includes("Stealth Specialist")) {
+  if (progress.stealthSpecialist >= 5 && !currentAchievements.includes("Stealth Specialist")) {
     achievements.push({ name: "Stealth Specialist", dateEarned: new Date() });
   }
-  if (progress.horrorHero >= 5 && !progress.achievements.includes("Horror Hero")) {
+  if (progress.horrorHero >= 5 && !currentAchievements.includes("Horror Hero")) {
     achievements.push({ name: "Horror Hero", dateEarned: new Date() });
   }
-  if (progress.triviaMaster >= 5 && !progress.achievements.includes("Trivia Master")) {
+  if (progress.triviaMaster >= 5 && !currentAchievements.includes("Trivia Master")) {
     achievements.push({ name: "Trivia Master", dateEarned: new Date() });
   }
-  if (progress.speedrunner >= 10 && !progress.achievements.includes("Speedrunner")) {
+  if (progress.speedrunner >= 10 && !currentAchievements.includes("Speedrunner")) {
     achievements.push({ name: "Speedrunner", dateEarned: new Date() });
   }
-  if (progress.collectorPro >= 10 && !progress.achievements.includes("Collector Pro")) {
+  if (progress.collectorPro >= 10 && !currentAchievements.includes("Collector Pro")) {
     achievements.push({ name: "Collector Pro", dateEarned: new Date() });
   }
-  if (progress.dataDiver >= 10 && !progress.achievements.includes("Data Diver")) {
+  if (progress.dataDiver >= 10 && !currentAchievements.includes("Data Diver")) {
     achievements.push({ name: "Data Diver", dateEarned: new Date() });
   }
-  if (progress.performanceTweaker >= 10 && !progress.achievements.includes("Performance Tweaker")) {
+  if (progress.performanceTweaker >= 10 && !currentAchievements.includes("Performance Tweaker")) {
     achievements.push({ name: "Performance Tweaker", dateEarned: new Date() });
   }
   if (achievements.length > 0) {
