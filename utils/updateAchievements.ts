@@ -110,7 +110,7 @@ const updateAchievementsForAllUsers = async () => {
   }
 };
 
-const verifyUpdate = async (userId: string) => {
+export const verifyUpdate = async (userId: string) => {
   await connectToMongoDB();
   try {
     const user = await User.findOne({ userId });
@@ -124,7 +124,7 @@ const verifyUpdate = async (userId: string) => {
   }
 };
 
-const updateAchievementsFromHistory = async (userId: string) => {
+export const updateAchievementsFromHistory = async (userId: string) => {
   await connectToMongoDB();
   
   try {
