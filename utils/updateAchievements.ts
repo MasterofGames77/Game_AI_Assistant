@@ -13,9 +13,10 @@ const updateAchievementsForUser = async (email: string) => {
       return;
     }
 
+    // Force update with $set instead of $setOnInsert
     const update = {
       $set: {
-        achievements: user.achievements || [],
+        achievements: [],
         progress: {
           firstQuestion: 0,
           frequentAsker: 0,
@@ -43,14 +44,19 @@ const updateAchievementsForUser = async (email: string) => {
       }
     };
 
-    // Update the user while preserving existing data
+    // Update using both email and userId to ensure we get the right user
     const result = await User.findOneAndUpdate(
-      { email },
+      { 
+        $or: [
+          { email },
+          { userId: user.userId }
+        ]
+      },
       update,
       { new: true }
     );
     
-    console.log(`Updated user with email ${email}:`, result ? 'Success' : 'No update needed');
+    console.log(`Updated user:`, result);
   } catch (error) {
     console.error('Error updating user:', error);
   } finally {
@@ -102,8 +108,25 @@ const updateAchievementsForAllUsers = async () => {
   }
 };
 
+const verifyUpdate = async (userId: string) => {
+  await connectToMongoDB();
+  try {
+    const user = await User.findOne({ userId });
+    console.log('User data:', {
+      userId: user?.userId,
+      hasAchievements: !!user?.achievements,
+      hasProgress: !!user?.progress
+    });
+  } finally {
+    await mongoose.connection.close();
+  }
+};
+
 // Export both functions
 export { updateAchievementsForUser, updateAchievementsForAllUsers };
 
 // Run the update for your specific email
 updateAchievementsForUser("mgambardella16@gmail.com");
+
+// Run with your userId
+verifyUpdate("user-1733517065102");

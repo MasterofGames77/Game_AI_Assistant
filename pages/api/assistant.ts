@@ -541,7 +541,7 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
             { userId }, 
             { 
               $inc: { conversationCount: 1 },
-              $setOnInsert: {
+              $set: {
                 achievements: [],
                 progress: {
                   firstQuestion: 0,
