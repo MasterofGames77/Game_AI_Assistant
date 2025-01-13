@@ -1,6 +1,8 @@
 import connectToMongoDB from './mongodb';
 import User from '../models/User';
 import mongoose from 'mongoose';
+import Question from '../models/Question';
+import { checkQuestionType, checkAndAwardAchievements } from '../pages/api/assistant';
 
 const updateAchievementsForUser = async (email: string) => {
   await connectToMongoDB();
@@ -122,11 +124,42 @@ const verifyUpdate = async (userId: string) => {
   }
 };
 
+const updateAchievementsFromHistory = async (userId: string) => {
+  await connectToMongoDB();
+  
+  try {
+    // Get all user's questions
+    const questions = await Question.find({ userId });
+    
+    // Count question types
+    const progress: Record<string, number> = {};
+    
+    questions.forEach(q => {
+      const type = checkQuestionType(q.question);
+      if (type) {
+        progress[type] = (progress[type] || 0) + 1;
+      }
+    });
+    
+    // Update user's progress
+    const user = await User.findOneAndUpdate(
+      { userId },
+      { $set: { progress } },
+      { new: true }
+    );
+    
+    // Check and award achievements
+    if (user) {
+      await checkAndAwardAchievements(userId, user.progress, null);
+    }
+    
+    console.log('Updated achievements from history for user:', userId);
+  } catch (error) {
+    console.error('Error updating achievements from history:', error);
+  } finally {
+    await mongoose.connection.close();
+  }
+};
+
 // Export both functions
 export { updateAchievementsForUser, updateAchievementsForAllUsers };
-
-// Run the update for your specific email
-updateAchievementsForUser("mgambardella16@gmail.com");
-
-// Run with your userId
-verifyUpdate("user-1733517065102");

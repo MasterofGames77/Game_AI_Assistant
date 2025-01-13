@@ -267,29 +267,35 @@ const extractGameTitle = (question: string): string => {
 };
 
 // Function to determine question category for achievement tracking
-const checkQuestionType = (question: string): string | null => {
-  if (question.toLowerCase().includes("rpg")) return "rpgEnthusiast";
-  if (question.toLowerCase().includes("boss fight")) return "bossBuster";
-  if (question.toLowerCase().includes("strategy")) return "strategySpecialist";
-  if (question.toLowerCase().includes("action")) return "actionAficionado";
-  if (question.toLowerCase().includes("battle royale")) return "battleRoyale";
-  if (question.toLowerCase().includes("sports")) return "sportsChampion";
-  if (question.toLowerCase().includes("adventure")) return "adventureAddict";
-  if (question.toLowerCase().includes("shooter")) return "shooterSpecialist";
-  if (question.toLowerCase().includes("puzzle")) return "puzzlePro";
-  if (question.toLowerCase().includes("racing")) return "racingPro";
-  if (question.toLowerCase().includes("stealth")) return "stealthSpecialist";
-  if (question.toLowerCase().includes("horror")) return "horrorHero";
-  if (question.toLowerCase().includes("trivia")) return "triviaMaster";
-  if (question.toLowerCase().includes("speed run")) return "speedrunner";
-  if (question.toLowerCase().includes("collect")) return "collectorPro";
-  if (question.toLowerCase().includes("analytics")) return "dataDiver";
-  if (question.toLowerCase().includes("performance")) return "performanceTweaker";
+export const checkQuestionType = (question: string): string | null => {
+  const lowerQuestion = question.toLowerCase();
+  
+  // Game genre specific achievements
+  if (lowerQuestion.includes("rpg") || lowerQuestion.includes("role playing")) return "rpgEnthusiast";
+  if (lowerQuestion.includes("boss") || lowerQuestion.includes("defeat")) return "bossBuster";
+  if (lowerQuestion.includes("strategy") || lowerQuestion.includes("tactics")) return "strategySpecialist";
+  if (lowerQuestion.includes("action") || lowerQuestion.includes("combat")) return "actionAficionado";
+  if (lowerQuestion.includes("battle royale") || lowerQuestion.includes("fortnite")) return "battleRoyale";
+  if (lowerQuestion.includes("sports") || lowerQuestion.includes("fifa") || lowerQuestion.includes("nba")) return "sportsChampion";
+  if (lowerQuestion.includes("adventure") || lowerQuestion.includes("explore")) return "adventureAddict";
+  if (lowerQuestion.includes("shooter") || lowerQuestion.includes("fps")) return "shooterSpecialist";
+  if (lowerQuestion.includes("puzzle") || lowerQuestion.includes("solve")) return "puzzlePro";
+  if (lowerQuestion.includes("racing") || lowerQuestion.includes("race")) return "racingExpert";
+  if (lowerQuestion.includes("stealth") || lowerQuestion.includes("sneak")) return "stealthSpecialist";
+  if (lowerQuestion.includes("horror") || lowerQuestion.includes("survival horror")) return "horrorHero";
+  if (lowerQuestion.includes("trivia") || lowerQuestion.includes("quiz")) return "triviaMaster";
+  
+  // Special achievements
+  if (lowerQuestion.includes("speedrun") || lowerQuestion.includes("fast completion")) return "speedrunner";
+  if (lowerQuestion.includes("collect") || lowerQuestion.includes("items")) return "collectorPro";
+  if (lowerQuestion.includes("stats") || lowerQuestion.includes("data")) return "dataDiver";
+  if (lowerQuestion.includes("performance") || lowerQuestion.includes("fps")) return "performanceTweaker";
+  
   return null;
 };
 
 // Function to check and award achievements based on user progress
-const checkAndAwardAchievements = async (userId: string, progress: any, session: mongoose.ClientSession | null = null) => {
+export const checkAndAwardAchievements = async (userId: string, progress: any, session: mongoose.ClientSession | null = null) => {
   // First get the user's current achievements
   const user = await User.findOne({ userId }).session(session);
   const currentAchievements = user?.achievements?.map((a: { name: any; }) => a.name) || [];
@@ -546,7 +552,7 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
             { userId }, 
             { 
               $inc: { conversationCount: 1 },
-              $set: {
+              $setOnInsert: {
                 achievements: [],
                 progress: {
                   firstQuestion: 0,
