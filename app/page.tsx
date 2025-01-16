@@ -166,24 +166,24 @@ export default function Home() {
     window.open(twitchLoginUrl, "_blank");
   };
 
-  // const handleDiscordAuth = async () => {
-  //   try {
-  //     // Get the current domain based on environment
-  //     const domain =
-  //       process.env.NODE_ENV === "production"
-  //         ? "https://assistant.videogamewingman.com"
-  //         : "http://localhost:3000";
+  const handleDiscordAuth = async () => {
+    try {
+      // Get the current domain based on environment
+      const domain =
+        process.env.NODE_ENV === "production"
+          ? "https://assistant.videogamewingman.com"
+          : "http://localhost:3000";
 
-  //     // Construct the Discord login URL
-  //     const discordLoginUrl = `${domain}/api/discordLogin`;
+      // Construct the Discord login URL
+      const discordLoginUrl = `${domain}/api/discordLogin`;
 
-  //     // Open Discord login in new tab instead of current window
-  //     window.open(discordLoginUrl, "_blank");
-  //   } catch (error) {
-  //     console.error("Error during Discord authentication:", error);
-  //     setError("Failed to authenticate with Discord");
-  //   }
-  // };
+      // Open Discord login in new tab instead of current window
+      window.open(discordLoginUrl, "_blank");
+    } catch (error) {
+      console.error("Error during Discord authentication:", error);
+      setError("Failed to authenticate with Discord");
+    }
+  };
 
   const formatResponse = (response: string) => {
     const sentences = response.split("\n").map((sentence) => sentence.trim());
@@ -289,12 +289,12 @@ export default function Home() {
                     Login with Twitch
                   </button>
 
-                  {/* <button
+                  <button
                     onClick={handleDiscordAuth}
                     className="mt-2 p-2 bg-[#5865F2] text-white rounded"
                   >
                     Login with Discord
-                  </button> */}
+                  </button>
                   <button
                     onClick={handleResetUserId}
                     className="mt-2 p-2 bg-blue-500 text-white rounded"

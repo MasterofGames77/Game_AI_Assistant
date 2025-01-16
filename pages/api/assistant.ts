@@ -246,7 +246,8 @@ const getGenreFromMapping = (gameTitle: string): string | null => {
     "Deathloop": "Immersive Sim",
     "Bejeweled": "Tile-Matching",
     "Shellshock Live": "Artillery",
-    "Roller Coaster Tycoon 3": "Construction and Management Simulation"
+    "Roller Coaster Tycoon 3": "Construction and Management Simulation",
+    "Stray": "Adventure"
   };
   return genreMapping[gameTitle] || null;
 };
@@ -304,7 +305,7 @@ export const checkAndAwardAchievements = async (userId: string, progress: any, s
   if (progress.rpgEnthusiast >= 5 && !currentAchievements.includes("RPG Enthusiast")) {
     achievements.push({ name: "RPG Enthusiast", dateEarned: new Date() });
   }
-  if (progress.bossBuster >= 10 && !currentAchievements.includes("Boss Buster")) {
+  if (progress.bossBuster >= 5 && !currentAchievements.includes("Boss Buster")) {
     achievements.push({ name: "Boss Buster", dateEarned: new Date() });
   }
   if (progress.strategySpecialist >= 5 && !currentAchievements.includes("Strategy Specialist")) {
@@ -340,16 +341,16 @@ export const checkAndAwardAchievements = async (userId: string, progress: any, s
   if (progress.triviaMaster >= 5 && !currentAchievements.includes("Trivia Master")) {
     achievements.push({ name: "Trivia Master", dateEarned: new Date() });
   }
-  if (progress.speedrunner >= 10 && !currentAchievements.includes("Speedrunner")) {
+  if (progress.speedrunner >= 5 && !currentAchievements.includes("Speedrunner")) {
     achievements.push({ name: "Speedrunner", dateEarned: new Date() });
   }
-  if (progress.collectorPro >= 10 && !currentAchievements.includes("Collector Pro")) {
+  if (progress.collectorPro >= 5 && !currentAchievements.includes("Collector Pro")) {
     achievements.push({ name: "Collector Pro", dateEarned: new Date() });
   }
-  if (progress.dataDiver >= 10 && !currentAchievements.includes("Data Diver")) {
+  if (progress.dataDiver >= 5 && !currentAchievements.includes("Data Diver")) {
     achievements.push({ name: "Data Diver", dateEarned: new Date() });
   }
-  if (progress.performanceTweaker >= 10 && !currentAchievements.includes("Performance Tweaker")) {
+  if (progress.performanceTweaker >= 5 && !currentAchievements.includes("Performance Tweaker")) {
     achievements.push({ name: "Performance Tweaker", dateEarned: new Date() });
   }
   if (achievements.length > 0) {
