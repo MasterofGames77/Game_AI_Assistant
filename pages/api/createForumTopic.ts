@@ -1,42 +1,49 @@
 // import type { NextApiRequest, NextApiResponse } from "next";
 // import connectToMongoDB from "../../utils/mongodb";
 // import Forum from "../../models/Forum";
+// import { nanoid } from 'nanoid'; // For better ID generation
 
-// // This handler will create a new forum topic within a forum
 // const createForumTopic = async (req: NextApiRequest, res: NextApiResponse) => {
+//   if (req.method !== 'POST') {
+//     return res.status(405).json({ error: 'Method not allowed' });
+//   }
+
 //   try {
-//     // Connect to the MongoDB database
 //     await connectToMongoDB();
 
 //     const { forumId, topicTitle, isPrivate, allowedUsers } = req.body;
+//     const userId = req.headers['user-id']; // Assuming user authentication is implemented
 
 //     if (!forumId || !topicTitle) {
 //       return res.status(400).json({ error: "forumId and topicTitle are required" });
 //     }
 
-//     // Find the forum by its ID
-//     const forum = await Forum.findById(forumId);
+//     if (!userId) {
+//       return res.status(401).json({ error: "Authentication required" });
+//     }
 
+//     const forum = await Forum.findById(forumId);
 //     if (!forum) {
 //       return res.status(404).json({ error: "Forum not found" });
 //     }
 
-//     // Create the new topic
 //     const newTopic = {
-//       _id: new Date().getTime().toString(), // Use timestamp as unique topic ID or use Mongoose auto-gen
-//       topicTitle,
+//       _id: nanoid(), // Generate a shorter, unique ID
+//       topicTitle: topicTitle.trim(),
 //       posts: [],
 //       isPrivate: !!isPrivate,
-//       allowedUsers: isPrivate ? allowedUsers || [] : [], // If private, set allowed users
+//       allowedUsers: isPrivate ? Array.from(new Set([userId, ...(allowedUsers || [])])) : [],
+//       createdBy: userId,
+//       createdAt: new Date(),
 //     };
 
-//     // Add the new topic to the forum's topics array
 //     forum.topics.push(newTopic);
-
-//     // Save the updated forum to the database
 //     await forum.save();
 
-//     return res.status(201).json({ message: "Forum topic created successfully", forum });
+//     return res.status(201).json({ 
+//       message: "Forum topic created successfully", 
+//       topic: newTopic 
+//     });
 //   } catch (error: any) {
 //     console.error("Error creating forum topic:", error.message);
 //     return res.status(500).json({ error: "Internal Server Error" });

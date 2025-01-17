@@ -18,9 +18,26 @@ const ForumSchema = new mongoose.Schema({
     isPrivate: { type: Boolean, default: false },
     allowedUsers: [String],
     createdAt: { type: Date, default: Date.now }
-  }]
+  }],
+  metadata: {
+    totalTopics: { type: Number, default: 0 },
+    totalPosts: { type: Number, default: 0 },
+    lastActivityAt: { type: Date, default: Date.now },
+    lastActiveUser: { type: String },
+    tags: [String],
+    category: { type: String, required: true },
+    viewCount: { type: Number, default: 0 }
+  }
 }, {
   timestamps: true
+});
+
+// Add middleware to update metadata
+ForumSchema.pre('save', function(this: any, next) {
+  this.metadata.totalTopics = this.topics.length;
+  this.metadata.totalPosts = this.topics.reduce((acc: any, topic: any) => acc + topic.posts.length, 0);
+  this.metadata.lastActivityAt = new Date();
+  next();
 });
 
 // Export the Forum model
