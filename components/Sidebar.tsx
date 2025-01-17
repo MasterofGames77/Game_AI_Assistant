@@ -55,6 +55,12 @@ const Sidebar = ({
       "build",
       "upload",
       "inventory",
+      "how to",
+      "how to do",
+      "how to get",
+      "how to unlock",
+      "how to find",
+      "how to progress",
     ];
 
     const titlePattern = new RegExp(keywords.join("|"), "i");
