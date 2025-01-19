@@ -128,11 +128,12 @@ export const updateAchievementsFromHistory = async (userId: string) => {
   await connectToMongoDB();
   
   try {
-    // Get all user's questions
     const questions = await Question.find({ userId });
-    
-    // Count question types
     const progress: Record<string, number> = {};
+    
+    // Get existing achievements
+    const user = await User.findOne({ userId });
+    const existingAchievements = user?.achievements || [];
     
     questions.forEach(q => {
       const type = checkQuestionType(q.question);
@@ -141,19 +142,19 @@ export const updateAchievementsFromHistory = async (userId: string) => {
       }
     });
     
-    // Update user's progress
-    const user = await User.findOneAndUpdate(
+    await User.findOneAndUpdate(
       { userId },
-      { $set: { progress } },
-      { new: true }
+      { 
+        $set: { progress },
+        $setOnInsert: { achievements: existingAchievements }
+      },
+      { new: true, upsert: true }
     );
     
-    // Check and award achievements
-    if (user) {
-      await checkAndAwardAchievements(userId, user.progress, null);
+    const updatedUser = await User.findOne({ userId });
+    if (updatedUser) {
+      await checkAndAwardAchievements(userId, updatedUser.progress, null);
     }
-    
-    console.log('Updated achievements from history for user:', userId);
   } catch (error) {
     console.error('Error updating achievements from history:', error);
   } finally {
