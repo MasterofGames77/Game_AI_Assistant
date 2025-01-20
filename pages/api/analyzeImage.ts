@@ -4,12 +4,22 @@
 // import path from "path";
 // import fs from 'fs';
 
+// const getGoogleCredentials = () => {
+//     if (process.env.NODE_ENV === 'production') {
+//       // For production: use credentials from environment variable
+//       return JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS || '{}');
+//     } else {
+//       // For development: use local JSON file
+//       return require('../../path/to/your/credentials.json');
+//     }
+//   };
+
 // const analyzeImage = async (req: NextApiRequest, res: NextApiResponse) => {
 //   try {
 //     const { question, imageFilePath } = req.body;
 //     console.log("Processing request:", { question, imageFilePath });
 
-//     // Get the base answer for the question regardless of image
+//     // Get the base answer for the question using existing game databases
 //     let baseAnswer = await getChatCompletion(question);
     
 //     if (!baseAnswer) {
@@ -28,7 +38,6 @@
 //       const client = new ImageAnnotatorClient();
 //       const imagePath = path.join(process.cwd(), 'public', imageFilePath);
       
-//       // Verify file exists
 //       if (!fs.existsSync(imagePath)) {
 //         console.error("Image file not found:", imagePath);
 //         return res.status(200).json({
@@ -36,24 +45,31 @@
 //         });
 //       }
 
-//       const [result] = await client.labelDetection(imagePath);
-//       const labels = result.labelAnnotations?.map(label => label?.description).filter(Boolean) || [];
-//       console.log("Vision API labels:", labels);
+//       // Get both labels and text from the image
+//       const [labelResult] = await client.labelDetection(imagePath);
+//       const [textResult] = await client.textDetection(imagePath);
       
-//       // Filter for gaming-related labels
-//       const gamingLabels = labels.filter(label => 
-//         label?.toLowerCase().includes('game') ||
-//         label?.toLowerCase().includes('console') ||
-//         label?.toLowerCase().includes('controller') ||
-//         label?.toLowerCase().includes('screen') ||
-//         label?.toLowerCase().includes('video') ||
-//         label?.toLowerCase().includes('gaming')
-//       );
+//       const labels = labelResult.labelAnnotations?.map(label => label?.description).filter(Boolean) || [];
+//       const detectedText = textResult.textAnnotations?.[0]?.description || '';
+      
+//       console.log("Vision API labels:", labels);
+//       console.log("Detected text:", detectedText);
+
+//       // Combine all detected information
+//       const imageAnalysis = [];
+      
+//       if (labels.length > 0) {
+//         imageAnalysis.push(`I can see: ${labels.join(', ')}`);
+//       }
+      
+//       if (detectedText) {
+//         imageAnalysis.push(`I can read the following text: ${detectedText}`);
+//       }
 
 //       // Combine the base answer with image analysis
-//       const combinedAnswer = gamingLabels.length > 0
-//         ? `${baseAnswer}\n\nImage Analysis: I can see this image contains: ${gamingLabels.join(', ')}. This appears to be related to video games.`
-//         : `${baseAnswer}\n\nImage Analysis: While I can see the image, I don't detect any specific gaming-related elements.`;
+//       const combinedAnswer = imageAnalysis.length > 0
+//         ? `${baseAnswer}\n\nBased on the image you provided:\n${imageAnalysis.join('\n')}`
+//         : `${baseAnswer}\n\nI analyzed the image but couldn't detect any specific gaming-related elements.`;
 
 //       return res.status(200).json({
 //         analysis: combinedAnswer
@@ -61,7 +77,6 @@
 
 //     } catch (imageError) {
 //       console.error("Error analyzing image:", imageError);
-//       // Return the base answer if image analysis fails
 //       return res.status(200).json({
 //         analysis: baseAnswer
 //       });
@@ -73,3 +88,4 @@
 // };
 
 // export default analyzeImage;
+// export { getGoogleCredentials };

@@ -14,7 +14,8 @@ const nextConfig = {
     TWITCH_CLIENT_SECRET: process.env.TWITCH_CLIENT_SECRET,
     TWITCH_REDIRECT_URI: process.env.TWITCH_REDIRECT_URI,
     RAWG_API_KEY: process.env.RAWG_API_KEY,
-    MONGODB_URI: process.env.MONGODB_URI, // Ensure MongoDB URI is included
+    MONGODB_URI: process.env.MONGODB_URI,
+    GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS,
   },
 };
 
