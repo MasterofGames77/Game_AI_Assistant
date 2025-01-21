@@ -4,6 +4,12 @@ import { NextApiResponse } from 'next';
 let cachedAccessToken: string | null = null;
 let tokenExpiryTime: number | null = null;
 
+/**
+ * Retrieves a client credentials access token for Twitch API access
+ * Implements caching to avoid unnecessary token requests
+ * @returns Promise containing the access token string
+ * @throws Error if environment variables are missing or token fetch fails
+ */
 export const getClientCredentialsAccessToken = async (): Promise<string> => {
   const clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID;
   const clientSecret = process.env.TWITCH_CLIENT_SECRET;
@@ -38,6 +44,13 @@ export const getClientCredentialsAccessToken = async (): Promise<string> => {
   }
 };
 
+/**
+ * Gets an access token using authorization code flow or refresh token
+ * @param code - Authorization code from Twitch OAuth
+ * @param refreshToken - Optional refresh token for token renewal
+ * @returns Promise containing the access token string
+ * @throws Error if required parameters are missing or token fetch fails
+ */
 export const getAccessToken = async (code: string, refreshToken?: string): Promise<string> => {
   const clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID;
   const clientSecret = process.env.TWITCH_CLIENT_SECRET;
@@ -73,6 +86,12 @@ export const getAccessToken = async (code: string, refreshToken?: string): Promi
   }
 };
 
+/**
+ * Fetches user data from Twitch API using provided access token
+ * @param accessToken - Valid Twitch access token
+ * @returns Promise containing user data from Twitch API
+ * @throws Error if API request fails
+ */
 export const getTwitchUserData = async (accessToken: string) => {
   try {
     console.log('Fetching Twitch user data with access token:', accessToken);
@@ -90,6 +109,12 @@ export const getTwitchUserData = async (accessToken: string) => {
   }
 };
 
+/**
+ * Constructs the Twitch authorization URL with proper parameters
+ * Handles URL cleaning to prevent double slashes
+ * @param redirectUri - URI where Twitch should redirect after auth
+ * @returns Properly formatted Twitch authorization URL
+ */
 function buildTwitchAuthorizationUrl(redirectUri: string): string {
   const clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID;
   const scope = process.env.TWITCH_SCOPES || 'user:read:email';
@@ -101,6 +126,10 @@ function buildTwitchAuthorizationUrl(redirectUri: string): string {
   return `https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${cleanUri}&scope=${encodeURIComponent(scope)}`;
 }
 
+/**
+ * Redirects user to Twitch authorization page
+ * @param res - NextJS response object for handling redirect
+ */
 export const redirectToTwitch = (res: NextApiResponse) => {
   let redirectUri = process.env.TWITCH_REDIRECT_URI || '';
 

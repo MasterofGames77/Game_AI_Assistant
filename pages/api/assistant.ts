@@ -13,7 +13,12 @@ import { getIO } from '../../middleware/realtime';
 import mongoose from 'mongoose';
 import winston from 'winston';
 
-// Add performance monitoring
+/**
+ * Measures the execution time of an async operation and returns both the result and latency
+ * @param operation - Name of the operation being measured
+ * @param callback - Async function to measure
+ * @returns Object containing operation result and latency in milliseconds
+ */
 const measureLatency = async (operation: string, callback: () => Promise<any>) => {
   const start = performance.now();
   const result = await callback();
@@ -31,11 +36,20 @@ const openai = new OpenAI({
 // Functions for reading and processing game data from CSV file
 const CSV_FILE_PATH = path.join(process.cwd(), 'data/Video Games Data.csv');
 
+/**
+ * Reads and parses a CSV file from the specified path
+ * @param filePath - Path to the CSV file
+ * @returns Parsed CSV data as an array of objects
+ */
 const readCSVFile = async (filePath: string) => {
   const fileContent = await readFile(filePath, 'utf8');
   return parse(fileContent, { columns: true });
 };
 
+/**
+ * Retrieves game data from the local CSV database
+ * @returns Parsed CSV data containing game information
+ */
 const getCSVData = async () => {
   try {
     return await readCSVFile(CSV_FILE_PATH);
@@ -46,11 +60,21 @@ const getCSVData = async () => {
 };
 
 // Utility functions for formatting game information
+/**
+ * Converts date string from DD-MM-YYYY to MM/DD/YYYY format
+ * @param dateString - Date in DD-MM-YYYY format
+ * @returns Formatted date string in MM/DD/YYYY format
+ */
 const formatReleaseDate = (dateString: string): string => {
   const [day, month, year] = dateString.split('-');
   return `${month}/${day}/${year}`;
 };
 
+/**
+ * Formats game information into a readable string
+ * @param gameInfo - Game data object from CSV
+ * @returns Formatted string containing game details
+ */
 const formatGameInfo = (gameInfo: any): string => {
   const formattedReleaseDate = formatReleaseDate(gameInfo.release_date);
   return `${gameInfo.title} was released on ${formattedReleaseDate} for ${gameInfo.console}. It is a ${gameInfo.genre} game developed by ${gameInfo.developer} and published by ${gameInfo.publisher}.`;
@@ -66,6 +90,11 @@ interface IGDBGame {
   url?: string;
 }
 
+/**
+ * Fetches game information from IGDB API
+ * @param query - Game title to search for
+ * @returns Formatted string of game information or error message
+ */
 const fetchGamesFromIGDB = async (query: string): Promise<string | null> => {
   const accessToken = await getClientCredentialsAccessToken();
   const headers = {
@@ -115,6 +144,11 @@ interface RAWGGame {
   slug?: string;
 }
 
+/**
+ * Fetches game information from RAWG API
+ * @param searchQuery - Game title to search for
+ * @returns Formatted string of game information or error message
+ */
 const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
   const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&search=${encodeURIComponent(searchQuery)}`;
   try {
@@ -146,7 +180,12 @@ const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
   }
 };
 
-// Function to combine game data from multiple sources (RAWG, IGDB, and local CSV)
+/**
+ * Combines game data from multiple sources (RAWG, IGDB, and local CSV)
+ * @param question - User's original question
+ * @param answer - Initial AI response
+ * @returns Enhanced response with additional game information
+ */
 const fetchAndCombineGameData = async (question: string, answer: string): Promise<string> => {
   const gameName = question.replace(/when (was|did) (.*?) (released|come out)/i, "$2").trim();
 
@@ -252,7 +291,11 @@ const getGenreFromMapping = (gameTitle: string): string | null => {
   return genreMapping[gameTitle] || null;
 };
 
-// Utility function to extract game title from user questions
+/**
+ * Extracts game title from user questions using regex patterns
+ * @param question - User's question
+ * @returns Extracted game title or empty string
+ */
 const extractGameTitle = (question: string): string => {
   // First, handle titles with colons and apostrophes
   const fullTitleMatch = question.match(/["']([^"']+)["']|[:]?\s([^:?]+?)(?:\s(?:chapter|level|stage|part|area|boss|item|character|section|location|quest)|\?|$)/i);
@@ -267,7 +310,11 @@ const extractGameTitle = (question: string): string => {
   return match ? match[1].trim() : '';
 };
 
-// Function to determine question category for achievement tracking
+/**
+ * Determines question category for achievement tracking
+ * @param question - User's question
+ * @returns Achievement category or null
+ */
 export const checkQuestionType = (question: string): string | null => {
   const lowerQuestion = question.toLowerCase();
   
@@ -295,7 +342,12 @@ export const checkQuestionType = (question: string): string | null => {
   return null;
 };
 
-// Function to check and award achievements based on user progress
+/**
+ * Checks user progress and awards achievements when thresholds are met
+ * @param userId - User's ID
+ * @param progress - User's current progress
+ * @param session - MongoDB session for transaction
+ */
 export const checkAndAwardAchievements = async (userId: string, progress: any, session: mongoose.ClientSession | null = null) => {
   // First get the user's current achievements
   const user = await User.findOne({ userId }).session(session);
