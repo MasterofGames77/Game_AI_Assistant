@@ -1,4 +1,4 @@
-"use client"; // client-side component
+"use client";
 
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
@@ -6,6 +6,8 @@ import Sidebar from "../components/Sidebar";
 import Image from "next/image";
 import { Conversation } from "../types";
 import { v4 as uuidv4 } from "uuid";
+// import ForumList from "../components/ForumList";
+// import CreateTopic from "../components/CreateTopic";
 // import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 // import { faPaperclip } from "@fortawesome/free-solid-svg-icons";
 
@@ -19,6 +21,9 @@ export default function Home() {
     useState<Conversation | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [metrics, setMetrics] = useState<{ [key: string]: number }>({});
+
+  // const [currentForumId, setCurrentForumId] = useState("");
+  // const [forumTopics, setForumTopics] = useState([]);
 
   // Optional image-related states (commented for now)
   // const [image, setImage] = useState<File | null>(null);

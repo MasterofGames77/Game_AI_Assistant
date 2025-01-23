@@ -49,7 +49,8 @@
 //       <div className="forum-posts">
 //         {forumTopic.posts.map((post, index) => (
 //           <div key={index} className="forum-post">
-//             <strong>User {post.userId}</strong>: {post.message} {/* Updated this line */}
+//             <strong>User {post.userId}</strong>: {post.message}{" "}
+//             {/* Updated this line */}
 //           </div>
 //         ))}
 //       </div>

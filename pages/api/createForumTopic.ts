@@ -11,20 +11,33 @@
 //   try {
 //     await connectToMongoDB();
 
-//     const { forumId, topicTitle, isPrivate, allowedUsers } = req.body;
+//     const { forumId, topicTitle, isPrivate, allowedUsers, gameTitle, category } = req.body;
 //     const userId = req.headers['user-id']; // Assuming user authentication is implemented
 
-//     if (!forumId || !topicTitle) {
-//       return res.status(400).json({ error: "forumId and topicTitle are required" });
+//     if (!gameTitle || !topicTitle) {
+//       return res.status(400).json({ error: "Game title and topic title are required" });
 //     }
 
 //     if (!userId) {
 //       return res.status(401).json({ error: "Authentication required" });
 //     }
 
-//     const forum = await Forum.findById(forumId);
+//     // Find or create forum for this game
+//     let forum = await Forum.findById(forumId);
 //     if (!forum) {
-//       return res.status(404).json({ error: "Forum not found" });
+//       forum = await Forum.create({
+//         _id: forumId,
+//         title: gameTitle,
+//         topics: [],
+//         metadata: {
+//           category: category || 'General',
+//           tags: [gameTitle.toLowerCase()],
+//           totalTopics: 0,
+//           totalPosts: 0,
+//           lastActivityAt: new Date(),
+//           viewCount: 0
+//         }
+//       });
 //     }
 
 //     const newTopic = {

@@ -1,32 +1,60 @@
 // import { useState } from "react";
 // import axios from "axios";
 
-// export default function CreateTopic({ forumId }: { forumId: string }) {
+// export default function CreateTopic({
+//   onTopicCreated,
+// }: {
+//   onTopicCreated?: (forumId: string) => void;
+// }) {
+//   const [gameTitle, setGameTitle] = useState("");
 //   const [topicTitle, setTopicTitle] = useState("");
+//   const [category, setCategory] = useState("");
 //   const [isPrivate, setIsPrivate] = useState(false);
 //   const [allowedUsers, setAllowedUsers] = useState("");
 //   const [error, setError] = useState("");
 //   const [success, setSuccess] = useState("");
 
 //   const handleCreateTopic = async () => {
-//     if (!topicTitle.trim()) {
-//       setError("Topic title cannot be empty.");
+//     if (!gameTitle.trim() || !topicTitle.trim()) {
+//       setError("Game title and topic title are required.");
 //       return;
 //     }
 
 //     try {
-//       const response = await axios.post("/api/createTopic", {
-//         forumId,
-//         topicTitle,
-//         isPrivate,
-//         allowedUsers: allowedUsers.split(",").map((id) => id.trim()), // Convert comma-separated user IDs into an array
-//       });
+//       const userId = localStorage.getItem("userId");
+//       const forumId = gameTitle.toLowerCase().replace(/[^a-z0-9]/g, "-");
+//       const fullTopicTitle = category
+//         ? `${gameTitle} - ${category} - ${topicTitle}`
+//         : `${gameTitle} - ${topicTitle}`;
+
+//       const response = await axios.post(
+//         "/api/createForumTopic",
+//         {
+//           forumId,
+//           topicTitle: fullTopicTitle,
+//           isPrivate,
+//           allowedUsers: allowedUsers.split(",").map((id) => id.trim()),
+//           gameTitle,
+//           category,
+//         },
+//         {
+//           headers: {
+//             "user-id": userId,
+//           },
+//         }
+//       );
 
 //       setSuccess("Topic created successfully!");
-//       setTopicTitle(""); // Clear the form fields
+//       if (onTopicCreated) {
+//         onTopicCreated(forumId);
+//       }
+
+//       // Reset form
+//       setGameTitle("");
+//       setTopicTitle("");
+//       setCategory("");
 //       setAllowedUsers("");
 //       setError("");
-//       // Optionally refresh the list of topics here if necessary
 //     } catch (err) {
 //       setError("Error creating forum topic.");
 //       setSuccess("");
@@ -36,6 +64,29 @@
 //   return (
 //     <div className="create-topic-container">
 //       <h2>Create a New Topic</h2>
+
+//       <input
+//         type="text"
+//         value={gameTitle}
+//         onChange={(e) => setGameTitle(e.target.value)}
+//         placeholder="Enter game title (e.g., Super Mario 64, Sonic 3, etc.)"
+//         className="w-full p-2 border border-gray-300 rounded mb-4"
+//       />
+
+//       <select
+//         value={category}
+//         onChange={(e) => setCategory(e.target.value)}
+//         className="w-full p-2 border border-gray-300 rounded mb-4"
+//       >
+//         <option value="">Select Category (Optional)</option>
+//         <option value="General Discussion">General Discussion</option>
+//         <option value="Speedrun">Speedrun</option>
+//         <option value="Guides">Guides</option>
+//         <option value="Tips & Tricks">Tips & Tricks</option>
+//         <option value="Bugs & Glitches">Bugs & Glitches</option>
+//         <option value="Mods">Mods</option>
+//       </select>
+
 //       <input
 //         type="text"
 //         value={topicTitle}

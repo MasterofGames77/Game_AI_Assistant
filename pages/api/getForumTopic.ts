@@ -15,7 +15,7 @@
 
 //     // If topicId is provided, return specific topic
 //     if (topicId) {
-//       const topic = forum.topics.find(t => t._id === topicId);
+//       const topic = forum.topics.find((t: { _id: string }) => t._id === topicId);
 //       if (!topic) {
 //         return res.status(404).json({ error: 'Topic not found' });
 //       }
@@ -29,7 +29,7 @@
 //     }
 
 //     // Filter topics based on access
-//     const accessibleTopics = forum.topics.filter(topic => 
+//     const accessibleTopics = forum.topics.filter((topic: { isPrivate: any; allowedUsers: string | string[]; }) => 
 //       !topic.isPrivate || topic.allowedUsers.includes(userId as string)
 //     );
 

@@ -28,8 +28,12 @@ export interface Forum {
 
 export interface ForumTopic {
   _id: string;
+  forumId: string;
+  gameTitle: string;
+  category?: string;
   topicTitle: string;
-  posts: Post[];
+  posts: Array<{ userId: string; message: string }>;
+  createdBy: string;
   isPrivate: boolean;
   allowedUsers: string[];
   createdAt: Date;
