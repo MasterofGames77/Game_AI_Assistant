@@ -311,7 +311,12 @@ export const checkQuestionType = async (question: string): Promise<string | null
   if (lowerQuestion.includes("stealth") || lowerQuestion.includes("sneak")) return "stealthSpecialist";
   if (lowerQuestion.includes("horror") || lowerQuestion.includes("survival horror")) return "horrorHero";
   if (lowerQuestion.includes("trivia") || lowerQuestion.includes("quiz")) return "triviaMaster";
-  
+  // Special achievements
+  if (lowerQuestion.includes("speedrun") || lowerQuestion.includes("fast completion")) return "speedrunner";
+  if (lowerQuestion.includes("collect") || lowerQuestion.includes("items")) return "collectorPro";
+  if (lowerQuestion.includes("stats") || lowerQuestion.includes("data")) return "dataDiver";
+  if (lowerQuestion.includes("performance") || lowerQuestion.includes("fps")) return "performanceTweaker";
+  if (lowerQuestion.includes("conversational") || lowerQuestion.includes("chat")) return "conversationalist";
   return null;
 };
 

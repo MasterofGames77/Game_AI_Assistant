@@ -131,30 +131,26 @@ export const updateAchievementsFromHistory = async (userId: string) => {
     const questions = await Question.find({ userId });
     const progress: Record<string, number> = {};
     
-    // Get existing achievements
-    const user = await User.findOne({ userId });
-    const existingAchievements = user?.achievements || [];
-    
-    questions.forEach(q => {
-      const type = checkQuestionType(q.question);
+    // Process questions sequentially due to async nature
+    for (const q of questions) {
+      const type = await checkQuestionType(q.question);
       if (type) {
         progress[type] = (progress[type] || 0) + 1;
       }
-    });
+    }
     
-    await User.findOneAndUpdate(
+    // Update user's progress
+    const user = await User.findOneAndUpdate(
       { userId },
-      { 
-        $set: { progress },
-        $setOnInsert: { achievements: existingAchievements }
-      },
-      { new: true, upsert: true }
+      { $set: { progress } },
+      { new: true }
     );
     
-    const updatedUser = await User.findOne({ userId });
-    if (updatedUser) {
-      await checkAndAwardAchievements(userId, updatedUser.progress, null);
+    if (user) {
+      await checkAndAwardAchievements(userId, user.progress, null);
     }
+    
+    console.log('Updated achievements from history for user:', userId);
   } catch (error) {
     console.error('Error updating achievements from history:', error);
   } finally {
