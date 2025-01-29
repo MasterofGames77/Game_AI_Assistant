@@ -7,7 +7,7 @@ const UserViolationSchema = new mongoose.Schema({
     offendingWords: [String],
     timestamp: { type: Date, default: Date.now }
   }],
-  banExpiresAt: { type: Date, default: null },
+  banExpiresAt: { type: Date, default: null, nullable: true },
   warningCount: { type: Number, default: 0 }
 });
 
