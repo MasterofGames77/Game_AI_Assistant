@@ -268,36 +268,10 @@ const extractGameTitle = (question: string): string => {
 };
 
 // Function to determine question category for achievement tracking
-export const checkQuestionType = async (question: string): Promise<string | null> => {
+export const checkQuestionType = (question: string): string | null => {
   const lowerQuestion = question.toLowerCase();
   
-  // Get game genre from RAWG if available
-  const gameTitle = extractGameTitle(question);
-  if (gameTitle) {
-    const rawgData = await fetchGamesFromRAWG(gameTitle);
-    if (rawgData && !rawgData.includes("No games found")) {
-      // Extract genre from RAWG response
-      const genreMatch = rawgData.match(/Genres: ([^,]+)/);
-      if (genreMatch) {
-        const genre = genreMatch[1].toLowerCase();
-        
-        // Map RAWG genres to achievements
-        if (genre.includes('role-playing') || genre.includes('rpg')) return "rpgEnthusiast";
-        if (genre.includes('strategy')) return "strategySpecialist";
-        if (genre.includes('action')) return "actionAficionado";
-        if (genre.includes('battle royale')) return "battleRoyale";
-        if (genre.includes('sports')) return "sportsChampion";
-        if (genre.includes('adventure')) return "adventureAddict";
-        if (genre.includes('shooter')) return "shooterSpecialist";
-        if (genre.includes('puzzle')) return "puzzlePro";
-        if (genre.includes('racing')) return "racingExpert";
-        if (genre.includes('stealth')) return "stealthSpecialist";
-        if (genre.includes('horror')) return "horrorHero";
-      }
-    }
-  }
-  
-  // Fallback to question content checking
+  // Game genre specific achievements
   if (lowerQuestion.includes("rpg") || lowerQuestion.includes("role playing")) return "rpgEnthusiast";
   if (lowerQuestion.includes("boss") || lowerQuestion.includes("defeat")) return "bossBuster";
   if (lowerQuestion.includes("strategy") || lowerQuestion.includes("tactics")) return "strategySpecialist";
@@ -307,16 +281,17 @@ export const checkQuestionType = async (question: string): Promise<string | null
   if (lowerQuestion.includes("adventure") || lowerQuestion.includes("explore")) return "adventureAddict";
   if (lowerQuestion.includes("shooter") || lowerQuestion.includes("fps")) return "shooterSpecialist";
   if (lowerQuestion.includes("puzzle") || lowerQuestion.includes("solve")) return "puzzlePro";
-  if (lowerQuestion.includes("racing") || lowerQuestion.includes("race")) return "racingExpert";
+  if (lowerQuestion.includes("racing") || lowerQuestion.includes("race") || lowerQuestion.includes("mario kart")) return "racingExpert";
   if (lowerQuestion.includes("stealth") || lowerQuestion.includes("sneak")) return "stealthSpecialist";
   if (lowerQuestion.includes("horror") || lowerQuestion.includes("survival horror")) return "horrorHero";
   if (lowerQuestion.includes("trivia") || lowerQuestion.includes("quiz")) return "triviaMaster";
+  
   // Special achievements
   if (lowerQuestion.includes("speedrun") || lowerQuestion.includes("fast completion")) return "speedrunner";
   if (lowerQuestion.includes("collect") || lowerQuestion.includes("items")) return "collectorPro";
   if (lowerQuestion.includes("stats") || lowerQuestion.includes("data")) return "dataDiver";
   if (lowerQuestion.includes("performance") || lowerQuestion.includes("fps")) return "performanceTweaker";
-  if (lowerQuestion.includes("conversational") || lowerQuestion.includes("chat")) return "conversationalist";
+  
   return null;
 };
 
