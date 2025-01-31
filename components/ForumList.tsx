@@ -4,6 +4,8 @@
 // import axios from "axios";
 // import { ForumTopic } from "../types";
 
+// import { containsOffensiveContent } from '../utils/contentModeration';
+
 // export default function ForumList({
 //   forumId,
 //   initialTopics = [],
@@ -37,33 +39,44 @@
 //     fetchTopics();
 //   }, []);
 
-//   const handlePostSubmit = async (topicId: string, currentForumId: string) => {
-//     if (!newPost.trim()) return;
+// const handlePostSubmit = async (topicId: string, currentForumId: string) => {
+//   if (!newPost.trim()) return;
 
-//     try {
-//       const userId = localStorage.getItem("userId");
-//       if (!userId) {
-//         setError("User ID not found");
-//         return;
-//       }
+//   // Check for offensive content
+//   const contentCheck = containsOffensiveContent(newPost);
+//   if (contentCheck.isOffensive) {
+//     setError(
+//       `The following words/phrases violate Video Game Wingman's policy: ${contentCheck.offendingWords.join(
+//         ", "
+//       )}`
+//     );
+//     return;
+//   }
 
-//       await axios.post("/api/addPostToForum", {
-//         forumId: currentForumId,
-//         topicId,
-//         userId,
-//         message: newPost,
-//       });
-
-//       // Refresh topics after posting
-//       const response = await axios.get("/api/getAllForums", {
-//         params: { userId },
-//       });
-//       setTopics(response.data.flatMap((forum: any) => forum.topics));
-//       setNewPost("");
-//     } catch (err) {
-//       setError("Error adding post to forum");
+//   try {
+//     const userId = localStorage.getItem("userId");
+//     if (!userId) {
+//       setError("User ID not found");
+//       return;
 //     }
-//   };
+
+//     await axios.post("/api/addPostToForum", {
+//       forumId: currentForumId,
+//       topicId,
+//       userId,
+//       message: newPost,
+//     });
+
+//     // Refresh topics after posting
+//     const response = await axios.get("/api/getAllForums", {
+//       params: { userId },
+//     });
+//     setTopics(response.data.flatMap((forum: any) => forum.topics));
+//     setNewPost("");
+//   } catch (err) {
+//     setError("Error adding post to forum");
+//   }
+// };
 
 //   const handleDeleteForum = async (specificForumId: string) => {
 //     try {
