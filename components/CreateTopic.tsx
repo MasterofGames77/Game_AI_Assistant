@@ -1,5 +1,6 @@
 // import { useState } from "react";
 // import axios from "axios";
+import { containsOffensiveContent } from "../utils/contentModeration";
 
 // export default function CreateTopic({
 //   onTopicCreated,
@@ -17,6 +18,16 @@
 //   const handleCreateTopic = async () => {
 //     if (!gameTitle.trim() || !topicTitle.trim()) {
 //       setError("Game title and topic title are required.");
+//       return;
+//     }
+
+//     // Check for offensive content
+//     const titleCheck = containsOffensiveContent(topicTitle);
+//     const gameTitleCheck = containsOffensiveContent(gameTitle);
+
+//     if (titleCheck.isOffensive || gameTitleCheck.isOffensive) {
+//       const offendingWords = [...titleCheck.offendingWords, ...gameTitleCheck.offendingWords];
+//       setError(`The following words/phrases violates Video Game Wingman's policy: ${offendingWords.join(', ')}`);
 //       return;
 //     }
 
