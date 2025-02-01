@@ -17,7 +17,7 @@ function cleanAndMatchTitle(queryTitle: string, recordTitle: string): boolean {
 }
 
 // Example IGDB Fetch Function with Improved Filtering
-async function fetchFromIGDB(gameTitle: string): Promise<string | null> {
+export async function fetchFromIGDB(gameTitle: string): Promise<string | null> {
   try {
     const accessToken = await getClientCredentialsAccessToken();
     
