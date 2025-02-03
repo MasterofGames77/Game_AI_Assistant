@@ -42,17 +42,6 @@
 // const handlePostSubmit = async (topicId: string, currentForumId: string) => {
 //   if (!newPost.trim()) return;
 
-//   // Check for offensive content
-//   const contentCheck = containsOffensiveContent(newPost);
-//   if (contentCheck.isOffensive) {
-//     setError(
-//       `The following words/phrases violate Video Game Wingman's policy: ${contentCheck.offendingWords.join(
-//         ", "
-//       )}`
-//     );
-//     return;
-//   }
-
 //   try {
 //     const userId = localStorage.getItem("userId");
 //     if (!userId) {
@@ -60,6 +49,18 @@
 //       return;
 //     }
 
+//     // Check for offensive content
+//     const contentCheck = await containsOffensiveContent(newPost, userId);
+//     if (contentCheck.isOffensive) {
+//       setError(
+//         `The following words violate our policy: ${contentCheck.offendingWords.join(
+//           ", "
+//         )}`
+//       );
+//       return;
+//     }
+
+//     // If content is clean, proceed with post
 //     await axios.post("/api/addPostToForum", {
 //       forumId: currentForumId,
 //       topicId,
