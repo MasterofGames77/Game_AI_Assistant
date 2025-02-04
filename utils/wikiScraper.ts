@@ -233,6 +233,23 @@
 //       "https://zelda.fandom.com/wiki/Hyrule_Warriors:_Definitive_Edition",
 //       "https://zelda.fandom.com/wiki/Hyrule_Warriors:_Age_of_Calamity",
       
+//     ],
+//     super mario: [
+//      "https://www.mariowiki.com/Super_Mario_Bros.",
+//      "https://www.mariowiki.com/Super_Mario_Bros._2",
+//      "https://www.mariowiki.com/Super_Mario_Bros._3",
+//      "https://www.mariowiki.com/Super_Mario_World",
+//      "https://www.mariowiki.com/Super_Mario_64",
+//      "https://www.mariowiki.com/Super_Mario_Sunshine",
+//      "https://www.mariowiki.com/New_Super_Mario_Bros.",
+//      "https://www.mariowiki.com/Super_Mario_Galaxy",
+//      "https://www.mariowiki.com/New_Super_Mario_Bros._Wii",
+//      "https://www.mariowiki.com/Super_Mario_Galaxy_2",
+//      "https://www.mariowiki.com/Super_Mario_3D_Land",
+//      "https://www.mariowiki.com/Super_Mario_3D_World",
+//      "https://www.mariowiki.com/New_Super_Mario_Bros._U",
+//      "https://www.mariowiki.com/Super_Mario_Odyssey",
+//      "https://www.mariowiki.com/Super_Mario_Bros._Wonder"
 //     ]
 //     // Add more wikis and games as needed
 //   };
