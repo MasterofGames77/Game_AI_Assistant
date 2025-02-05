@@ -13,9 +13,8 @@
 //     await connectToMongoDB();
     
 //     const forums = await Forum.find({});
-//     console.log('Found forums:', forums);
     
-//     // Enhance topics with their parent forum's information
+//     // Keep the original topic title and add forum metadata
 //     const accessibleForums = forums.map(forum => ({
 //       ...forum.toObject(),
 //       topics: forum.topics.filter((topic: { isPrivate: boolean; allowedUsers: string[] }) =>
@@ -28,7 +27,6 @@
 //       }))
 //     }));
     
-//     console.log('Accessible forums:', accessibleForums);
 //     return res.status(200).json(accessibleForums);
 //   } catch (error) {
 //     console.error('Error fetching forums:', error);

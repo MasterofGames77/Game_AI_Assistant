@@ -27,9 +27,10 @@
 //     if (!forum) {
 //       forum = await Forum.create({
 //         _id: forumId,
-//         title: gameTitle,
+//         title: topicTitle.trim(),
 //         topics: [],
 //         metadata: {
+//           gameTitle: gameTitle,
 //           category: category || 'General',
 //           tags: [gameTitle.toLowerCase()],
 //           totalTopics: 0,

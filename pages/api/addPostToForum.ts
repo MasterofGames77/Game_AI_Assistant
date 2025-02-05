@@ -36,7 +36,12 @@
 //     topic.posts.push({
 //       userId,
 //       message,
-//       timestamp: new Date()
+//       timestamp: new Date(),
+//       createdBy: userId,
+//       metadata: {
+//         edited: false,
+//         likes: 0
+//       }
 //     });
 
 //     await forum.save();

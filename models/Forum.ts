@@ -4,7 +4,13 @@ import mongoose from 'mongoose';
 const PostSchema = new mongoose.Schema({
   userId: { type: String, required: true },    // The ID of the user who posted
   message: { type: String, required: true },   // The content of the post
-  timestamp: { type: Date, default: Date.now } // When the post was created
+  timestamp: { type: Date, default: Date.now }, // When the post was created
+  createdBy: { type: String },  // Add this field
+  metadata: {                   // Add metadata for posts
+    edited: { type: Boolean, default: false },
+    editedAt: { type: Date },
+    likes: { type: Number, default: 0 }
+  }
 });
 
 // Define the schema for a forum topic
@@ -17,15 +23,17 @@ const ForumSchema = new mongoose.Schema({
     posts: [PostSchema],
     isPrivate: { type: Boolean, default: false },
     allowedUsers: [String],
+    createdBy: { type: String },  // Add this
     createdAt: { type: Date, default: Date.now }
   }],
   metadata: {
+    gameTitle: { type: String, required: true }, // Add this
+    category: { type: String, required: true },
+    tags: [String],  // Add this back
     totalTopics: { type: Number, default: 0 },
     totalPosts: { type: Number, default: 0 },
     lastActivityAt: { type: Date, default: Date.now },
     lastActiveUser: { type: String },
-    tags: [String],
-    category: { type: String, required: true },
     viewCount: { type: Number, default: 0 }
   }
 }, {
@@ -34,11 +42,20 @@ const ForumSchema = new mongoose.Schema({
 
 // Add middleware to update metadata
 ForumSchema.pre('save', function(this: any, next) {
+  // Update total topics
   this.metadata.totalTopics = this.topics.length;
-  this.metadata.totalPosts = this.topics.reduce((acc: any, topic: any) => acc + topic.posts.length, 0);
+  
+  // Update total posts
+  this.metadata.totalPosts = this.topics.reduce((acc: number, topic: any) => {
+    return acc + (topic.posts ? topic.posts.length : 0);
+  }, 0);
+  
+  // Update last activity
   this.metadata.lastActivityAt = new Date();
+  
   next();
 });
 
 // Export the Forum model
-export default mongoose.models.Forum || mongoose.model('Forum', ForumSchema);
+const Forum = mongoose.models.Forum || mongoose.model('Forum', ForumSchema);
+export default Forum;

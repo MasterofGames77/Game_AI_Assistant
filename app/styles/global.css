@@ -177,7 +177,8 @@ input[type="file"]:focus {
   box-shadow: 0 0 3px rgba(0, 119, 255, 0.5);
 } */
 
-/* Forum Styles */
+/* Forum Styles - Commented out for now */
+/* 
 .forum-topic-container {
   max-width: 800px;
   margin: 20px auto;
@@ -262,3 +263,4 @@ input[type="file"]:focus {
   font-size: 0.8em;
   margin-left: 10px;
 }
+*/

@@ -4,7 +4,7 @@
 // import axios from "axios";
 // import { ForumTopic } from "../types";
 
-// import { containsOffensiveContent } from '../utils/contentModeration';
+// import { containsOffensiveContent } from "../utils/contentModeration";
 
 // export default function ForumList({
 //   forumId,
@@ -18,6 +18,8 @@
 //   const [newPost, setNewPost] = useState("");
 //   const [error, setError] = useState("");
 //   const [loading, setLoading] = useState(false);
+//   const [success, setSuccess] = useState({ message: "", isError: false });
+//   const [topicSuccess, setTopicSuccess] = useState("");
 
 //   useEffect(() => {
 //     const fetchTopics = async () => {
@@ -39,45 +41,47 @@
 //     fetchTopics();
 //   }, []);
 
-// const handlePostSubmit = async (topicId: string, currentForumId: string) => {
-//   if (!newPost.trim()) return;
+//   const handlePostSubmit = async (topicId: string, currentForumId: string) => {
+//     if (!newPost.trim()) return;
 
-//   try {
-//     const userId = localStorage.getItem("userId");
-//     if (!userId) {
-//       setError("User ID not found");
-//       return;
+//     try {
+//       const userId = localStorage.getItem("userId");
+//       if (!userId) {
+//         setError("User ID not found");
+//         return;
+//       }
+
+//       // Check for offensive content
+//       const contentCheck = await containsOffensiveContent(newPost, userId);
+//       if (contentCheck.isOffensive) {
+//         setError(
+//           `The following words violate our policy: ${contentCheck.offendingWords.join(
+//             ", "
+//           )}`
+//         );
+//         return;
+//       }
+
+//       // If content is clean, proceed with post
+//       await axios.post("/api/addPostToForum", {
+//         forumId: currentForumId,
+//         topicId,
+//         userId,
+//         message: newPost,
+//       });
+
+//       // Refresh topics after posting
+//       const response = await axios.get("/api/getAllForums", {
+//         params: { userId },
+//       });
+//       setTopics(response.data.flatMap((forum: any) => forum.topics));
+//       setNewPost("");
+//       setError(""); // Clear any existing errors
+//     } catch (err) {
+//       console.error("Error adding post to forum:", err);
+//       setError("Error adding post to forum");
 //     }
-
-//     // Check for offensive content
-//     const contentCheck = await containsOffensiveContent(newPost, userId);
-//     if (contentCheck.isOffensive) {
-//       setError(
-//         `The following words violate our policy: ${contentCheck.offendingWords.join(
-//           ", "
-//         )}`
-//       );
-//       return;
-//     }
-
-//     // If content is clean, proceed with post
-//     await axios.post("/api/addPostToForum", {
-//       forumId: currentForumId,
-//       topicId,
-//       userId,
-//       message: newPost,
-//     });
-
-//     // Refresh topics after posting
-//     const response = await axios.get("/api/getAllForums", {
-//       params: { userId },
-//     });
-//     setTopics(response.data.flatMap((forum: any) => forum.topics));
-//     setNewPost("");
-//   } catch (err) {
-//     setError("Error adding post to forum");
-//   }
-// };
+//   };
 
 //   const handleDeleteForum = async (specificForumId: string) => {
 //     try {
@@ -87,6 +91,13 @@
 //       });
 //       // Remove all topics associated with this forum
 //       setTopics(topics.filter((topic) => topic.forumId !== specificForumId));
+//       setSuccess({ message: "Forum deleted successfully!", isError: true });
+//       setTopicSuccess(""); // Clear any existing topic success message
+
+//       // Clear success message after 3 seconds
+//       setTimeout(() => {
+//         setSuccess({ message: "", isError: false });
+//       }, 3000);
 //     } catch (error) {
 //       console.error("Error deleting forum:", error);
 //       setError("Failed to delete forum");
@@ -96,12 +107,11 @@
 //   // Group topics by forum
 //   const groupedTopics = topics.reduce(
 //     (acc: { [key: string]: ForumTopic[] }, topic) => {
-//       // Group by unique combination of gameTitle and category
-//       const forumKey = `${topic.gameTitle}-${topic.category || "general"}`;
-//       if (!acc[forumKey]) {
-//         acc[forumKey] = [];
+//       // Group by forumId instead
+//       if (!acc[topic.forumId]) {
+//         acc[topic.forumId] = [];
 //       }
-//       acc[forumKey].push(topic);
+//       acc[topic.forumId].push(topic);
 //       return acc;
 //     },
 //     {}
@@ -120,16 +130,33 @@
 
 //   return (
 //     <div className="forum-container space-y-6">
-//       {Object.entries(groupedTopics).map(([forumKey, forumTopics]) => (
-//         <div key={forumKey} className="bg-white p-4 rounded-lg shadow">
-//           <div className="flex justify-between items-center mb-4">
-//             <h2 className="text-2xl font-bold">
-//               {`${forumTopics[0].gameTitle} - ${
-//                 forumTopics[0].category || "General"
+//       {(success.message || topicSuccess) && (
+//         <div className="transition-opacity duration-500 ease-in-out">
+//           {success.message && (
+//             <div
+//               className={`mb-4 ${
+//                 success.isError ? "text-red-500" : "text-green-500"
 //               }`}
-//             </h2>
+//             >
+//               {success.message}
+//             </div>
+//           )}
+//           {topicSuccess && (
+//             <div className="text-green-500 mb-4">{topicSuccess}</div>
+//           )}
+//         </div>
+//       )}
+//       {Object.entries(groupedTopics).map(([forumId, forumTopics]) => (
+//         <div key={forumId} className="bg-white p-4 rounded-lg shadow">
+//           <div className="flex justify-between items-center mb-4">
+//             <div>
+//               <h2 className="text-2xl font-bold">
+//                 {forumTopics[0].topicTitle}
+//               </h2>
+//               <p className="text-gray-600">{forumTopics[0].gameTitle}</p>
+//             </div>
 //             <button
-//               onClick={() => handleDeleteForum(forumTopics[0].forumId)}
+//               onClick={() => handleDeleteForum(forumId)}
 //               className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
 //             >
 //               Delete Forum

@@ -22,8 +22,9 @@ export default function Home() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [metrics, setMetrics] = useState<{ [key: string]: number }>({});
 
-  // const [currentForumId, setCurrentForumId] = useState("");
-  // const [forumTopics, setForumTopics] = useState([]);
+  const [activeView, setActiveView] = useState<"chat" | "forum">("chat");
+  const [currentForumId, setCurrentForumId] = useState("");
+  const [forumTopics, setForumTopics] = useState([]);
 
   // Optional image-related states (commented for now)
   // const [image, setImage] = useState<File | null>(null);
@@ -124,6 +125,38 @@ export default function Home() {
   //     setImage(e.target.files[0]);
   //   }
   // };
+
+  const handleTopicCreated = (forumId: string) => {
+    setCurrentForumId(forumId);
+  };
+
+  useEffect(() => {
+    const fetchForums = async () => {
+      if (activeView === "forum") {
+        try {
+          const userId = localStorage.getItem("userId");
+          const response = await axios.get("/api/getAllForums", {
+            params: { userId },
+          });
+          setForumTopics(response.data);
+        } catch (error) {
+          console.error("Error fetching forums:", error);
+        }
+      }
+    };
+    fetchForums();
+  }, [activeView]);
+
+  // const renderForumSection = () => (
+  //   <div className="w-full mt-4">
+  //     <CreateTopic onTopicCreated={handleTopicCreated} />
+  //     <ForumList
+  //       forumId={currentForumId}
+  //       key={currentForumId}
+  //       initialTopics={forumTopics}
+  //     />
+  //   </div>
+  // );
 
   const handleClear = () => {
     setQuestion("");
@@ -236,45 +269,65 @@ export default function Home() {
               <li>Access detailed game guides.</li>
             </ul>
 
-            {/* Form to submit question */}
-            <form onSubmit={handleSubmit} className="w-full max-w-md mt-2">
-              <input
-                type="text"
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder="Message Video Game Wingman"
-                className="w-full p-2 border border-gray-300 rounded mb-4"
-              />
+            <div className="flex space-x-4 mb-4">
+              <button
+                className={`px-4 py-2 rounded ${
+                  activeView === "chat"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-700"
+                }`}
+                onClick={() => setActiveView("chat")}
+              >
+                Chat
+              </button>
+              <button
+                className="px-4 py-2 rounded bg-gray-300 text-gray-500 cursor-not-allowed"
+                disabled
+              >
+                Forum (Coming Soon)
+              </button>
+            </div>
 
-              {/* Optional file upload input (commented for now) */}
-              {/* 
-              <label className="cursor-pointer">
-                <FontAwesomeIcon icon={faPaperclip} size="2x" />
+            {activeView === "chat" && (
+              <form onSubmit={handleSubmit} className="w-full max-w-md mt-2">
                 <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  style={{ display: "none" }}
+                  type="text"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  placeholder="Message Video Game Wingman"
+                  className="w-full p-2 border border-gray-300 rounded mb-4"
                 />
-              </label>
-              */}
 
-              <div className="flex space-x-4">
-                <button
-                  type="submit"
-                  className="w-full p-2 bg-blue-500 text-white rounded"
-                >
-                  Submit
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  className="w-full p-2 bg-blue-500 text-white rounded"
-                >
-                  Clear
-                </button>
-              </div>
-            </form>
+                {/* Optional file upload input (commented for now) */}
+                {/* 
+                <label className="cursor-pointer">
+                  <FontAwesomeIcon icon={faPaperclip} size="2x" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    style={{ display: "none" }}
+                  />
+                </label>
+                */}
+
+                <div className="flex space-x-4">
+                  <button
+                    type="submit"
+                    className="w-full p-2 bg-blue-500 text-white rounded"
+                  >
+                    Submit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClear}
+                    className="w-full p-2 bg-blue-500 text-white rounded"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </form>
+            )}
 
             {loading && <div className="spinner mt-4"></div>}
             {error && <div className="mt-4 text-red-500">{error}</div>}

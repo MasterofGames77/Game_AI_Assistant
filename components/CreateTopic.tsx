@@ -1,6 +1,6 @@
 // import { useState } from "react";
 // import axios from "axios";
-import { containsOffensiveContent } from "../utils/contentModeration";
+// import { containsOffensiveContent } from "../utils/contentModeration";
 
 // export default function CreateTopic({
 //   onTopicCreated,
@@ -13,7 +13,7 @@ import { containsOffensiveContent } from "../utils/contentModeration";
 //   const [isPrivate, setIsPrivate] = useState(false);
 //   const [allowedUsers, setAllowedUsers] = useState("");
 //   const [error, setError] = useState("");
-//   const [success, setSuccess] = useState("");
+//   const [topicSuccess, setTopicSuccess] = useState("");
 
 //   const handleCreateTopic = async () => {
 //     if (!gameTitle.trim() || !topicTitle.trim()) {
@@ -22,27 +22,31 @@ import { containsOffensiveContent } from "../utils/contentModeration";
 //     }
 
 //     // Check for offensive content
-//     const titleCheck = containsOffensiveContent(topicTitle);
-//     const gameTitleCheck = containsOffensiveContent(gameTitle);
+//     const userId = localStorage.getItem("userId");
+//     const titleCheck = await containsOffensiveContent(topicTitle, userId!);
+//     const gameTitleCheck = await containsOffensiveContent(gameTitle, userId!);
 
 //     if (titleCheck.isOffensive || gameTitleCheck.isOffensive) {
-//       const offendingWords = [...titleCheck.offendingWords, ...gameTitleCheck.offendingWords];
-//       setError(`The following words/phrases violates Video Game Wingman's policy: ${offendingWords.join(', ')}`);
+//       const offendingWords = [
+//         ...titleCheck.offendingWords,
+//         ...gameTitleCheck.offendingWords,
+//       ];
+//       setError(
+//         `The following words/phrases violates Video Game Wingman's policy: ${offendingWords.join(
+//           ", "
+//         )}`
+//       );
 //       return;
 //     }
 
 //     try {
-//       const userId = localStorage.getItem("userId");
 //       const forumId = gameTitle.toLowerCase().replace(/[^a-z0-9]/g, "-");
-//       const fullTopicTitle = category
-//         ? `${gameTitle} - ${category} - ${topicTitle}`
-//         : `${gameTitle} - ${topicTitle}`;
 
 //       const response = await axios.post(
 //         "/api/createForumTopic",
 //         {
 //           forumId,
-//           topicTitle: fullTopicTitle,
+//           topicTitle: topicTitle.trim(),
 //           isPrivate,
 //           allowedUsers: allowedUsers.split(",").map((id) => id.trim()),
 //           gameTitle,
@@ -55,7 +59,10 @@ import { containsOffensiveContent } from "../utils/contentModeration";
 //         }
 //       );
 
-//       setSuccess("Topic created successfully!");
+//       setTopicSuccess("Topic created successfully!");
+//       setTimeout(() => {
+//         setTopicSuccess("");
+//       }, 3000);
 //       if (onTopicCreated) {
 //         onTopicCreated(forumId);
 //       }
@@ -68,7 +75,7 @@ import { containsOffensiveContent } from "../utils/contentModeration";
 //       setError("");
 //     } catch (err) {
 //       setError("Error creating forum topic.");
-//       setSuccess("");
+//       setTopicSuccess("");
 //     }
 //   };
 
@@ -134,7 +141,7 @@ import { containsOffensiveContent } from "../utils/contentModeration";
 //       </button>
 
 //       {error && <p className="text-red-500">{error}</p>}
-//       {success && <p className="text-green-500">{success}</p>}
+//       {topicSuccess && <p className="text-green-500">{topicSuccess}</p>}
 //     </div>
 //   );
 // }
