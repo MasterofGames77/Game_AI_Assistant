@@ -107,7 +107,8 @@ const OFFENSIVE_WORDS = [
   'titties',
   'titjob',
   'handjob',
-  'butt fuck'
+  'butt fuck',
+  'D.O.G.E'
   // I do not approve any of these words, names, and or phrases being used in the application.
 ];
 

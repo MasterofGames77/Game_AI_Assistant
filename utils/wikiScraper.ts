@@ -208,7 +208,6 @@
 //       "https://finalfantasy.fandom.com/wiki/Final_Fantasy_II",
 //       "https://finalfantasy.fandom.com/wiki/Final_Fantasy"
 //     ],
-
 //     zelda: [
 //       "https://zelda.fandom.com/wiki/The_Legend_of_Zelda:_Tears_of_the_Kingdom",
 //       "https://zelda.fandom.com/wiki/The_Legend_of_Zelda:_Breath_of_the_Wild",
@@ -234,7 +233,7 @@
 //       "https://zelda.fandom.com/wiki/Hyrule_Warriors:_Age_of_Calamity",
       
 //     ],
-//     super mario: [
+//     supermario: [
 //      "https://www.mariowiki.com/Super_Mario_Bros.",
 //      "https://www.mariowiki.com/Super_Mario_Bros._2",
 //      "https://www.mariowiki.com/Super_Mario_Bros._3",
@@ -250,6 +249,46 @@
 //      "https://www.mariowiki.com/New_Super_Mario_Bros._U",
 //      "https://www.mariowiki.com/Super_Mario_Odyssey",
 //      "https://www.mariowiki.com/Super_Mario_Bros._Wonder"
+//     ],
+//     sonic: [
+//         "https://sonic.fandom.com/wiki/Sonic_the_Hedgehog_(1991)",
+//         "https://sonic.fandom.com/wiki/Sonic_the_Hedgehog_2",
+//         "https://sonic.fandom.com/wiki/Sonic_the_Hedgehog_CD",
+//         "https://sonic.fandom.com/wiki/Sonic_the_Hedgehog_3",
+//         "https://sonic.fandom.com/wiki/Sonic_%26_Knuckles",
+//         "https://sonic.fandom.com/wiki/Knuckles%27_Chaotix",
+//         "https://sonic.fandom.com/wiki/Sonic_the_Fighters",
+//         "https://sonic.fandom.com/wiki/Sonic_R",
+//         "https://sonic.fandom.com/wiki/Sonic_Adventure",
+//         "https://sonic.fandom.com/wiki/Sonic_Adventure_2",
+//         "https://sonic.fandom.com/wiki/Sonic_Adventure_2:_Battle",
+//         "https://sonic.fandom.com/wiki/Sonic_Advance",
+//         "https://sonic.fandom.com/wiki/Sonic_Advance_2",
+//         "https://sonic.fandom.com/wiki/Sonic_Advance_3",
+//         "https://sonic.fandom.com/wiki/Sonic_Adventure_DX:_Director%27s_Cut",
+//         "https://sonic.fandom.com/wiki/Sonic_Heroes",
+//         "https://sonic.fandom.com/wiki/Sonic_Rush",
+//         "https://sonic.fandom.com/wiki/Shadow_the_Hedgehog_(game)",
+//         "https://sonic.fandom.com/wiki/Sonic_Riders",
+//         "https://sonic.fandom.com/wiki/Sonic_the_Hedgehog_(2006)",
+//         "https://sonic.fandom.com/wiki/Sonic_and_the_Secret_Rings",
+//         "https://sonic.fandom.com/wiki/Sonic_Rush_Adventure",
+//         "https://sonic.fandom.com/wiki/Sonic_Riders:_Zero_Gravity",
+//         "https://sonic.fandom.com/wiki/Sonic_Unleashed",
+//         "https://sonic.fandom.com/wiki/Sonic_and_the_Black_Knight",
+//         "https://sonic.fandom.com/wiki/Sonic_%26_Sega_All-Stars_Racing",
+//         "https://sonic.fandom.com/wiki/Sonic_Colors",
+//         "https://sonic.fandom.com/wiki/Sonic_Generations",
+//         "https://sonic.fandom.com/wiki/Sonic_%26_All-Stars_Racing_Transformed",
+//         "https://sonic.fandom.com/wiki/Sonic_Lost_World",
+//         "https://sonic.fandom.com/wiki/Sonic_Mania",
+//         "https://sonic.fandom.com/wiki/Sonic_Forces",
+//         "https://sonic.fandom.com/wiki/Team_Sonic_Racing",
+//         "https://sonic.fandom.com/wiki/Sonic_Origins",
+//         "https://sonic.fandom.com/wiki/Sonic_Frontiers",
+//         "https://sonic.fandom.com/wiki/Sonic_Superstars",
+//         "https://sonic.fandom.com/wiki/Sonic_Dream_Team",
+//         "https://sonic.fandom.com/wiki/Sonic_X_Shadow_Generations"
 //     ]
 //     // Add more wikis and games as needed
 //   };
