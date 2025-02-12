@@ -8,6 +8,7 @@ if (!process.env.DISCORD_API_TOKEN) {
   throw new Error('DISCORD_API_TOKEN is not defined in environment variables');
 }
 
+// Initialize the Discord client
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,

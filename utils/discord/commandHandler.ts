@@ -20,6 +20,7 @@ commands.set('ping', {
   },
 });
 
+// Help command
 commands.set('help', {
   name: 'help',
   description: 'Lists all available commands',
@@ -53,6 +54,7 @@ export const handleCommand = async (interaction: Interaction) => {
     return;
   }
 
+  // Execute the command
   try {
     logger.info('Executing command', { 
       command: interaction.commandName,

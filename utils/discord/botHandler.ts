@@ -6,11 +6,13 @@ import { checkProAccess } from '../checkProAccess';
 export class DiscordBotHandler {
   private client: Client;
 
+  // Initialize the bot handler
   constructor(client: Client) {
     this.client = client;
     this.setupEventHandlers();
   }
 
+  // Setup event handlers
   private setupEventHandlers() {
     this.client.on('messageCreate', async (message: Message) => {
       if (message.author.bot) return;
@@ -35,6 +37,7 @@ export class DiscordBotHandler {
     });
   }
 
+  // Process the message
   private async processMessage(message: Message): Promise<string> {
     const question = message.content;
     
