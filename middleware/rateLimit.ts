@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import rateLimit from 'express-rate-limit';
 
-// Create a more Next.js compatible rate limiter
+// Next.js compatible rate limiter
 const createRateLimiter = () => {
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes

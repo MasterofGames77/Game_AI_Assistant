@@ -71,6 +71,7 @@ export default function Home() {
     initializeUser();
   }, []);
 
+  // function to get conversations
   const fetchConversations = useCallback(async () => {
     try {
       const res = await axios.get(`/api/getConversation?userId=${userId}`);
@@ -93,6 +94,7 @@ export default function Home() {
     }
   }, [selectedConversation]);
 
+  // function to handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -126,26 +128,26 @@ export default function Home() {
   //   }
   // };
 
-  const handleTopicCreated = (forumId: string) => {
-    setCurrentForumId(forumId);
-  };
+  // const handleTopicCreated = (forumId: string) => {
+  //   setCurrentForumId(forumId);
+  // };
 
-  useEffect(() => {
-    const fetchForums = async () => {
-      if (activeView === "forum") {
-        try {
-          const userId = localStorage.getItem("userId");
-          const response = await axios.get("/api/getAllForums", {
-            params: { userId },
-          });
-          setForumTopics(response.data);
-        } catch (error) {
-          console.error("Error fetching forums:", error);
-        }
-      }
-    };
-    fetchForums();
-  }, [activeView]);
+  // useEffect(() => {
+  //   const fetchForums = async () => {
+  //     if (activeView === "forum") {
+  //       try {
+  //         const userId = localStorage.getItem("userId");
+  //         const response = await axios.get("/api/getAllForums", {
+  //           params: { userId },
+  //         });
+  //         setForumTopics(response.data);
+  //       } catch (error) {
+  //         console.error("Error fetching forums:", error);
+  //       }
+  //     }
+  //   };
+  //   fetchForums();
+  // }, [activeView]);
 
   // const renderForumSection = () => (
   //   <div className="w-full mt-4">
@@ -158,6 +160,7 @@ export default function Home() {
   //   </div>
   // );
 
+  // function to clear the form
   const handleClear = () => {
     setQuestion("");
     setResponse("");
@@ -166,11 +169,13 @@ export default function Home() {
     // setImage(null); // Clear file input if using image
   };
 
+  // delete conversation from database
   const handleDeleteConversation = () => {
     handleClear();
     fetchConversations();
   };
 
+  // function to reset user id
   const handleResetUserId = () => {
     console.log("Resetting User ID.");
 
@@ -189,6 +194,7 @@ export default function Home() {
     }
   };
 
+  // handle twitch authentication
   const handleTwitchAuth = () => {
     const domain =
       process.env.NODE_ENV === "production"
@@ -223,6 +229,7 @@ export default function Home() {
   //   }
   // };
 
+  // format assistant's response
   const formatResponse = (response: string) => {
     const sentences = response.split("\n").map((sentence) => sentence.trim());
     let stepCounter = 1;

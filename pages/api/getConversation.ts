@@ -2,9 +2,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import connectToMongoDB from '../../utils/mongodb';
 import Question from '../../models/Question';
 
+// get conversation
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { userId } = req.query;
 
+  // connect to mongodb
   try {
     console.log(`Fetching conversations for user: ${userId}`);
     await connectToMongoDB();

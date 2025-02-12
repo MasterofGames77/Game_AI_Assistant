@@ -42,6 +42,7 @@ export async function fetchFromIGDB(gameTitle: string): Promise<string | null> {
     if (response.data && response.data.length > 0) {
       const game = response.data.find((g: any) => cleanAndMatchTitle(gameTitle, g.name));
       
+      // get developers, publishers, platforms, and release date
       const developers = game.involved_companies?.filter((ic: any) => ic.developer)
         .map((ic: any) => ic.company.name).join(", ") || "unknown developers";
       const publishers = game.involved_companies?.filter((ic: any) => ic.publisher)

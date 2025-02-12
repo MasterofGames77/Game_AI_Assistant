@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 
+// Define the UserViolation schema
 const UserViolationSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   violations: [{

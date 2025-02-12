@@ -1,15 +1,19 @@
+// Import necessary dependencies and types
 import { useState, useEffect } from "react";
 import axios from "axios";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Conversation, SideBarProps } from "../types";
 
+// Sidebar component that displays conversation history
 const Sidebar = ({
   userId,
   onSelectConversation,
   onDeleteConversation,
 }: SideBarProps) => {
+  // State to store the list of conversations
   const [conversations, setConversations] = useState<Conversation[]>([]);
 
+  // Effect hook to fetch conversations when userId changes
   useEffect(() => {
     const fetchConversations = async () => {
       try {
@@ -23,7 +27,9 @@ const Sidebar = ({
     fetchConversations();
   }, [userId]);
 
+  // Function to create shortened titles from questions
   const shortenQuestion = (question: string): string => {
+    // List of keywords to identify important context in questions
     const keywords = [
       "release",
       "complete",
@@ -49,6 +55,8 @@ const Sidebar = ({
       "gameplay",
       "obtain",
       "collect",
+      "discover",
+      "improve",
       "area",
       "level",
       "create",
@@ -63,9 +71,11 @@ const Sidebar = ({
       "how to progress",
     ];
 
+    // Create pattern to match keywords
     const titlePattern = new RegExp(keywords.join("|"), "i");
     const match = question.match(titlePattern);
 
+    // Extract context and create title
     let context = match ? match[0] : null; // Capture the context if found
     let title = question.split(/\s+/).slice(0, 8).join(" "); // Get the first few words of the question
 
@@ -75,6 +85,7 @@ const Sidebar = ({
     return summary.length > 50 ? `${summary.substring(0, 47)}...` : summary;
   };
 
+  // Function to handle conversation deletion
   const handleDelete = async (id: string) => {
     try {
       await axios.post(`/api/deleteInteraction`, { id });
@@ -85,18 +96,22 @@ const Sidebar = ({
     }
   };
 
+  // Render the sidebar component
   return (
     <div className="w-64 bg-gray-800 text-white p-4">
       <h2 className="text-2xl font-bold mb-4">Conversations</h2>
+      {/* Map through conversations and render each one */}
       {conversations.map((convo) => (
         <div key={convo._id} className="mb-4">
           <div className="flex justify-between items-center">
+            {/* Clickable conversation title */}
             <div
               className="cursor-pointer"
               onClick={() => onSelectConversation(convo)}
             >
               {shortenQuestion(convo.question)}
             </div>
+            {/* Dropdown menu for conversation actions */}
             <DropdownMenu.Root>
               <DropdownMenu.Trigger className="text-white">
                 <svg
@@ -108,6 +123,7 @@ const Sidebar = ({
                   <path d="M12 7a2 2 0 110-4 2 2 0 010 4zM12 13a2 2 0 110-4 2 2 0 010 4zM12 19a2 2 0 110-4 2 2 0 010 4z" />
                 </svg>
               </DropdownMenu.Trigger>
+              {/* Dropdown menu content */}
               <DropdownMenu.Content className="bg-gray-700 text-white p-2 rounded-md">
                 <DropdownMenu.Item onSelect={() => handleDelete(convo._id)}>
                   Delete

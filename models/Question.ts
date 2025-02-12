@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 
+// Define the Question schema
 const QuestionSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   question: { type: String, required: true },

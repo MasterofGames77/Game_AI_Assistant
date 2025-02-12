@@ -11,6 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'No code provided' });
     }
 
+    // get twitch client id and secret
     const clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID;
     const clientSecret = process.env.TWITCH_CLIENT_SECRET;
     let redirectUri = process.env.TWITCH_REDIRECT_URI || '';
@@ -29,6 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(500).json({ error: 'Missing environment variables' });
     }
 
+    // create params for token request
     const params = new URLSearchParams({
         client_id: clientId,
         client_secret: clientSecret,
@@ -37,6 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         redirect_uri: redirectUri, // This should match exactly what was sent initially
     });
 
+    // try to get token response
     try {
         console.log("OAuth token request parameters:", params.toString());
 

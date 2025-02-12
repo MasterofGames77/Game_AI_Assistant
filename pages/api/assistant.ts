@@ -31,11 +31,13 @@ const openai = new OpenAI({
 // Functions for reading and processing game data from CSV file
 const CSV_FILE_PATH = path.join(process.cwd(), 'data/Video Games Data.csv');
 
+// Function to read the CSV file
 const readCSVFile = async (filePath: string) => {
   const fileContent = await readFile(filePath, 'utf8');
   return parse(fileContent, { columns: true });
 };
 
+// Function to get the CSV data
 const getCSVData = async () => {
   try {
     return await readCSVFile(CSV_FILE_PATH);
@@ -51,6 +53,7 @@ const formatReleaseDate = (dateString: string): string => {
   return `${month}/${day}/${year}`;
 };
 
+// Utility function to format game information
 const formatGameInfo = (gameInfo: any): string => {
   const formattedReleaseDate = formatReleaseDate(gameInfo.release_date);
   return `${gameInfo.title} was released on ${formattedReleaseDate} for ${gameInfo.console}. It is a ${gameInfo.genre} game developed by ${gameInfo.developer} and published by ${gameInfo.publisher}.`;
@@ -66,6 +69,7 @@ interface IGDBGame {
   url?: string;
 }
 
+// Function to fetch game information from IGDB API
 const fetchGamesFromIGDB = async (query: string): Promise<string | null> => {
   const accessToken = await getClientCredentialsAccessToken();
   const headers = {
@@ -115,6 +119,7 @@ interface RAWGGame {
   slug?: string;
 }
 
+// Function to fetch game information from RAWG API
 const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
   const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&search=${encodeURIComponent(searchQuery)}`;
   try {
@@ -158,6 +163,7 @@ const fetchAndCombineGameData = async (question: string, answer: string): Promis
       getCSVData()
     ]);
 
+    // Extract responses from promises
     const rawgResponse = rawgResult.status === 'fulfilled' ? rawgResult.value : null;
     const igdbResponse = igdbResult.status === 'fulfilled' ? igdbResult.value : null;
     const csvGameInfo =
@@ -367,6 +373,7 @@ export const checkAndAwardAchievements = async (userId: string, progress: any, s
   }
 };
 
+// measure memory usage
 const measureMemoryUsage = () => {
   const used = process.memoryUsage();
   return {
@@ -377,6 +384,7 @@ const measureMemoryUsage = () => {
   };
 };
 
+// measure response size
 const measureResponseSize = (data: any) => {
   const size = Buffer.byteLength(JSON.stringify(data));
   return {
@@ -385,6 +393,7 @@ const measureResponseSize = (data: any) => {
   };
 };
 
+// measure database query
 const measureDBQuery = async (operation: string, query: () => Promise<any>) => {
   const startMemory = process.memoryUsage().heapUsed;
   const startTime = performance.now();
@@ -402,6 +411,7 @@ const measureDBQuery = async (operation: string, query: () => Promise<any>) => {
   };
 };
 
+// measure request rate
 class RequestMonitor {
   private requests: number = 0;
   private startTime: number = Date.now();
@@ -419,6 +429,7 @@ class RequestMonitor {
   }
 }
 
+// measure cache metrics
 class CacheMetrics {
   private hits: number = 0;
   private misses: number = 0;
