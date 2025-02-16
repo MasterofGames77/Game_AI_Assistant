@@ -66,6 +66,7 @@ const updateAchievementsForUser = async (email: string) => {
   }
 };
 
+// Update all users with new achievements progress
 const updateAchievementsForAllUsers = async () => {
   await connectToMongoDB();
 
@@ -124,6 +125,7 @@ export const verifyUpdate = async (userId: string) => {
   }
 };
 
+// Update achievements from history
 export const updateAchievementsFromHistory = async (userId: string) => {
   await connectToMongoDB();
   

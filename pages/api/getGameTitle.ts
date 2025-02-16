@@ -3,6 +3,7 @@ import path from 'path';
 import { readFile } from 'fs/promises';
 import { parse } from 'csv-parse/sync';
 
+// Get all game titles from the CSV file
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
         const csvFilePath = path.join(process.cwd(), 'data/Video Games Data.csv');
