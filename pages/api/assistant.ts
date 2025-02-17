@@ -280,6 +280,8 @@ export const checkQuestionType = (question: string): string | null => {
   // Game genre specific achievements
   if (lowerQuestion.includes("rpg") || lowerQuestion.includes("role playing")) return "rpgEnthusiast";
   if (lowerQuestion.includes("boss") || lowerQuestion.includes("defeat")) return "bossBuster";
+  if (lowerQuestion.includes("platformer") || lowerQuestion.includes("platform")) return "platformerPro";
+  if (lowerQuestion.includes("survival") || lowerQuestion.includes("zombie")) return "survivalSpecialist";
   if (lowerQuestion.includes("strategy") || lowerQuestion.includes("tactics")) return "strategySpecialist";
   if (lowerQuestion.includes("action") || lowerQuestion.includes("combat")) return "actionAficionado";
   if (lowerQuestion.includes("battle royale") || lowerQuestion.includes("fortnite")) return "battleRoyale";
