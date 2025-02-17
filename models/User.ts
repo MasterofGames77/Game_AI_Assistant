@@ -55,6 +55,8 @@ const UserSchema = new Schema<IUser>({
     frequentAsker: { type: Number, default: 0 },
     rpgEnthusiast: { type: Number, default: 0 },
     bossBuster: { type: Number, default: 0 },
+    platformerPro: { type: Number, default: 0 },
+    survivalSpecialist: { type: Number, default: 0 },
     strategySpecialist: { type: Number, default: 0 },
     actionAficionado: { type: Number, default: 0 },
     battleRoyale: { type: Number, default: 0 },

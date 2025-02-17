@@ -314,6 +314,12 @@ export const checkAndAwardAchievements = async (userId: string, progress: any, s
   if (progress.bossBuster >= 5 && !currentAchievements.includes("Boss Buster")) {
     achievements.push({ name: "Boss Buster", dateEarned: new Date() });
   }
+  if (progress.platformerPro >= 5 && !currentAchievements.includes("Platformer Pro")) {
+    achievements.push({ name: "Platformer Pro", dateEarned: new Date() });
+  }
+  if (progress.survivalSpecialist >= 5 && !currentAchievements.includes("Survival Specialist")) {
+    achievements.push({ name: "Survival Specialist", dateEarned: new Date() });
+  }
   if (progress.strategySpecialist >= 5 && !currentAchievements.includes("Strategy Specialist")) {
     achievements.push({ name: "Strategy Specialist", dateEarned: new Date() });
   }
@@ -458,7 +464,6 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
   const { userId, question, code } = req.body;
   const metrics: any = {};
   const requestMonitor = new RequestMonitor();
-  const cacheMetrics = new CacheMetrics();
   
   try {
     // Validate question
@@ -571,6 +576,8 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
                   frequentAsker: 0,
                   rpgEnthusiast: 0,
                   bossBuster: 0,
+                  platformerPro: 0,
+                  survivalSpecialist: 0,
                   strategySpecialist: 0,
                   actionAficionado: 0,
                   battleRoyale: 0,
