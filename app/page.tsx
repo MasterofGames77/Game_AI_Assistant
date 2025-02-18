@@ -6,6 +6,8 @@ import Sidebar from "../components/Sidebar";
 import Image from "next/image";
 import { Conversation } from "../types";
 import { v4 as uuidv4 } from "uuid";
+import { io } from "socket.io-client";
+import toast, { Toaster } from "react-hot-toast";
 // import ForumList from "../components/ForumList";
 // import CreateTopic from "../components/CreateTopic";
 // import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -28,6 +30,8 @@ export default function Home() {
 
   // Optional image-related states (commented for now)
   // const [image, setImage] = useState<File | null>(null);
+
+  const [socket, setSocket] = useState<any>(null);
 
   useEffect(() => {
     const initializeUser = async () => {
@@ -251,8 +255,35 @@ export default function Home() {
     });
   };
 
+  useEffect(() => {
+    if (userId) {
+      // Initialize socket connection
+      const socketInstance = io(
+        process.env.NEXT_PUBLIC_WEBSOCKET_URL || "http://localhost:3000"
+      );
+      setSocket(socketInstance);
+
+      // Listen for achievement events
+      socketInstance.on("achievementEarned", (data) => {
+        if (data.userId === userId) {
+          data.achievements.forEach((achievement: { name: string }) => {
+            toast.success(`🏆 Achievement Unlocked: ${achievement.name}!`, {
+              duration: 5000,
+              position: "top-right",
+            });
+          });
+        }
+      });
+
+      return () => {
+        socketInstance.disconnect();
+      };
+    }
+  }, [userId]);
+
   return (
     <div className="min-h-screen flex">
+      <Toaster />
       {userId ? (
         <>
           <Sidebar

@@ -375,7 +375,7 @@ export const checkAndAwardAchievements = async (userId: string, progress: any, s
       { session: session || undefined }
     );
 
-    // Emit a Socket.IO event to notify the user
+    // Emit achievement event
     const io = getIO();
     io.emit('achievementEarned', { userId, achievements });
   }
