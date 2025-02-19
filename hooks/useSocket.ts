@@ -8,7 +8,12 @@ interface AchievementData {
 }
 
 const useSocket = (url: string): Socket => {
-  const { current: socket } = useRef<Socket>(io(url));
+  const { current: socket } = useRef<Socket>(
+    io(url, {
+      path: '/api/socket',
+      addTrailingSlash: false
+    })
+  );
 
   useEffect(() => {
     socket.on("connect", () => {
@@ -19,7 +24,6 @@ const useSocket = (url: string): Socket => {
       console.log("Disconnected from socket.io server");
     });
 
-    // // Listen for achievement notifications with proper typing
     socket.on("achievementEarned", (data: AchievementData) => {
       console.log("Achievement earned:", data);
       alert(`Congratulations! You earned the following achievements: ${data.achievements.map(a => a.name).join(", ")}`);
