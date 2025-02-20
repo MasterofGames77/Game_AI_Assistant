@@ -5,6 +5,8 @@ interface Progress {
   frequentAsker?: number;
   rpgEnthusiast?: number;
   bossBuster?: number;
+  platformerPro?: number;
+  survivalSpecialist?: number;
   strategySpecialist?: number;
   actionAficionado?: number;
   battleRoyale?: number;
