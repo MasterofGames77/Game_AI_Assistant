@@ -99,38 +99,50 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
       : await SplashUser.findOne({ userId });
 
     if (splashUser) {
+      // Check pro access eligibility
+      const signupDate = new Date(splashUser.userId.split('-')[1]); // Extract date from userId
+      const proDeadline = new Date('2025-07-31T23:59:59.999Z');
+      const hasProAccess = (
+        (typeof splashUser.position === 'number' && splashUser.position <= 5000) || // First 5000 users
+        signupDate <= proDeadline // Or signed up before deadline
+      );
+
       // Update or create user in Wingman DB with all required fields
       await WingmanUser.findOneAndUpdate(
         { userId: splashUser.userId },
         {
           userId: splashUser.userId,
           email: splashUser.email,
-          hasProAccess: splashUser.hasProAccess || splashUser.isApproved,
+          hasProAccess, // Use the calculated hasProAccess value
           conversationCount: 0,
-          achievements: [],
-          progress: {
-            firstQuestion: 0,
-            frequentAsker: 0,
-            rpgEnthusiast: 0,
-            bossBuster: 0,
-            strategySpecialist: 0,
-            actionAficionado: 0,
-            battleRoyale: 0,
-            sportsChampion: 0,
-            adventureAddict: 0,
-            shooterSpecialist: 0,
-            puzzlePro: 0,
-            racingExpert: 0,
-            stealthSpecialist: 0,
-            horrorHero: 0,
-            triviaMaster: 0,
-            totalQuestions: 0,
-            dailyExplorer: 0,
-            speedrunner: 0,
-            collectorPro: 0,
-            dataDiver: 0,
-            performanceTweaker: 0,
-            conversationalist: 0,
+          $setOnInsert: {
+            achievements: [],
+            progress: {
+              firstQuestion: 0,
+              frequentAsker: 0,
+              rpgEnthusiast: 0,
+              bossBuster: 0,
+              platformerPro: 0,
+              survivalSpecialist: 0,
+              strategySpecialist: 0,
+              actionAficionado: 0,
+              battleRoyale: 0,
+              sportsChampion: 0,
+              adventureAddict: 0,
+              shooterSpecialist: 0,
+              puzzlePro: 0,
+              racingExpert: 0,
+              stealthSpecialist: 0,
+              horrorHero: 0,
+              triviaMaster: 0,
+              totalQuestions: 0,
+              dailyExplorer: 0,
+              speedrunner: 0,
+              collectorPro: 0,
+              dataDiver: 0,
+              performanceTweaker: 0,
+              conversationalist: 0
+            }
           }
         },
         { 
@@ -145,6 +157,5 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
     }
   } catch (error) {
     console.error('Error syncing user data:', error);
-    throw error;
   }
 };
