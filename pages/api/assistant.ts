@@ -12,6 +12,7 @@ import { parse } from 'csv-parse/sync';
 import { getIO } from '../../middleware/realtime';
 import mongoose from 'mongoose';
 import winston from 'winston';
+import { containsOffensiveContent } from '../../utils/contentModeration';
 
 // Add performance monitoring
 const measureLatency = async (operation: string, callback: () => Promise<any>) => {
@@ -473,6 +474,28 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
       throw new Error('Invalid question format - question must be a non-empty string');
     }
 
+    // Check for offensive content first
+    const contentCheck = await containsOffensiveContent(question, userId);
+    if (contentCheck.isOffensive) {
+      if (contentCheck.violationResult?.action === 'banned') {
+        return res.status(403).json({
+          error: 'Account Suspended',
+          message: 'Your account is temporarily suspended',
+          banExpiresAt: contentCheck.violationResult.expiresAt,
+          metrics
+        });
+      }
+      
+      if (contentCheck.violationResult?.action === 'warning') {
+        return res.status(400).json({
+          error: 'Content Warning',
+          message: `Warning ${contentCheck.violationResult.count}/3: Please avoid using inappropriate language`,
+          offendingWords: contentCheck.offendingWords,
+          metrics
+        });
+      }
+    }
+
     // Track request
     requestMonitor.incrementRequest();
     
@@ -560,13 +583,10 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
 
     // Measure database operations with enhanced metrics
     const dbMetrics = await measureDBQuery('Create Question', async () => {
-      const session = await mongoose.startSession();
-      session.startTransaction();
-
       try {
-        // Create question and update user in parallel
+        // Create question and update user without transactions
         const [questionDoc, userDoc] = await Promise.all([
-          Question.create([{ userId, question, response: answer }], { session }),
+          Question.create({ userId, question, response: answer }),
           User.findOneAndUpdate(
             { userId }, 
             { 
@@ -601,34 +621,30 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
                 }
               }
             }, 
-            { upsert: true, new: true, session }
+            { upsert: true, new: true }
           )
         ]);
 
-        // Handle achievements after initial operations
+        // Handle achievements
         if (userDoc) {
           const questionType = await checkQuestionType(question);
           if (questionType) {
             await User.updateOne(
               { userId },
-              { $inc: { [`progress.${questionType}`]: 1 } },
-              { session }
+              { $inc: { [`progress.${questionType}`]: 1 } }
             );
 
-            // Get updated progress for achievement checks
-            const updatedUser = await User.findOne({ userId }).session(session);
+            const updatedUser = await User.findOne({ userId });
             if (updatedUser) {
-              await checkAndAwardAchievements(userId, updatedUser.progress, session);
+              await checkAndAwardAchievements(userId, updatedUser.progress);
             }
           }
         }
 
-        await session.commitTransaction();
+        return { questionDoc, userDoc };
       } catch (error) {
-        await session.abortTransaction();
+        console.error('Database operation error:', error);
         throw error;
-      } finally {
-        session.endSession();
       }
     });
     metrics.databaseMetrics = dbMetrics;

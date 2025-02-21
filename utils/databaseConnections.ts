@@ -16,18 +16,27 @@ let splashDB: mongoose.Connection;
 
 // Connect to main application database (Wingman)
 export const connectToWingmanDB = async (): Promise<mongoose.Connection> => {
-  // Only create new connection if none exists or previous connection closed
-  if (!wingmanDB || wingmanDB.readyState === 0) {
-    try {
-      console.log('Connecting to Wingman DB...');
-      wingmanDB = await mongoose.createConnection(process.env.MONGODB_URI as string);
-      console.log('Connected to Wingman DB');
-    } catch (error) {
-      console.error('Error connecting to Wingman DB:', error);
-      throw error;
+  try {
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI is not defined');
     }
+
+    if (mongoose.connection.readyState === 1) {
+      return mongoose.connection;
+    }
+
+    await mongoose.connect(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 10000, // Timeout after 10s
+      socketTimeoutMS: 45000, // Close sockets after 45s
+      maxPoolSize: 10,
+    });
+
+    console.log('Connected to MongoDB');
+    return mongoose.connection;
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    throw error;
   }
-  return wingmanDB;
 };
 
 // Connect to splash page database

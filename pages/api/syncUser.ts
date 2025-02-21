@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { syncUserData } from '../../utils/checkProAccess';
 import { connectToWingmanDB } from '../../utils/databaseConnections';
 import User from '../../models/User';
+import mongoose from 'mongoose';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -15,10 +16,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // First connect to the Wingman database
-    const db = await connectToWingmanDB();
+    // Ensure mongoose is connected
+    if (mongoose.connection.readyState !== 1) {
+      await connectToWingmanDB();
+    }
     
-    // Create or update user document
     const user = await User.findOneAndUpdate(
       { userId },
       { 
@@ -31,13 +33,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           progress: {}
         }
       },
-      { upsert: true, new: true }
-    );
+      { 
+        upsert: true, 
+        new: true,
+        maxTimeMS: 5000
+      }
+    ).exec(); // Add .exec() to ensure proper promise handling
 
     await syncUserData(userId, email);
     res.status(200).json({ message: 'User data synced successfully', user });
   } catch (error) {
     console.error('Error in syncUser API:', error);
-    res.status(500).json({ message: 'Error syncing user data' });
+    res.status(500).json({ 
+      message: 'Error syncing user data',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 } 

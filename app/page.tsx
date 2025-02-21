@@ -31,41 +31,63 @@ export default function Home() {
 
   useEffect(() => {
     const initializeUser = async () => {
-      let storedUserId = localStorage.getItem("userId");
-      let storedEmail = localStorage.getItem("userEmail");
-
-      // Check URL parameters for userId and email from splash page
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlUserId = urlParams.get("userId");
-      const urlEmail = urlParams.get("email");
-
-      if (urlUserId && urlEmail) {
-        // If we have parameters from the splash page, use those
-        storedUserId = urlUserId;
-        storedEmail = urlEmail;
-        localStorage.setItem("userId", urlUserId);
-        localStorage.setItem("userEmail", urlEmail);
-      } else if (!storedUserId || storedUserId === "null") {
-        // Only generate new ID if we don't have one from splash page or storage
-        storedUserId = uuidv4();
-        alert(
-          `Your new user ID is: ${storedUserId}. Please save it for future use.`
-        );
-        localStorage.setItem("userId", storedUserId);
-      }
-
+      let storedUserId: string | null = null;
       try {
-        // Call API endpoint to sync user data
-        await axios.post("/api/syncUser", {
-          userId: storedUserId,
-          email: storedEmail,
-        });
-      } catch (error) {
-        console.error("Error syncing user data:", error);
-      }
+        storedUserId = localStorage.getItem("userId");
+        let storedEmail = localStorage.getItem("userEmail");
 
-      setUserId(storedUserId);
-      console.log("User ID set:", storedUserId);
+        // For development only: Create test user if no data exists
+        if (
+          process.env.NODE_ENV === "development" &&
+          (!storedUserId || !storedEmail)
+        ) {
+          storedUserId = "test-" + Math.random().toString(36).substr(2, 9);
+          storedEmail = "test@example.com";
+          localStorage.setItem("userId", storedUserId);
+          localStorage.setItem("userEmail", storedEmail);
+        }
+
+        if (storedUserId && storedEmail) {
+          let retries = 3;
+          while (retries > 0) {
+            try {
+              const response = await axios.post(
+                "/api/syncUser",
+                {
+                  userId: storedUserId,
+                  email: storedEmail,
+                },
+                {
+                  timeout: 10000, // Increased timeout to 10 seconds
+                }
+              );
+
+              if (response.status === 200) {
+                setUserId(storedUserId);
+                break;
+              }
+            } catch (syncError) {
+              console.error(
+                `Error syncing user (attempts left: ${retries - 1}):`,
+                syncError
+              );
+              retries--;
+              if (retries === 0) {
+                // If all retries fail, still set userId to allow basic functionality
+                setUserId(storedUserId);
+              } else {
+                // Wait 1 second before retrying
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error initializing user:", error);
+        if (storedUserId) setUserId(storedUserId);
+      } finally {
+        setLoading(false);
+      }
     };
 
     initializeUser();
@@ -102,20 +124,49 @@ export default function Home() {
     const startTime = performance.now();
 
     try {
-      const res = await axios.post("/api/assistant", { userId, question });
+      // Log request details
+      console.log("Submitting question:", {
+        userId,
+        question,
+        timestamp: new Date().toISOString(),
+      });
+
+      const res = await axios.post(
+        "/api/assistant",
+        {
+          userId,
+          question,
+        },
+        {
+          timeout: 30000, // 30 second timeout
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
       const endTime = performance.now();
       console.log(
         `Total frontend latency: ${(endTime - startTime).toFixed(2)}ms`
       );
+      console.log("Response:", res.data);
 
       setResponse(res.data.answer);
       if (res.data.metrics) {
         setMetrics(res.data.metrics);
       }
       fetchConversations();
-    } catch (error) {
-      console.error("Error submitting form:", error);
-      setError("There was an error processing your request. Please try again.");
+    } catch (error: any) {
+      console.error("Error details:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+
+      setError(
+        error.response?.data?.message ||
+          "There was an error processing your request. Please try again."
+      );
     } finally {
       setLoading(false);
     }

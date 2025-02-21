@@ -2,6 +2,20 @@
 const OFFENSIVE_WORDS = [
   'ejaculate',
   'ejaculation',
+  'arsehead',
+  'arse',
+  'arsehole',
+  'shite',
+  'dumbass',
+  'dumb fuck',
+  'dyke',
+  'load of shit',
+  'full of shit',
+  'horseshit',
+  'dogshit',
+  'son of a bitch',
+  'son of a whore',
+  'prick',
   'shit',
   'shithead',
   'fuck face',
@@ -24,6 +38,8 @@ const OFFENSIVE_WORDS = [
   'fuck',
   'fuck you',
   'fuck off',
+  'fuck me',
+  'fucking',
   'bastard',
   'spastic',
   'retard',
@@ -86,6 +102,7 @@ const OFFENSIVE_WORDS = [
   'Jesse Watters',
   'Kari Lake',
   'Marco Rubio',
+  'Rudy Giuliani',
   'Linda McMahon',
   'Chuck Grassley',
   'Steve Bannon',
@@ -103,6 +120,7 @@ const OFFENSIVE_WORDS = [
   'Margery Taylor Greene',
   'Lauren Boebert',
   'Matt Gaetz',
+  'Alice Johnson',
   'Jim Jordan',
   'Donald Trump Jr.',
   'Eric Trump',
@@ -121,6 +139,7 @@ const OFFENSIVE_WORDS = [
   'sex trafficking',
   'kiss my ass',
   'suck my dick',
+  'eat a dick',
   'blew my load',
   'titty fuck',
   'nipples',
@@ -136,31 +155,54 @@ const OFFENSIVE_WORDS = [
   'titjob',
   'handjob',
   'butt fuck',
-  'D.O.G.E'
+  'D.O.G.E',
+  'bitch tits',
+  'bitch ass',
+  'masterbate',
+  'masterbating',
+  'masterbated',
+  'horny',
+  'horny bitch',
+  'slut',
+  'slutty',
+  'Bollocks',
+  'cumdumpster',
   // I do not approve any of these words, names, and or phrases being used in the application.
 ];
 
 import { handleContentViolation } from './violationHandler';
+import UserViolation from '../models/UserViolation';
 
-export const containsOffensiveContent = async (text: string, userId: string): Promise<{ 
+export const containsOffensiveContent = async (content: string, userId: string): Promise<{ 
   isOffensive: boolean; 
   offendingWords: string[];
   violationResult?: any;
 }> => {
-  const words = text.toLowerCase().split(/\s+/);
-  const offendingWords = words.filter(word => OFFENSIVE_WORDS.includes(word));
-  
-  if (offendingWords.length > 0) {
-    const violationResult = await handleContentViolation(userId, offendingWords);
+  try {
+    const words = content.toLowerCase().split(/\s+/);
+    const offendingWords = words.filter(word => OFFENSIVE_WORDS.includes(word));
+    
+    if (offendingWords.length > 0) {
+      const violationResult = await handleContentViolation(userId, offendingWords);
+      return {
+        isOffensive: true,
+        offendingWords,
+        violationResult
+      };
+    }
+    
+    // Use the model without recompiling
+    const violations = await UserViolation.findOne({ userId });
+    
     return {
-      isOffensive: true,
-      offendingWords,
-      violationResult
+      isOffensive: false,
+      offendingWords: []
+    };
+  } catch (error) {
+    console.error('Error in content moderation:', error);
+    return { 
+      isOffensive: false,
+      offendingWords: []
     };
   }
-  
-  return {
-    isOffensive: false,
-    offendingWords: []
-  };
 }; 

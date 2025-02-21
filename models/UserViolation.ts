@@ -1,15 +1,15 @@
 import mongoose from 'mongoose';
 
-// Define the UserViolation schema
-const UserViolationSchema = new mongoose.Schema({
+// Check if model already exists before defining
+const UserViolation = mongoose.models.UserViolation || mongoose.model('UserViolation', new mongoose.Schema({
   userId: { type: String, required: true },
   violations: [{
+    type: { type: String, required: true },
+    timestamp: { type: Date, default: Date.now },
     content: String,
-    offendingWords: [String],
-    timestamp: { type: Date, default: Date.now }
-  }],
-  banExpiresAt: { type: Date, default: null, nullable: true },
-  warningCount: { type: Number, default: 0 }
-});
+    action: String,
+    expiresAt: Date
+  }]
+}));
 
-export default mongoose.model('UserViolation', UserViolationSchema); 
+export default UserViolation; 
