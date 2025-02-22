@@ -30,6 +30,11 @@ const OFFENSIVE_WORDS = [
   'Xi Jinping',
   'Adolf Hitler',
   'Hitler',
+  'Augusto Pinochet',
+  'Alberto Fujimori',
+  'Lee Kuan Yew',
+  'Recep Tayyip Erdoğan',
+  'Boris Yeltsin',
   'Donald Trump',
   'Trump',
   'Maga',
@@ -62,6 +67,7 @@ const OFFENSIVE_WORDS = [
   'proud boys',
   'oathkeepers',
   'Al Qaeda',
+  'Taliban',
   'ISIS',
   'Osama Bin Laden',
   'qanon',
@@ -132,6 +138,11 @@ const OFFENSIVE_WORDS = [
   'Neil Gorsuch',
   'Aileen Cannon',
   'Tommy Tuberville',
+  'Dr. Oz',
+  'Greg Abbott',
+  'Enrique Tarrio',
+  'Steward Rhodes',
+  'Eric Adams',
   'Tesla',
   'herpes',
   'genitalia',
@@ -167,7 +178,11 @@ const OFFENSIVE_WORDS = [
   'slutty',
   'Bollocks',
   'cumdumpster',
-  // I do not approve any of these words, names, and or phrases being used in the application.
+  'testicles',
+  'neek',
+  'buttfucker',
+  'buttfucked',
+  // I do not approve any of these words, names, and or phrases being used in this application.
 ];
 
 import { handleContentViolation } from './violationHandler';
