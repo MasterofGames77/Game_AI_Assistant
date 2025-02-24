@@ -5,7 +5,6 @@ import axios from "axios";
 import Sidebar from "../components/Sidebar";
 import Image from "next/image";
 import { Conversation } from "../types";
-import { v4 as uuidv4 } from "uuid";
 // import ForumList from "../components/ForumList";
 // import CreateTopic from "../components/CreateTopic";
 // import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -23,8 +22,8 @@ export default function Home() {
   const [metrics, setMetrics] = useState<{ [key: string]: number }>({});
 
   const [activeView, setActiveView] = useState<"chat" | "forum">("chat");
-  const [currentForumId, setCurrentForumId] = useState("");
-  const [forumTopics, setForumTopics] = useState([]);
+  // const [currentForumId, setCurrentForumId] = useState("");
+  // const [forumTopics, setForumTopics] = useState([]);
 
   // Optional image-related states (commented for now)
   // const [image, setImage] = useState<File | null>(null);

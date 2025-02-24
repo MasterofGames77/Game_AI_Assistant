@@ -1,3 +1,6 @@
+import mongoose from 'mongoose';
+import { handleContentViolation } from './violationHandler';
+
 // This is a list of words/names/phrases that are considered offensive and should not be used in this application.
 const OFFENSIVE_WORDS = [
   'ejaculate',
@@ -185,15 +188,16 @@ const OFFENSIVE_WORDS = [
   // I do not approve any of these words, names, and or phrases being used in this application.
 ];
 
-import { handleContentViolation } from './violationHandler';
-import UserViolation from '../models/UserViolation';
-
 export const containsOffensiveContent = async (content: string, userId: string): Promise<{ 
   isOffensive: boolean; 
   offendingWords: string[];
   violationResult?: any;
 }> => {
   try {
+    if (!mongoose.connection.readyState) {
+      await mongoose.connect(process.env.MONGODB_URI as string);
+    }
+    
     const words = content.toLowerCase().split(/\s+/);
     const offendingWords = words.filter(word => OFFENSIVE_WORDS.includes(word));
     
@@ -205,9 +209,6 @@ export const containsOffensiveContent = async (content: string, userId: string):
         violationResult
       };
     }
-    
-    // Use the model without recompiling
-    const violations = await UserViolation.findOne({ userId });
     
     return {
       isOffensive: false,

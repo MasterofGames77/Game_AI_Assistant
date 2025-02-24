@@ -18,7 +18,7 @@
 //   const [newPost, setNewPost] = useState("");
 //   const [error, setError] = useState("");
 //   const [loading, setLoading] = useState(false);
-//   const [success, setSuccess] = useState({ message: "", isError: false });
+//   const [success, setSuccess] = useState("");
 //   const [topicSuccess, setTopicSuccess] = useState("");
 
 //   useEffect(() => {
