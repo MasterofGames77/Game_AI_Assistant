@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { updateAchievementsForAllUsers } from '../../utils/updateAchievements';
 
+// This is a test endpoint to update all achievements for all users
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
