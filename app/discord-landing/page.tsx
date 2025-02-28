@@ -30,6 +30,7 @@ function DiscordLandingContent() {
     userId: userId ? "[REDACTED]" : "null",
   });
 
+  // handle adding the bot to the server
   const handleAddToServer = () => {
     if (botInviteUrl) {
       console.log("Opening bot invite URL in new window");
@@ -39,6 +40,7 @@ function DiscordLandingContent() {
     }
   };
 
+  // handle starting a direct message with the bot
   const handleStartDM = async () => {
     if (!applicationId) {
       console.error("Discord application ID not available");

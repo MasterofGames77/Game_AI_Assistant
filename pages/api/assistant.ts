@@ -452,6 +452,7 @@ class CacheMetrics {
   }
 }
 
+// measure performance metrics
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),

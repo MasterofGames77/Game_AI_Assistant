@@ -17,6 +17,8 @@ interface IWingmanUser extends Document {
       frequentAsker: number;
       rpgEnthusiast?: number;
       bossBuster?: number;
+      platformerPro?: number;
+      survivalSpecialist?: number;
       strategySpecialist?: number;
       actionAficionado?: number;
       battleRoyale?: number;
@@ -61,6 +63,7 @@ const splashUserSchema = new Schema<ISplashUser>({
   userId: { type: String, required: true },
 });
 
+// Check pro access for a user
 export const checkProAccess = async (userId: string): Promise<boolean> => {
   try {
     const wingmanDB = await connectToWingmanDB();

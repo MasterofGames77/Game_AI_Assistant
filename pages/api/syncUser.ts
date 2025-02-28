@@ -21,6 +21,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await connectToWingmanDB();
     }
     
+    // Check if the user already exists
+    const existingUser = await User.findOne({ userId });
+    if (existingUser) {
+      return res.status(200).json({ message: 'User already exists', user: existingUser });
+    }
+
+    // Create a new user
     const user = await User.findOneAndUpdate(
       { userId },
       { 

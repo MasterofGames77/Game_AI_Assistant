@@ -3,6 +3,7 @@ import { Server as HttpServer } from "http";
 
 let io: Server;
 
+// Initialize the Socket.IO server
 const initSocket = (server: HttpServer): void => {
   io = new Server(server, {
     cors: {
@@ -20,6 +21,7 @@ const initSocket = (server: HttpServer): void => {
   });
 };
 
+// Get the Socket.IO server instance
 const getIO = (): Server => {
   if (!io) {
     throw new Error("Socket.IO not initialized");
