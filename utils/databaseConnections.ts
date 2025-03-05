@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '.env.local') });
 
 // Database connection instances
-let wingmanDB: mongoose.Connection;
+// let wingmanDB: mongoose.Connection;
 let splashDB: mongoose.Connection;
 
 // Connect to main application database (Wingman)

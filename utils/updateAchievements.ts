@@ -15,11 +15,130 @@ const updateAchievementsForUser = async (email: string) => {
       return;
     }
 
-    // Force update with $set instead of $setOnInsert
-    const update = {
-      $set: {
-        achievements: [],
-        progress: {
+    console.log('Found user:', user.email);
+
+    // Get all questions for this user
+    const questions = await Question.find({ userId: user.userId });
+    console.log(`Found ${questions.length} questions for user`);
+
+    // Initialize progress with all possible fields
+    const progress: Record<string, number> = {
+      firstQuestion: 0,
+      frequentAsker: 0,
+      rpgEnthusiast: 0,
+      bossBuster: 0,
+      platformerPro: 0,
+      survivalSpecialist: 0,
+      strategySpecialist: 0,
+      actionAficionado: 0,
+      battleRoyale: 0,
+      sportsChampion: 0,
+      adventureAddict: 0,
+      shooterSpecialist: 0,
+      puzzlePro: 0,
+      racingExpert: 0,
+      stealthSpecialist: 0,
+      horrorHero: 0,
+      triviaMaster: 0,
+      totalQuestions: questions.length,
+      dailyExplorer: 0,
+      speedrunner: 0,
+      collectorPro: 0,
+      dataDiver: 0,
+      performanceTweaker: 0,
+      conversationalist: 0
+    };
+
+    // Process each question to update progress using the enhanced checkQuestionType
+    console.log('Processing questions for achievement tracking...');
+    for (const question of questions) {
+      const type = await checkQuestionType(question.question);
+      if (type && type in progress) {
+        progress[type]++;
+        console.log(`Detected ${type} for question: "${question.question.substring(0, 50)}..."`);
+      }
+    }
+
+    console.log('Calculated progress:', progress);
+
+    // Update user's progress
+    const updateResult = await User.findOneAndUpdate(
+      { 
+        $or: [
+          { email },
+          { userId: user.userId }
+        ]
+      },
+      { 
+        $set: { progress }
+      },
+      { new: true }
+    );
+
+    if (updateResult) {
+      // Now check and award achievements based on the progress
+      const newAchievements = await checkAndAwardAchievements(user.userId, progress);
+      console.log('Awarded achievements:', newAchievements);
+    }
+
+    console.log('Update completed for user:', email);
+    return updateResult;
+  } catch (error) {
+    console.error('Error updating user:', error);
+    throw error;
+  } finally {
+    await mongoose.connection.close();
+  }
+};
+
+// Create a new endpoint specifically for updating a single user by email
+const createUpdateUserEndpoint = async (req: any, res: any) => {
+  if (!req.query.email) {
+    return res.status(400).json({ message: 'Email parameter is required' });
+  }
+
+  try {
+    const result = await updateAchievementsForUser(req.query.email);
+    if (!result) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    return res.status(200).json({ 
+      message: 'Successfully updated user achievements',
+      progress: result.progress,
+      achievements: result.achievements
+    });
+  } catch (error) {
+    console.error('Error in update endpoint:', error);
+    return res.status(500).json({ 
+      message: 'Error updating achievements',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
+
+// Update all users with new achievements progress
+const updateAchievementsForAllUsers = async () => {
+  console.log('Starting achievement update for all users...');
+  
+  try {
+    await connectToMongoDB();
+    console.log('Connected to MongoDB successfully');
+
+    // First, get all users
+    const users = await User.find({});
+    console.log(`Found ${users.length} users to process`);
+
+    // Process each user
+    for (const user of users) {
+      console.log(`Processing user: ${user.email || user.userId}`);
+      
+      try {
+        // Get user's questions to calculate progress
+        const questions = await Question.find({ userId: user.userId });
+        console.log(`Found ${questions.length} questions for user`);
+
+        // Initialize progress with all possible fields
+        const progress: Record<string, number> = {
           firstQuestion: 0,
           frequentAsker: 0,
           rpgEnthusiast: 0,
@@ -37,85 +156,64 @@ const updateAchievementsForUser = async (email: string) => {
           stealthSpecialist: 0,
           horrorHero: 0,
           triviaMaster: 0,
-          totalQuestions: user.conversationCount || 0,
+          totalQuestions: questions.length,
           dailyExplorer: 0,
           speedrunner: 0,
           collectorPro: 0,
           dataDiver: 0,
           performanceTweaker: 0,
           conversationalist: 0
+        };
+        
+        // Process each question to update progress using the enhanced checkQuestionType
+        console.log('Processing questions for achievement tracking...');
+        for (const q of questions) {
+          const type = await checkQuestionType(q.question);
+          if (type && type in progress) {
+            progress[type]++;
+            console.log(`Detected ${type} for question: "${q.question.substring(0, 50)}..."`);
+          }
         }
-      }
-    };
 
-    // Update using both email and userId to ensure we get the right user
-    const result = await User.findOneAndUpdate(
-      { 
-        $or: [
-          { email },
-          { userId: user.userId }
-        ]
-      },
-      update,
-      { new: true }
-    );
-    
-    console.log(`Updated user:`, result);
-  } catch (error) {
-    console.error('Error updating user:', error);
-  } finally {
-    await mongoose.connection.close();
-  }
-};
+        console.log(`Updated progress for user:`, progress);
 
-// Update all users with new achievements progress
-const updateAchievementsForAllUsers = async () => {
-  await connectToMongoDB();
+        // Update user's progress
+        const updateResult = await User.findOneAndUpdate(
+          { userId: user.userId },
+          { 
+            $set: { progress }
+          },
+          { new: true }
+        );
 
-  const update = {
-    $set: {
-      achievements: [],
-      progress: {
-        firstQuestion: 0,
-        frequentAsker: 0,
-        rpgEnthusiast: 0,
-        bossBuster: 0,
-        platformerPro: 0,
-        survivalSpecialist: 0,
-        strategySpecialist: 0,
-        actionAficionado: 0,
-        battleRoyale: 0,
-        sportsChampion: 0,
-        adventureAddict: 0,
-        shooterSpecialist: 0,
-        puzzlePro: 0,
-        racingExpert: 0,
-        stealthSpecialist: 0,
-        horrorHero: 0,
-        triviaMaster: 0,
-        totalQuestions: 0,
-        dailyExplorer: 0,
-        speedrunner: 0,
-        collectorPro: 0,
-        dataDiver: 0,
-        performanceTweaker: 0,
-        conversationalist: 0
+        // Check and award achievements
+        if (updateResult) {
+          const newAchievements = await checkAndAwardAchievements(user.userId, progress);
+          if (newAchievements.length > 0) {
+            console.log(`Awarded ${newAchievements.length} new achievements to user ${user.email || user.userId}`);
+          }
+        }
+
+        console.log(`Completed processing for user: ${user.email || user.userId}`);
+      } catch (userError) {
+        console.error(`Error processing user ${user.email || user.userId}:`, userError);
+        // Continue with next user even if one fails
+        continue;
       }
     }
-  };
 
-  try {
-    // Update all users by adding the progress field to each document
-    const result = await User.updateMany({}, update);
-    console.log(`Updated ${result.modifiedCount} users with new achievements progress.`);
+    console.log('Successfully completed achievement update for all users');
   } catch (error) {
-    console.error('Error updating users:', error);
+    console.error('Error in updateAchievementsForAllUsers:', error);
+    throw error;
   } finally {
     await mongoose.connection.close();
+    console.log('Closed MongoDB connection');
   }
 };
 
-export const verifyUpdate = async (userId: string) => {
+// Verify update function
+const verifyUpdate = async (userId: string) => {
   await connectToMongoDB();
   try {
     const user = await User.findOne({ userId });
@@ -130,7 +228,7 @@ export const verifyUpdate = async (userId: string) => {
 };
 
 // Update achievements from history
-export const updateAchievementsFromHistory = async (userId: string) => {
+const updateAchievementsFromHistory = async (userId: string) => {
   await connectToMongoDB();
   
   try {
@@ -164,5 +262,11 @@ export const updateAchievementsFromHistory = async (userId: string) => {
   }
 };
 
-// Export both functions
-export { updateAchievementsForUser, updateAchievementsForAllUsers };
+// Export all functions in one place
+export {
+  updateAchievementsForUser,
+  updateAchievementsForAllUsers,
+  updateAchievementsFromHistory,
+  verifyUpdate,
+  createUpdateUserEndpoint
+};

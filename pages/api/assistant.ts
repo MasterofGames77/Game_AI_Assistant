@@ -285,108 +285,227 @@ const extractGameTitle = (question: string): string => {
 export const checkQuestionType = (question: string): string | null => {
   const lowerQuestion = question.toLowerCase();
   
-  // Game genre specific achievements
-  if (lowerQuestion.includes("rpg") || lowerQuestion.includes("role playing")) return "rpgEnthusiast";
-  if (lowerQuestion.includes("boss") || lowerQuestion.includes("defeat")) return "bossBuster";
-  if (lowerQuestion.includes("platformer") || lowerQuestion.includes("platform")) return "platformerPro";
-  if (lowerQuestion.includes("survival") || lowerQuestion.includes("zombie")) return "survivalSpecialist";
-  if (lowerQuestion.includes("strategy") || lowerQuestion.includes("tactics")) return "strategySpecialist";
-  if (lowerQuestion.includes("action") || lowerQuestion.includes("combat")) return "actionAficionado";
-  if (lowerQuestion.includes("battle royale") || lowerQuestion.includes("fortnite")) return "battleRoyale";
-  if (lowerQuestion.includes("sports") || lowerQuestion.includes("fifa") || lowerQuestion.includes("nba")) return "sportsChampion";
-  if (lowerQuestion.includes("adventure") || lowerQuestion.includes("explore")) return "adventureAddict";
-  if (lowerQuestion.includes("shooter") || lowerQuestion.includes("fps")) return "shooterSpecialist";
-  if (lowerQuestion.includes("puzzle") || lowerQuestion.includes("solve")) return "puzzlePro";
-  if (lowerQuestion.includes("racing") || lowerQuestion.includes("race") || lowerQuestion.includes("mario kart")) return "racingExpert";
-  if (lowerQuestion.includes("stealth") || lowerQuestion.includes("sneak")) return "stealthSpecialist";
-  if (lowerQuestion.includes("horror") || lowerQuestion.includes("survival horror")) return "horrorHero";
-  if (lowerQuestion.includes("trivia") || lowerQuestion.includes("quiz")) return "triviaMaster";
+  // Comprehensive game title to genre mapping
+  const platformerGames = [
+    'super mario', 'mario odyssey', 'mario galaxy', 'mario sunshine', 'mario 64',
+    'donkey kong', 'crash bandicoot', 'spyro', 'rayman', 'sonic',
+    'hollow knight', 'celeste', 'ori', 'little big planet', 'ratchet', 'clank',
+    'jak', 'daxter', 'sly cooper', 'banjo', 'kazooie', 'metroid',
+    'mega man', 'kirby', 'yoshi', 'platformer', 'jumping', 'hat in time',
+    'psychonauts', 'braid', 'shovel knight', 'cuphead'
+  ];
+
+  const rpgGames = [
+    'final fantasy', 'dragon quest', 'xenoblade', 'persona', 'shin megami',
+    'pokemon', 'chrono trigger', 'mass effect', 'elder scrolls', 'skyrim',
+    'fallout', 'witcher', 'dark souls', 'elden ring', 'bloodborne', 'sekiro',
+    'tales of', 'kingdom hearts', 'ni no kuni', 'dragon age', 'baldur\'s gate',
+    'pillars of eternity', 'divinity', 'octopath traveler', 'bravely default',
+    'fire emblem', 'xenogears', 'xenosaga', 'saga', 'star ocean', 'ys'
+  ];
+
+  const actionGames = [
+    'devil may cry', 'bayonetta', 'god of war', 'ninja gaiden',
+    'metal gear rising', 'dynasty warriors', 'nier', 'automata',
+    'darksiders', 'prototype', 'infamous', 'asura\'s wrath',
+    'kingdom hearts', 'monster hunter', 'dragons dogma'
+  ];
+
+  const survivalGames = [
+    'resident evil', 'silent hill', 'dead space', 'amnesia',
+    'outlast', 'dying light', 'dead by daylight', 'left 4 dead',
+    'state of decay', 'the forest', 'subnautica', 'rust',
+    'dayz', '7 days to die', 'minecraft', 'valheim'
+  ];
+
+  const strategyGames = [
+    'civilization', 'age of empires', 'starcraft', 'warcraft',
+    'command & conquer', 'total war', 'xcom', 'fire emblem',
+    'advance wars', 'into the breach', 'valkyria chronicles',
+    'disgaea', 'triangle strategy', 'tactics ogre'
+  ];
+
+  const shooterGames = [
+    'call of duty', 'battlefield', 'halo', 'doom', 'overwatch',
+    'counter strike', 'apex legends', 'titanfall', 'destiny',
+    'borderlands', 'bioshock', 'half life', 'portal', 'valorant',
+    'rainbow six', 'team fortress', 'quake', 'unreal tournament'
+  ];
+
+  const sportsGames = [
+    'fifa', 'nba', 'madden', 'nhl', 'pga', 'wii sports',
+    'tony hawk', 'skate', 'mario tennis', 'mario golf',
+    'mario strikers', 'rocket league', 'sports story'
+  ];
+
+  const racingGames = [
+    'forza', 'gran turismo', 'need for speed', 'mario kart',
+    'burnout', 'dirt', 'f1', 'project cars', 'assetto corsa',
+    'wipeout', 'crash team racing', 'sonic racing'
+  ];
+
+  const stealthGames = [
+    'metal gear solid', 'splinter cell', 'hitman', 'assassin\'s creed',
+    'thief', 'dishonored', 'deus ex', 'death loop', 'aragami'
+  ];
+
+  const horrorGames = [
+    'resident evil', 'silent hill', 'dead space', 'amnesia',
+    'outlast', 'layers of fear', 'little nightmares', 'evil within',
+    'until dawn', 'five nights at freddy\'s', 'phasmophobia'
+  ];
+
+  const puzzleGames = [
+    'portal', 'baba is you', 'tetris', 'professor layton',
+    'the witness', 'talos principle', 'braid', 'fez',
+    'human fall flat', 'untitled goose game', 'it takes two'
+  ];
+
+  // Check for genre keywords in the question
+  const genreKeywords = {
+    platformerPro: ['platform', 'jump', 'collect coins', 'collect stars', '3d platformer', '2d platformer'],
+    rpgEnthusiast: ['rpg', 'role playing', 'role-playing', 'jrpg', 'level up', 'stats', 'character build'],
+    bossBuster: ['boss fight', 'boss battle', 'defeat boss', 'beat the boss', 'final boss'],
+    survivalSpecialist: ['survival', 'survive', 'horror', 'zombie', 'craft', 'resource'],
+    strategySpecialist: ['strategy', 'tactics', 'turn-based', 'rts', 'build', 'command'],
+    actionAficionado: ['action', 'combat', 'combo', 'fight', 'hack and slash', 'battle system'],
+    battleRoyale: ['battle royale', 'fortnite', 'pubg', 'last man standing', 'battle pass'],
+    sportsChampion: ['sports', 'score', 'tournament', 'championship', 'league'],
+    adventureAddict: ['adventure', 'explore', 'open world', 'quest', 'story'],
+    shooterSpecialist: ['shooter', 'fps', 'third person shooter', 'aim', 'gun', 'shooting'],
+    puzzlePro: ['puzzle', 'solve', 'riddle', 'brain teaser', 'logic'],
+    racingExpert: ['racing', 'race', 'drift', 'track', 'lap', 'speed'],
+    stealthSpecialist: ['stealth', 'sneak', 'hide', 'assassination', 'silent'],
+    horrorHero: ['horror', 'scary', 'survival horror', 'fear', 'terror'],
+    triviaMaster: ['trivia', 'quiz', 'knowledge', 'question', 'answer']
+  };
+
+  // Check game titles first
+  if (platformerGames.some(game => lowerQuestion.includes(game))) return "platformerPro";
+  if (rpgGames.some(game => lowerQuestion.includes(game))) return "rpgEnthusiast";
+  if (actionGames.some(game => lowerQuestion.includes(game))) return "actionAficionado";
+  if (survivalGames.some(game => lowerQuestion.includes(game))) return "survivalSpecialist";
+  if (strategyGames.some(game => lowerQuestion.includes(game))) return "strategySpecialist";
+  if (shooterGames.some(game => lowerQuestion.includes(game))) return "shooterSpecialist";
+  if (sportsGames.some(game => lowerQuestion.includes(game))) return "sportsChampion";
+  if (racingGames.some(game => lowerQuestion.includes(game))) return "racingExpert";
+  if (stealthGames.some(game => lowerQuestion.includes(game))) return "stealthSpecialist";
+  if (horrorGames.some(game => lowerQuestion.includes(game))) return "horrorHero";
+  if (puzzleGames.some(game => lowerQuestion.includes(game))) return "puzzlePro";
+
+  // Then check for genre keywords
+  for (const [achievement, keywords] of Object.entries(genreKeywords)) {
+    if (keywords.some(keyword => lowerQuestion.includes(keyword))) {
+      return achievement;
+    }
+  }
+
+  // Special achievements based on question content
+  if (lowerQuestion.includes("speedrun") || lowerQuestion.includes("fast completion") ||
+      lowerQuestion.includes("world record") || lowerQuestion.includes("fastest way")) {
+    return "speedrunner";
+  }
   
-  // Special achievements
-  if (lowerQuestion.includes("speedrun") || lowerQuestion.includes("fast completion")) return "speedrunner";
-  if (lowerQuestion.includes("collect") || lowerQuestion.includes("items")) return "collectorPro";
-  if (lowerQuestion.includes("stats") || lowerQuestion.includes("data")) return "dataDiver";
-  if (lowerQuestion.includes("performance") || lowerQuestion.includes("fps")) return "performanceTweaker";
+  if (lowerQuestion.includes("collect") || lowerQuestion.includes("items") ||
+      lowerQuestion.includes("100%") || lowerQuestion.includes("completion") ||
+      lowerQuestion.includes("all items") || lowerQuestion.includes("all items") ||
+      lowerQuestion.includes("achievements") || lowerQuestion.includes("trophies")) {
+    return "collectorPro";
+  }
   
+  if (lowerQuestion.includes("stats") || lowerQuestion.includes("data") ||
+      lowerQuestion.includes("numbers") || lowerQuestion.includes("analysis")) {
+    return "dataDiver";
+  }
+  
+  if (lowerQuestion.includes("performance") || lowerQuestion.includes("fps") ||
+      lowerQuestion.includes("graphics") || lowerQuestion.includes("optimization") ||
+      lowerQuestion.includes("settings") || lowerQuestion.includes("lag")) {
+    return "performanceTweaker";
+  }
+
   return null;
 };
 
+interface Achievement {
+  name: string;
+  dateEarned: Date;
+}
+
 // Function to check and award achievements based on user progress
 export const checkAndAwardAchievements = async (userId: string, progress: any, session: mongoose.ClientSession | null = null) => {
+  console.log('Checking achievements for user:', userId);
+  console.log('Current progress:', progress);
+
   // First get the user's current achievements
   const user = await User.findOne({ userId }).session(session);
-  const currentAchievements = user?.achievements?.map((a: { name: any; }) => a.name) || [];
-  const achievements: any[] = [];
+  const currentAchievements = user?.achievements || [];
+  const newAchievements: { name: string; dateEarned: Date }[] = [];
 
-  if (progress.rpgEnthusiast >= 5 && !currentAchievements.includes("RPG Enthusiast")) {
-    achievements.push({ name: "RPG Enthusiast", dateEarned: new Date() });
+  // Log current state
+  console.log('Current achievements:', currentAchievements);
+
+  // Check each achievement condition
+  const achievementChecks = [
+    { name: 'RPG Enthusiast', field: 'rpgEnthusiast', threshold: 5 },
+    { name: 'Boss Buster', field: 'bossBuster', threshold: 5 },
+    { name: 'Platformer Pro', field: 'platformerPro', threshold: 5 },
+    { name: 'Survival Specialist', field: 'survivalSpecialist', threshold: 5 },
+    { name: 'Strategy Specialist', field: 'strategySpecialist', threshold: 5 },
+    { name: 'Action Aficionado', field: 'actionAficionado', threshold: 5 },
+    { name: 'Battle Royale Master', field: 'battleRoyale', threshold: 5 },
+    { name: 'Sports Champion', field: 'sportsChampion', threshold: 5 },
+    { name: 'Adventure Addict', field: 'adventureAddict', threshold: 5 },
+    { name: 'Shooter Specialist', field: 'shooterSpecialist', threshold: 5 },
+    { name: 'Puzzle Pro', field: 'puzzlePro', threshold: 5 },
+    { name: 'Racing Expert', field: 'racingExpert', threshold: 5 },
+    { name: 'Stealth Specialist', field: 'stealthSpecialist', threshold: 5 },
+    { name: 'Horror Hero', field: 'horrorHero', threshold: 5 },
+    { name: 'Trivia Master', field: 'triviaMaster', threshold: 5 }
+  ];
+
+  // Check each achievement
+  for (const check of achievementChecks) {
+    const progressValue = progress[check.field] || 0;
+    console.log(`Checking ${check.name}: ${progressValue}/${check.threshold}`);
+    
+    if (progressValue >= check.threshold && 
+        !currentAchievements.some((a: { name: string; }) => a.name === check.name)) {
+      newAchievements.push({ 
+        name: check.name, 
+        dateEarned: new Date() 
+      });
+      console.log(`Achievement earned: ${check.name}`);
+    }
   }
-  if (progress.bossBuster >= 5 && !currentAchievements.includes("Boss Buster")) {
-    achievements.push({ name: "Boss Buster", dateEarned: new Date() });
-  }
-  if (progress.platformerPro >= 5 && !currentAchievements.includes("Platformer Pro")) {
-    achievements.push({ name: "Platformer Pro", dateEarned: new Date() });
-  }
-  if (progress.survivalSpecialist >= 5 && !currentAchievements.includes("Survival Specialist")) {
-    achievements.push({ name: "Survival Specialist", dateEarned: new Date() });
-  }
-  if (progress.strategySpecialist >= 5 && !currentAchievements.includes("Strategy Specialist")) {
-    achievements.push({ name: "Strategy Specialist", dateEarned: new Date() });
-  }
-  if (progress.actionAficionado >= 5 && !currentAchievements.includes("Action Aficionado")) {
-    achievements.push({ name: "Action Aficionado", dateEarned: new Date() });
-  }
-  if (progress.battleRoyale >= 5 && !currentAchievements.includes("Battle Royale")) {
-    achievements.push({ name: "Battle Royale Master", dateEarned: new Date() });
-  }
-  if (progress.sportsChampion >= 5 && !currentAchievements.includes("Sports Champion")) {
-    achievements.push({ name: "Sports Champion", dateEarned: new Date() });
-  }
-  if (progress.adventureAddict >= 5 && !currentAchievements.includes("Adventure Addict")) {
-    achievements.push({ name: "Adventure Addict", dateEarned: new Date() });
-  }
-  if (progress.shooterSpecialist >= 5 && !currentAchievements.includes("Shooter Specialist")) {
-    achievements.push({ name: "Shooter Specialist", dateEarned: new Date() });
-  }
-  if (progress.puzzlePro >= 5 && !currentAchievements.includes("Puzzle Pro")) {
-    achievements.push({ name: "Puzzle Pro", dateEarned: new Date() });
-  }
-  if (progress.racingExpert >= 5 && !currentAchievements.includes("Racing Expert")) {
-    achievements.push({ name: "Racing Expert", dateEarned: new Date() });
-  }
-  if (progress.stealthSpecialist >= 5 && !currentAchievements.includes("Stealth Specialist")) {
-    achievements.push({ name: "Stealth Specialist", dateEarned: new Date() });
-  }
-  if (progress.horrorHero >= 5 && !currentAchievements.includes("Horror Hero")) {
-    achievements.push({ name: "Horror Hero", dateEarned: new Date() });
-  }
-  if (progress.triviaMaster >= 5 && !currentAchievements.includes("Trivia Master")) {
-    achievements.push({ name: "Trivia Master", dateEarned: new Date() });
-  }
-  if (progress.speedrunner >= 5 && !currentAchievements.includes("Speedrunner")) {
-    achievements.push({ name: "Speedrunner", dateEarned: new Date() });
-  }
-  if (progress.collectorPro >= 5 && !currentAchievements.includes("Collector Pro")) {
-    achievements.push({ name: "Collector Pro", dateEarned: new Date() });
-  }
-  if (progress.dataDiver >= 5 && !currentAchievements.includes("Data Diver")) {
-    achievements.push({ name: "Data Diver", dateEarned: new Date() });
-  }
-  if (progress.performanceTweaker >= 5 && !currentAchievements.includes("Performance Tweaker")) {
-    achievements.push({ name: "Performance Tweaker", dateEarned: new Date() });
-  }
-  if (achievements.length > 0) {
+
+  if (newAchievements.length > 0) {
+    console.log('New achievements to award:', newAchievements);
+
     // Update the user with the new achievements
-    await User.updateOne(
-      { userId }, 
-      { $push: { achievements: { $each: achievements } } },
-      { session: session || undefined }
+    const updateResult = await User.findOneAndUpdate(
+      { userId },
+      { 
+        $set: { progress },
+        $push: { achievements: { $each: newAchievements } }
+      },
+      { session: session || undefined, new: true }
     );
+
+    console.log('Update result:', updateResult);
 
     // Emit achievement event
     const io = getIO();
-    io.emit('achievementEarned', { userId, achievements });
+    io.emit('achievementEarned', { 
+      userId, 
+      achievements: newAchievements,
+      message: `Congratulations! You've earned ${newAchievements.length} new achievement(s)!`
+    });
+
+    return newAchievements;
   }
+
+  return [];
 };
 
 // measure memory usage
@@ -592,64 +711,84 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     // Measure database operations with enhanced metrics
     const dbMetrics = await measureDBQuery('Create Question', async () => {
       try {
-        // Create question and update user without transactions
-        const [questionDoc, userDoc] = await Promise.all([
-          Question.create({ userId, question, response: answer }),
-          User.findOneAndUpdate(
-            { userId }, 
-            { 
-              $inc: { conversationCount: 1 },
-              $setOnInsert: {
-                achievements: [],
-                progress: {
-                  firstQuestion: 0,
-                  frequentAsker: 0,
-                  rpgEnthusiast: 0,
-                  bossBuster: 0,
-                  platformerPro: 0,
-                  survivalSpecialist: 0,
-                  strategySpecialist: 0,
-                  actionAficionado: 0,
-                  battleRoyale: 0,
-                  sportsChampion: 0,
-                  adventureAddict: 0,
-                  shooterSpecialist: 0,
-                  puzzlePro: 0,
-                  racingExpert: 0,
-                  stealthSpecialist: 0,
-                  horrorHero: 0,
-                  triviaMaster: 0,
-                  totalQuestions: 0,
-                  dailyExplorer: 0,
-                  speedrunner: 0,
-                  collectorPro: 0,
-                  dataDiver: 0,
-                  performanceTweaker: 0,
-                  conversationalist: 0
-                }
-              }
-            }, 
-            { upsert: true, new: true }
-          )
-        ]);
+        // Start a session for transaction
+        const session = await mongoose.startSession();
+        let result;
 
-        // Handle achievements
-        if (userDoc) {
-          const questionType = await checkQuestionType(question);
-          if (questionType) {
-            await User.updateOne(
+        try {
+          await session.withTransaction(async () => {
+            // Create question
+            const questionDoc = await Question.create([{ userId, question, response: answer }], { session });
+
+            // Update user's conversation count and ensure achievements/progress structure exists
+            const userDoc = await User.findOneAndUpdate(
               { userId },
-              { $inc: { [`progress.${questionType}`]: 1 } }
+              {
+                $inc: { conversationCount: 1 },
+                $setOnInsert: {
+                  achievements: [],
+                  progress: {
+                    firstQuestion: 0,
+                    frequentAsker: 0,
+                    rpgEnthusiast: 0,
+                    bossBuster: 0,
+                    platformerPro: 0,
+                    survivalSpecialist: 0,
+                    strategySpecialist: 0,
+                    actionAficionado: 0,
+                    battleRoyale: 0,
+                    sportsChampion: 0,
+                    adventureAddict: 0,
+                    shooterSpecialist: 0,
+                    puzzlePro: 0,
+                    racingExpert: 0,
+                    stealthSpecialist: 0,
+                    horrorHero: 0,
+                    triviaMaster: 0,
+                    totalQuestions: 0,
+                    dailyExplorer: 0,
+                    speedrunner: 0,
+                    collectorPro: 0,
+                    dataDiver: 0,
+                    performanceTweaker: 0,
+                    conversationalist: 0
+                  }
+                }
+              },
+              { upsert: true, new: true, session }
             );
 
-            const updatedUser = await User.findOne({ userId });
-            if (updatedUser) {
-              await checkAndAwardAchievements(userId, updatedUser.progress);
-            }
-          }
-        }
+            // Check question type and update progress
+            const questionType = await checkQuestionType(question);
+            console.log('Question type detected:', questionType); // Debug log
 
-        return { questionDoc, userDoc };
+            if (questionType) {
+              // Update the specific progress counter
+              await User.findOneAndUpdate(
+                { userId },
+                { $inc: { [`progress.${questionType}`]: 1 } },
+                { session, new: true }
+              );
+
+              // Get updated user data
+              const updatedUser = await User.findOne({ userId }).session(session);
+              console.log('Updated user progress:', updatedUser?.progress); // Debug log
+
+              if (updatedUser) {
+                // Check and award achievements
+                await checkAndAwardAchievements(userId, updatedUser.progress, session);
+              }
+            }
+
+            result = { questionDoc, userDoc };
+          });
+
+          await session.endSession();
+          return result;
+        } catch (error) {
+          await session.endSession();
+          throw error;
+        }
       } catch (error) {
         console.error('Database operation error:', error);
         throw error;
