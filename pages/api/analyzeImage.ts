@@ -1,18 +1,20 @@
 // import type { NextApiRequest, NextApiResponse } from "next";
 // import { ImageAnnotatorClient } from "@google-cloud/vision";
-// import { getChatCompletion } from "../../utils/aiHelper";
 // import path from "path";
 // import fs from 'fs';
+// import { getChatCompletion } from "../../utils/aiHelper";
 
 // const getGoogleCredentials = () => {
-//     if (process.env.NODE_ENV === 'production') {
-//       // For production: use credentials from environment variable
-//       return JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS || '{}');
-//     } else {
-//       // For development: use local JSON file
-//       return require('../../path/to/your/credentials.json');
+//   if (process.env.GOOGLE_CREDENTIALS) {
+//     try {
+//       return JSON.parse(process.env.GOOGLE_CREDENTIALS);
+//     } catch (error) {
+//       console.error('Error parsing Google credentials:', error);
+//       return {};
 //     }
-//   };
+//   }
+//   return {};
+// };
 
 // const analyzeImage = async (req: NextApiRequest, res: NextApiResponse) => {
 //   try {
@@ -35,7 +37,10 @@
 
 //     // If image is provided, use Google Vision API
 //     try {
-//       const client = new ImageAnnotatorClient();
+//       const client = new ImageAnnotatorClient({
+//         credentials: getGoogleCredentials(),
+//       });
+      
 //       const imagePath = path.join(process.cwd(), 'public', imageFilePath);
       
 //       if (!fs.existsSync(imagePath)) {
@@ -88,4 +93,3 @@
 // };
 
 // export default analyzeImage;
-// export { getGoogleCredentials };

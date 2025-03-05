@@ -22,21 +22,39 @@
 //   }
 
 //   try {
+//     // Create uploads directory if it doesn't exist
+//     if (!fs.existsSync(uploadDir)) {
+//       fs.mkdirSync(uploadDir, { recursive: true });
+//     }
+
 //     const form = formidable({
 //       uploadDir,
 //       keepExtensions: true,
 //       maxFileSize: 10 * 1024 * 1024, // 10MB limit
+//       filename: (name, ext, part) => {
+//         // Create a unique filename
+//         return `${Date.now()}-${part.originalFilename}`;
+//       }
 //     });
 
-//     const [, files] = await form.parse(req);
+//     const [fields, files] = await form.parse(req);
 //     const file = files.image?.[0];
 
 //     if (!file) {
 //       return res.status(400).json({ error: 'No file uploaded' });
 //     }
 
-//     const relativePath = path.relative('./public', file.filepath);
-//     return res.status(200).json({ filePath: relativePath });
+//     // Get the path relative to the public directory
+//     const relativePath = path.relative(path.join(process.cwd(), 'public'), file.filepath);
+    
+//     // Convert Windows backslashes to forward slashes for web URLs
+//     const webPath = relativePath.replace(/\\/g, '/');
+
+//     return res.status(200).json({ 
+//       filePath: webPath,
+//       success: true 
+//     });
+
 //   } catch (error) {
 //     console.error('Error uploading file:', error);
 //     return res.status(500).json({ error: 'Error uploading file' });

@@ -13,6 +13,8 @@ import { getIO } from '../../middleware/realtime';
 import mongoose from 'mongoose';
 import winston from 'winston';
 import { containsOffensiveContent } from '../../utils/contentModeration';
+// import { ImageAnnotatorClient } from '@google-cloud/vision';
+// import fs from 'fs';
 
 // Add performance monitoring
 const measureLatency = async (operation: string, callback: () => Promise<any>) => {
@@ -72,42 +74,47 @@ interface IGDBGame {
 
 // Function to fetch game information from IGDB API
 const fetchGamesFromIGDB = async (query: string): Promise<string | null> => {
-  const accessToken = await getClientCredentialsAccessToken();
-  const headers = {
-    'Client-ID': process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID,
-    'Authorization': `Bearer ${accessToken}`
-  };
-
-  // Define IGDB query as plain text
-  const body = `
-    fields name, genres.name, platforms.name, release_dates.date, involved_companies.company.name, involved_companies.publisher, involved_companies.developer, url;
-    search "${query}";
-    limit 10;
-  `;
-
   try {
+    const accessToken = await getClientCredentialsAccessToken();
+    console.log('IGDB Access Token obtained:', accessToken ? 'Yes' : 'No');
+
+    const headers = {
+      'Client-ID': process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID,
+      'Authorization': `Bearer ${accessToken}`
+    };
+
+    // Sanitize the query to prevent injection
+    const sanitizedQuery = query.replace(/['"\\]/g, '');
+    
+    // Modified IGDB query
+    const body = `
+      search "${sanitizedQuery}";
+      fields name,genres.name,platforms.name,release_dates.date,involved_companies.company.name,involved_companies.publisher,involved_companies.developer;
+      limit 5;
+    `;
+
+    console.log('IGDB Request:', {
+      headers: {
+        'Client-ID': 'present',
+        'Authorization': 'Bearer present'
+      },
+      body: body
+    });
+
     const response = await axios.post('https://api.igdb.com/v4/games', body, { headers });
     
     if (response.data.length > 0) {
-      const games = response.data.map((game: IGDBGame) => ({
-        name: game.name,
-        releaseDate: game.release_dates?.[0]?.date,
-        genres: game.genres?.map((genre) => genre.name).join(', '),
-        platforms: game.platforms?.map((platform) => platform.name).join(', '),
-        developers: game.involved_companies?.filter((company) => company.developer).map((company) => company.company.name).join(', '),
-        publishers: game.involved_companies?.filter((company) => company.publisher).map((company) => company.company.name).join(', '),
-        url: game.url || 'URL not available'
-      }));
-
-      return games.map((game: { name: string; releaseDate: string | number | Date; genres: string; platforms: string; developers: string; publishers: string; url: string }) =>
-        `${game.name} (Released: ${game.releaseDate ? new Date(game.releaseDate).toLocaleDateString() : 'N/A'}, Genres: ${game.genres}, Platforms: ${game.platforms}, Developers: ${game.developers}, Publishers: ${game.publishers}, URL: ${game.url})`
-      ).join('\n');
+      return `Found ${response.data.length} games matching your query.`;
     } else {
-      return `No games found related to ${query}.`;
+      return `No games found matching "${sanitizedQuery}"`;
     }
   } catch (error: any) {
-    console.error("Error fetching data from IGDB:", error.message);
-    return "Failed to fetch data from IGDB.";
+    console.error('IGDB Error details:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status
+    });
+    return null; // Return null instead of throwing error to allow fallback to other sources
   }
 };
 
@@ -660,7 +667,10 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     // Add request rate
     metrics.requestRate = requestMonitor.getRequestRate();
     
-    res.status(200).json(responseData);
+    // Return just the base answer
+    return res.status(200).json({ 
+      answer: answer 
+    });
     
   } catch (error) {
     console.error("Error in API route:", error);

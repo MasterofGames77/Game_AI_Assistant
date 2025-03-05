@@ -25,8 +25,9 @@ export default function Home() {
   // const [currentForumId, setCurrentForumId] = useState("");
   // const [forumTopics, setForumTopics] = useState([]);
 
-  // Optional image-related states (commented for now)
+  // Comment out image state variables
   // const [image, setImage] = useState<File | null>(null);
+  // const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const initializeUser = async () => {
@@ -123,21 +124,34 @@ export default function Home() {
     const startTime = performance.now();
 
     try {
-      // Log request details
       console.log("Submitting question:", {
         userId,
         question,
         timestamp: new Date().toISOString(),
       });
+      // let imageFilePath = null;
+
+      // Comment out image upload section
+      // if (image) {
+      //   try {
+      //     const formData = new FormData();
+      //     formData.append("image", image);
+      //     const uploadRes = await axios.post("/api/uploadImage", formData);
+      //     imageFilePath = uploadRes.data.filePath;
+      //   } catch (imageError) {
+      //     console.error("Error uploading image:", imageError);
+      //   }
+      // }
 
       const res = await axios.post(
         "/api/assistant",
         {
           userId,
           question,
+          // imageFilePath, // Comment out this line
         },
         {
-          timeout: 30000, // 30 second timeout
+          timeout: 30000,
           headers: {
             "Content-Type": "application/json",
           },
@@ -155,6 +169,10 @@ export default function Home() {
         setMetrics(res.data.metrics);
       }
       fetchConversations();
+
+      // Clear image after successful submission
+      // setImage(null);
+      // setImageUrl(null);
     } catch (error: any) {
       console.error("Error details:", {
         message: error.message,
@@ -171,10 +189,11 @@ export default function Home() {
     }
   };
 
-  // Optional image handler (commented for now)
+  // Comment out image handler
   // const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   //   if (e.target.files && e.target.files[0]) {
   //     setImage(e.target.files[0]);
+  //     setImageUrl(URL.createObjectURL(e.target.files[0]));
   //   }
   // };
 
@@ -355,17 +374,30 @@ export default function Home() {
                   className="w-full p-2 border border-gray-300 rounded mb-4"
                 />
 
-                {/* Optional file upload input (commented for now) */}
-                {/* 
-                <label className="cursor-pointer">
-                  <FontAwesomeIcon icon={faPaperclip} size="2x" />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    style={{ display: "none" }}
-                  />
-                </label>
+                {/* Comment out image upload UI section
+                <div className="mb-4">
+                  <label className="cursor-pointer flex items-center gap-2">
+                    <FontAwesomeIcon icon={faPaperclip} size="lg" />
+                    <span>Attach Screenshot</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      style={{ display: "none" }}
+                    />
+                  </label>
+                  {imageUrl && (
+                    <div className="mt-2">
+                      <Image
+                        src={imageUrl}
+                        alt="Selected"
+                        width={200}
+                        height={200}
+                        className="rounded"
+                      />
+                    </div>
+                  )}
+                </div>
                 */}
 
                 <div className="flex space-x-4">
