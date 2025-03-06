@@ -34,6 +34,8 @@ const updateAchievementsForUser = async (email: string) => {
       battleRoyale: 0,
       sportsChampion: 0,
       adventureAddict: 0,
+      fightingFanatic: 0,
+      simulationSpecialist: 0,
       shooterSpecialist: 0,
       puzzlePro: 0,
       racingExpert: 0,

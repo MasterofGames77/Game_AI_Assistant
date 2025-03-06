@@ -1,3 +1,7 @@
+// DEPRECATED: This endpoint has been consolidated into /api/updateAchievements?updateAll=true
+// Please use the new endpoint instead.
+
+/*
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { updateAchievementsForAllUsers } from '../../utils/updateAchievements';
 
@@ -15,4 +19,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error('Error updating achievements:', error);
     res.status(500).json({ message: 'Error updating achievements', error: error instanceof Error ? error.message : 'Unknown error' });
   }
+}
+*/
+
+// Redirect to new endpoint
+import type { NextApiRequest, NextApiResponse } from 'next';
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.redirect(307, '/api/updateAchievements?updateAll=true');
 }

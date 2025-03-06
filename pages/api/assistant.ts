@@ -287,12 +287,12 @@ export const checkQuestionType = (question: string): string | null => {
   
   // Comprehensive game title to genre mapping
   const platformerGames = [
-    'super mario', 'mario odyssey', 'mario galaxy', 'mario sunshine', 'mario 64',
-    'donkey kong', 'crash bandicoot', 'spyro', 'rayman', 'sonic',
+    'super mario', 'mario', 'donkey kong', 
+    'crash bandicoot', 'spyro', 'rayman', 'sonic',
     'hollow knight', 'celeste', 'ori', 'little big planet', 'ratchet', 'clank',
     'jak', 'daxter', 'sly cooper', 'banjo', 'kazooie', 'metroid',
-    'mega man', 'kirby', 'yoshi', 'platformer', 'jumping', 'hat in time',
-    'psychonauts', 'braid', 'shovel knight', 'cuphead'
+    'mega man', 'kirby', 'yoshi', 'platformer', 'jumping', 'a hat in time',
+    'psychonauts', 'braid', 'shovel knight', 'cuphead', 
   ];
 
   const rpgGames = [
@@ -301,14 +301,16 @@ export const checkQuestionType = (question: string): string | null => {
     'fallout', 'witcher', 'dark souls', 'elden ring', 'bloodborne', 'sekiro',
     'tales of', 'kingdom hearts', 'ni no kuni', 'dragon age', 'baldur\'s gate',
     'pillars of eternity', 'divinity', 'octopath traveler', 'bravely default',
-    'fire emblem', 'xenogears', 'xenosaga', 'saga', 'star ocean', 'ys'
+    'fire emblem', 'xenogears', 'xenosaga', 'saga', 'star ocean', 'ys', 'paper mario', 
+    'mario & luigi', 'triangle strategy', 'mega man battle network', 'mega man star force',
   ];
 
   const actionGames = [
     'devil may cry', 'bayonetta', 'god of war', 'ninja gaiden',
     'metal gear rising', 'dynasty warriors', 'nier', 'automata',
     'darksiders', 'prototype', 'infamous', 'asura\'s wrath',
-    'kingdom hearts', 'monster hunter', 'dragons dogma'
+    'kingdom hearts', 'monster hunter', 'dragons dogma', 'grand theft auto',
+    'the legend of zelda'
   ];
 
   const survivalGames = [
@@ -329,13 +331,15 @@ export const checkQuestionType = (question: string): string | null => {
     'call of duty', 'battlefield', 'halo', 'doom', 'overwatch',
     'counter strike', 'apex legends', 'titanfall', 'destiny',
     'borderlands', 'bioshock', 'half life', 'portal', 'valorant',
-    'rainbow six', 'team fortress', 'quake', 'unreal tournament'
+    'rainbow six', 'team fortress', 'quake', 'unreal tournament',
+    'splatoon', 
   ];
 
   const sportsGames = [
     'fifa', 'nba', 'madden', 'nhl', 'pga', 'wii sports',
     'tony hawk', 'skate', 'mario tennis', 'mario golf',
-    'mario strikers', 'rocket league', 'sports story'
+    'mario strikers', 'rocket league', 'sports story', 'ea sports',
+    'mlb', '2k'
   ];
 
   const racingGames = [
@@ -349,16 +353,36 @@ export const checkQuestionType = (question: string): string | null => {
     'thief', 'dishonored', 'deus ex', 'death loop', 'aragami'
   ];
 
+  const simulationGames = [
+    'sim city', 'the sims', 'animal crossing', 'farming simulator',
+    'microsoft flight simulator', 'bus simulator', 'train simulator',
+    'cities: skylines', 'stardew valley', 'harvest moon'
+  ];
+
   const horrorGames = [
     'resident evil', 'silent hill', 'dead space', 'amnesia',
     'outlast', 'layers of fear', 'little nightmares', 'evil within',
-    'until dawn', 'five nights at freddy\'s', 'phasmophobia'
+    'until dawn', 'five nights at freddy\'s', 'phasmophobia', 'dead rising'
+  ];
+
+  const adventureGames = [
+    'the legend of zelda', 'the last of us', 'the witcher', 'the elder scrolls',
+    'the walking dead', 'the last guardian', 'blaster master', 
+  ];
+
+  const fightingGames = [
+    'street fighter', 'tekken', 'rival schools', 'super smash bros', 'darkstalkers',
+    'marvel vs capcom', 'capcom vs snk', 'fatal fury', 'mortal kombat', 'art of fighting',
+    'soulcalibur', 'dead or alive', 'king of fighters', 'guilty gear', 'injustice',
+    'virtua fighter', 'blazblue', 'capcom vs', 'playstation all stars'
+
   ];
 
   const puzzleGames = [
     'portal', 'baba is you', 'tetris', 'professor layton',
     'the witness', 'talos principle', 'braid', 'fez',
-    'human fall flat', 'untitled goose game', 'it takes two'
+    'human fall flat', 'untitled goose game', 'it takes two',
+    'candy crush', 'bejeweled'
   ];
 
   // Check for genre keywords in the question
@@ -373,6 +397,8 @@ export const checkQuestionType = (question: string): string | null => {
     sportsChampion: ['sports', 'score', 'tournament', 'championship', 'league'],
     adventureAddict: ['adventure', 'explore', 'open world', 'quest', 'story'],
     shooterSpecialist: ['shooter', 'fps', 'third person shooter', 'aim', 'gun', 'shooting'],
+    simulationSpecialist: ['simulation', 'sim', 'management', 'construction', 'management simulation', 'town', 'city'],
+    fightingFanatic: ['fighting', 'combo', 'cancel', 'air dodge', 'frame', 'mixup', 'throw', 'hit stun', 'stun lock', 'block'],
     puzzlePro: ['puzzle', 'solve', 'riddle', 'brain teaser', 'logic'],
     racingExpert: ['racing', 'race', 'drift', 'track', 'lap', 'speed'],
     stealthSpecialist: ['stealth', 'sneak', 'hide', 'assassination', 'silent'],
@@ -387,10 +413,13 @@ export const checkQuestionType = (question: string): string | null => {
   if (survivalGames.some(game => lowerQuestion.includes(game))) return "survivalSpecialist";
   if (strategyGames.some(game => lowerQuestion.includes(game))) return "strategySpecialist";
   if (shooterGames.some(game => lowerQuestion.includes(game))) return "shooterSpecialist";
+  if (simulationGames.some(game => lowerQuestion.includes(game))) return "simulationSpecialist";
   if (sportsGames.some(game => lowerQuestion.includes(game))) return "sportsChampion";
   if (racingGames.some(game => lowerQuestion.includes(game))) return "racingExpert";
   if (stealthGames.some(game => lowerQuestion.includes(game))) return "stealthSpecialist";
   if (horrorGames.some(game => lowerQuestion.includes(game))) return "horrorHero";
+  if (adventureGames.some(game => lowerQuestion.includes(game))) return "adventureAddict";
+  if (fightingGames.some(game => lowerQuestion.includes(game))) return "fightingFanatic";
   if (puzzleGames.some(game => lowerQuestion.includes(game))) return "puzzlePro";
 
   // Then check for genre keywords
@@ -457,6 +486,8 @@ export const checkAndAwardAchievements = async (userId: string, progress: any, s
     { name: 'Sports Champion', field: 'sportsChampion', threshold: 5 },
     { name: 'Adventure Addict', field: 'adventureAddict', threshold: 5 },
     { name: 'Shooter Specialist', field: 'shooterSpecialist', threshold: 5 },
+    { name: 'Fighting Fanatic', field: 'fightingFanatic', threshold: 5 },
+    { name: 'Simulation Specialist', field: 'simulationSpecialist', threshold: 5 },
     { name: 'Puzzle Pro', field: 'puzzlePro', threshold: 5 },
     { name: 'Racing Expert', field: 'racingExpert', threshold: 5 },
     { name: 'Stealth Specialist', field: 'stealthSpecialist', threshold: 5 },

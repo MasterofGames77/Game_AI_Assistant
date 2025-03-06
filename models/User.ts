@@ -8,6 +8,8 @@ interface Progress {
   platformerPro?: number;
   survivalSpecialist?: number;
   strategySpecialist?: number;
+  simulationSpecialist?: number;
+  fightingFanatic?: number;
   actionAficionado?: number;
   battleRoyale?: number;
   sportsChampion?: number;
@@ -61,6 +63,8 @@ const UserSchema = new Schema<IUser>({
     survivalSpecialist: { type: Number, default: 0 },
     strategySpecialist: { type: Number, default: 0 },
     actionAficionado: { type: Number, default: 0 },
+    fightingFanatic: { type: Number, default: 0 },
+    simulationSpecialist: { type: Number, default: 0 },
     battleRoyale: { type: Number, default: 0 },
     sportsChampion: { type: Number, default: 0 },
     adventureAddict: { type: Number, default: 0 },
