@@ -292,7 +292,8 @@ export const checkQuestionType = (question: string): string | null => {
     'hollow knight', 'celeste', 'ori', 'little big planet', 'ratchet', 'clank',
     'jak', 'daxter', 'sly cooper', 'banjo', 'kazooie', 'metroid',
     'mega man', 'kirby', 'yoshi', 'platformer', 'jumping', 'a hat in time',
-    'psychonauts', 'braid', 'shovel knight', 'cuphead', 
+    'psychonauts', 'braid', 'shovel knight', 'cuphead', 'platforming', 'freedom planet',
+    'celeste', 'little big planet'
   ];
 
   const rpgGames = [
@@ -303,6 +304,7 @@ export const checkQuestionType = (question: string): string | null => {
     'pillars of eternity', 'divinity', 'octopath traveler', 'bravely default',
     'fire emblem', 'xenogears', 'xenosaga', 'saga', 'star ocean', 'ys', 'paper mario', 
     'mario & luigi', 'triangle strategy', 'mega man battle network', 'mega man star force',
+    'hades', 'mana', 'rune factory', 'skies of arcadia', 'shining force', 'phantasy star'
   ];
 
   const actionGames = [
@@ -310,7 +312,7 @@ export const checkQuestionType = (question: string): string | null => {
     'metal gear rising', 'dynasty warriors', 'nier', 'automata',
     'darksiders', 'prototype', 'infamous', 'asura\'s wrath',
     'kingdom hearts', 'monster hunter', 'dragons dogma', 'grand theft auto',
-    'the legend of zelda'
+    'the legend of zelda', 'dynasty warriors'
   ];
 
   const survivalGames = [
@@ -324,22 +326,22 @@ export const checkQuestionType = (question: string): string | null => {
     'civilization', 'age of empires', 'starcraft', 'warcraft',
     'command & conquer', 'total war', 'xcom', 'fire emblem',
     'advance wars', 'into the breach', 'valkyria chronicles',
-    'disgaea', 'triangle strategy', 'tactics ogre'
+    'disgaea', 'triangle strategy', 'tactics ogre', 'age of empires'
   ];
 
   const shooterGames = [
     'call of duty', 'battlefield', 'halo', 'doom', 'overwatch',
     'counter strike', 'apex legends', 'titanfall', 'destiny',
     'borderlands', 'bioshock', 'half life', 'portal', 'valorant',
-    'rainbow six', 'team fortress', 'quake', 'unreal tournament',
-    'splatoon', 
+    'rainbow six', 'team fortress 2', 'quake', 'unreal tournament',
+    'splatoon', 'far cry', 'battleborn', 'gears of war'
   ];
 
   const sportsGames = [
     'fifa', 'nba', 'madden', 'nhl', 'pga', 'wii sports',
     'tony hawk', 'skate', 'mario tennis', 'mario golf',
     'mario strikers', 'rocket league', 'sports story', 'ea sports',
-    'mlb', '2k'
+    'mlb', '2k', 'wwe'
   ];
 
   const racingGames = [
@@ -353,10 +355,15 @@ export const checkQuestionType = (question: string): string | null => {
     'thief', 'dishonored', 'deus ex', 'death loop', 'aragami'
   ];
 
+  const battleRoyaleGames = [
+    'players unknown battlegrounds', 'pubg', 'apex legends', 'fortnite',
+    'fall guys', 'call of duty: warzone', 'eternal return'
+  ];
+
   const simulationGames = [
     'sim city', 'the sims', 'animal crossing', 'farming simulator',
     'microsoft flight simulator', 'bus simulator', 'train simulator',
-    'cities: skylines', 'stardew valley', 'harvest moon'
+    'cities: skylines', 'stardew valley', 'harvest moon', 'story of seasons'
   ];
 
   const horrorGames = [
@@ -367,14 +374,16 @@ export const checkQuestionType = (question: string): string | null => {
 
   const adventureGames = [
     'the legend of zelda', 'the last of us', 'the witcher', 'the elder scrolls',
-    'the walking dead', 'the last guardian', 'blaster master', 
+    'the walking dead', 'the last guardian', 'blaster master', 'turnip boy', 'luigi\'s mansion',
+    'shenmue'
   ];
 
   const fightingGames = [
     'street fighter', 'tekken', 'rival schools', 'super smash bros', 'darkstalkers',
     'marvel vs capcom', 'capcom vs snk', 'fatal fury', 'mortal kombat', 'art of fighting',
     'soulcalibur', 'dead or alive', 'king of fighters', 'guilty gear', 'injustice',
-    'virtua fighter', 'blazblue', 'capcom vs', 'playstation all stars'
+    'virtua fighter', 'blazblue', 'capcom vs', 'playstation all stars', 'brawlhalla',
+    'jump', 'dragon ball', 'fighting vipers', 'final fight'
 
   ];
 
@@ -414,6 +423,7 @@ export const checkQuestionType = (question: string): string | null => {
   if (strategyGames.some(game => lowerQuestion.includes(game))) return "strategySpecialist";
   if (shooterGames.some(game => lowerQuestion.includes(game))) return "shooterSpecialist";
   if (simulationGames.some(game => lowerQuestion.includes(game))) return "simulationSpecialist";
+  if (battleRoyaleGames.some(game => lowerQuestion.includes(game))) return "battleRoyale";
   if (sportsGames.some(game => lowerQuestion.includes(game))) return "sportsChampion";
   if (racingGames.some(game => lowerQuestion.includes(game))) return "racingExpert";
   if (stealthGames.some(game => lowerQuestion.includes(game))) return "stealthSpecialist";
