@@ -20,6 +20,7 @@ interface Progress {
   stealthSpecialist?: number;
   horrorHero?: number;
   triviaMaster?: number;
+  storySeeker?: number;
   totalQuestions?: number;
   dailyExplorer?: number;
   speedrunner?: number;
@@ -74,6 +75,7 @@ const UserSchema = new Schema<IUser>({
     stealthSpecialist: { type: Number, default: 0 },
     horrorHero: { type: Number, default: 0 },
     triviaMaster: { type: Number, default: 0 },
+    storySeeker: { type: Number, default: 0 },
     totalQuestions: { type: Number, default: 0 },
     dailyExplorer: { type: Number, default: 0 },
     speedrunner: { type: Number, default: 0 },

@@ -304,7 +304,8 @@ export const checkQuestionType = (question: string): string | null => {
     'pillars of eternity', 'divinity', 'octopath traveler', 'bravely default',
     'fire emblem', 'xenogears', 'xenosaga', 'saga', 'star ocean', 'ys', 'paper mario', 
     'mario & luigi', 'triangle strategy', 'mega man battle network', 'mega man star force',
-    'hades', 'mana', 'rune factory', 'skies of arcadia', 'shining force', 'phantasy star'
+    'hades', 'mana', 'rune factory', 'skies of arcadia', 'shining force', 'phantasy star',
+    'eldin ring', 'baulder\'s gate'
   ];
 
   const actionGames = [
@@ -312,7 +313,8 @@ export const checkQuestionType = (question: string): string | null => {
     'metal gear rising', 'dynasty warriors', 'nier', 'automata',
     'darksiders', 'prototype', 'infamous', 'asura\'s wrath',
     'kingdom hearts', 'monster hunter', 'dragons dogma', 'grand theft auto',
-    'the legend of zelda', 'dynasty warriors'
+    'the legend of zelda', 'dynasty warriors', 'red dead redemption', 'batman',
+    'arkham', 'assassin\'s creed', 'star wars', 'dead rising'
   ];
 
   const survivalGames = [
@@ -326,7 +328,7 @@ export const checkQuestionType = (question: string): string | null => {
     'civilization', 'age of empires', 'starcraft', 'warcraft',
     'command & conquer', 'total war', 'xcom', 'fire emblem',
     'advance wars', 'into the breach', 'valkyria chronicles',
-    'disgaea', 'triangle strategy', 'tactics ogre', 'age of empires'
+    'disgaea', 'triangle strategy', 'tactics ogre', 'homeworld'
   ];
 
   const shooterGames = [
@@ -334,7 +336,7 @@ export const checkQuestionType = (question: string): string | null => {
     'counter strike', 'apex legends', 'titanfall', 'destiny',
     'borderlands', 'bioshock', 'half life', 'portal', 'valorant',
     'rainbow six', 'team fortress 2', 'quake', 'unreal tournament',
-    'splatoon', 'far cry', 'battleborn', 'gears of war'
+    'splatoon', 'far cry', 'battleborn', 'gears of war', 'wolfenstein'
   ];
 
   const sportsGames = [
@@ -347,7 +349,10 @@ export const checkQuestionType = (question: string): string | null => {
   const racingGames = [
     'forza', 'gran turismo', 'need for speed', 'mario kart',
     'burnout', 'dirt', 'f1', 'project cars', 'assetto corsa',
-    'wipeout', 'crash team racing', 'sonic racing'
+    'wipeout', 'crash team racing', 'sonic racing', 'crazy taxi',
+    'destruction derby', 'excitebike', 'f-zero', 'hot wheels',
+    'monster jam', 'monster energy', 'rally', 'ridge racer',
+    'trackmania', 'twisted metal'
   ];
 
   const stealthGames = [
@@ -360,6 +365,11 @@ export const checkQuestionType = (question: string): string | null => {
     'fall guys', 'call of duty: warzone', 'eternal return'
   ];
 
+  const visualNovelGames = [
+    'phoenix wright', 'ace attorney', 'doki doki literature club', 'sakura wars',
+    'danganronpa', 'steins gate', 'hatoful boyfriend', 'coffee talk'
+  ];
+
   const simulationGames = [
     'sim city', 'the sims', 'animal crossing', 'farming simulator',
     'microsoft flight simulator', 'bus simulator', 'train simulator',
@@ -369,13 +379,14 @@ export const checkQuestionType = (question: string): string | null => {
   const horrorGames = [
     'resident evil', 'silent hill', 'dead space', 'amnesia',
     'outlast', 'layers of fear', 'little nightmares', 'evil within',
-    'until dawn', 'five nights at freddy\'s', 'phasmophobia', 'dead rising'
+    'until dawn', 'five nights at freddy\'s', 'phasmophobia'
   ];
 
   const adventureGames = [
     'the legend of zelda', 'the last of us', 'the witcher', 'the elder scrolls',
     'the walking dead', 'the last guardian', 'blaster master', 'turnip boy', 'luigi\'s mansion',
-    'shenmue'
+    'shenmue', 'hogwarts legacy', 'far cry', 'assassin\'s creed', 'uncharted',
+    'red dead redemption', 'god of war', 'wolfenstein', 'batman', 'arkham', 'star wars'
   ];
 
   const fightingGames = [
@@ -391,7 +402,7 @@ export const checkQuestionType = (question: string): string | null => {
     'portal', 'baba is you', 'tetris', 'professor layton',
     'the witness', 'talos principle', 'braid', 'fez',
     'human fall flat', 'untitled goose game', 'it takes two',
-    'candy crush', 'bejeweled'
+    'candy crush', 'bejeweled', 'inside', 'outer wilds'
   ];
 
   // Check for genre keywords in the question
@@ -412,6 +423,7 @@ export const checkQuestionType = (question: string): string | null => {
     racingExpert: ['racing', 'race', 'drift', 'track', 'lap', 'speed'],
     stealthSpecialist: ['stealth', 'sneak', 'hide', 'assassination', 'silent'],
     horrorHero: ['horror', 'scary', 'survival horror', 'fear', 'terror'],
+    storySeeker: ['story', 'narrative', 'plot', 'dialogue', 'cutscene', 'cinematic', 'visual novel'],
     triviaMaster: ['trivia', 'quiz', 'knowledge', 'question', 'answer']
   };
 
@@ -430,6 +442,7 @@ export const checkQuestionType = (question: string): string | null => {
   if (horrorGames.some(game => lowerQuestion.includes(game))) return "horrorHero";
   if (adventureGames.some(game => lowerQuestion.includes(game))) return "adventureAddict";
   if (fightingGames.some(game => lowerQuestion.includes(game))) return "fightingFanatic";
+  if (visualNovelGames.some(game => lowerQuestion.includes(game))) return "storySeeker";
   if (puzzleGames.some(game => lowerQuestion.includes(game))) return "puzzlePro";
 
   // Then check for genre keywords
@@ -502,7 +515,8 @@ export const checkAndAwardAchievements = async (userId: string, progress: any, s
     { name: 'Racing Expert', field: 'racingExpert', threshold: 5 },
     { name: 'Stealth Specialist', field: 'stealthSpecialist', threshold: 5 },
     { name: 'Horror Hero', field: 'horrorHero', threshold: 5 },
-    { name: 'Trivia Master', field: 'triviaMaster', threshold: 5 }
+    { name: 'Trivia Master', field: 'triviaMaster', threshold: 5 },
+    { name: 'Story Seeker', field: 'storySeeker', threshold: 5 }
   ];
 
   // Check each achievement
