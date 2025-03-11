@@ -9,6 +9,72 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Cache implementation for API responses
+export class AICacheMetrics {
+  private hits: number = 0;
+  private misses: number = 0;
+  private cacheData: Map<string, any> = new Map();
+  private static instance: AICacheMetrics;
+
+  private constructor() {}
+
+  public static getInstance(): AICacheMetrics {
+    if (!AICacheMetrics.instance) {
+      AICacheMetrics.instance = new AICacheMetrics();
+    }
+    return AICacheMetrics.instance;
+  }
+
+  recordHit() { this.hits++; }
+  recordMiss() { this.misses++; }
+
+  getHitRate() {
+    const total = this.hits + this.misses;
+    return total ? (this.hits / total * 100).toFixed(2) + '%' : '0%';
+  }
+
+  set(key: string, value: any, ttl: number = 3600000) { // Default TTL: 1 hour
+    this.cacheData.set(key, {
+      value,
+      expiry: Date.now() + ttl
+    });
+  }
+
+  get(key: string): any {
+    const data = this.cacheData.get(key);
+    
+    if (!data) {
+      this.recordMiss();
+      return null;
+    }
+    
+    if (data.expiry < Date.now()) {
+      this.cacheData.delete(key);
+      this.recordMiss();
+      return null;
+    }
+    
+    this.recordHit();
+    return data.value;
+  }
+
+  getMetrics() {
+    return {
+      hits: this.hits,
+      misses: this.misses,
+      hitRate: this.getHitRate(),
+      cacheSize: this.cacheData.size
+    };
+  }
+
+  clearCache() {
+    this.cacheData.clear();
+  }
+}
+
+// Get the singleton instance
+const aiCache = AICacheMetrics.getInstance();
+
 // Utility function to clean and match titles
 function cleanAndMatchTitle(queryTitle: string, recordTitle: string): boolean {
   const cleanQuery = queryTitle.toLowerCase().trim();
@@ -153,6 +219,16 @@ function filterGameSeries(games: any[], seriesPrefix: string): any[] {
 // Get chat completion for user questions
 export const getChatCompletion = async (question: string, systemMessage?: string): Promise<string | null> => {
   try {
+    // Generate a cache key based on the question and system message
+    const cacheKey = `chat:${question}:${systemMessage || 'default'}`;
+    
+    // Check if we have a cached response
+    const cachedResponse = aiCache.get(cacheKey);
+    if (cachedResponse) {
+      console.log('Cache hit for chat completion:', question.substring(0, 30) + '...');
+      return cachedResponse;
+    }
+
     if (question.toLowerCase().includes("list all of the games in the")) {
       const seriesTitle = extractSeriesName(question);
       if (seriesTitle) {
@@ -184,7 +260,7 @@ export const getChatCompletion = async (question: string, systemMessage?: string
     // If no response from APIs, fall back to OpenAI completion
     if (!response) {
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: 'gpt-4-turbo',
         messages: [
           { 
             role: 'system', 
@@ -198,9 +274,14 @@ export const getChatCompletion = async (question: string, systemMessage?: string
       response = completion.choices[0].message.content;
     }
 
+    // Cache the response if we got one
+    if (response) {
+      aiCache.set(cacheKey, response);
+    }
+
     return response;
-  } catch (error: any) {
-    console.error('Failed to get completion from OpenAI:', error.message);
+  } catch (error) {
+    console.error('Error in getChatCompletion:', error);
     return null;
   }
 };
@@ -305,3 +386,6 @@ export const fetchRecommendations = async (genre: string): Promise<string[]> => 
     return [];
   }
 };
+
+// Export the cache for use in other modules
+export const getAICache = () => aiCache;

@@ -3,7 +3,7 @@ import axios from 'axios';
 import connectToMongoDB from '../../utils/mongodb';
 import Question from '../../models/Question';
 import User from '../../models/User';
-import { getChatCompletion, fetchRecommendations, analyzeUserQuestions } from '../../utils/aiHelper';
+import { getChatCompletion, fetchRecommendations, analyzeUserQuestions, getAICache } from '../../utils/aiHelper';
 import { getClientCredentialsAccessToken, getAccessToken, getTwitchUserData, redirectToTwitch } from '../../utils/twitchAuth';
 import OpenAI from 'openai';
 import path from 'path';
@@ -444,6 +444,7 @@ export const checkQuestionType = (question: string): string | null => {
   if (fightingGames.some(game => lowerQuestion.includes(game))) return "fightingFanatic";
   if (visualNovelGames.some(game => lowerQuestion.includes(game))) return "storySeeker";
   if (puzzleGames.some(game => lowerQuestion.includes(game))) return "puzzlePro";
+  if (visualNovelGames.some(game => lowerQuestion.includes(game))) return "storySeeker";
 
   // Then check for genre keywords
   for (const [achievement, keywords] of Object.entries(genreKeywords)) {
@@ -478,11 +479,6 @@ export const checkQuestionType = (question: string): string | null => {
 
   return null;
 };
-
-interface Achievement {
-  name: string;
-  dateEarned: Date;
-}
 
 // Function to check and award achievements based on user progress
 export const checkAndAwardAchievements = async (userId: string, progress: any, session: mongoose.ClientSession | null = null) => {
@@ -619,20 +615,6 @@ class RequestMonitor {
   }
 }
 
-// measure cache metrics
-class CacheMetrics {
-  private hits: number = 0;
-  private misses: number = 0;
-
-  recordHit() { this.hits++; }
-  recordMiss() { this.misses++; }
-
-  getHitRate() {
-    const total = this.hits + this.misses;
-    return total ? (this.hits / total * 100).toFixed(2) + '%' : '0%';
-  }
-}
-
 // measure performance metrics
 const logger = winston.createLogger({
   level: 'info',
@@ -649,6 +631,7 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
   const { userId, question, code } = req.body;
   const metrics: any = {};
   const requestMonitor = new RequestMonitor();
+  const aiCache = getAICache();
   
   try {
     // Validate question
@@ -800,6 +783,7 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
                     stealthSpecialist: 0,
                     horrorHero: 0,
                     triviaMaster: 0,
+                    storySeeker: 0,
                     totalQuestions: 0,
                     dailyExplorer: 0,
                     speedrunner: 0,
@@ -854,6 +838,9 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     // Measure final memory usage
     metrics.finalMemory = measureMemoryUsage();
     
+    // Add cache metrics to response
+    metrics.aiCacheMetrics = aiCache.getMetrics();
+    
     // Measure response size
     const responseData = { answer, metrics };
     metrics.responseSize = measureResponseSize(responseData);
@@ -863,13 +850,15 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     
     // Return just the base answer
     return res.status(200).json({ 
-      answer: answer 
+      answer: answer,
+      metrics
     });
     
   } catch (error) {
     console.error("Error in API route:", error);
     const endTime = performance.now();
     metrics.totalTime = endTime - startTime;
+    metrics.aiCacheMetrics = aiCache.getMetrics();
     
     if (error instanceof Error) {
       res.status(500).json({ 
