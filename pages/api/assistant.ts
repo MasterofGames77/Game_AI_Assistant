@@ -5,7 +5,7 @@ import Question from '../../models/Question';
 import User from '../../models/User';
 import { getChatCompletion, fetchRecommendations, analyzeUserQuestions, getAICache } from '../../utils/aiHelper';
 import { getClientCredentialsAccessToken, getAccessToken, getTwitchUserData, redirectToTwitch } from '../../utils/twitchAuth';
-import OpenAI from 'openai';
+// import OpenAI from 'openai';
 import path from 'path';
 import { readFile } from 'fs/promises';
 import { parse } from 'csv-parse/sync';
@@ -27,9 +27,9 @@ const measureLatency = async (operation: string, callback: () => Promise<any>) =
 };
 
 // Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// const openai = new OpenAI({
+//   apiKey: process.env.OPENAI_API_KEY,
+// });
 
 // Functions for reading and processing game data from CSV file
 const CSV_FILE_PATH = path.join(process.cwd(), 'data/Video Games Data.csv');
@@ -104,7 +104,9 @@ const fetchGamesFromIGDB = async (query: string): Promise<string | null> => {
     const response = await axios.post('https://api.igdb.com/v4/games', body, { headers });
     
     if (response.data.length > 0) {
-      return `Found ${response.data.length} games matching your query.`;
+      // Use the IGDBGame interface to type the response data
+      const games = response.data as IGDBGame[];
+      return `Found ${games.length} games matching your query.`;
     } else {
       return `No games found matching "${sanitizedQuery}"`;
     }

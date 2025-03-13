@@ -19,7 +19,7 @@ export default function Home() {
   const [selectedConversation, setSelectedConversation] =
     useState<Conversation | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [metrics, setMetrics] = useState<{ [key: string]: number }>({});
+  const [metrics, setMetrics] = useState<any>({});
 
   const [activeView, setActiveView] = useState<"chat" | "forum">("chat");
   // const [currentForumId, setCurrentForumId] = useState("");
@@ -115,6 +115,9 @@ export default function Home() {
       setResponse(selectedConversation.response);
     }
   }, [selectedConversation]);
+
+  // Display conversation count in the UI
+  const conversationCount = conversations.length;
 
   // function to handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -328,6 +331,7 @@ export default function Home() {
             userId={userId}
             onSelectConversation={setSelectedConversation}
             onDeleteConversation={handleDeleteConversation}
+            conversations={conversations}
           />
           <div className="flex-1 flex flex-col items-center justify-center py-2 main-content">
             <Image
@@ -337,6 +341,13 @@ export default function Home() {
               width={350}
               height={350}
             />
+
+            {conversationCount > 0 && (
+              <p className="text-sm text-gray-600 mt-2">
+                You have {conversationCount} saved conversation
+                {conversationCount !== 1 ? "s" : ""}
+              </p>
+            )}
 
             <ul className="mt-4 text-lg text-center">
               <li>Discover a game&apos;s hidden secrets.</li>
@@ -426,6 +437,34 @@ export default function Home() {
                 <div className="bg-gray-100 p-4 rounded response-box">
                   {formatResponse(response)}
                 </div>
+
+                {/* Display metrics if available */}
+                {Object.keys(metrics).length > 0 && (
+                  <div className="mt-4 text-xs text-gray-500">
+                    <details>
+                      <summary>Performance Metrics</summary>
+                      <div className="mt-2 p-2 bg-gray-100 rounded">
+                        {metrics.totalTime && (
+                          <p>
+                            Total time: {Number(metrics.totalTime).toFixed(2)}ms
+                          </p>
+                        )}
+                        {metrics.responseSize && (
+                          <p>
+                            Response size:{" "}
+                            {metrics.responseSize.kilobytes || "N/A"}
+                          </p>
+                        )}
+                        {metrics.aiCacheMetrics && (
+                          <p>
+                            Cache hit rate:{" "}
+                            {metrics.aiCacheMetrics.hitRate || "N/A"}
+                          </p>
+                        )}
+                      </div>
+                    </details>
+                  </div>
+                )}
 
                 {/* Move buttons below the response */}
                 <div className="mt-4 footer-buttons">
