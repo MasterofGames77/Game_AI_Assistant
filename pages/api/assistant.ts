@@ -848,6 +848,15 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     // Add request rate
     metrics.requestRate = requestMonitor.getRequestRate();
     
+    // Log performance metrics
+    const endTime = performance.now();
+    metrics.totalTime = endTime - startTime;
+    logger.info('API request completed', { 
+      userId,
+      questionLength: question.length,
+      metrics
+    });
+    
     // Return just the base answer
     return res.status(200).json({ 
       answer: answer,
@@ -859,6 +868,13 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     const endTime = performance.now();
     metrics.totalTime = endTime - startTime;
     metrics.aiCacheMetrics = aiCache.getMetrics();
+    
+    // Log error metrics
+    logger.error('API request failed', {
+      userId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      metrics
+    });
     
     if (error instanceof Error) {
       res.status(500).json({ 
