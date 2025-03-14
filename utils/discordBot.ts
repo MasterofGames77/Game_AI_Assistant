@@ -21,6 +21,9 @@ const client = new Client({
 // Initialize bot handler
 const botHandler = new DiscordBotHandler(client);
 
+// Export the bot handler for use in other modules
+export { botHandler };
+
 client.once('ready', () => {
   console.log(`Bot logged in as ${client.user?.tag}`);
 });

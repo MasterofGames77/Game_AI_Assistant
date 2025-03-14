@@ -24,12 +24,15 @@ interface IWingmanUser extends Document {
       battleRoyale?: number;
       sportsChampion?: number;
       adventureAddict?: number;
+      fightingFanatic?: number;
+      simulationSpecialist?: number;
       shooterSpecialist?: number;
       puzzlePro?: number;
       racingExpert?: number;
       stealthSpecialist?: number;
       horrorHero?: number;
       triviaMaster?: number;
+      storySeeker?: number;
       totalQuestions?: number;
       dailyExplorer?: number;
       speedrunner?: number;
@@ -91,8 +94,9 @@ export const checkProAccess = async (userId: string): Promise<boolean> => {
 
 export const syncUserData = async (userId: string, email?: string): Promise<void> => {
   try {
-    const wingmanDB = await connectToWingmanDB();
-    const splashDB = await connectToSplashDB();
+    // Connect to databases
+    await connectToWingmanDB(); // Just connect without storing the reference
+    await connectToSplashDB();
 
     // Check if models already exist before compiling
     const WingmanUser = mongoose.models.User || mongoose.model('User', wingmanUserSchema);
@@ -134,12 +138,15 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
               battleRoyale: 0,
               sportsChampion: 0,
               adventureAddict: 0,
+              fightingFanatic: 0,
+              simulationSpecialist: 0,
               shooterSpecialist: 0,
               puzzlePro: 0,
               racingExpert: 0,
               stealthSpecialist: 0,
               horrorHero: 0,
               triviaMaster: 0,
+              storySeeker: 0,
               totalQuestions: 0,
               dailyExplorer: 0,
               speedrunner: 0,

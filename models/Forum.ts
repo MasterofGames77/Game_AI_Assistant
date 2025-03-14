@@ -5,7 +5,7 @@ const PostSchema = new mongoose.Schema({
   userId: { type: String, required: true },    // The ID of the user who posted
   message: { type: String, required: true },   // The content of the post
   timestamp: { type: Date, default: Date.now }, // When the post was created
-  createdBy: { type: String },  // Add this field
+  createdBy: { type: String },
   metadata: {                   // Add metadata for posts
     edited: { type: Boolean, default: false },
     editedAt: { type: Date },
@@ -27,7 +27,7 @@ const ForumSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
   }],
   metadata: {
-    gameTitle: { type: String, required: true }, // Add this
+    gameTitle: { type: String, required: true },
     category: { type: String, required: true },
     tags: [String],  // Add this back
     totalTopics: { type: Number, default: 0 },
