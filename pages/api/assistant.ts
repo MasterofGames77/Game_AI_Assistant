@@ -295,7 +295,7 @@ export const checkQuestionType = (question: string): string | null => {
     'jak', 'daxter', 'sly cooper', 'banjo', 'kazooie', 'metroid',
     'mega man', 'kirby', 'yoshi', 'platformer', 'jumping', 'a hat in time',
     'psychonauts', 'braid', 'shovel knight', 'cuphead', 'platforming', 'freedom planet',
-    'celeste', 'little big planet'
+    'celeste', 'sackboy'
   ];
 
   const rpgGames = [
@@ -307,7 +307,7 @@ export const checkQuestionType = (question: string): string | null => {
     'fire emblem', 'xenogears', 'xenosaga', 'saga', 'star ocean', 'ys', 'paper mario', 
     'mario & luigi', 'triangle strategy', 'mega man battle network', 'mega man star force',
     'hades', 'mana', 'rune factory', 'skies of arcadia', 'shining force', 'phantasy star',
-    'eldin ring', 'baulder\'s gate'
+    'lufia', 'mother', 'earthbound'
   ];
 
   const actionGames = [
@@ -345,7 +345,7 @@ export const checkQuestionType = (question: string): string | null => {
     'fifa', 'nba', 'madden', 'nhl', 'pga', 'wii sports',
     'tony hawk', 'skate', 'mario tennis', 'mario golf',
     'mario strikers', 'rocket league', 'sports story', 'ea sports',
-    'mlb', '2k', 'wwe'
+    'mlb', '2k', 'wwe', 'the show', 'olympic games', 'punch-out!!'
   ];
 
   const racingGames = [
@@ -359,7 +359,7 @@ export const checkQuestionType = (question: string): string | null => {
 
   const stealthGames = [
     'metal gear solid', 'splinter cell', 'hitman', 'assassin\'s creed',
-    'thief', 'dishonored', 'deus ex', 'death loop', 'aragami'
+    'thief', 'dishonored', 'deus ex', 'death loop', 'aragami', 'metal gear'
   ];
 
   const battleRoyaleGames = [
@@ -397,7 +397,6 @@ export const checkQuestionType = (question: string): string | null => {
     'soulcalibur', 'dead or alive', 'king of fighters', 'guilty gear', 'injustice',
     'virtua fighter', 'blazblue', 'capcom vs', 'playstation all stars', 'brawlhalla',
     'jump', 'dragon ball', 'fighting vipers', 'final fight'
-
   ];
 
   const puzzleGames = [
@@ -411,22 +410,22 @@ export const checkQuestionType = (question: string): string | null => {
   const genreKeywords = {
     platformerPro: ['platform', 'jump', 'collect coins', 'collect stars', '3d platformer', '2d platformer'],
     rpgEnthusiast: ['rpg', 'role playing', 'role-playing', 'jrpg', 'level up', 'stats', 'character build'],
-    bossBuster: ['boss fight', 'boss battle', 'defeat boss', 'beat the boss', 'final boss'],
+    bossBuster: ['boss fight', 'boss battle', 'defeat boss', 'beat the boss', 'final boss', 'superboss'],
     survivalSpecialist: ['survival', 'survive', 'horror', 'zombie', 'craft', 'resource'],
     strategySpecialist: ['strategy', 'tactics', 'turn-based', 'rts', 'build', 'command'],
     actionAficionado: ['action', 'combat', 'combo', 'fight', 'hack and slash', 'battle system'],
     battleRoyale: ['battle royale', 'fortnite', 'pubg', 'last man standing', 'battle pass'],
-    sportsChampion: ['sports', 'score', 'tournament', 'championship', 'league'],
+    sportsChampion: ['sports', 'score', 'tournament', 'championship', 'league', 'competition', 'event'],
     adventureAddict: ['adventure', 'explore', 'open world', 'quest', 'story'],
     shooterSpecialist: ['shooter', 'fps', 'third person shooter', 'aim', 'gun', 'shooting'],
     simulationSpecialist: ['simulation', 'sim', 'management', 'construction', 'management simulation', 'town', 'city'],
     fightingFanatic: ['fighting', 'combo', 'cancel', 'air dodge', 'frame', 'mixup', 'throw', 'hit stun', 'stun lock', 'block'],
     puzzlePro: ['puzzle', 'solve', 'riddle', 'brain teaser', 'logic'],
-    racingExpert: ['racing', 'race', 'drift', 'track', 'lap', 'speed'],
+    racingExpert: ['racing', 'race', 'drift', 'track', 'lap', 'speed', 'kart'],
     stealthSpecialist: ['stealth', 'sneak', 'hide', 'assassination', 'silent'],
     horrorHero: ['horror', 'scary', 'survival horror', 'fear', 'terror'],
     storySeeker: ['story', 'narrative', 'plot', 'dialogue', 'cutscene', 'cinematic', 'visual novel'],
-    triviaMaster: ['trivia', 'quiz', 'knowledge', 'question', 'answer']
+    triviaMaster: ['trivia', 'quiz', 'knowledge', 'question', 'answer', 'category']
   };
 
   // Check game titles first
