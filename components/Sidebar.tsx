@@ -77,6 +77,22 @@ const Sidebar = ({
   // Memoize the shorten function
   const shortenQuestion = useCallback((question: string): string => {
     const match = question.match(titlePattern);
+    if (match) {
+      // If we find a keyword, include it and surrounding context
+      const keywordIndex = question
+        .toLowerCase()
+        .indexOf(match[0].toLowerCase());
+      const start = Math.max(0, keywordIndex - 20);
+      const end = Math.min(
+        question.length,
+        keywordIndex + match[0].length + 20
+      );
+      let title = question.slice(start, end);
+      if (start > 0) title = "..." + title;
+      if (end < question.length) title = title + "...";
+      return title.length > 50 ? `${title.substring(0, 47)}...` : title;
+    }
+    // Fallback to original behavior if no keyword found
     const title = question.split(/\s+/).slice(0, 8).join(" ");
     return title.length > 50 ? `${title.substring(0, 47)}...` : title;
   }, []);
