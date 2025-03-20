@@ -97,7 +97,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .skip(skip)
       .limit(pageSize)
       .lean()
-      .select('question answer timestamp -_id'); // Select only needed fields
+      .select('question response timestamp -_id'); // Changed 'answer' to 'response'
 
     // Update cache with full dataset
     updateCache(userId, conversations);
