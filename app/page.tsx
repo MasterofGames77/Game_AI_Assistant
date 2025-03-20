@@ -431,11 +431,13 @@ export default function Home() {
 
             {loading && <div className="spinner mt-4"></div>}
             {error && <div className="mt-4 text-red-500">{error}</div>}
-            {response && (
+            {(response || selectedConversation?.response) && (
               <div className="mt-8 w-full max-w-3xl">
                 <h2 className="text-2xl font-bold">Response</h2>
                 <div className="bg-gray-100 p-4 rounded response-box">
-                  {formatResponse(response)}
+                  {formatResponse(
+                    response || selectedConversation?.response || ""
+                  )}
                 </div>
 
                 {/* Display metrics if available */}
