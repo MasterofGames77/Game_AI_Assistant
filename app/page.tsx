@@ -97,7 +97,7 @@ export default function Home() {
   const fetchConversations = useCallback(async () => {
     try {
       const res = await axios.get(`/api/getConversation?userId=${userId}`);
-      setConversations(res.data);
+      setConversations(res.data.conversations);
     } catch (error) {
       console.error("Error fetching conversations:", error);
     }
