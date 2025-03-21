@@ -114,35 +114,50 @@ const Sidebar = ({
   // Memoize the conversation list
   const conversationList = useMemo(
     () =>
-      conversations.map((convo) => (
-        <div key={convo._id} className="mb-4">
-          <div className="flex justify-between items-center">
-            <div
-              className="cursor-pointer truncate flex-1 mr-2"
-              onClick={() => onSelectConversation(convo)}
-            >
-              {shortenQuestion(convo.question)}
+      conversations.map((convo, index) => {
+        // Generate a unique key using index as fallback if _id is not available
+        const uniqueKey =
+          convo._id || `temp-${index}-${convo.question?.substring(0, 10)}`;
+
+        return (
+          <div key={uniqueKey} className="mb-4">
+            <div className="flex justify-between items-center">
+              <div
+                className="cursor-pointer truncate flex-1 mr-2"
+                onClick={() => onSelectConversation(convo)}
+              >
+                {shortenQuestion(convo.question || "Untitled conversation")}
+              </div>
+              <DropdownMenu.Root>
+                <DropdownMenu.Trigger className="text-white flex-shrink-0">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="w-6 h-6"
+                  >
+                    <path d="M12 7a2 2 0 110-4 2 2 0 010 4zM12 13a2 2 0 110-4 2 2 0 010 4zM12 19a2 2 0 110-4 2 2 0 010 4z" />
+                  </svg>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content
+                    className="bg-gray-700 text-white p-2 rounded-md"
+                    sideOffset={5}
+                  >
+                    <DropdownMenu.Item
+                      onSelect={() => handleDelete(convo._id)}
+                      className="outline-none cursor-pointer hover:bg-gray-600 px-2 py-1 rounded"
+                      disabled={!convo._id}
+                    >
+                      Delete
+                    </DropdownMenu.Item>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
             </div>
-            <DropdownMenu.Root>
-              <DropdownMenu.Trigger className="text-white flex-shrink-0">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  className="w-6 h-6"
-                >
-                  <path d="M12 7a2 2 0 110-4 2 2 0 010 4zM12 13a2 2 0 110-4 2 2 0 010 4zM12 19a2 2 0 110-4 2 2 0 010 4z" />
-                </svg>
-              </DropdownMenu.Trigger>
-              <DropdownMenu.Content className="bg-gray-700 text-white p-2 rounded-md">
-                <DropdownMenu.Item onSelect={() => handleDelete(convo._id)}>
-                  Delete
-                </DropdownMenu.Item>
-              </DropdownMenu.Content>
-            </DropdownMenu.Root>
           </div>
-        </div>
-      )),
+        );
+      }),
     [conversations, handleDelete, onSelectConversation, shortenQuestion]
   );
 
@@ -152,7 +167,7 @@ const Sidebar = ({
       {isLoading ? (
         <div className="text-center">Loading...</div>
       ) : (
-        conversationList
+        <div>{conversationList}</div>
       )}
     </div>
   );

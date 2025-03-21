@@ -308,14 +308,14 @@ export default function Home() {
     return sentences.map((sentence, index) => {
       if (sentence.match(/^\d+\.\s/)) {
         return (
-          <p key={index} className="mt-2">
+          <p key={`step-${index}-${stepCounter}`} className="mt-2">
             <strong>{stepCounter++}. </strong>
             {sentence.replace(/^\d+\.\s/, "").trim()}
           </p>
         );
       } else {
         return (
-          <p key={index} className="mt-2">
+          <p key={`sentence-${index}`} className="mt-2">
             {sentence}
           </p>
         );
@@ -340,6 +340,7 @@ export default function Home() {
               className="logo"
               width={350}
               height={350}
+              priority={true}
             />
 
             {conversationCount > 0 && (

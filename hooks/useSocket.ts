@@ -26,7 +26,10 @@ const useSocket = (url: string): Socket => {
 
     socket.on("achievementEarned", (data: AchievementData) => {
       console.log("Achievement earned:", data);
-      alert(`Congratulations! You earned the following achievements: ${data.achievements.map(a => a.name).join(", ")}`);
+      const achievementNames = data.achievements
+        .map((achievement, index) => `${index + 1}. ${achievement.name}`)
+        .join("\n");
+      alert(`Congratulations! You earned the following achievements:\n${achievementNames}`);
     });
 
     return () => {
