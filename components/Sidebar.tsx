@@ -43,6 +43,20 @@ const keywords = [
   "how to unlock",
   "how to find",
   "how to progress",
+  "how to beat",
+  "world record",
+  "develop",
+  "craft",
+  "cheats",
+  "hack",
+  "mod",
+  "update",
+  "grind",
+  "available",
+  "upgrade",
+  "quest",
+  "collectable",
+  "achievement",
 ].join("|");
 
 const titlePattern = new RegExp(keywords, "i");
