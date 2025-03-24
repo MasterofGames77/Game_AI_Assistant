@@ -263,7 +263,9 @@ const getGenreFromMapping = (gameTitle: string): string | null => {
     "Bejeweled": "Tile-Matching",
     "Shellshock Live": "Artillery",
     "Roller Coaster Tycoon 3": "Construction and Management Simulation",
-    "Stray": "Adventure"
+    "Stray": "Adventure",
+    "No Man's Sky": "Survival",
+    "Among Us": "Social Deduction",
   };
   return genreMapping[gameTitle] || null;
 };
@@ -323,7 +325,7 @@ export const checkQuestionType = (question: string): string | null => {
     'resident evil', 'silent hill', 'dead space', 'amnesia',
     'outlast', 'dying light', 'dead by daylight', 'left 4 dead',
     'state of decay', 'the forest', 'subnautica', 'rust',
-    'dayz', '7 days to die', 'minecraft', 'valheim'
+    'dayz', '7 days to die', 'minecraft', 'valheim', 'no man\'s sky'
   ];
 
   const strategyGames = [
@@ -345,7 +347,8 @@ export const checkQuestionType = (question: string): string | null => {
     'fifa', 'nba', 'madden', 'nhl', 'pga', 'wii sports',
     'tony hawk', 'skate', 'mario tennis', 'mario golf',
     'mario strikers', 'rocket league', 'sports story', 'ea sports',
-    'mlb', '2k', 'wwe', 'the show', 'olympic games', 'punch-out!!'
+    'mlb', '2k', 'wwe', 'the show', 'olympic games', 'punch-out!!',
+    'ufc', 
   ];
 
   const racingGames = [

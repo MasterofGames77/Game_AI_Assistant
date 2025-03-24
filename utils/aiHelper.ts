@@ -25,6 +25,7 @@ export class AICacheMetrics {
     return AICacheMetrics.instance;
   }
 
+  // Record hits and misses
   recordHit() { this.hits++; }
   recordMiss() { this.misses++; }
 
@@ -33,6 +34,7 @@ export class AICacheMetrics {
     return total ? (this.hits / total * 100).toFixed(2) + '%' : '0%';
   }
 
+  // Set the cache value and expiry time
   set(key: string, value: any, ttl: number = 3600000) { // Default TTL: 1 hour
     this.cacheData.set(key, {
       value,
@@ -40,6 +42,7 @@ export class AICacheMetrics {
     });
   }
 
+  // Get the cache value
   get(key: string): any {
     const data = this.cacheData.get(key);
     
@@ -48,12 +51,14 @@ export class AICacheMetrics {
       return null;
     }
     
+    // Check if the cache value has expired
     if (data.expiry < Date.now()) {
       this.cacheData.delete(key);
       this.recordMiss();
       return null;
     }
     
+    // Record a hit if the value is still valid
     this.recordHit();
     return data.value;
   }
