@@ -36,7 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         client_secret: clientSecret,
         grant_type: 'authorization_code',
         code: code as string,
-        redirect_uri: redirectUri, // This should match exactly what was sent initially
+        redirect_uri: redirectUri,
     });
 
     // try to get token response

@@ -3,27 +3,10 @@ import { verifyKey } from 'discord-interactions';
 import connectToMongoDB from '../../utils/mongodb';
 import User from '../../models/User';
 import { createLogger } from '../../utils/logger';
+import { DiscordRequest, VerificationResponse } from '../../types';
 
 const DISCORD_PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY!;
 const logger = createLogger('verifyUser');
-
-// Define strict types for Discord requests
-interface DiscordRequest {
-  user_id: string;
-  guild_id: string;
-  permissions: string;
-}
-
-// Define response types for better type safety
-interface VerificationResponse {
-  message: string;
-  status: 'ALLOW' | 'DENY';
-  userData?: {
-    id: string;
-    hasProAccess: boolean;
-    roles?: string[];
-  };
-}
 
 // Verify Discord's request with proper error handling
 const verifyDiscordRequest = async (req: NextApiRequest): Promise<boolean> => {
