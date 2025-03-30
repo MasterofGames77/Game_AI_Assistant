@@ -46,6 +46,17 @@ export interface ForumPost {
   timestamp: Date;
 }
 
+export interface Topic {
+  topicId: string;
+  isPrivate: boolean;
+  allowedUsers: string[];
+  metadata: {
+    status: string;
+    viewCount: number;
+  };
+  posts: any[];
+}
+
 export interface DiscordRequest {
   user_id: string;
   guild_id: string;
