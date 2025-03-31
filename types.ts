@@ -48,13 +48,20 @@ export interface ForumPost {
 
 export interface Topic {
   topicId: string;
+  topicTitle: string;
+  description: string;
+  posts: any[];
   isPrivate: boolean;
   allowedUsers: string[];
+  createdBy: string;
+  createdAt: Date;
   metadata: {
-    status: string;
+    lastPostAt: Date;
+    lastPostBy: string;
+    postCount: number;
     viewCount: number;
+    status: string;
   };
-  posts: any[];
 }
 
 export interface DiscordRequest {
