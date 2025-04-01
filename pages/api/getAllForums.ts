@@ -1,6 +1,7 @@
 // import { NextApiRequest, NextApiResponse } from 'next';
 // import connectToMongoDB from '../../utils/mongodb';
 // import Forum from '../../models/Forum';
+// import { Forum as ForumType, Topic } from '../../types';
 
 // export default async function getAllForums(req: NextApiRequest, res: NextApiResponse) {
 //   if (req.method !== 'GET') {
@@ -17,13 +18,13 @@
 //     // Keep the original topic title and add forum metadata
 //     const accessibleForums = forums.map(forum => ({
 //       ...forum.toObject(),
-//       topics: forum.topics.filter((topic: { isPrivate: boolean; allowedUsers: string[] }) =>
+//       topics: forum.topics.filter((topic: Topic) =>
 //         !topic.isPrivate || topic.allowedUsers.includes(userId as string)
-//       ).map((topic: any) => ({
+//       ).map((topic: Topic) => ({
 //         ...topic,
 //         forumId: forum._id,
-//         gameTitle: forum.title,
-//         category: forum.metadata?.category
+//         gameTitle: forum.metadata.gameTitle,
+//         category: forum.metadata.category
 //       }))
 //     }));
     
