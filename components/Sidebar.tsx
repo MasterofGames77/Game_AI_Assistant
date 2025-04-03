@@ -104,11 +104,11 @@ const Sidebar = ({
       let title = question.slice(start, end);
       if (start > 0) title = "..." + title;
       if (end < question.length) title = title + "...";
-      return title.length > 50 ? `${title.substring(0, 47)}...` : title;
+      return title.length > 50 ? `${title.substring(0, 45)}...` : title;
     }
     // Fallback to original behavior if no keyword found
     const title = question.split(/\s+/).slice(0, 8).join(" ");
-    return title.length > 50 ? `${title.substring(0, 47)}...` : title;
+    return title.length > 50 ? `${title.substring(0, 45)}...` : title;
   }, []);
 
   // Memoize the delete handler
