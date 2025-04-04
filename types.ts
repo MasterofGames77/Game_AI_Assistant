@@ -21,8 +21,27 @@ export interface Post {
 
 export interface Forum {
   _id: string;
+  forumId: string;
   title: string;
-  topics: ForumTopic[];
+  description: string;
+  topics: Topic[];
+  metadata: {
+    gameTitle: string;
+    category: string;
+    tags: string[];
+    totalTopics: number;
+    totalPosts: number;
+    lastActivityAt: Date;
+    viewCount: number;
+    status: string;
+    settings: {
+      allowNewTopics: boolean;
+      requireApproval: boolean;
+      maxTopicsPerUser: number;
+      maxPostsPerTopic: number;
+    };
+    moderators: string[];
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -44,13 +63,18 @@ export interface ForumPost {
   userId: string;
   message: string;
   timestamp: Date;
+  metadata?: {
+    edited: boolean;
+    likes: number;
+    status: string;
+  };
 }
 
 export interface Topic {
   topicId: string;
   topicTitle: string;
   description: string;
-  posts: any[];
+  posts: ForumPost[];
   isPrivate: boolean;
   allowedUsers: string[];
   createdBy: string;
@@ -78,4 +102,19 @@ export interface VerificationResponse {
     hasProAccess: boolean;
     roles?: string[];
   };
+}
+
+export interface ForumContextType {
+  forums: Forum[];
+  currentForum: Forum | null;
+  topics: Topic[];
+  loading: boolean;
+  error: string | null;
+  fetchForums: () => Promise<void>;
+  fetchTopics: (forumId: string) => Promise<void>;
+  addPost: (forumId: string, topicId: string, message: string) => Promise<void>;
+  createTopic: (forumId: string, topicData: Partial<Topic>) => Promise<void>;
+  deleteTopic: (forumId: string, topicId: string) => Promise<void>;
+  setCurrentForum: (forum: Forum | null) => void;
+  setError: (error: string | null) => void;
 }
