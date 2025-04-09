@@ -1,36 +1,47 @@
-// import { NextApiRequest, NextApiResponse } from 'next';
-// import connectToMongoDB from '../../utils/mongodb';
-// import Forum from '../../models/Forum';
-// import { Forum as ForumType, Topic } from '../../types';
+import { NextApiRequest, NextApiResponse } from 'next';
+import connectToMongoDB from '../../utils/mongodb';
+import Forum from '../../models/Forum';
+import { Forum as ForumType, Topic } from '../../types';
 
-// export default async function getAllForums(req: NextApiRequest, res: NextApiResponse) {
-//   if (req.method !== 'GET') {
-//     return res.status(405).json({ error: 'Method not allowed' });
-//   }
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-//   const { userId } = req.query;
+  try {
+    await connectToMongoDB();
+    const { userId } = req.query;
 
-//   try {
-//     await connectToMongoDB();
+    // Fetch all forums
+    const forums = await Forum.find({});
     
-//     const forums = await Forum.find({});
-    
-//     // Keep the original topic title and add forum metadata
-//     const accessibleForums = forums.map(forum => ({
-//       ...forum.toObject(),
-//       topics: forum.topics.filter((topic: Topic) =>
-//         !topic.isPrivate || topic.allowedUsers.includes(userId as string)
-//       ).map((topic: Topic) => ({
-//         ...topic,
-//         forumId: forum._id,
-//         gameTitle: forum.metadata.gameTitle,
-//         category: forum.metadata.category
-//       }))
-//     }));
-    
-//     return res.status(200).json(accessibleForums);
-//   } catch (error) {
-//     console.error('Error fetching forums:', error);
-//     return res.status(500).json({ error: 'Error fetching forums' });
-//   }
-// } 
+    // Process forums to filter private topics and add metadata
+    const accessibleForums = forums.map(forum => {
+      const forumData = forum.toObject();
+      
+      // Filter topics based on access and status
+      const accessibleTopics = forumData.topics.filter((topic: Topic) => 
+        (!topic.isPrivate || topic.allowedUsers.includes(userId as string)) &&
+        topic.metadata.status === 'active'
+      );
+
+      // Add forum metadata to each topic
+      const topicsWithMetadata = accessibleTopics.map((topic: Topic) => ({
+        ...topic,
+        forumId: forumData._id,
+        gameTitle: forumData.metadata.gameTitle,
+        category: forumData.metadata.category
+      }));
+
+      return {
+        ...forumData,
+        topics: topicsWithMetadata
+      };
+    });
+
+    return res.status(200).json(accessibleForums);
+  } catch (error) {
+    console.error('Error fetching forums:', error);
+    return res.status(500).json({ error: 'Error fetching forums' });
+  }
+} 
