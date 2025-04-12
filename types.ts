@@ -62,9 +62,11 @@ export interface ForumTopic {
 export interface ForumPost {
   userId: string;
   message: string;
-  timestamp: Date;
+  timestamp: string;
   metadata?: {
     edited: boolean;
+    editedBy?: string;
+    editedAt?: string;
     likes: number;
     status: string;
   };
