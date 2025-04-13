@@ -3,6 +3,7 @@ import connectToMongoDB from "../../utils/mongodb";
 import Forum from "../../models/Forum";
 import { nanoid } from 'nanoid';
 import { Topic } from '../../types';
+import { validateTopicStatus } from "@/utils/validation";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -80,6 +81,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         status: 'active'
       }
     };
+
+    // Validate topic status
+    if (!validateTopicStatus(newTopic.metadata.status)) {
+      return res.status(400).json({ error: "Invalid topic status" });
+    }
 
     forum.topics.push(newTopic);
     await forum.save();

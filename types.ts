@@ -82,8 +82,8 @@ export interface Topic {
   createdBy: string;
   createdAt: Date;
   metadata: {
-    lastPostAt: Date;
-    lastPostBy: string;
+    lastPostAt?: Date;
+    lastPostBy?: string;
     postCount: number;
     viewCount: number;
     status: string;
@@ -119,4 +119,9 @@ export interface ForumContextType {
   deleteTopic: (forumId: string, topicId: string) => Promise<void>;
   setCurrentForum: (forum: Forum | null) => void;
   setError: (error: string | null) => void;
+}
+
+export interface ForumListProps {
+  forumId: string;
+  initialTopics?: Topic[];
 }
