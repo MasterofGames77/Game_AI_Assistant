@@ -6,9 +6,11 @@ import {
   useState,
   useCallback,
   ReactNode,
+  useEffect,
 } from "react";
 import axios from "axios";
 import { Topic, Forum as ForumType, ForumContextType } from "../types";
+import { validateTopicData, validateTopicStatus } from "@/utils/validation";
 
 const ForumContext = createContext<ForumContextType | undefined>(undefined);
 
@@ -157,6 +159,32 @@ export function ForumProvider({ children }: { children: ReactNode }) {
     },
     [fetchForums, fetchTopics]
   );
+
+  const validateState = (state: Topic[]) => {
+    return state.every(
+      (topic) =>
+        validateTopicData(topic) &&
+        topic.metadata.status &&
+        validateTopicStatus(topic.metadata.status)
+    );
+  };
+
+  const recoverState = async (forumId: string) => {
+    try {
+      const response = await axios.get(
+        `/api/getForumTopics?forumId=${forumId}`
+      );
+      if (validateState(response.data)) {
+        setTopics(response.data);
+      }
+    } catch (err) {
+      setError("Failed to recover state");
+    }
+  };
+
+  useEffect(() => {
+    localStorage.setItem("forumTopics", JSON.stringify(topics));
+  }, [topics]);
 
   return (
     <ForumContext.Provider
