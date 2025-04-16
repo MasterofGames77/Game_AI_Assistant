@@ -1,5 +1,5 @@
 {
-  "name": "Gaming Wingman",
+  "name": "Hero Game Wingman",
   "id": "gaming_wingman",
   "description": "A helpful AI assistant for video game related discussions and advice",
   "modelProvider": "OPENAI",
