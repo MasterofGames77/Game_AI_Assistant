@@ -1,5 +1,4 @@
-import mongoose from 'mongoose';
-import { handleContentViolation } from './violationHandler';
+import { checkContent } from './contentModerationService';
 
 // This is a list of words/names/phrases that are considered offensive and should not be used in this application.
 const OFFENSIVE_WORDS = [
@@ -145,6 +144,8 @@ const OFFENSIVE_WORDS = [
   'Eric Trump',
   'Ivanka Trump',
   'Mitch McConnell',
+  'Doug Burgum',
+  'Tom Homan',
   'John Roberts',
   'Clarence Thomas',
   'Lindsey Graham',
@@ -236,37 +237,26 @@ const OFFENSIVE_WORDS = [
   // I do not approve any of these words, names, organizations and or phrases being used in this application.
 ];
 
-export const containsOffensiveContent = async (content: string, userId: string): Promise<{ 
-  isOffensive: boolean; 
-  offendingWords: string[];
-  violationResult?: any;
-}> => {
-  try {
-    if (!mongoose.connection.readyState) {
-      await mongoose.connect(process.env.MONGODB_URI as string);
-    }
-    
-    const words = content.toLowerCase().split(/\s+/);
-    const offendingWords = words.filter(word => OFFENSIVE_WORDS.includes(word));
-    
-    if (offendingWords.length > 0) {
-      const violationResult = await handleContentViolation(userId, offendingWords);
-      return {
-        isOffensive: true,
-        offendingWords,
-        violationResult
-      };
-    }
-    
+export const containsOffensiveContent = async (content: string, userId: string) => {
+  // First do a quick local check
+  const lowercaseContent = content.toLowerCase();
+  const foundWords = OFFENSIVE_WORDS.filter(word => 
+    lowercaseContent.includes(word.toLowerCase())
+  );
+
+  if (foundWords.length === 0) {
     return {
       isOffensive: false,
       offendingWords: []
     };
-  } catch (error) {
-    console.error('Error in content moderation:', error);
-    return { 
-      isOffensive: false,
-      offendingWords: []
-    };
   }
+
+  // If we found offensive words locally, verify with the server
+  const result = await checkContent(content, userId);
+
+  return {
+    isOffensive: !result.isValid,
+    offendingWords: result.offendingWords || foundWords,
+    violationResult: result.violationResult
+  };
 }; 
