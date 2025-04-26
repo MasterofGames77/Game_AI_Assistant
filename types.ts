@@ -13,6 +13,14 @@ export interface SideBarProps {
   conversations: Conversation[];
 }
 
+export interface UserViolation {
+  type: string;
+  timestamp: Date;
+  content?: string;
+  action?: string;
+  expiresAt?: Date;
+}
+
 export interface Post {
   userId: string;
   message: string;
@@ -25,51 +33,30 @@ export interface Forum {
   title: string;
   description: string;
   topics: Topic[];
-  metadata: {
-    gameTitle: string;
-    category: string;
-    tags: string[];
-    totalTopics: number;
-    totalPosts: number;
-    lastActivityAt: Date;
-    viewCount: number;
-    status: string;
-    settings: {
-      allowNewTopics: boolean;
-      requireApproval: boolean;
-      maxTopicsPerUser: number;
-      maxPostsPerTopic: number;
-    };
-    moderators: string[];
-  };
+  metadata: ForumMetadata;
   createdAt: Date;
   updatedAt: Date;
-}
-
-export interface ForumTopic {
-  _id: string;
-  forumId: string;
-  gameTitle: string;
-  category?: string;
-  topicTitle: string;
-  posts: Array<{ userId: string; message: string }>;
   createdBy: string;
-  isPrivate: boolean;
-  allowedUsers: string[];
-  createdAt: Date;
 }
 
-export interface ForumPost {
-  userId: string;
-  message: string;
-  timestamp: string;
-  metadata?: {
-    edited: boolean;
-    editedBy?: string;
-    editedAt?: string;
-    likes: number;
-    status: string;
-  };
+export interface ForumMetadata {
+  gameTitle: string;
+  category: string;
+  tags: string[];
+  totalTopics: number;
+  totalPosts: number;
+  lastActivityAt: Date;
+  viewCount: number;
+  status: string;
+  settings: ForumSettings;
+  moderators: string[];
+}
+
+export interface ForumSettings {
+  allowNewTopics: boolean;
+  requireApproval: boolean;
+  maxTopicsPerUser: number;
+  maxPostsPerTopic: number;
 }
 
 export interface Topic {
@@ -81,13 +68,31 @@ export interface Topic {
   allowedUsers: string[];
   createdBy: string;
   createdAt: Date;
-  metadata: {
-    lastPostAt?: Date;
-    lastPostBy?: string;
-    postCount: number;
-    viewCount: number;
-    status: string;
-  };
+  metadata: TopicMetadata;
+}
+
+export interface TopicMetadata {
+  lastPostAt: Date;
+  lastPostBy: string;
+  postCount: number;
+  viewCount: number;
+  status: string;
+}
+
+export interface ForumPost {
+  userId: string;
+  message: string;
+  timestamp: Date;
+  createdBy: string;
+  metadata?: PostMetadata;
+}
+
+export interface PostMetadata {
+  edited: boolean;
+  editedBy?: string;
+  editedAt?: Date;
+  likes: number;
+  status: string;
 }
 
 export interface DiscordRequest {
@@ -112,11 +117,12 @@ export interface ForumContextType {
   topics: Topic[];
   loading: boolean;
   error: string | null;
-  fetchForums: () => Promise<void>;
+  fetchForums: (page: number, limit: number) => Promise<Forum[]>;
   fetchTopics: (forumId: string) => Promise<void>;
   addPost: (forumId: string, topicId: string, message: string) => Promise<void>;
   createTopic: (forumId: string, topicData: Partial<Topic>) => Promise<void>;
   deleteTopic: (forumId: string, topicId: string) => Promise<void>;
+  deleteForum: (forumId: string) => Promise<void>;
   setCurrentForum: (forum: Forum | null) => void;
   setError: (error: string | null) => void;
 }

@@ -187,6 +187,7 @@ const OFFENSIVE_WORDS = [
   'Boris Epstein',
   'Ed Martin',
   'Mike Lindell',
+  'Harmeet Dhillon',
   'herpes',
   'genitalia',
   'genitals',
