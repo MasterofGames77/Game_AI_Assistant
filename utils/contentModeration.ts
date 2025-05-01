@@ -230,6 +230,8 @@ const OFFENSIVE_WORDS = [
   'buttfucked',
   'pussy hole',
   'blow me',
+  'Heritage Foundation',
+  'Project 2025',
   'National Socialist Movement',
   'Order of the Black Sun',
   'Blood Tribe',
