@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useForum } from "../context/ForumContext";
 import { containsOffensiveContent } from "../utils/contentModeration";
+import { validateTopicData } from "../utils/validation";
 
 interface CreateTopicProps {
   onTopicCreated?: (forumId: string) => void;
@@ -19,63 +20,103 @@ export default function CreateTopic({ onTopicCreated }: CreateTopicProps) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
 
-  const handleCreateTopic = async () => {
-    // Reset states
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError("");
     setSuccess("");
-    setLoading(true);
 
     try {
-      // Basic validation
-      if (!gameTitle.trim() || !topicTitle.trim()) {
-        setError("Game title and topic title are required");
-        return;
-      }
-
-      // Check for offensive content
+      setLoading(true);
       const userId = localStorage.getItem("userId");
       if (!userId) {
         setError("User ID not found");
         return;
       }
 
-      const titleCheck = await containsOffensiveContent(topicTitle, userId);
-      const gameTitleCheck = await containsOffensiveContent(gameTitle, userId);
-
-      if (titleCheck.isOffensive || gameTitleCheck.isOffensive) {
-        const offendingWords = [
-          ...titleCheck.offendingWords,
-          ...gameTitleCheck.offendingWords,
-        ];
-        setError(
-          `The following words/phrases violate our policy: ${offendingWords.join(
-            ", "
-          )}`
-        );
-        return;
-      }
-
-      // Generate forumId from game title
-      const forumId = gameTitle.toLowerCase().replace(/[^a-z0-9]/g, "-");
-
-      // Create topic data
-      const topicData = {
-        topicTitle: topicTitle.trim(),
-        description: description.trim(),
+      // Validate topic data
+      const validationErrors = validateTopicData({
+        topicTitle,
+        description,
         isPrivate,
         allowedUsers: isPrivate
           ? allowedUsers.split(",").map((id) => id.trim())
           : [],
-        gameTitle: gameTitle.trim(),
-        category: category || "General",
-      };
+      });
 
-      // Create topic using context
-      await createTopic(forumId, topicData);
+      if (validationErrors.length > 0) {
+        setError(validationErrors[0]);
+        return;
+      }
 
-      // Show success message
-      setSuccess("Topic created successfully!");
-      setTimeout(() => setSuccess(""), 3000);
+      // Check for offensive content in title and description
+      const titleCheck = await containsOffensiveContent(topicTitle, userId);
+      const descriptionCheck = description
+        ? await containsOffensiveContent(description, userId)
+        : null;
+
+      if (
+        titleCheck.isOffensive ||
+        (descriptionCheck && descriptionCheck.isOffensive)
+      ) {
+        const offendingWords = [
+          ...(titleCheck.offendingWords || []),
+          ...(descriptionCheck?.offendingWords || []),
+        ];
+
+        let errorMessage = `The following words violate Video Game Wingman's policy: ${offendingWords.join(
+          ", "
+        )}`;
+
+        // Use the most severe violation result
+        const violationResult =
+          titleCheck.violationResult || descriptionCheck?.violationResult;
+        if (violationResult) {
+          if (violationResult.action === "banned") {
+            errorMessage = `Your account is suspended until ${new Date(
+              violationResult.expiresAt!
+            ).toLocaleString()}`;
+          } else if (violationResult.action === "warning") {
+            errorMessage = `Warning ${violationResult.count}/3: ${errorMessage}`;
+          }
+        }
+
+        setError(errorMessage);
+        return;
+      }
+
+      // Create topic
+      const forumId = gameTitle.toLowerCase().replace(/[^a-z0-9]/g, "-");
+      await createTopic(forumId, {
+        topicTitle,
+        description,
+        isPrivate,
+        allowedUsers: isPrivate
+          ? allowedUsers.split(",").map((id) => id.trim())
+          : [],
+        metadata: {
+          lastPostAt: new Date(),
+          lastPostBy: userId,
+          postCount: 0,
+          viewCount: 0,
+          status: "active",
+        },
+      });
+
+      // Update forum metadata with category
+      await fetch(`/api/updateForumMetadata`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+          "user-id": userId,
+        },
+        body: JSON.stringify({
+          forumId,
+          metadata: {
+            category,
+          },
+        }),
+      });
 
       // Reset form
       setGameTitle("");
@@ -84,14 +125,17 @@ export default function CreateTopic({ onTopicCreated }: CreateTopicProps) {
       setCategory("");
       setIsPrivate(false);
       setAllowedUsers("");
+      setSuccess("Topic created successfully!");
 
-      // Callback if provided
+      // Notify parent component
       if (onTopicCreated) {
         onTopicCreated(forumId);
       }
+
+      setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       console.error("Error creating topic:", err);
-      setError("Failed to create topic. Please try again.");
+      setError(err instanceof Error ? err.message : "Failed to create topic");
     } finally {
       setLoading(false);
     }
@@ -99,8 +143,6 @@ export default function CreateTopic({ onTopicCreated }: CreateTopicProps) {
 
   return (
     <div className="create-topic-container max-w-2xl mx-auto p-6 bg-white rounded-lg shadow">
-      <h2 className="text-2xl font-bold mb-6">Create a New Topic</h2>
-
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -110,7 +152,7 @@ export default function CreateTopic({ onTopicCreated }: CreateTopicProps) {
             type="text"
             value={gameTitle}
             onChange={(e) => setGameTitle(e.target.value)}
-            placeholder="Enter game title (e.g., Super Mario 64, Sonic 3, etc.)"
+            placeholder="Enter game title"
             className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
@@ -122,9 +164,9 @@ export default function CreateTopic({ onTopicCreated }: CreateTopicProps) {
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 dark:bg-gray-800 dark:text-white dark:border-gray-600"
           >
-            <option value="">Select Category (Optional)</option>
+            <option value="">Select a Category (Optional)</option>
             <option value="General Discussion">General Discussion</option>
             <option value="Speedrun">Speedrun</option>
             <option value="Guides">Guides</option>
@@ -154,8 +196,8 @@ export default function CreateTopic({ onTopicCreated }: CreateTopicProps) {
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Enter topic description (optional)"
-            className="w-full p-2 border border-gray-300 rounded h-24 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Enter topic description"
+            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 h-32"
           />
         </div>
 
@@ -191,7 +233,7 @@ export default function CreateTopic({ onTopicCreated }: CreateTopicProps) {
         {success && <div className="text-green-500 text-sm">{success}</div>}
 
         <button
-          onClick={handleCreateTopic}
+          onClick={handleSubmit}
           disabled={loading}
           className={`w-full py-2 px-4 rounded text-white font-medium ${
             loading

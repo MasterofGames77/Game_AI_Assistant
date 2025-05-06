@@ -1,22 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useForum } from "../context/ForumContext";
-import { Topic, ForumListProps } from "../types";
-import { validateTopicData } from "../utils/validation";
+import { Topic, Forum } from "../types";
 import { containsOffensiveContent } from "../utils/contentModeration";
+import { useRouter } from "next/navigation";
+import ErrorBoundary from "../components/ErrorBoundary";
 
-export default function ForumList({
-  forumId,
-  initialTopics = [],
-}: ForumListProps) {
+export default function ForumList() {
   const {
+    forums,
     topics,
     loading,
     error: forumError,
     setError,
+    fetchForums,
     fetchTopics,
-    createTopic,
     deleteTopic,
     addPost,
   } = useForum();
@@ -25,20 +24,93 @@ export default function ForumList({
   const [newPost, setNewPost] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState("");
-  const [topicSuccess, setTopicSuccess] = useState("");
+  const [selectedForum, setSelectedForum] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const ITEMS_PER_PAGE = 9;
+  const router = useRouter();
 
-  // Form states for new topic
-  const [topicTitle, setTopicTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [isPrivate, setIsPrivate] = useState(false);
-  const [allowedUsers, setAllowedUsers] = useState("");
+  // Load forums
+  const loadForums = useCallback(async () => {
+    try {
+      const result = await fetchForums(page, ITEMS_PER_PAGE);
+      setHasMore(result.length === ITEMS_PER_PAGE);
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "Failed to fetch forums"
+      );
+    }
+  }, [page, fetchForums, setError, ITEMS_PER_PAGE]);
+
+  // Fetch topics for the selected forum
+  const handleTopicsFetch = useCallback(async () => {
+    if (selectedForum) {
+      try {
+        await fetchTopics(selectedForum);
+      } catch (error) {
+        setError(
+          error instanceof Error ? error.message : "Failed to fetch topics"
+        );
+      }
+    }
+  }, [selectedForum, fetchTopics, setError]);
 
   useEffect(() => {
-    if (forumId) {
-      fetchTopics(forumId);
-    }
-  }, [forumId, fetchTopics]);
+    const loadInitialForums = async () => {
+      try {
+        setIsLoading(true);
+        await loadForums();
+      } catch (error) {
+        setError(
+          error instanceof Error ? error.message : "Failed to fetch forums"
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
+    loadInitialForums();
+  }, [loadForums, setError]);
+
+  useEffect(() => {
+    if (selectedForum) {
+      const loadForumTopics = async () => {
+        try {
+          setIsLoading(true);
+          await handleTopicsFetch();
+        } catch (error) {
+          setError(
+            error instanceof Error ? error.message : "Failed to fetch topics"
+          );
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      loadForumTopics();
+    }
+  }, [handleTopicsFetch, selectedForum, setError]);
+
+  const handleLoadMore = () => {
+    setPage((prevPage) => prevPage + 1);
+  };
+
+  // Handle topic deletion
+  const handleDeleteTopic = async (topicId: string) => {
+    try {
+      setIsLoading(true);
+      await deleteTopic(selectedForum!, topicId);
+      setSuccess("Topic deleted successfully!");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      console.error("Error deleting topic:", err);
+      setError("Failed to delete topic");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle post submission
   const handlePostSubmit = async (topicId: string) => {
     if (!newPost.trim()) return;
 
@@ -53,16 +125,27 @@ export default function ForumList({
       // Check for offensive content
       const contentCheck = await containsOffensiveContent(newPost, userId);
       if (contentCheck.isOffensive) {
-        setError(
-          `The following words violate our policy: ${contentCheck.offendingWords.join(
-            ", "
-          )}`
-        );
+        let errorMessage = `The following words violate our policy: ${contentCheck.offendingWords.join(
+          ", "
+        )}`;
+
+        // Add additional context if there's a violation result
+        if (contentCheck.violationResult) {
+          if (contentCheck.violationResult.action === "banned") {
+            errorMessage = `Your account is suspended until ${new Date(
+              contentCheck.violationResult.expiresAt!
+            ).toLocaleString()}`;
+          } else if (contentCheck.violationResult.action === "warning") {
+            errorMessage = `Warning ${contentCheck.violationResult.count}/3: ${errorMessage}`;
+          }
+        }
+
+        setError(errorMessage);
         return;
       }
 
       // Add post using context
-      await addPost(forumId, topicId, newPost);
+      await addPost(selectedForum!, topicId, newPost);
       setNewPost("");
       setSuccess("Post added successfully!");
       setTimeout(() => setSuccess(""), 3000);
@@ -74,81 +157,7 @@ export default function ForumList({
     }
   };
 
-  const handleCreateTopic = async () => {
-    try {
-      setIsLoading(true);
-      const userId = localStorage.getItem("userId");
-      if (!userId) {
-        setError("User ID not found");
-        return;
-      }
-
-      // Validate topic data
-      const validationErrors = validateTopicData({
-        topicTitle,
-        description,
-        isPrivate,
-        allowedUsers: isPrivate
-          ? allowedUsers.split(",").map((id) => id.trim())
-          : [],
-      });
-
-      if (validationErrors.length > 0) {
-        setError(validationErrors[0]);
-        return;
-      }
-
-      // Check for offensive content
-      const contentCheck = await containsOffensiveContent(topicTitle, userId);
-      if (contentCheck.isOffensive) {
-        setError(
-          `The following words violate our policy: ${contentCheck.offendingWords.join(
-            ", "
-          )}`
-        );
-        return;
-      }
-
-      // Create topic using context
-      await createTopic(forumId, {
-        topicTitle,
-        description,
-        isPrivate,
-        allowedUsers: isPrivate
-          ? allowedUsers.split(",").map((id) => id.trim())
-          : [],
-      });
-
-      // Reset form
-      setTopicTitle("");
-      setDescription("");
-      setIsPrivate(false);
-      setAllowedUsers("");
-      setTopicSuccess("Topic created successfully!");
-      setTimeout(() => setTopicSuccess(""), 3000);
-    } catch (err) {
-      console.error("Error creating topic:", err);
-      setError("Failed to create topic");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDeleteTopic = async (topicId: string) => {
-    try {
-      setIsLoading(true);
-      await deleteTopic(forumId, topicId);
-      setSuccess("Topic deleted successfully!");
-      setTimeout(() => setSuccess(""), 3000);
-    } catch (err) {
-      console.error("Error deleting topic:", err);
-      setError("Failed to delete topic");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (isLoading || loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -157,179 +166,137 @@ export default function ForumList({
   }
 
   return (
-    <div className="forum-container space-y-6">
-      {/* Error and Success Messages */}
-      {forumError && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          {forumError}
-        </div>
-      )}
-      {success && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
-          {success}
-        </div>
-      )}
-      {topicSuccess && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
-          {topicSuccess}
-        </div>
-      )}
-
-      {/* Create New Topic Form */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h2 className="text-2xl font-bold mb-4">Create New Topic</h2>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Topic Title
-            </label>
-            <input
-              type="text"
-              value={topicTitle}
-              onChange={(e) => setTopicTitle(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter topic title"
-            />
+    <ErrorBoundary
+      fallback={<div>Something went wrong. Please try again later.</div>}
+    >
+      <div className="p-4">
+        <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
+          Your Forums
+        </h2>
+        {forumError && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {forumError}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter topic description"
-              rows={3}
-            />
+        )}
+        {success && (
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+            {success}
           </div>
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              checked={isPrivate}
-              onChange={(e) => setIsPrivate(e.target.checked)}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <label className="ml-2 block text-sm text-gray-700">
-              Private Topic
-            </label>
-          </div>
-          {isPrivate && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Allowed Users (comma-separated)
-              </label>
-              <input
-                type="text"
-                value={allowedUsers}
-                onChange={(e) => setAllowedUsers(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter user IDs separated by commas"
-              />
-            </div>
-          )}
-          <button
-            onClick={handleCreateTopic}
-            disabled={isLoading}
-            className={`w-full py-2 px-4 rounded text-white font-medium ${
-              isLoading
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-blue-500 hover:bg-blue-600"
-            }`}
-          >
-            {isLoading ? "Creating..." : "Create Topic"}
-          </button>
-        </div>
-      </div>
-
-      {/* Topics List */}
-      <div className="space-y-4">
-        {topics.map((topic) => (
-          <div key={topic.topicId} className="bg-white p-6 rounded-lg shadow">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900">
-                  {topic.topicTitle}
-                </h3>
-                <p className="text-gray-600 mt-1">{topic.description}</p>
-                <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-                  <span>Posts: {topic.metadata.postCount}</span>
-                  <span>Views: {topic.metadata.viewCount}</span>
-                  <span>
-                    Last Activity:{" "}
-                    {topic.metadata.lastPostAt instanceof Date
-                      ? topic.metadata.lastPostAt.toLocaleString()
-                      : "No activity yet"}
-                  </span>
-                  {topic.isPrivate && (
-                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
-                      Private
-                    </span>
-                  )}
-                </div>
+        )}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {forums.map((forum: Forum) => (
+            <div
+              key={forum._id}
+              className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer"
+              onClick={() => {
+                setSelectedForum(forum.forumId);
+                router.push(`/forums/${forum.forumId}`);
+              }}
+            >
+              <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">
+                {forum.title}
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-2">
+                {forum.description}
+              </p>
+              <div className="flex justify-between items-center text-sm text-gray-500 dark:text-gray-400">
+                <span>{forum.topics?.length || 0} topics</span>
+                <span>
+                  Created {new Date(forum.createdAt).toLocaleDateString()}
+                </span>
               </div>
-              {topic.createdBy === localStorage.getItem("userId") && (
-                <button
-                  onClick={() => handleDeleteTopic(topic.topicId)}
-                  className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
-                >
-                  Delete Topic
-                </button>
-              )}
             </div>
-
-            {/* Posts Section */}
-            <div className="space-y-4 mt-4">
-              {topic.posts.map((post, index) => (
+          ))}
+        </div>
+        {selectedForum && topics.length > 0 && (
+          <div className="mt-8">
+            <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+              Topics
+            </h3>
+            <div className="space-y-4">
+              {topics.map((topic) => (
                 <div
-                  key={`${topic.topicId}-${index}`}
-                  className="bg-gray-50 p-4 rounded"
+                  key={topic.topicId}
+                  className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow"
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="font-semibold">User {post.userId}</div>
-                    <div className="text-sm text-gray-500">
-                      {new Date(post.timestamp).toLocaleString()}
+                  <h4 className="text-lg font-medium mb-2 text-gray-900 dark:text-white">
+                    {topic.topicTitle}
+                  </h4>
+                  <p className="text-gray-600 dark:text-gray-300 mb-4">
+                    {topic.description}
+                  </p>
+                  {selectedTopic?.topicId === topic.topicId ? (
+                    <div className="space-y-4">
+                      <textarea
+                        value={newPost}
+                        onChange={(e) => setNewPost(e.target.value)}
+                        className="w-full p-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        placeholder="Write your post..."
+                        rows={4}
+                      />
+                      <div className="flex justify-end space-x-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedTopic(null);
+                          }}
+                          className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePostSubmit(topic.topicId);
+                          }}
+                          disabled={isLoading}
+                          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                        >
+                          {isLoading ? "Posting..." : "Submit Post"}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-gray-800">{post.message}</div>
-                  {post.metadata?.edited && (
-                    <div className="text-xs text-gray-500 mt-2">
-                      Edited by {post.metadata.editedBy} on{" "}
-                      {post.metadata.editedAt
-                        ? new Date(post.metadata.editedAt).toLocaleString()
-                        : "Unknown time"}
+                  ) : (
+                    <div className="flex justify-between items-center">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedTopic(topic);
+                        }}
+                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                      >
+                        Reply
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteTopic(topic.topicId);
+                        }}
+                        className="px-4 py-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                      >
+                        Delete
+                      </button>
                     </div>
                   )}
                 </div>
               ))}
-
-              {/* New Post Form */}
-              {topic.metadata.status === "active" && (
-                <div className="mt-4">
-                  <textarea
-                    value={newPost}
-                    onChange={(e) => setNewPost(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Write your reply..."
-                    rows={3}
-                  />
-                  <button
-                    onClick={() => handlePostSubmit(topic.topicId)}
-                    disabled={isLoading}
-                    className={`mt-2 px-4 py-2 rounded text-white font-medium ${
-                      isLoading
-                        ? "bg-gray-400 cursor-not-allowed"
-                        : "bg-blue-500 hover:bg-blue-600"
-                    }`}
-                  >
-                    {isLoading ? "Posting..." : "Post Reply"}
-                  </button>
-                </div>
-              )}
             </div>
           </div>
-        ))}
+        )}
+        {forums.length === 0 && !loading && (
+          <p className="text-center text-gray-500 dark:text-gray-400 mt-4">
+            No forums found. Create your first forum to get started!
+          </p>
+        )}
+        {hasMore && !loading && forums.length > 0 && (
+          <button
+            onClick={handleLoadMore}
+            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+          >
+            Load More
+          </button>
+        )}
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }
