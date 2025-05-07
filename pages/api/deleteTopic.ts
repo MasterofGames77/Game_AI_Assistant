@@ -47,19 +47,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    await connectToMongoDB();
+    const userId = req.headers['user-id'] as string;
+    const authToken = req.headers.authorization?.split(' ')[1];
+
     // Validate authentication
     const authError = validateAuth(req);
     if (authError) {
       return res.status(401).json({ error: authError });
     }
 
-    await connectToMongoDB();
-    const userId = req.headers['user-id'] as string;
-
     // Validate user authentication
-    const authErrors = validateUserAuthentication(userId);
-    if (authErrors.length > 0) {
-      return res.status(401).json({ error: authErrors[0] });
+    const userAuthErrors = validateUserAuthentication(userId);
+    if (userAuthErrors.length > 0) {
+      return res.status(401).json({ error: userAuthErrors[0] });
     }
 
     // Check rate limiting
@@ -74,53 +75,57 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
+    // Find the forum and topic first to validate access
     const forum = await Forum.findOne({ forumId });
     if (!forum) {
       return res.status(404).json({ error: 'Forum not found' });
     }
 
-    // Find the topic
-    const topicIndex = forum.topics.findIndex((t: Topic) => t.topicId === topicId);
-    if (topicIndex === -1) {
+    const topic = forum.topics.find((t: Topic) => t.topicId === topicId);
+    if (!topic) {
       return res.status(404).json({ error: 'Topic not found' });
     }
 
-    const topic = forum.topics[topicIndex];
-
-    // Check if user has permission to delete (creator or moderator)
-    const moderators = forum.metadata.moderators || [];
-    const isModerator = moderators.includes(userId);
-    const isCreator = topic.createdBy === userId;
-
-    if (!isCreator && !isModerator) {
-      return res.status(403).json({ error: 'Not authorized to delete this topic' });
+    // Validate user access to the topic
+    const accessErrors = validateUserAccess(topic, userId);
+    if (accessErrors.length > 0) {
+      return res.status(403).json({ error: accessErrors[0] });
     }
 
-    // For private topics, ensure the user has access
-    if (topic.isPrivate) {
-      const accessErrors = validateUserAccess(topic, userId);
-      if (accessErrors.length > 0) {
-        return res.status(403).json({ error: accessErrors[0] });
+    // Add delay before processing request
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Use findOneAndUpdate to avoid validation issues
+    const result = await Forum.findOneAndUpdate(
+      { forumId },
+      { 
+        $pull: { topics: { topicId } },
+        $set: { 'metadata.lastActivityAt': new Date() }
+      },
+      { new: true }
+    );
+
+    if (!result) {
+      return res.status(404).json({ error: 'Forum not found' });
+    }
+
+    // Update forum metadata counts
+    await Forum.findOneAndUpdate(
+      { forumId },
+      {
+        $set: {
+          'metadata.totalTopics': result.topics.length,
+          'metadata.totalPosts': result.topics.reduce((sum: number, t: Topic) => sum + t.metadata.postCount, 0)
+        }
       }
-    }
-
-    // Remove the topic
-    forum.topics.splice(topicIndex, 1);
-    
-    // Update forum metadata
-    forum.metadata.totalTopics = forum.topics.length;
-    forum.metadata.lastActivityAt = new Date();
-    forum.metadata.totalPosts = forum.topics.reduce((sum: number, t: Topic) => sum + t.metadata.postCount, 0);
-
-    // Save changes
-    await forum.save();
+    );
 
     return res.status(200).json({ 
       message: 'Topic deleted successfully',
       metadata: {
-        totalTopics: forum.metadata.totalTopics,
-        totalPosts: forum.metadata.totalPosts,
-        lastActivityAt: forum.metadata.lastActivityAt
+        totalTopics: result.topics.length,
+        totalPosts: result.topics.reduce((sum: number, t: Topic) => sum + t.metadata.postCount, 0),
+        lastActivityAt: result.metadata.lastActivityAt
       }
     });
   } catch (error) {
