@@ -131,3 +131,16 @@ export interface ForumListProps {
   forumId: string;
   initialTopics?: Topic[];
 }
+
+export interface ContentCheckResult {
+  isValid: boolean;
+  error?: string;
+  offendingWords?: string[];
+  violationResult?: {
+    action: 'warning' | 'banned' | 'permanent_ban';
+    count?: number;
+    expiresAt?: Date;
+    message?: string;
+    banCount?: number;
+  };
+}
