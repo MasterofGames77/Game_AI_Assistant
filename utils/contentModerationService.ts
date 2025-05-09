@@ -1,16 +1,5 @@
 import axios from 'axios';
-
-export interface ContentCheckResult {
-  isValid: boolean;
-  error?: string;
-  offendingWords?: string[];
-  violationResult?: {
-    action: 'warning' | 'banned';
-    count?: number;
-    expiresAt?: Date;
-    message?: string;
-  };
-}
+import { ContentCheckResult } from '../types';
 
 export const checkContent = async (content: string, userId: string): Promise<ContentCheckResult> => {
   try {
