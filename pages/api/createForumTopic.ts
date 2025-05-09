@@ -77,8 +77,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Validate required fields
-    if (!gameTitle || !topicTitle) {
-      return res.status(400).json({ error: "Game title and topic title are required" });
+    if (!gameTitle || !topicTitle || !forumId) {
+      return res.status(400).json({ error: "Game title, topic title, and forum ID are required" });
     }
 
     // Sanitize input
