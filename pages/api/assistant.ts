@@ -314,10 +314,10 @@ export const checkQuestionType = (question: string): string | null => {
 
   const actionGames = [
     'devil may cry', 'bayonetta', 'god of war', 'ninja gaiden',
-    'metal gear rising', 'dynasty warriors', 'nier', 'automata',
+    'metal gear rising: revengeance', 'dynasty warriors', 'nier', 'automata',
     'darksiders', 'prototype', 'infamous', 'asura\'s wrath',
     'kingdom hearts', 'monster hunter', 'dragons dogma', 'grand theft auto',
-    'the legend of zelda', 'dynasty warriors', 'red dead redemption', 'batman',
+    'the legend of zelda', 'red dead redemption', 'batman',
     'arkham', 'assassin\'s creed', 'star wars', 'dead rising'
   ];
 
@@ -399,7 +399,7 @@ export const checkQuestionType = (question: string): string | null => {
     'marvel vs capcom', 'capcom vs snk', 'fatal fury', 'mortal kombat', 'art of fighting',
     'soulcalibur', 'dead or alive', 'king of fighters', 'guilty gear', 'injustice',
     'virtua fighter', 'blazblue', 'capcom vs', 'playstation all stars', 'brawlhalla',
-    'jump', 'dragon ball', 'fighting vipers', 'final fight'
+    'jump', 'dragon ball', 'fighting vipers'
   ];
 
   const puzzleGames = [
@@ -407,6 +407,20 @@ export const checkQuestionType = (question: string): string | null => {
     'the witness', 'talos principle', 'braid', 'fez',
     'human fall flat', 'untitled goose game', 'it takes two',
     'candy crush', 'bejeweled', 'inside', 'outer wilds'
+  ];
+
+  const beatEmUpGames = [
+    'streets of rage', 'river city girls', 'final fight', 'yakuza', 'like a dragon',
+    'double dragon', 'sifu', 'golden axe', 'battletoads', 'castle crashers', 'scott pilgrim',
+    'teenage mutant ninja turtles'
+  ];
+
+  const rhythmGames = [
+    'crypt of the necrodancer', 'dance dance revolution', 'space channel 5', 'samba de amigo',
+    'beat saber', 'rhythm heaven', 'parappa the rapper', 'friday night funkin', 'geometry dash',
+    'arcaea', 'guitar hero', 'rock band', 'donkey konga', 'theatrhythm final fantasy', 'osu!',
+    'taiko no tatsujin', 'thumper', 'hi-fi rush', 'rhythm doctor', 'metal: hellslinger',
+    'sayonara wild hearts', 'fuser'
   ];
 
   // Check for genre keywords in the question
@@ -428,7 +442,9 @@ export const checkQuestionType = (question: string): string | null => {
     stealthSpecialist: ['stealth', 'sneak', 'hide', 'assassination', 'silent'],
     horrorHero: ['horror', 'scary', 'survival horror', 'fear', 'terror'],
     storySeeker: ['story', 'narrative', 'plot', 'dialogue', 'cutscene', 'cinematic', 'visual novel'],
-    triviaMaster: ['trivia', 'quiz', 'knowledge', 'question', 'answer', 'category']
+    triviaMaster: ['trivia', 'quiz', 'knowledge', 'question', 'answer', 'category'],
+    beatEmUpBrawler: ['brawler', 'side-scrolling', 'frame advantage', 'belt-scroll', 'pressure', 'dash'],
+    rhythmMaster: ['rhythm', 'music', 'beat', 'dance', 'song', 'beatmap', 'notes', 'streams', 'beats per minute']
   };
 
   // Check game titles first
@@ -449,6 +465,8 @@ export const checkQuestionType = (question: string): string | null => {
   if (visualNovelGames.some(game => lowerQuestion.includes(game))) return "storySeeker";
   if (puzzleGames.some(game => lowerQuestion.includes(game))) return "puzzlePro";
   if (visualNovelGames.some(game => lowerQuestion.includes(game))) return "storySeeker";
+  if (beatEmUpGames.some(game => lowerQuestion.includes(game))) return "beatEmUpBrawler";
+  if (rhythmGames.some(game => lowerQuestion.includes(game))) return "rhythmMaster";
 
   // Then check for genre keywords
   for (const [achievement, keywords] of Object.entries(genreKeywords)) {
@@ -516,7 +534,9 @@ export const checkAndAwardAchievements = async (userId: string, progress: any, s
     { name: 'Stealth Specialist', field: 'stealthSpecialist', threshold: 5 },
     { name: 'Horror Hero', field: 'horrorHero', threshold: 5 },
     { name: 'Trivia Master', field: 'triviaMaster', threshold: 5 },
-    { name: 'Story Seeker', field: 'storySeeker', threshold: 5 }
+    { name: 'Story Seeker', field: 'storySeeker', threshold: 5 },
+    { name: 'Beat Em Up Brawler', field: 'beatEmUpBrawler', threshold: 5 },
+    { name: 'Rhythm Master', field: 'rhythmMaster', threshold: 5 }
   ];
 
   // Check each achievement
@@ -788,6 +808,8 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
                     horrorHero: 0,
                     triviaMaster: 0,
                     storySeeker: 0,
+                    beatEmUpBrawler: 0,
+                    rhythmMaster: 0,
                     totalQuestions: 0,
                     dailyExplorer: 0,
                     speedrunner: 0,
