@@ -3,49 +3,44 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { useForum } from "../context/ForumContext";
-import { Topic } from "../types";
+import { Forum } from "../types";
 import { validatePostData } from "../utils/validation";
 import { containsOffensiveContent } from "../utils/contentModeration";
+import { ForumProvider } from "../context/ForumContext";
 
-export default function ForumTopicPage() {
+export default function ForumTopicPageWrapper() {
+  return (
+    <ForumProvider>
+      <ForumPage />
+    </ForumProvider>
+  );
+}
+
+function ForumPage() {
   const router = useRouter();
-  const { forumId, topicId } = router.query;
+  const { forumId } = router.query;
   const {
+    forums,
     addPost,
+    deletePost,
+    likePost,
     error: forumError,
     setError,
     loading: forumLoading,
   } = useForum();
-  const [forumTopic, setForumTopic] = useState<Topic | null>(null);
+  const [forum, setForum] = useState<Forum | null>(null);
   const [newPost, setNewPost] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
-    const fetchTopic = async () => {
-      if (forumId && topicId) {
-        try {
-          setLoading(true);
-          const userId = localStorage.getItem("userId");
-          const response = await fetch(
-            `/api/getForumTopic?forumId=${forumId}&topicId=${topicId}&userId=${userId}`
-          );
-          if (!response.ok) {
-            throw new Error("Failed to fetch topic");
-          }
-          const data = await response.json();
-          setForumTopic(data);
-        } catch (error) {
-          console.error("Error fetching topic:", error);
-          setError("Error fetching forum topic");
-        } finally {
-          setLoading(false);
-        }
+    if (forumId) {
+      const currentForum = forums.find((f) => f.forumId === forumId);
+      if (currentForum) {
+        setForum(currentForum);
       }
-    };
-
-    fetchTopic();
-  }, [forumId, topicId, setError]);
+    }
+  }, [forumId, forums]);
 
   const handlePostSubmit = async () => {
     if (!newPost.trim()) return;
@@ -62,7 +57,6 @@ export default function ForumTopicPage() {
       const validationErrors = validatePostData({
         message: newPost,
         userId,
-        topicId: topicId as string,
         forumId: forumId as string,
       });
 
@@ -83,17 +77,7 @@ export default function ForumTopicPage() {
       }
 
       // Add post using context
-      await addPost(forumId as string, topicId as string, newPost);
-
-      // Refresh topic data
-      const response = await fetch(
-        `/api/getForumTopic?forumId=${forumId}&topicId=${topicId}&userId=${userId}`
-      );
-      if (!response.ok) {
-        throw new Error("Failed to refresh topic");
-      }
-      const data = await response.json();
-      setForumTopic(data);
+      await addPost(forumId as string, newPost);
 
       // Reset form and show success
       setNewPost("");
@@ -107,6 +91,29 @@ export default function ForumTopicPage() {
     }
   };
 
+  const handleDeletePost = async (postId: string) => {
+    try {
+      setLoading(true);
+      await deletePost(forumId as string, postId);
+      setSuccess("Post deleted successfully!");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      console.error("Error deleting post:", err);
+      setError("Error deleting post");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLikePost = async (postId: string) => {
+    try {
+      await likePost(forumId as string, postId);
+    } catch (err) {
+      console.error("Error liking post:", err);
+      setError("Error liking post");
+    }
+  };
+
   if (loading || forumLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -115,12 +122,12 @@ export default function ForumTopicPage() {
     );
   }
 
-  if (!forumTopic) {
+  if (!forum) {
     return (
       <div className="text-center p-8">
-        <h2 className="text-2xl font-bold text-gray-800">Topic not found</h2>
+        <h2 className="text-2xl font-bold text-gray-800">Forum not found</h2>
         <p className="text-gray-600 mt-2">
-          The requested topic could not be found or you don&apos;t have access
+          The requested forum could not be found or you don&apos;t have access
           to it.
         </p>
       </div>
@@ -128,38 +135,39 @@ export default function ForumTopicPage() {
   }
 
   return (
-    <div className="forum-topic-container max-w-4xl mx-auto p-4">
-      {/* Topic Header */}
+    <div className="forum-container max-w-4xl mx-auto p-4">
+      {/* Forum Header */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              {forumTopic.topicTitle}
+              {forum.title}
             </h1>
-            <p className="text-gray-600 mb-4">{forumTopic.description}</p>
+            <p className="text-gray-600 mb-2">Game: {forum.gameTitle}</p>
+            <p className="text-gray-600 mb-4">Category: {forum.category}</p>
             <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-              <span>Created by: User {forumTopic.createdBy}</span>
+              <span>Created by: User {forum.createdBy}</span>
               <span>•</span>
-              <span>Posts: {forumTopic.metadata.postCount}</span>
+              <span>Posts: {forum.metadata.totalPosts}</span>
               <span>•</span>
-              <span>Views: {forumTopic.metadata.viewCount}</span>
+              <span>Views: {forum.metadata.viewCount}</span>
               <span>•</span>
               <span
                 className={`px-2 py-1 rounded ${
-                  forumTopic.metadata.status === "active"
+                  forum.metadata.status === "active"
                     ? "bg-green-100 text-green-800"
-                    : forumTopic.metadata.status === "locked"
+                    : forum.metadata.status === "locked"
                     ? "bg-yellow-100 text-yellow-800"
                     : "bg-gray-100 text-gray-800"
                 }`}
               >
-                Status: {forumTopic.metadata.status}
+                Status: {forum.metadata.status}
               </span>
             </div>
           </div>
-          {forumTopic.isPrivate && (
+          {forum.isPrivate && (
             <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
-              Private Topic
+              Private Forum
             </div>
           )}
         </div>
@@ -179,16 +187,16 @@ export default function ForumTopicPage() {
 
       {/* Posts Section */}
       <div className="space-y-4 mb-6">
-        {forumTopic.posts.map((post, index) => (
-          <div key={index} className="bg-white p-4 rounded-lg shadow">
+        {forum.posts.map((post) => (
+          <div key={post._id} className="bg-white p-4 rounded-lg shadow">
             <div className="flex justify-between items-start mb-2">
               <div className="flex items-center space-x-2">
                 <div className="font-semibold text-gray-900">
                   User {post.userId}
                 </div>
-                {post.userId === forumTopic.createdBy && (
+                {post.userId === forum.createdBy && (
                   <span className="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded">
-                    Topic Creator
+                    Forum Creator
                   </span>
                 )}
               </div>
@@ -199,26 +207,36 @@ export default function ForumTopicPage() {
             <div className="text-gray-800 whitespace-pre-wrap">
               {post.message}
             </div>
-            {post.metadata?.edited &&
-              post.metadata.editedBy &&
-              post.metadata.editedAt && (
-                <div className="text-xs text-gray-500 mt-2">
-                  Edited by {post.metadata.editedBy} on{" "}
-                  {new Date(post.metadata.editedAt).toLocaleString()}
-                </div>
-              )}
-            {post.metadata?.likes && post.metadata.likes > 0 && (
+            {post.metadata?.edited && (
               <div className="text-xs text-gray-500 mt-2">
-                {post.metadata.likes}{" "}
-                {post.metadata.likes === 1 ? "like" : "likes"}
+                Edited by {post.metadata.editedBy} on{" "}
+                {new Date(post.metadata.editedAt!).toLocaleString()}
               </div>
             )}
+            <div className="flex justify-between items-center mt-4">
+              <button
+                onClick={() => handleLikePost(post._id)}
+                className="flex items-center space-x-1 text-gray-500 hover:text-blue-500"
+              >
+                <span>❤️</span>
+                <span>{post.likes.length} likes</span>
+              </button>
+              {(post.userId === localStorage.getItem("userId") ||
+                forum.createdBy === localStorage.getItem("userId")) && (
+                <button
+                  onClick={() => handleDeletePost(post._id)}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
 
       {/* New Post Form */}
-      {forumTopic.metadata.status === "active" && (
+      {forum.metadata.status === "active" && (
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold mb-4">Add a Reply</h3>
           <textarea
@@ -241,9 +259,9 @@ export default function ForumTopicPage() {
         </div>
       )}
 
-      {forumTopic.metadata.status !== "active" && (
+      {forum.metadata.status !== "active" && (
         <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
-          This topic is {forumTopic.metadata.status}. New posts cannot be added.
+          This forum is {forum.metadata.status}. New posts cannot be added.
         </div>
       )}
     </div>

@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import connectToMongoDB from '../../utils/mongodb';
 import Forum from '../../models/Forum';
+import { validateUserAuthentication, validateUserAccess } from '../../utils/validation';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'DELETE') {
@@ -9,28 +10,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     await connectToMongoDB();
-    const userId = req.headers['user-id'] as string;
-    const authToken = req.headers.authorization?.split(' ')[1];
-
-    if (!userId || !authToken) {
-      return res.status(401).json({ error: 'Authentication required' });
+    let userId = 'test-user';
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      userId = authHeader.split(' ')[1] || 'test-user';
     }
-
     const { forumId } = req.query;
+
+    // Validate user authentication
+    const userAuthErrors = validateUserAuthentication(userId);
+    if (userAuthErrors.length > 0) {
+      return res.status(401).json({ error: userAuthErrors[0] });
+    }
 
     if (!forumId) {
       return res.status(400).json({ error: 'Forum ID is required' });
     }
 
-    // Add delay before processing request
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    // Delete the forum
-    const result = await Forum.findOneAndDelete({ forumId });
-
-    if (!result) {
+    // Find the forum first to validate access
+    const forum = await Forum.findOne({
+      $or: [
+        { forumId: forumId },
+        { _id: forumId }
+      ]
+    });
+    if (!forum) {
       return res.status(404).json({ error: 'Forum not found' });
     }
+
+    // Only allow forum creator to delete
+    if (forum.createdBy !== userId) {
+      return res.status(403).json({ error: 'Only the forum creator can delete this forum' });
+    }
+
+    // Delete the forum
+    await Forum.deleteOne({
+      $or: [
+        { forumId: forumId },
+        { _id: forumId }
+      ]
+    });
 
     return res.status(200).json({ 
       message: 'Forum deleted successfully'

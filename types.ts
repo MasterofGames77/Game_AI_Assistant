@@ -31,68 +31,36 @@ export interface Forum {
   _id: string;
   forumId: string;
   title: string;
-  description: string;
-  topics: Topic[];
-  metadata: ForumMetadata;
+  gameTitle: string;
+  category: string;
+  isPrivate: boolean;
+  allowedUsers: string[];
+  posts: ForumPost[];
   createdAt: Date;
   updatedAt: Date;
   createdBy: string;
+  metadata: ForumMetadata;
 }
 
 export interface ForumMetadata {
-  gameTitle: string;
-  category: string;
-  tags: string[];
-  totalTopics: number;
   totalPosts: number;
   lastActivityAt: Date;
   viewCount: number;
-  status: string;
-  settings: ForumSettings;
-  moderators: string[];
-}
-
-export interface ForumSettings {
-  allowNewTopics: boolean;
-  requireApproval: boolean;
-  maxTopicsPerUser: number;
-  maxPostsPerTopic: number;
-}
-
-export interface Topic {
-  topicId: string;
-  topicTitle: string;
-  description: string;
-  posts: ForumPost[];
-  isPrivate: boolean;
-  allowedUsers: string[];
-  createdBy: string;
-  createdAt: Date;
-  metadata: TopicMetadata;
-}
-
-export interface TopicMetadata {
-  lastPostAt: Date;
-  lastPostBy: string;
-  postCount: number;
-  viewCount: number;
-  status: string;
+  status: 'active' | 'archived' | 'locked';
 }
 
 export interface ForumPost {
+  _id: string;
   userId: string;
   message: string;
   timestamp: Date;
   createdBy: string;
-  metadata?: PostMetadata;
-}
-
-export interface PostMetadata {
-  edited: boolean;
-  editedBy?: string;
-  editedAt?: Date;
-  likes: number;
-  status: string;
+  likes: string[]; // Array of user IDs who liked the post
+  metadata: {
+    edited: boolean;
+    editedAt?: Date;
+    editedBy?: string;
+  };
 }
 
 export interface DiscordRequest {
@@ -114,22 +82,20 @@ export interface VerificationResponse {
 export interface ForumContextType {
   forums: Forum[];
   currentForum: Forum | null;
-  topics: Topic[];
   loading: boolean;
   error: string | null;
   fetchForums: (page: number, limit: number) => Promise<Forum[]>;
-  fetchTopics: (forumId: string) => Promise<void>;
-  addPost: (forumId: string, topicId: string, message: string) => Promise<void>;
-  createTopic: (forumId: string, topicData: Partial<Topic>) => Promise<void>;
-  deleteTopic: (forumId: string, topicId: string) => Promise<void>;
+  createForum: (forumData: Partial<Forum>) => Promise<Forum | null>;
   deleteForum: (forumId: string) => Promise<void>;
+  addPost: (forumId: string, message: string) => Promise<void>;
+  deletePost: (forumId: string, postId: string) => Promise<void>;
+  likePost: (forumId: string, postId: string) => Promise<void>;
   setCurrentForum: (forum: Forum | null) => void;
   setError: (error: string | null) => void;
 }
 
 export interface ForumListProps {
   forumId: string;
-  initialTopics?: Topic[];
 }
 
 export interface ContentCheckResult {

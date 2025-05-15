@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import connectToMongoDB from '../../utils/mongodb';
 import Forum from '../../models/Forum';
-import { Topic } from '../../types';
+import { containsOffensiveContent } from '../../utils/contentModeration';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -10,10 +10,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     await connectToMongoDB();
-    const { forumId, topicId, message, userId } = req.body;
+    const { forumId, message, userId } = req.body;
 
     // Validate required fields
-    if (!forumId || !topicId || !message || !userId) {
+    if (!forumId || !message || !userId) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -23,48 +23,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Forum not found' });
     }
 
-    // Find the topic
-    const topic = forum.topics.find((t: Topic) => t.topicId === topicId);
-    if (!topic) {
-      return res.status(404).json({ error: 'Topic not found' });
+    // Check if forum is private and user is allowed
+    if (forum.isPrivate && !forum.allowedUsers.includes(userId)) {
+      return res.status(403).json({ error: 'Not authorized to post in this forum' });
     }
 
-    // Check if topic is private and user is allowed
-    if (topic.isPrivate && !topic.allowedUsers.includes(userId)) {
-      return res.status(403).json({ error: 'Not authorized to post in this topic' });
+    // Check if forum is active
+    if (forum.metadata.status !== 'active') {
+      return res.status(403).json({ error: 'Forum is not active' });
     }
 
-    // Check if topic is active
-    if (topic.metadata.status !== 'active') {
-      return res.status(403).json({ error: 'Topic is not active' });
-    }
-
-    // Check post limit
-    if (topic.posts.length >= forum.metadata.settings.maxPostsPerTopic) {
-      return res.status(400).json({ error: 'Topic has reached maximum posts limit' });
+    // Check for offensive content
+    const contentCheck = await containsOffensiveContent(message, userId);
+    if (contentCheck.isOffensive) {
+      return res.status(400).json({ 
+        error: `The following words violate our policy: ${contentCheck.offendingWords.join(', ')}`,
+        violationResult: contentCheck.violationResult
+      });
     }
 
     // Create new post
     const newPost = {
+      _id: new Date().getTime().toString(), // Temporary ID until MongoDB assigns one
       userId,
       message: message.trim(),
       timestamp: new Date(),
       createdBy: userId,
+      likes: [],
       metadata: {
-        edited: false,
-        likes: 0,
-        status: 'active'
+        edited: false
       }
     };
 
-    // Add post to topic
-    topic.posts.push(newPost);
+    // Add post to forum
+    forum.posts.push(newPost);
     
-    // Update topic metadata
-    topic.metadata.lastPostAt = new Date();
-    topic.metadata.lastPostBy = userId;
-    topic.metadata.postCount = topic.posts.length;
-
     // Update forum metadata
     forum.metadata.totalPosts += 1;
     forum.metadata.lastActivityAt = new Date();
@@ -74,8 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ 
       message: 'Post added successfully', 
-      post: newPost,
-      topic: topic
+      post: newPost
     });
   } catch (error) {
     console.error('Error adding post:', error);

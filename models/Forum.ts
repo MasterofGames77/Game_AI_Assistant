@@ -79,12 +79,13 @@ const ForumSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
-  description: {
+  title: {
     type: String,
     required: true,
     trim: true,
   },
-  topics: [TopicSchema],
+  isPrivate: { type: Boolean, default: false },
+  allowedUsers: [{ type: String }],
   createdAt: {
     type: Date,
     default: Date.now,
@@ -94,40 +95,19 @@ const ForumSchema = new mongoose.Schema({
     default: Date.now,
   },
   createdBy: { type: String, required: true },
+  posts: [PostSchema],
   metadata: {
-    category: { type: String, required: true },
-    tags: [{ type: String }],
-    totalTopics: { type: Number, default: 0 },
     totalPosts: { type: Number, default: 0 },
     lastActivityAt: { type: Date, default: Date.now },
-    lastActiveUser: { type: String },
     viewCount: { type: Number, default: 0 },
-    status: { 
-      type: String, 
-      enum: ['active', 'maintenance', 'archived'],
+    status: {
+      type: String,
+      enum: ['active', 'archived', 'locked'],
       default: 'active'
-    },
-    moderators: [{ type: String }],
-    settings: {
-      allowNewTopics: { type: Boolean, default: true },
-      requireApproval: { type: Boolean, default: false },
-      maxTopicsPerUser: { type: Number, default: 10 },
-      maxPostsPerTopic: { type: Number, default: 1000 }
     }
   }
 }, {
   timestamps: true
-});
-
-// Add middleware to update metadata
-ForumSchema.pre('save', function(this: any, next) {
-  this.metadata.totalTopics = this.topics.length;
-  this.metadata.totalPosts = this.topics.reduce((acc: number, topic: any) => {
-    return acc + (topic.posts ? topic.posts.length : 0);
-  }, 0);
-  this.metadata.lastActivityAt = new Date();
-  this.updatedAt = new Date();
-  next();
 });
 
 // Create compound indexes for better query performance
@@ -138,11 +118,6 @@ TopicSchema.index({ allowedUsers: 1 });
 ForumSchema.index({ 'metadata.gameTitle': 1 });
 ForumSchema.index({ 'metadata.category': 1 });
 ForumSchema.index({ 'metadata.tags': 1 });
-
-// Virtual for active topics
-ForumSchema.virtual('activeTopics').get(function() {
-  return this.topics.filter(topic => topic && topic.metadata && topic.metadata.status === 'active');
-});
 
 ForumSchema.methods.updateActivity = async function(userId: string) {
   this.metadata.lastActivityAt = new Date();

@@ -5,8 +5,8 @@ import axios from "axios";
 import Sidebar from "../components/Sidebar";
 import Image from "next/image";
 import { Conversation } from "../types";
-// import ForumList from "../components/ForumList";
-// import CreateTopic from "../components/CreateTopic";
+import ForumList from "../components/ForumList";
+import { ForumProvider } from "../context/ForumContext";
 // import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 // import { faPaperclip } from "@fortawesome/free-solid-svg-icons";
 
@@ -22,8 +22,9 @@ export default function Home() {
   const [metrics, setMetrics] = useState<any>({});
 
   const [activeView, setActiveView] = useState<"chat" | "forum">("chat");
-  // const [currentForumId, setCurrentForumId] = useState("");
-  // const [forumTopics, setForumTopics] = useState([]);
+  const [currentForumId, setCurrentForumId] = useState("");
+  const [forumTopics, setForumTopics] = useState([]);
+  const [isForumReady, setIsForumReady] = useState(false);
 
   // Comment out image state variables
   // const [image, setImage] = useState<File | null>(null);
@@ -200,37 +201,56 @@ export default function Home() {
   //   }
   // };
 
-  // const handleTopicCreated = (forumId: string) => {
-  //   setCurrentForumId(forumId);
-  // };
-
+  // Add forum initialization effect
   // useEffect(() => {
-  //   const fetchForums = async () => {
-  //     if (activeView === "forum") {
+  //   if (userId && activeView === "forum") {
+  //     const initializeForum = async () => {
   //       try {
-  //         const userId = localStorage.getItem("userId");
-  //         const response = await axios.get("/api/getAllForums", {
-  //           params: { userId },
-  //         });
-  //         setForumTopics(response.data);
+  //         // Check if we have necessary auth
+  //         let authToken = localStorage.getItem("authToken");
+  //         if (!authToken) {
+  //           // Create a temporary auth token for development
+  //           if (process.env.NODE_ENV === "development") {
+  //             authToken = "dev-" + Date.now();
+  //             localStorage.setItem("authToken", authToken);
+  //           } else {
+  //             setError("Authentication required for forum access");
+  //             return;
+  //           }
+  //         }
+  //         setIsForumReady(true);
   //       } catch (error) {
-  //         console.error("Error fetching forums:", error);
+  //         console.error("Error initializing forum:", error);
+  //         setError("Failed to initialize forum system");
+  //         setIsForumReady(false);
   //       }
-  //     }
-  //   };
-  //   fetchForums();
-  // }, [activeView]);
+  //     };
 
-  // const renderForumSection = () => (
-  //   <div className="w-full mt-4">
-  //     <CreateTopic onTopicCreated={handleTopicCreated} />
-  //     <ForumList
-  //       forumId={currentForumId}
-  //       key={currentForumId}
-  //       initialTopics={forumTopics}
-  //     />
-  //   </div>
-  // );
+  //     initializeForum();
+  //   }
+  // }, [userId, activeView]);
+
+  // const renderForumSection = () => {
+  //   if (!userId) {
+  //     return (
+  //       <div className="text-center p-4">Please log in to access forums</div>
+  //     );
+  //   }
+
+  //   if (!isForumReady) {
+  //     return (
+  //       <div className="text-center p-4">Initializing forum system...</div>
+  //     );
+  //   }
+
+  //   return (
+  //     <ForumProvider>
+  //       <div className="w-full mt-4">
+  //         <ForumList />
+  //       </div>
+  //     </ForumProvider>
+  //   );
+  // };
 
   // function to clear the form
   const handleClear = () => {
@@ -369,10 +389,10 @@ export default function Home() {
                 Chat
               </button>
               <button
-                className="px-4 py-2 rounded bg-gray-300 text-gray-500 cursor-not-allowed"
+                className={`px-4 py-2 rounded bg-blue-600 text-white font-semibold ml-2 opacity-50 cursor-not-allowed`}
                 disabled
               >
-                Forum (Coming Soon)
+                Coming soon
               </button>
             </div>
 
@@ -430,69 +450,73 @@ export default function Home() {
               </form>
             )}
 
+            {/* {activeView === "forum" && renderForumSection()} */}
+
             {loading && <div className="spinner mt-4"></div>}
             {error && <div className="mt-4 text-red-500">{error}</div>}
-            {(response || selectedConversation?.response) && (
-              <div className="mt-8 w-full max-w-3xl">
-                <h2 className="text-2xl font-bold">Response</h2>
-                <div className="bg-gray-100 p-4 rounded response-box">
-                  {formatResponse(
-                    response || selectedConversation?.response || ""
-                  )}
-                </div>
-
-                {/* Display metrics if available */}
-                {Object.keys(metrics).length > 0 && (
-                  <div className="mt-4 text-xs text-gray-500">
-                    <details>
-                      <summary>Performance Metrics</summary>
-                      <div className="mt-2 p-2 bg-gray-100 rounded">
-                        {metrics.totalTime && (
-                          <p>
-                            Total time: {Number(metrics.totalTime).toFixed(2)}ms
-                          </p>
-                        )}
-                        {metrics.responseSize && (
-                          <p>
-                            Response size:{" "}
-                            {metrics.responseSize.kilobytes || "N/A"}
-                          </p>
-                        )}
-                        {metrics.aiCacheMetrics && (
-                          <p>
-                            Cache hit rate:{" "}
-                            {metrics.aiCacheMetrics.hitRate || "N/A"}
-                          </p>
-                        )}
-                      </div>
-                    </details>
+            {activeView === "chat" &&
+              (response || selectedConversation?.response) && (
+                <div className="mt-8 w-full max-w-3xl">
+                  <h2 className="text-2xl font-bold">Response</h2>
+                  <div className="bg-gray-100 p-4 rounded response-box">
+                    {formatResponse(
+                      response || selectedConversation?.response || ""
+                    )}
                   </div>
-                )}
 
-                {/* Move buttons below the response */}
-                <div className="mt-4 footer-buttons">
-                  <button
-                    onClick={handleTwitchAuth}
-                    className="mt-2 p-2 bg-blue-500 text-white rounded"
-                  >
-                    Login with Twitch
-                  </button>
+                  {/* Display metrics if available */}
+                  {Object.keys(metrics).length > 0 && (
+                    <div className="mt-4 text-xs text-gray-500">
+                      <details>
+                        <summary>Performance Metrics</summary>
+                        <div className="mt-2 p-2 bg-gray-100 rounded">
+                          {metrics.totalTime && (
+                            <p>
+                              Total time: {Number(metrics.totalTime).toFixed(2)}
+                              ms
+                            </p>
+                          )}
+                          {metrics.responseSize && (
+                            <p>
+                              Response size:{" "}
+                              {metrics.responseSize.kilobytes || "N/A"}
+                            </p>
+                          )}
+                          {metrics.aiCacheMetrics && (
+                            <p>
+                              Cache hit rate:{" "}
+                              {metrics.aiCacheMetrics.hitRate || "N/A"}
+                            </p>
+                          )}
+                        </div>
+                      </details>
+                    </div>
+                  )}
 
-                  {/* <button
+                  {/* Move buttons below the response */}
+                  <div className="mt-4 footer-buttons">
+                    <button
+                      onClick={handleTwitchAuth}
+                      className="mt-2 p-2 bg-blue-500 text-white rounded"
+                    >
+                      Login with Twitch
+                    </button>
+
+                    {/* <button
                     onClick={handleDiscordAuth}
                     className="mt-2 p-2 bg-[#5865F2] text-white rounded"
                   >
                     Login with Discord
                   </button> */}
-                  <button
-                    onClick={handleResetUserId}
-                    className="mt-2 p-2 bg-blue-500 text-white rounded"
-                  >
-                    Reset User ID
-                  </button>
+                    <button
+                      onClick={handleResetUserId}
+                      className="mt-2 p-2 bg-blue-500 text-white rounded"
+                    >
+                      Reset User ID
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
           </div>
         </>
       ) : (
