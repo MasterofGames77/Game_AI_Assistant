@@ -39,33 +39,15 @@ export default function CreateForum() {
   };
 
   return (
-    <div className="bg-white dark:bg-black p-6 rounded-lg shadow-md mb-6">
+    <div className="create-forum-container max-w-2xl mx-auto p-6 bg-white dark:bg-black rounded-lg shadow mb-6">
       <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
         Create New Forum
       </h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label
-            htmlFor="title"
-            className="block text-sm font-medium text-gray-400 dark:text-gray-200"
-          >
-            Forum Title
-          </label>
-          <input
-            type="text"
-            id="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-900 dark:text-white"
-            placeholder="Forum title"
-            required
-          />
-        </div>
-
-        <div>
-          <label
             htmlFor="gameTitle"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1"
           >
             Game Title
           </label>
@@ -74,8 +56,8 @@ export default function CreateForum() {
             id="gameTitle"
             value={gameTitle}
             onChange={(e) => setGameTitle(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-900 dark:text-white"
-            placeholder="Game title"
+            placeholder="Enter game title"
+            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 dark:bg-gray-800 dark:text-white dark:border-gray-600"
             required
           />
         </div>
@@ -83,7 +65,7 @@ export default function CreateForum() {
         <div>
           <label
             htmlFor="category"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1"
           >
             Category
           </label>
@@ -91,7 +73,7 @@ export default function CreateForum() {
             id="category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white placeholder-gray-400 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-900 dark:text-white"
+            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 dark:bg-gray-800 dark:text-white dark:border-gray-600"
             required
           >
             <option value="">Select a category</option>
@@ -101,6 +83,24 @@ export default function CreateForum() {
             <option value="general">General Discussion</option>
             <option value="help">Help & Support</option>
           </select>
+        </div>
+
+        <div>
+          <label
+            htmlFor="title"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1"
+          >
+            Forum Title
+          </label>
+          <input
+            type="text"
+            id="title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Enter forum title"
+            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 dark:bg-gray-800 dark:text-white dark:border-gray-600"
+            required
+          />
         </div>
 
         <div className="flex items-center">
@@ -121,13 +121,15 @@ export default function CreateForum() {
 
         {error && <p className="text-red-500 text-sm">{error}</p>}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-half py-2 px-4 rounded-md shadow-sm text-base font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-        >
-          {loading ? "Creating..." : "Create Forum"}
-        </button>
+        <div className="flex justify-center">
+          <button
+            type="submit"
+            disabled={loading}
+            className="py-2 px-4 rounded-md shadow-sm text-base font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+          >
+            {loading ? "Creating..." : "Create Forum"}
+          </button>
+        </div>
       </form>
     </div>
   );
