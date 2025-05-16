@@ -202,6 +202,19 @@ const OFFENSIVE_WORDS = [
   'Rodney Scott',
   'Steve Moore',
   'Robert Wolf',
+  'Salvatore Cordileone',
+  'Thom Tillis',
+  'Jason Smith',
+  'John Sauer',
+  'Zach Rehl',
+  'Jessica Watkins',
+  'Kenneth Harrelson',
+  'Kyle Young',
+  'Robert Morss',
+  'Kelly Meggs',
+  'Joseph Hackett',
+  'Dominic Pezzola',
+  'Tim Hale',
   'herpes',
   'genitalia',
   'genitals',
@@ -252,7 +265,8 @@ const OFFENSIVE_WORDS = [
   'Order of the Black Sun',
   'Blood Tribe',
   'Patriot Front',
-  'Atomwaffen Division'
+  'Atomwaffen Division',
+  'Phyllis Schlafly Eagles'
   // I do not approve any of these words, names, organizations and or phrases being used in this application.
 ];
 
