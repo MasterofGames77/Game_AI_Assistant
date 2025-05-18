@@ -358,7 +358,17 @@ export const analyzeUserQuestions = (questions: Array<{ question: string, respon
     "action rpg": "Action Role-Playing Game",
     "action role-playing game": "Action Role-Playing Game",
     "immersive sim": "Immersive Sim",
-    "Construction and management simulation": "Construction and Management Simulation"
+    "Construction and management simulation": "Construction and Management Simulation",
+    "vehicle simulation": "Vehicle Simulation",
+    "real-time tactics": "Real-Time Tactics",
+    "grand strategy": "Grand Strategy",
+    "gacha": "Gacha",
+    "photography": "Photography",
+    "idle": "Incremental",
+    "incremental": "Incremental",
+    "mmofps": "Massively Multiplayer Online First-Person Shooter",
+    "mmorts": "Massively Multiplayer Online Real-Time Strategy",
+    "mmotbs": "Massively Multiplayer Online Turn-Based Strategy",
   };
 
   // Loop through each question and count the occurrences of each genre based on keywords

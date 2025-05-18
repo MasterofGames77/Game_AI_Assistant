@@ -79,6 +79,7 @@ const OFFENSIVE_WORDS = [
   'Al Qaeda',
   'Taliban',
   'ISIS',
+  'Qatar',
   'Osama Bin Laden',
   'qanon',
   'cum',
