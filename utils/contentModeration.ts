@@ -34,6 +34,8 @@ const OFFENSIVE_WORDS = [
   'Benjamin Netanyahu',
   'Viktor Orbán',
   'Xi Jinping',
+  'Ayatollah Ali Khamenei',
+  'Ahmed al‑Sharaa',
   'Adolf Hitler',
   'Hitler',
   'Augusto Pinochet',
@@ -126,6 +128,7 @@ const OFFENSIVE_WORDS = [
   'Tim Scott',
   'Vivek Ramaswamy',
   'Kash Patel',
+  'Dan Bongino',
   'Mike Johnson',
   'Kyle Rittenhouse',
   'Rick Scott',
@@ -160,6 +163,7 @@ const OFFENSIVE_WORDS = [
   'Aileen Cannon',
   'Tommy Tuberville',
   'Dr. Oz',
+  'Mehmet Oz',
   'Greg Abbott',
   'Enrique Tarrio',
   'Steward Rhodes',
@@ -216,6 +220,8 @@ const OFFENSIVE_WORDS = [
   'Joseph Hackett',
   'Dominic Pezzola',
   'Tim Hale',
+  'Sean Combs',
+  'Bret Baier',
   'herpes',
   'genitalia',
   'genitals',
@@ -255,6 +261,7 @@ const OFFENSIVE_WORDS = [
   'neek',
   'prick',
   'twat',
+  'gooning',
   'buttfucker',
   'buttfucked',
   'pussy hole',
@@ -267,7 +274,8 @@ const OFFENSIVE_WORDS = [
   'Blood Tribe',
   'Patriot Front',
   'Atomwaffen Division',
-  'Phyllis Schlafly Eagles'
+  'Phyllis Schlafly Eagles',
+  'Religious Liberty Commission'
   // I do not approve any of these words, names, organizations and or phrases being used in this application.
 ];
 
