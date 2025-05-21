@@ -5,8 +5,8 @@ import axios from "axios";
 import Sidebar from "../components/Sidebar";
 import Image from "next/image";
 import { Conversation } from "../types";
-import ForumList from "../components/ForumList";
-import { ForumProvider } from "../context/ForumContext";
+// import ForumList from "../components/ForumList";
+// import { ForumProvider } from "../context/ForumContext";
 // import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 // import { faPaperclip } from "@fortawesome/free-solid-svg-icons";
 
