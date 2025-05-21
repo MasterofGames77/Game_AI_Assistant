@@ -28,8 +28,8 @@ interface IWingmanUser extends Document {
       simulationSpecialist?: number;
       shooterSpecialist?: number;
       puzzlePro?: number;
-      racingExpert?: number;
-      stealthSpecialist?: number;
+      racingRengade?: number;
+      stealthExpert?: number;
       horrorHero?: number;
       triviaMaster?: number;
       storySeeker?: number;
@@ -144,8 +144,8 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
               simulationSpecialist: 0,
               shooterSpecialist: 0,
               puzzlePro: 0,
-              racingExpert: 0,
-              stealthSpecialist: 0,
+              racingRenegade: 0,
+              stealthExpert: 0,
               horrorHero: 0,
               triviaMaster: 0,
               storySeeker: 0,

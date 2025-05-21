@@ -16,8 +16,8 @@ interface Progress {
   adventureAddict?: number;
   shooterSpecialist?: number;
   puzzlePro?: number;
-  racingExpert?: number;
-  stealthSpecialist?: number;
+  racingRenegade?: number;
+  stealthExpert?: number;
   horrorHero?: number;
   triviaMaster?: number;
   storySeeker?: number;
@@ -73,8 +73,8 @@ const UserSchema = new Schema<IUser>({
     adventureAddict: { type: Number, default: 0 },
     shooterSpecialist: { type: Number, default: 0 },
     puzzlePro: { type: Number, default: 0 },
-    racingExpert: { type: Number, default: 0 },
-    stealthSpecialist: { type: Number, default: 0 },
+    racingRenegade: { type: Number, default: 0 },
+    stealthExpert: { type: Number, default: 0 },
     horrorHero: { type: Number, default: 0 },
     triviaMaster: { type: Number, default: 0 },
     storySeeker: { type: Number, default: 0 },

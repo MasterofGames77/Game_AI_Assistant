@@ -438,8 +438,8 @@ export const checkQuestionType = (question: string): string | null => {
     simulationSpecialist: ['simulation', 'sim', 'management', 'construction', 'management simulation', 'town', 'city'],
     fightingFanatic: ['fighting', 'combo', 'cancel', 'air dodge', 'frame', 'mixup', 'throw', 'hit stun', 'stun lock', 'block'],
     puzzlePro: ['puzzle', 'solve', 'riddle', 'brain teaser', 'logic'],
-    racingExpert: ['racing', 'race', 'drift', 'track', 'lap', 'speed', 'kart'],
-    stealthSpecialist: ['stealth', 'sneak', 'hide', 'assassination', 'silent'],
+    racingRenegade: ['racing', 'race', 'drift', 'track', 'lap', 'speed', 'kart'],
+    stealthExpert: ['stealth', 'sneak', 'hide', 'assassination', 'silent'],
     horrorHero: ['horror', 'scary', 'survival horror', 'fear', 'terror'],
     storySeeker: ['story', 'narrative', 'plot', 'dialogue', 'cutscene', 'cinematic', 'visual novel'],
     triviaMaster: ['trivia', 'quiz', 'knowledge', 'question', 'answer', 'category'],
@@ -457,14 +457,13 @@ export const checkQuestionType = (question: string): string | null => {
   if (simulationGames.some(game => lowerQuestion.includes(game))) return "simulationSpecialist";
   if (battleRoyaleGames.some(game => lowerQuestion.includes(game))) return "battleRoyale";
   if (sportsGames.some(game => lowerQuestion.includes(game))) return "sportsChampion";
-  if (racingGames.some(game => lowerQuestion.includes(game))) return "racingExpert";
-  if (stealthGames.some(game => lowerQuestion.includes(game))) return "stealthSpecialist";
+  if (racingGames.some(game => lowerQuestion.includes(game))) return "racingRenegade";
+  if (stealthGames.some(game => lowerQuestion.includes(game))) return "stealthExpert";
   if (horrorGames.some(game => lowerQuestion.includes(game))) return "horrorHero";
   if (adventureGames.some(game => lowerQuestion.includes(game))) return "adventureAddict";
   if (fightingGames.some(game => lowerQuestion.includes(game))) return "fightingFanatic";
   if (visualNovelGames.some(game => lowerQuestion.includes(game))) return "storySeeker";
   if (puzzleGames.some(game => lowerQuestion.includes(game))) return "puzzlePro";
-  if (visualNovelGames.some(game => lowerQuestion.includes(game))) return "storySeeker";
   if (beatEmUpGames.some(game => lowerQuestion.includes(game))) return "beatEmUpBrawler";
   if (rhythmGames.some(game => lowerQuestion.includes(game))) return "rhythmMaster";
 
@@ -530,8 +529,8 @@ export const checkAndAwardAchievements = async (userId: string, progress: any, s
     { name: 'Fighting Fanatic', field: 'fightingFanatic', threshold: 5 },
     { name: 'Simulation Specialist', field: 'simulationSpecialist', threshold: 5 },
     { name: 'Puzzle Pro', field: 'puzzlePro', threshold: 5 },
-    { name: 'Racing Expert', field: 'racingExpert', threshold: 5 },
-    { name: 'Stealth Specialist', field: 'stealthSpecialist', threshold: 5 },
+    { name: 'Racing Renegade', field: 'racingRenegade', threshold: 5 },
+    { name: 'Stealth Expert', field: 'stealthExpert', threshold: 5 },
     { name: 'Horror Hero', field: 'horrorHero', threshold: 5 },
     { name: 'Trivia Master', field: 'triviaMaster', threshold: 5 },
     { name: 'Story Seeker', field: 'storySeeker', threshold: 5 },
@@ -803,8 +802,8 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
                     adventureAddict: 0,
                     shooterSpecialist: 0,
                     puzzlePro: 0,
-                    racingExpert: 0,
-                    stealthSpecialist: 0,
+                    racingRenegade: 0,
+                    stealthExpert: 0,
                     horrorHero: 0,
                     triviaMaster: 0,
                     storySeeker: 0,
