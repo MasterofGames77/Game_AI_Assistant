@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useForum } from "../../../context/ForumContext";
-import { useRouter } from "next/navigation";
 import { ForumProvider } from "../../../context/ForumContext";
+import axios from "axios";
+import { useRouter } from "next/navigation";
 
 export default function ForumPageWrapper({
   params,
@@ -29,19 +30,25 @@ function ForumPage({ params }: { params: { forumId: string } }) {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const router = useRouter();
 
   useEffect(() => {
-    const forum = forums.find(
-      (f) => f._id === params.forumId || f.forumId === params.forumId
-    );
-    if (forum) {
-      setCurrentForum(forum);
-      setLoading(false);
-    } else {
-      setError("Forum not found");
-      setLoading(false);
-    }
-  }, [params.forumId, forums, setCurrentForum]);
+    const fetchForum = async () => {
+      try {
+        const userId = localStorage.getItem("userId") || "test-user";
+        const response = await axios.get(
+          `/api/getForumTopic?forumId=${params.forumId}&userId=${userId}&incrementView=false`
+        );
+        setCurrentForum(response.data);
+        setLoading(false);
+      } catch (err: any) {
+        setError(err.message || "Failed to load forum");
+        setLoading(false);
+      }
+    };
+
+    fetchForum();
+  }, [params.forumId, setCurrentForum]);
 
   const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +57,12 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     try {
       await addPost(params.forumId, message);
       setMessage("");
+      // Fetch updated forum data
+      const userId = localStorage.getItem("userId") || "test-user";
+      const response = await axios.get(
+        `/api/getForumTopic?forumId=${params.forumId}&userId=${userId}&incrementView=false`
+      );
+      setCurrentForum(response.data);
     } catch (err: any) {
       setError(err.message || "Failed to add post");
     }
@@ -60,6 +73,12 @@ function ForumPage({ params }: { params: { forumId: string } }) {
 
     try {
       await deletePost(params.forumId, postId);
+      // Fetch updated forum data
+      const userId = localStorage.getItem("userId") || "test-user";
+      const response = await axios.get(
+        `/api/getForumTopic?forumId=${params.forumId}&userId=${userId}&incrementView=false`
+      );
+      setCurrentForum(response.data);
     } catch (err: any) {
       setError(err.message || "Failed to delete post");
     }
@@ -85,80 +104,88 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     return <div>Forum not found</div>;
   }
 
-  // Commented out forum content rendering for debugging
-  // return (
-  //   <div className="max-w-4xl mx-auto p-4">
-  //     <div className="mb-8">
-  //       <h1 className="text-3xl font-bold mb-2">{currentForum.title}</h1>
-  //       <div className="text-gray-600">
-  //         <p>Game: {currentForum.gameTitle}</p>
-  //         <p>Category: {currentForum.category}</p>
-  //         <p>Status: {currentForum.metadata.status}</p>
-  //         <p>Total Posts: {currentForum.posts?.length || 0}</p>
-  //         <p>Views: {currentForum.metadata.viewCount}</p>
-  //       </div>
-  //     </div>
-  //
-  //     <div className="mb-8">
-  //       <form onSubmit={handlePostSubmit} className="space-y-4">
-  //         <textarea
-  //           value={message}
-  //           onChange={(e) => setMessage(e.target.value)}
-  //           placeholder="Write your post..."
-  //           className="w-full p-2 border border-gray-300 rounded"
-  //           rows={4}
-  //           required
-  //         />
-  //         <button
-  //           type="submit"
-  //           className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-  //         >
-  //           Post
-  //         </button>
-  //       </form>
-  //     </div>
-  //
-  //     <div className="space-y-4">
-  //       {currentForum.posts?.map((post) => (
-  //         <div
-  //           key={post._id}
-  //           className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow"
-  //         >
-  //           <div className="flex justify-between items-start">
-  //             <div>
-  //               <p className="text-gray-600 mb-2">
-  //                 Posted by {post.createdBy} on{" "}
-  //                 {new Date(post.timestamp).toLocaleString()}
-  //               </p>
-  //               <p className="whitespace-pre-wrap">{post.message}</p>
-  //               <div className="mt-2 flex items-center space-x-4">
-  //                 <button
-  //                   onClick={() => handleLikePost(post._id)}
-  //                   className="text-blue-500 hover:text-blue-700"
-  //                 >
-  //                   {post.likes?.length || 0} Likes
-  //                 </button>
-  //                 {post.createdBy === localStorage.getItem("userId") && (
-  //                   <button
-  //                     onClick={() => handleDeletePost(post._id)}
-  //                     className="text-red-500 hover:text-red-700"
-  //                   >
-  //                     Delete
-  //                   </button>
-  //                 )}
-  //               </div>
-  //             </div>
-  //           </div>
-  //         </div>
-  //       ))}
-  //
-  //       {currentForum.posts?.length === 0 && (
-  //         <div className="text-center text-gray-500 py-8">
-  //           No posts yet. Be the first to post!
-  //         </div>
-  //       )}
-  //     </div>
-  //   </div>
-  // );
-  return null;
+  return (
+    <div className="max-w-4xl mx-auto p-4">
+      <button
+        onClick={() => router.push("/")}
+        className="mb-4 px-4 py-2 rounded font-semibold transition
+          bg-gray-200 text-gray-800 hover:bg-gray-300
+          dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600
+          border border-gray-300 dark:border-gray-600
+          shadow"
+      >
+        ← Back to Forums
+      </button>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">{currentForum.title}</h1>
+        <div className="text-gray-600">
+          <p>Game: {currentForum.gameTitle}</p>
+          <p>Category: {currentForum.category}</p>
+          <p>Status: {currentForum.metadata.status}</p>
+          <p>Total Posts: {currentForum.posts?.length || 0}</p>
+          <p>Views: {currentForum.metadata.viewCount}</p>
+        </div>
+      </div>
+
+      <div className="mb-8">
+        <form onSubmit={handlePostSubmit} className="space-y-4">
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Write your post..."
+            className="w-full p-2 border border-gray-300 rounded"
+            rows={4}
+            required
+          />
+          <button
+            type="submit"
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Post
+          </button>
+        </form>
+      </div>
+
+      <div className="space-y-4">
+        {currentForum.posts?.map((post) => (
+          <div
+            key={post._id}
+            className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow"
+          >
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-gray-600 mb-2">
+                  Posted by {post.createdBy} on{" "}
+                  {new Date(post.timestamp).toLocaleString()}
+                </p>
+                <p className="whitespace-pre-wrap">{post.message}</p>
+                <div className="mt-2 flex items-center space-x-4">
+                  <button
+                    onClick={() => handleLikePost(post._id)}
+                    className="text-blue-500 hover:text-blue-700"
+                  >
+                    {post.likes?.length || 0} Likes
+                  </button>
+                  {post.createdBy === localStorage.getItem("userId") && (
+                    <button
+                      onClick={() => handleDeletePost(post._id)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {currentForum.posts?.length === 0 && (
+          <div className="text-center text-gray-500 py-8">
+            No posts yet. Be the first to post!
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }

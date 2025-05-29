@@ -44,7 +44,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Create new post
     const newPost = {
-      _id: new Date().getTime().toString(), // Temporary ID until MongoDB assigns one
       userId,
       message: message.trim(),
       timestamp: new Date(),
@@ -67,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ 
       message: 'Post added successfully', 
-      post: newPost
+      forum
     });
   } catch (error) {
     console.error('Error adding post:', error);

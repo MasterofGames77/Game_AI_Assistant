@@ -7,7 +7,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { forumId, userId } = req.query;
+  const { forumId, userId, incrementView } = req.query;
 
   if (!forumId) {
     return res.status(400).json({ error: 'Forum ID is required' });
@@ -31,9 +31,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ error: 'Forum is not active' });
     }
 
-    // Increment view count
-    forum.metadata.viewCount += 1;
-    await forum.save();
+    if (incrementView !== "false") {
+      forum.metadata.viewCount += 1;
+      await forum.save();
+    }
 
     // Return forum with posts
     return res.status(200).json(forum);

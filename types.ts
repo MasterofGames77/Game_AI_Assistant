@@ -7,10 +7,15 @@ export interface Conversation {
 }
 
 export interface SideBarProps {
-  userId: string;
+  conversations: Conversation[];
   onSelectConversation: (conversation: Conversation) => void;
   onDeleteConversation: () => void;
-  conversations: Conversation[];
+  onClear: () => void;
+  onResetUserId: () => void;
+  onTwitchAuth: () => void;
+  activeView: "chat" | "forum";
+  setActiveView: (view: "chat" | "forum") => void;
+  conversationCount: number;
 }
 
 export interface UserViolation {

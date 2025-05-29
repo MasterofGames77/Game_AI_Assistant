@@ -5,8 +5,9 @@ import axios from "axios";
 import Sidebar from "../components/Sidebar";
 import Image from "next/image";
 import { Conversation } from "../types";
-// import ForumList from "../components/ForumList";
-// import { ForumProvider } from "../context/ForumContext";
+import ForumList from "../components/ForumList";
+import { ForumProvider } from "../context/ForumContext";
+import { useRouter } from "next/navigation";
 // import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 // import { faPaperclip } from "@fortawesome/free-solid-svg-icons";
 
@@ -22,13 +23,12 @@ export default function Home() {
   const [metrics, setMetrics] = useState<any>({});
 
   const [activeView, setActiveView] = useState<"chat" | "forum">("chat");
-  const [currentForumId, setCurrentForumId] = useState("");
-  const [forumTopics, setForumTopics] = useState([]);
-  const [isForumReady, setIsForumReady] = useState(false);
 
   // Comment out image state variables
   // const [image, setImage] = useState<File | null>(null);
   // const [imageUrl, setImageUrl] = useState<string | null>(null);
+
+  const router = useRouter();
 
   useEffect(() => {
     const initializeUser = async () => {
@@ -201,57 +201,6 @@ export default function Home() {
   //   }
   // };
 
-  // Add forum initialization effect
-  // useEffect(() => {
-  //   if (userId && activeView === "forum") {
-  //     const initializeForum = async () => {
-  //       try {
-  //         // Check if we have necessary auth
-  //         let authToken = localStorage.getItem("authToken");
-  //         if (!authToken) {
-  //           // Create a temporary auth token for development
-  //           if (process.env.NODE_ENV === "development") {
-  //             authToken = "dev-" + Date.now();
-  //             localStorage.setItem("authToken", authToken);
-  //           } else {
-  //             setError("Authentication required for forum access");
-  //             return;
-  //           }
-  //         }
-  //         setIsForumReady(true);
-  //       } catch (error) {
-  //         console.error("Error initializing forum:", error);
-  //         setError("Failed to initialize forum system");
-  //         setIsForumReady(false);
-  //       }
-  //     };
-
-  //     initializeForum();
-  //   }
-  // }, [userId, activeView]);
-
-  // const renderForumSection = () => {
-  //   if (!userId) {
-  //     return (
-  //       <div className="text-center p-4">Please log in to access forums</div>
-  //     );
-  //   }
-
-  //   if (!isForumReady) {
-  //     return (
-  //       <div className="text-center p-4">Initializing forum system...</div>
-  //     );
-  //   }
-
-  //   return (
-  //     <ForumProvider>
-  //       <div className="w-full mt-4">
-  //         <ForumList />
-  //       </div>
-  //     </ForumProvider>
-  //   );
-  // };
-
   // function to clear the form
   const handleClear = () => {
     setQuestion("");
@@ -344,184 +293,195 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex">
-      {userId ? (
-        <>
-          <Sidebar
-            userId={userId}
-            onSelectConversation={setSelectedConversation}
-            onDeleteConversation={handleDeleteConversation}
-            conversations={conversations}
+    <div className="flex min-h-screen">
+      <Sidebar
+        conversations={conversations}
+        onSelectConversation={setSelectedConversation}
+        onDeleteConversation={handleDeleteConversation}
+        onClear={handleClear}
+        onResetUserId={handleResetUserId}
+        onTwitchAuth={handleTwitchAuth}
+        activeView={activeView}
+        setActiveView={setActiveView}
+        conversationCount={conversationCount}
+      />
+      <div className="flex-1 overflow-y-auto ml-64">
+        <div className="flex-1 flex flex-col items-center justify-center py-2 main-content">
+          <Image
+            src="/assets/video-game-wingman-logo.png"
+            alt="Video Game Wingman Logo"
+            className="logo"
+            width={350}
+            height={350}
+            priority={true}
           />
-          <div className="flex-1 flex flex-col items-center justify-center py-2 main-content">
-            <Image
-              src="/assets/video-game-wingman-logo.png"
-              alt="Video Game Wingman Logo"
-              className="logo"
-              width={350}
-              height={350}
-              priority={true}
-            />
 
-            {conversationCount > 0 && (
-              <p className="text-sm text-gray-600 mt-2">
-                You have {conversationCount} saved conversation
-                {conversationCount !== 1 ? "s" : ""}
-              </p>
-            )}
+          {conversationCount > 0 && (
+            <p className="text-sm text-gray-600 mt-2">
+              You have {conversationCount} saved conversation
+              {conversationCount !== 1 ? "s" : ""}
+            </p>
+          )}
 
-            <ul className="mt-4 text-lg text-center">
-              <li>Discover a game&apos;s hidden secrets.</li>
-              <li>Get personalized game recommendations.</li>
-              <li>Analyze gameplay data to improve your strategies.</li>
-              <li>Access detailed game guides.</li>
-            </ul>
+          <ul className="mt-4 text-lg text-center">
+            <li>Discover a game&apos;s hidden secrets.</li>
+            <li>Get personalized game recommendations.</li>
+            <li>Analyze gameplay data to improve your strategies.</li>
+            <li>Access detailed game guides.</li>
+          </ul>
 
-            <div className="flex space-x-4 mb-4">
-              <button
-                className={`px-4 py-2 rounded ${
-                  activeView === "chat"
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 text-gray-700"
-                }`}
-                onClick={() => setActiveView("chat")}
-              >
-                Chat
-              </button>
-              <button
-                className={`px-4 py-2 rounded bg-blue-600 text-white font-semibold ml-2 opacity-50 cursor-not-allowed`}
-                disabled
-              >
-                Forum (Coming Soon)
-              </button>
-            </div>
-
-            {activeView === "chat" && (
-              <form onSubmit={handleSubmit} className="w-full max-w-md mt-2">
-                <input
-                  type="text"
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  placeholder="Message Video Game Wingman"
-                  className="w-full p-2 border border-gray-300 rounded mb-4"
-                />
-
-                {/* Comment out image upload UI section
-                <div className="mb-4">
-                  <label className="cursor-pointer flex items-center gap-2">
-                    <FontAwesomeIcon icon={faPaperclip} size="lg" />
-                    <span>Attach Screenshot</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      style={{ display: "none" }}
-                    />
-                  </label>
-                  {imageUrl && (
-                    <div className="mt-2">
-                      <Image
-                        src={imageUrl}
-                        alt="Selected"
-                        width={200}
-                        height={200}
-                        className="rounded"
-                      />
-                    </div>
-                  )}
-                </div>
-                */}
-
-                <div className="flex space-x-4">
-                  <button
-                    type="submit"
-                    className="w-full p-2 bg-blue-500 text-white rounded"
-                  >
-                    Submit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleClear}
-                    className="w-full p-2 bg-blue-500 text-white rounded"
-                  >
-                    Clear
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* {activeView === "forum" && renderForumSection()} */}
-
-            {loading && <div className="spinner mt-4"></div>}
-            {error && <div className="mt-4 text-red-500">{error}</div>}
-            {activeView === "chat" &&
-              (response || selectedConversation?.response) && (
-                <div className="mt-8 w-full max-w-3xl">
-                  <h2 className="text-2xl font-bold">Response</h2>
-                  <div className="bg-gray-100 p-4 rounded response-box">
-                    {formatResponse(
-                      response || selectedConversation?.response || ""
-                    )}
-                  </div>
-
-                  {/* Display metrics if available */}
-                  {Object.keys(metrics).length > 0 && (
-                    <div className="mt-4 text-xs text-gray-500">
-                      <details>
-                        <summary>Performance Metrics</summary>
-                        <div className="mt-2 p-2 bg-gray-100 rounded">
-                          {metrics.totalTime && (
-                            <p>
-                              Total time: {Number(metrics.totalTime).toFixed(2)}
-                              ms
-                            </p>
-                          )}
-                          {metrics.responseSize && (
-                            <p>
-                              Response size:{" "}
-                              {metrics.responseSize.kilobytes || "N/A"}
-                            </p>
-                          )}
-                          {metrics.aiCacheMetrics && (
-                            <p>
-                              Cache hit rate:{" "}
-                              {metrics.aiCacheMetrics.hitRate || "N/A"}
-                            </p>
-                          )}
-                        </div>
-                      </details>
-                    </div>
-                  )}
-
-                  {/* Move buttons below the response */}
-                  <div className="mt-4 footer-buttons">
-                    <button
-                      onClick={handleTwitchAuth}
-                      className="mt-2 p-2 bg-blue-500 text-white rounded"
-                    >
-                      Login with Twitch
-                    </button>
-
-                    {/* <button
-                    onClick={handleDiscordAuth}
-                    className="mt-2 p-2 bg-[#5865F2] text-white rounded"
-                  >
-                    Login with Discord
-                  </button> */}
-                    <button
-                      onClick={handleResetUserId}
-                      className="mt-2 p-2 bg-blue-500 text-white rounded"
-                    >
-                      Reset User ID
-                    </button>
-                  </div>
-                </div>
-              )}
+          <div className="flex space-x-4 mb-4">
+            <button
+              className={`px-4 py-2 rounded ${
+                activeView === "chat"
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-200 text-gray-700"
+              }`}
+              onClick={() => setActiveView("chat")}
+            >
+              Chat
+            </button>
+            <button
+              className={`px-4 py-2 rounded ${
+                activeView === "forum"
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-200 text-gray-700"
+              }`}
+              onClick={() => setActiveView("forum")}
+            >
+              Forum
+            </button>
           </div>
-        </>
-      ) : (
-        <p>Loading user ID...</p>
-      )}
+
+          {activeView === "chat" && (
+            <form onSubmit={handleSubmit} className="w-full max-w-md mt-2">
+              <input
+                type="text"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                placeholder="Message Video Game Wingman"
+                className="w-full p-2 border border-gray-300 rounded mb-4"
+              />
+
+              {/* Comment out image upload UI section
+              <div className="mb-4">
+                <label className="cursor-pointer flex items-center gap-2">
+                  <FontAwesomeIcon icon={faPaperclip} size="lg" />
+                  <span>Attach Screenshot</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    style={{ display: "none" }}
+                  />
+                </label>
+                {imageUrl && (
+                  <div className="mt-2">
+                    <Image
+                      src={imageUrl}
+                      alt="Selected"
+                      width={200}
+                      height={200}
+                      className="rounded"
+                    />
+                  </div>
+                )}
+              </div>
+              */}
+
+              <div className="flex space-x-4">
+                <button
+                  type="submit"
+                  className="w-full p-2 bg-blue-500 text-white rounded"
+                >
+                  Submit
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="w-full p-2 bg-blue-500 text-white rounded"
+                >
+                  Clear
+                </button>
+              </div>
+            </form>
+          )}
+
+          {activeView === "forum" && (
+            <ForumProvider>
+              <div className="w-full mt-4">
+                <ForumList />
+              </div>
+            </ForumProvider>
+          )}
+
+          {loading && <div className="spinner mt-4"></div>}
+          {error && <div className="mt-4 text-red-500">{error}</div>}
+          {activeView === "chat" &&
+            (response || selectedConversation?.response) && (
+              <div className="mt-8 w-full max-w-3xl">
+                <h2 className="text-2xl font-bold">Response</h2>
+                <div className="bg-gray-100 p-4 rounded response-box">
+                  {formatResponse(
+                    response || selectedConversation?.response || ""
+                  )}
+                </div>
+
+                {/* Display metrics if available */}
+                {Object.keys(metrics).length > 0 && (
+                  <div className="mt-4 text-xs text-gray-500">
+                    <details>
+                      <summary>Performance Metrics</summary>
+                      <div className="mt-2 p-2 bg-gray-100 rounded">
+                        {metrics.totalTime && (
+                          <p>
+                            Total time: {Number(metrics.totalTime).toFixed(2)}
+                            ms
+                          </p>
+                        )}
+                        {metrics.responseSize && (
+                          <p>
+                            Response size:{" "}
+                            {metrics.responseSize.kilobytes || "N/A"}
+                          </p>
+                        )}
+                        {metrics.aiCacheMetrics && (
+                          <p>
+                            Cache hit rate:{" "}
+                            {metrics.aiCacheMetrics.hitRate || "N/A"}
+                          </p>
+                        )}
+                      </div>
+                    </details>
+                  </div>
+                )}
+
+                {/* Move buttons below the response */}
+                <div className="mt-4 footer-buttons">
+                  <button
+                    onClick={handleTwitchAuth}
+                    className="mt-2 p-2 bg-blue-500 text-white rounded"
+                  >
+                    Login with Twitch
+                  </button>
+
+                  {/* <button
+                  onClick={handleDiscordAuth}
+                  className="mt-2 p-2 bg-[#5865F2] text-white rounded"
+                >
+                  Login with Discord
+                </button> */}
+                  <button
+                    onClick={handleResetUserId}
+                    className="mt-2 p-2 bg-blue-500 text-white rounded"
+                  >
+                    Reset User ID
+                  </button>
+                </div>
+              </div>
+            )}
+        </div>
+      </div>
     </div>
   );
 }
