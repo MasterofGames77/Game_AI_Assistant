@@ -6,6 +6,14 @@ import { Forum } from "../types";
 import CreateForum from "./CreateForum";
 import Link from "next/link";
 
+const categoryLabels: Record<string, string> = {
+  speedruns: "Speedruns",
+  hacks: "Hacks",
+  mods: "Mods",
+  general: "General Discussion",
+  help: "Help & Support",
+};
+
 export default function ForumList() {
   const { forums, fetchForums, deleteForum } = useForum();
   const [loading, setLoading] = useState(true);
@@ -73,7 +81,10 @@ export default function ForumList() {
                   {forum.title}
                 </Link>
                 <p className="text-gray-600 mt-1">
-                  Game: {forum.gameTitle} | Category: {forum.category}
+                  Game: {forum.gameTitle} | Category:{" "}
+                  {categoryLabels[forum.category] ||
+                    forum.category ||
+                    "Uncategorized"}
                 </p>
                 <div className="mt-2 text-sm text-gray-500">
                   <span className="mr-4">

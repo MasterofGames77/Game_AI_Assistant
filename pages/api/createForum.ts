@@ -53,7 +53,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Validate forum data
-    const forumData = { title, gameTitle, category, isPrivate };
+    const forumData = {
+      title,
+      gameTitle,
+      category,
+      isPrivate,
+      allowedUsers: isPrivate ? [userId] : [],
+    };
     const validationErrors = validateForumData(forumData);
     if (validationErrors.length > 0) {
       return res.status(400).json({ error: validationErrors[0] });
@@ -85,8 +91,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         lastActivityAt: new Date(),
         viewCount: 0,
         status: "active",
+        gameTitle,
+        category
       },
     });
+
+    const allowedCategories = ["speedruns", "hacks", "mods", "general", "help"];
+    if (!allowedCategories.includes(category)) {
+      return res.status(400).json({ error: "Invalid category" });
+    }
 
     return res.status(201).json({ forum });
   } catch (error: any) {

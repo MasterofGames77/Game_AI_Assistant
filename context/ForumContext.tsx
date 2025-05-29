@@ -19,9 +19,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
         `/api/getAllForums?page=${page}&limit=${limit}`,
         {
           headers: {
-            Authorization: `Bearer ${
-              localStorage.getItem("userId") || "test-user"
-            }`,
+            "user-id": localStorage.getItem("userId") || "test-user",
           },
         }
       );

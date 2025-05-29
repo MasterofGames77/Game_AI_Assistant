@@ -33,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const forums = await Forum.find({
       $or: [
         { isPrivate: false },
-        { isPrivate: true, allowedUsers: userId }
+        { allowedUsers: userId }
       ],
       'metadata.status': 'active'
     })
@@ -56,7 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const total = await Forum.countDocuments({
       $or: [
         { isPrivate: false },
-        { isPrivate: true, allowedUsers: userId }
+        { allowedUsers: userId }
       ],
       'metadata.status': 'active'
     });

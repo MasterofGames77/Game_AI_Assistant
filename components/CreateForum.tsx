@@ -3,6 +3,14 @@
 import { useState } from "react";
 import { useForum } from "../context/ForumContext";
 
+const categoryLabels: Record<string, string> = {
+  speedruns: "Speedruns",
+  hacks: "Hacks",
+  mods: "Mods",
+  general: "General Discussion",
+  help: "Help & Support",
+};
+
 export default function CreateForum() {
   const [title, setTitle] = useState("");
   const [gameTitle, setGameTitle] = useState("");
@@ -18,12 +26,16 @@ export default function CreateForum() {
     setError("");
 
     try {
-      const success = await createForum({
+      const userId = localStorage.getItem("userId") || "test-user";
+      const forumData = {
         title,
         gameTitle,
         category,
         isPrivate,
-      });
+        allowedUsers: isPrivate ? [userId] : [],
+      };
+
+      const success = await createForum(forumData);
 
       if (success) {
         setTitle("");
@@ -73,10 +85,11 @@ export default function CreateForum() {
             id="category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 dark:bg-gray-800 dark:text-white dark:border-gray-600"
             required
           >
-            <option value="">Select a category</option>
+            <option value="" disabled>
+              Select a category
+            </option>
             <option value="speedruns">Speedruns</option>
             <option value="hacks">Hacks</option>
             <option value="mods">Mods</option>

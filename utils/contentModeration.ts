@@ -222,6 +222,7 @@ const OFFENSIVE_WORDS = [
   'Tim Hale',
   'Sean Combs',
   'Bret Baier',
+  'Elliot Gaiser',
   'Robert Durst',
   'Ted Bundy',
   'herpes',
