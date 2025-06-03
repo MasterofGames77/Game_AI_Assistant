@@ -256,6 +256,13 @@ input[type="file"]:focus {
   background: #f9f9f9;
 }
 
+@media (prefers-color-scheme: dark) {
+  .forum-post {
+    background: #222;
+    border-color: #444;
+  }
+}
+
 .forum-list-container {
   max-width: 800px;
   margin: 20px auto;

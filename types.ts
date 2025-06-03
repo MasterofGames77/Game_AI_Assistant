@@ -65,6 +65,8 @@ export interface ForumPost {
     edited: boolean;
     editedAt?: Date;
     editedBy?: string;
+    likes?: number;
+    likedBy?: string[];
   };
 }
 
