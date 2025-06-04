@@ -16,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     await connectToMongoDB();
     
-    const forum = await Forum.findOne({ forumId });
+    const forum = await Forum.findOne({ forumId }).lean() as any;
     if (!forum) {
       return res.status(404).json({ error: 'Forum not found' });
     }
@@ -33,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (incrementView !== "false") {
       forum.metadata.viewCount += 1;
-      await forum.save();
+      await Forum.updateOne({ forumId }, { $set: { 'metadata.viewCount': forum.metadata.viewCount } });
     }
 
     // Return forum with posts

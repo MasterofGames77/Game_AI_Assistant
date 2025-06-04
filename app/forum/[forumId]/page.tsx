@@ -84,13 +84,13 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     }
   };
 
-  const handleLikePost = async (postId: string) => {
-    try {
-      await likePost(params.forumId, postId);
-    } catch (err: any) {
-      setError(err.message || "Failed to like post");
-    }
-  };
+  // const handleLikePost = async (postId: string) => {
+  //   try {
+  //     await likePost(params.forumId, postId);
+  //   } catch (err: any) {
+  //     setError(err.message || "Failed to like post");
+  //   }
+  // };
 
   if (loading) {
     return <div className="text-center">Loading forum...</div>;
@@ -114,11 +114,11 @@ function ForumPage({ params }: { params: { forumId: string } }) {
           border border-gray-300 dark:border-gray-600
           shadow"
       >
-        ← Back to Forums
+        ← Back to Main Page
       </button>
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">{currentForum.title}</h1>
-        <div className="text-gray-600">
+        <div className="mb-2 text-gray-800 dark:text-gray-200">
           <p>Game: {currentForum.gameTitle}</p>
           <p>Category: {currentForum.category}</p>
           <p>Status: {currentForum.metadata.status}</p>
@@ -132,7 +132,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Write your post..."
+            placeholder="What's new..?"
             className="w-full p-2 border border-gray-300 rounded"
             rows={4}
             required
@@ -150,28 +150,32 @@ function ForumPage({ params }: { params: { forumId: string } }) {
         {currentForum.posts?.map((post) => (
           <div
             key={post._id}
-            className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow"
+            className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow hover:shadow-md transition-shadow"
           >
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-gray-600 mb-2">
+                <p className="mb-2 text-gray-800 dark:text-gray-200">
                   Posted by {post.createdBy} on{" "}
                   {new Date(post.timestamp).toLocaleString()}
                 </p>
-                <p className="whitespace-pre-wrap">{post.message}</p>
+                <p className="whitespace-pre-wrap text-gray-900 dark:text-gray-100">
+                  {post.message}
+                </p>
                 <div className="mt-2 flex items-center space-x-4">
+                  {/* 
                   <button
                     onClick={() => handleLikePost(post._id)}
                     className="text-blue-500 hover:text-blue-700"
                   >
                     {post.likes?.length || 0} Likes
                   </button>
+                  */}
                   {post.createdBy === localStorage.getItem("userId") && (
                     <button
                       onClick={() => handleDeletePost(post._id)}
                       className="text-red-500 hover:text-red-700"
                     >
-                      Delete
+                      Delete Post
                     </button>
                   )}
                 </div>

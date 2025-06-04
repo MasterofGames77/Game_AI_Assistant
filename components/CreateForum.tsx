@@ -3,14 +3,6 @@
 import { useState } from "react";
 import { useForum } from "../context/ForumContext";
 
-const categoryLabels: Record<string, string> = {
-  speedruns: "Speedruns",
-  hacks: "Hacks",
-  mods: "Mods",
-  general: "General Discussion",
-  help: "Help & Support",
-};
-
 export default function CreateForum() {
   const [title, setTitle] = useState("");
   const [gameTitle, setGameTitle] = useState("");
