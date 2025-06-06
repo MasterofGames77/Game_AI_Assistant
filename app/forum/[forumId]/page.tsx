@@ -37,7 +37,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       try {
         const userId = localStorage.getItem("userId") || "test-user";
         const response = await axios.get(
-          `/api/getForumTopic?forumId=${params.forumId}&userId=${userId}&incrementView=false`
+          `/api/getForumTopic?forumId=${params.forumId}&userId=${userId}`
         );
         setCurrentForum(response.data);
         setLoading(false);
@@ -60,7 +60,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       // Fetch updated forum data
       const userId = localStorage.getItem("userId") || "test-user";
       const response = await axios.get(
-        `/api/getForumTopic?forumId=${params.forumId}&userId=${userId}&incrementView=false`
+        `/api/getForumTopic?forumId=${params.forumId}&userId=${userId}`
       );
       setCurrentForum(response.data);
     } catch (err: any) {
@@ -76,7 +76,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       // Fetch updated forum data
       const userId = localStorage.getItem("userId") || "test-user";
       const response = await axios.get(
-        `/api/getForumTopic?forumId=${params.forumId}&userId=${userId}&incrementView=false`
+        `/api/getForumTopic?forumId=${params.forumId}&userId=${userId}`
       );
       setCurrentForum(response.data);
     } catch (err: any) {

@@ -100,6 +100,7 @@ const ForumSchema = new mongoose.Schema({
     totalPosts: { type: Number, default: 0 },
     lastActivityAt: { type: Date, default: Date.now },
     viewCount: { type: Number, default: 0 },
+    viewedBy: [{ type: String }],
     status: {
       type: String,
       enum: ['active', 'archived', 'locked'],

@@ -32,8 +32,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (incrementView !== "false") {
-      forum.metadata.viewCount += 1;
-      await Forum.updateOne({ forumId }, { $set: { 'metadata.viewCount': forum.metadata.viewCount } });
+      // Only increment view count if user hasn't viewed this forum before
+      if (!forum.metadata.viewedBy?.includes(userId as string)) {
+        forum.metadata.viewCount += 1;
+        forum.metadata.viewedBy = [...(forum.metadata.viewedBy || []), userId];
+        await Forum.updateOne(
+          { forumId },
+          { 
+            $set: { 
+              'metadata.viewCount': forum.metadata.viewCount,
+              'metadata.viewedBy': forum.metadata.viewedBy
+            } 
+          }
+        );
+      }
     }
 
     // Return forum with posts

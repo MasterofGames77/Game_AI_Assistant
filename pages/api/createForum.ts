@@ -90,6 +90,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         totalPosts: 0,
         lastActivityAt: new Date(),
         viewCount: 0,
+        viewedBy: [],
         status: "active",
         gameTitle,
         category
