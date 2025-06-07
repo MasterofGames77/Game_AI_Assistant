@@ -84,13 +84,19 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     }
   };
 
-  // const handleLikePost = async (postId: string) => {
-  //   try {
-  //     await likePost(params.forumId, postId);
-  //   } catch (err: any) {
-  //     setError(err.message || "Failed to like post");
-  //   }
-  // };
+  const handleLikePost = async (postId: string) => {
+    try {
+      await likePost(params.forumId, postId);
+      // Fetch updated forum data so the UI reflects the new like state/count
+      const userId = localStorage.getItem("userId") || "test-user";
+      const response = await axios.get(
+        `/api/getForumTopic?forumId=${params.forumId}&userId=${userId}`
+      );
+      setCurrentForum(response.data);
+    } catch (err: any) {
+      setError(err.message || "Failed to like post");
+    }
+  };
 
   if (loading) {
     return <div className="text-center">Loading forum...</div>;
@@ -162,14 +168,48 @@ function ForumPage({ params }: { params: { forumId: string } }) {
                   {post.message}
                 </p>
                 <div className="mt-2 flex items-center space-x-4">
-                  {/* 
                   <button
                     onClick={() => handleLikePost(post._id)}
-                    className="text-blue-500 hover:text-blue-700"
+                    className={`flex items-center space-x-1 ${
+                      post.metadata.likedBy?.includes(
+                        localStorage.getItem("userId") || "test-user"
+                      )
+                        ? "text-blue-600"
+                        : "text-gray-400"
+                    } hover:text-blue-700`}
                   >
-                    {post.likes?.length || 0} Likes
+                    {/* Heart icon: filled if liked, outline if not */}
+                    {post.metadata.likedBy?.includes(
+                      localStorage.getItem("userId") || "test-user"
+                    ) ? (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5 fill-current"
+                        viewBox="0 0 20 20"
+                      >
+                        <path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" />
+                      </svg>
+                    ) : (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z"
+                        />
+                      </svg>
+                    )}
+                    <span>
+                      {post.metadata.likes || 0} Like
+                      {(post.metadata.likes || 0) !== 1 ? "s" : ""}
+                    </span>
                   </button>
-                  */}
                   {post.createdBy === localStorage.getItem("userId") && (
                     <button
                       onClick={() => handleDeletePost(post._id)}
@@ -186,7 +226,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
 
         {currentForum.posts?.length === 0 && (
           <div className="text-center text-gray-500 py-8">
-            No posts yet. Be the first to post!
+            No posts yet. Be the first to add a post!
           </div>
         )}
       </div>
