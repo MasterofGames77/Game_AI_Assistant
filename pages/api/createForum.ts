@@ -97,7 +97,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
-    const allowedCategories = ["speedruns", "hacks", "mods", "general", "help"];
+    const allowedCategories = ["speedruns", "gameplay", "mods", "general", "help"];
     if (!allowedCategories.includes(category)) {
       return res.status(400).json({ error: "Invalid category" });
     }

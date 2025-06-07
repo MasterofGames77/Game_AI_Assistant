@@ -19,14 +19,8 @@ export default function ForumPageWrapper({
 }
 
 function ForumPage({ params }: { params: { forumId: string } }) {
-  const {
-    forums,
-    currentForum,
-    setCurrentForum,
-    addPost,
-    deletePost,
-    likePost,
-  } = useForum();
+  const { currentForum, setCurrentForum, addPost, deletePost, likePost } =
+    useForum();
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -122,7 +116,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       >
         ← Back to Main Page
       </button>
-      <div className="mb-8">
+      {/* <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">{currentForum.title}</h1>
         <div className="mb-2 text-gray-800 dark:text-gray-200">
           <p>Game: {currentForum.gameTitle}</p>
@@ -131,7 +125,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
           <p>Total Posts: {currentForum.posts?.length || 0}</p>
           <p>Views: {currentForum.metadata.viewCount}</p>
         </div>
-      </div>
+      </div> */}
 
       <div className="mb-8">
         <form onSubmit={handlePostSubmit} className="space-y-4">

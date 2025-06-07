@@ -78,12 +78,13 @@ export default function CreateForum() {
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             required
+            className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 dark:bg-gray-800 dark:text-white dark:border-gray-600"
           >
             <option value="" disabled>
               Select a category
             </option>
             <option value="speedruns">Speedruns</option>
-            <option value="hacks">Hacks</option>
+            <option value="gameplay">Gameplay</option>
             <option value="mods">Mods</option>
             <option value="general">General Discussion</option>
             <option value="help">Help & Support</option>

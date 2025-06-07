@@ -8,7 +8,7 @@ import Link from "next/link";
 
 const categoryLabels: Record<string, string> = {
   speedruns: "Speedruns",
-  hacks: "Hacks",
+  gameplay: "Gameplay",
   mods: "Mods",
   general: "General Discussion",
   help: "Help & Support",
@@ -67,46 +67,49 @@ export default function ForumList() {
       {showCreateForm && <CreateForum />}
 
       <div className="grid gap-4">
-        {forums.map((forum: Forum) => (
-          <div
-            key={forum._id}
-            className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow"
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <Link
-                  href={`/forum/${forum.forumId}`}
-                  className="text-xl font-semibold text-blue-600 hover:text-blue-800"
-                >
-                  {forum.title}
-                </Link>
-                <p className="text-gray-600 mt-1">
-                  Game: {forum.gameTitle} | Category:{" "}
-                  {categoryLabels[forum.category] ||
-                    forum.category ||
-                    "Uncategorized"}
-                </p>
-                <div className="mt-2 text-sm text-gray-500">
-                  <span className="mr-4">
-                    Posts: {forum.posts?.length || 0}
-                  </span>
-                  <span className="mr-4">
-                    Views: {forum.metadata?.viewCount || 0}
-                  </span>
-                  <span>Status: {forum.metadata?.status || "active"}</span>
+        {forums.map((forum: Forum) => {
+          console.log("Forum object:", forum);
+          return (
+            <div
+              key={forum._id}
+              className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <Link
+                    href={`/forum/${forum.forumId}`}
+                    className="text-xl font-semibold text-blue-600 hover:text-blue-800"
+                  >
+                    {forum.title}
+                  </Link>
+                  <p className="text-gray-600 mt-1">
+                    Game: {forum.gameTitle} | Category:{" "}
+                    {categoryLabels[forum.category] ||
+                      forum.category ||
+                      "Uncategorized"}
+                  </p>
+                  <div className="mt-2 text-sm text-gray-500">
+                    <span className="mr-4">
+                      Posts: {forum.posts?.length || 0}
+                    </span>
+                    <span className="mr-4">
+                      Views: {forum.metadata?.viewCount || 0}
+                    </span>
+                    <span>Status: {forum.metadata?.status || "active"}</span>
+                  </div>
                 </div>
+                {forum.createdBy === localStorage.getItem("userId") && (
+                  <button
+                    onClick={() => handleDelete(forum._id)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    Delete
+                  </button>
+                )}
               </div>
-              {forum.createdBy === localStorage.getItem("userId") && (
-                <button
-                  onClick={() => handleDelete(forum._id)}
-                  className="text-red-500 hover:text-red-700"
-                >
-                  Delete
-                </button>
-              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {forums.length === 0 && (
           <div className="text-center text-gray-500 py-8">
