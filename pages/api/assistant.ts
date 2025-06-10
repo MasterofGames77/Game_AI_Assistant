@@ -502,12 +502,12 @@ export const checkQuestionType = (question: string): string | null => {
 };
 
 // Function to check and award achievements based on user progress
-export const checkAndAwardAchievements = async (userId: string, progress: any, session: mongoose.ClientSession | null = null) => {
-  console.log('Checking achievements for user:', userId);
+export const checkAndAwardAchievements = async (username: string, progress: any, session: mongoose.ClientSession | null = null) => {
+  console.log('Checking achievements for user:', username);
   console.log('Current progress:', progress);
 
   // First get the user's current achievements
-  const user = await User.findOne({ userId }).session(session);
+  const user = await User.findOne({ username }).session(session);
   const currentAchievements = user?.achievements || [];
   const newAchievements: { name: string; dateEarned: Date }[] = [];
 
@@ -558,7 +558,7 @@ export const checkAndAwardAchievements = async (userId: string, progress: any, s
 
     // Update the user with the new achievements
     const updateResult = await User.findOneAndUpdate(
-      { userId },
+      { username },
       { 
         $set: { progress },
         $push: { achievements: { $each: newAchievements } }
@@ -571,7 +571,7 @@ export const checkAndAwardAchievements = async (userId: string, progress: any, s
     // Emit achievement event
     const io = getIO();
     io.emit('achievementEarned', { 
-      userId, 
+      username, 
       achievements: newAchievements,
       message: `Congratulations! You've earned ${newAchievements.length} new achievement(s)!`
     });
@@ -651,7 +651,7 @@ const logger = winston.createLogger({
 // Main API handler function that processes incoming requests
 const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
   const startTime = performance.now();
-  const { userId, question, code } = req.body;
+  const { username, question, code } = req.body;
   const metrics: any = {};
   const requestMonitor = new RequestMonitor();
   const aiCache = getAICache();
@@ -663,7 +663,7 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     }
 
     // Check for offensive content first
-    const contentCheck = await containsOffensiveContent(question, userId);
+    const contentCheck = await containsOffensiveContent(question, username);
     if (contentCheck.isOffensive) {
       if (contentCheck.violationResult?.action === 'banned') {
         return res.status(403).json({
@@ -706,7 +706,7 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     // Measure question processing time
     const { result: processedAnswer, latency: processingLatency } = await measureLatency('Question Processing', async () => {
       if (question.toLowerCase().includes("recommendations")) {
-        const previousQuestions = await Question.find({ userId });
+        const previousQuestions = await Question.find({ username });
         const genres = analyzeUserQuestions(previousQuestions);
         const recommendations = genres.length > 0 ? await fetchRecommendations(genres[0]) : [];
         
@@ -779,11 +779,11 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
         try {
           await session.withTransaction(async () => {
             // Create question
-            const questionDoc = await Question.create([{ userId, question, response: answer }], { session });
+            const questionDoc = await Question.create([{ username, question, response: answer }], { session });
 
             // Update user's conversation count and ensure achievements/progress structure exists
             const userDoc = await User.findOneAndUpdate(
-              { userId },
+              { username },
               {
                 $inc: { conversationCount: 1 },
                 $setOnInsert: {
@@ -829,18 +829,18 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
             if (questionType) {
               // Update the specific progress counter
               await User.findOneAndUpdate(
-                { userId },
+                { username },
                 { $inc: { [`progress.${questionType}`]: 1 } },
                 { session, new: true }
               );
 
               // Get updated user data
-              const updatedUser = await User.findOne({ userId }).session(session);
+              const updatedUser = await User.findOne({ username }).session(session);
               console.log('Updated user progress:', updatedUser?.progress); // Debug log
 
               if (updatedUser) {
                 // Check and award achievements
-                await checkAndAwardAchievements(userId, updatedUser.progress, session);
+                await checkAndAwardAchievements(username, updatedUser.progress, session);
               }
             }
 
@@ -877,7 +877,7 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     const endTime = performance.now();
     metrics.totalTime = endTime - startTime;
     logger.info('API request completed', { 
-      userId,
+      username,
       questionLength: question.length,
       metrics
     });
@@ -896,7 +896,7 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     
     // Log error metrics
     logger.error('API request failed', {
-      userId,
+      username,
       error: error instanceof Error ? error.message : 'Unknown error',
       metrics
     });

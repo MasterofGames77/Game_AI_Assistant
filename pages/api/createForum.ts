@@ -27,29 +27,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     await connectToMongoDB();
 
-    // Extract userId from Authorization header (Bearer token)
-    let userId = 'test-user';
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      userId = authHeader.split(' ')[1] || 'test-user';
-    }
+    // Extract username from request body
+    const { title, gameTitle, category, isPrivate, username } = req.body;
 
-    const { title, gameTitle, category, isPrivate } = req.body;
-
-    // Only require Bearer token if not test user
-    if (userId !== 'test-user') {
-      const authError = validateAuth(req);
-      if (authError) {
-        return res.status(401).json({ error: authError });
-      }
-    }
-
-    // Validate user authentication only if not test user
-    if (userId !== 'test-user') {
-      const userAuthErrors = validateUserAuthentication(userId);
-      if (userAuthErrors.length > 0) {
-        return res.status(401).json({ error: userAuthErrors[0] });
-      }
+    if (!username) {
+      return res.status(400).json({ error: 'Username is required' });
     }
 
     // Validate forum data
@@ -58,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       gameTitle,
       category,
       isPrivate,
-      allowedUsers: isPrivate ? [userId] : [],
+      allowedUsers: isPrivate ? [username] : [],
     };
     const validationErrors = validateForumData(forumData);
     if (validationErrors.length > 0) {
@@ -66,8 +48,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Check for offensive content
-    const titleCheck = await containsOffensiveContent(title, userId);
-    const gameTitleCheck = await containsOffensiveContent(gameTitle, userId);
+    const titleCheck = await containsOffensiveContent(title, username);
+    const gameTitleCheck = await containsOffensiveContent(gameTitle, username);
 
     if (titleCheck.isOffensive || gameTitleCheck.isOffensive) {
       return res.status(400).json({ error: 'Content contains offensive language' });
@@ -83,8 +65,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       gameTitle,
       category,
       isPrivate: !!isPrivate,
-      allowedUsers: isPrivate ? [userId] : [],
-      createdBy: userId,
+      allowedUsers: isPrivate ? [username] : [],
+      createdBy: username,
       posts: [],
       metadata: {
         totalPosts: 0,

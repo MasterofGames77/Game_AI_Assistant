@@ -69,7 +69,7 @@ const splashUserSchema = new Schema<ISplashUser>({
 });
 
 // Check pro access for a user
-export const checkProAccess = async (userId: string): Promise<boolean> => {
+export const checkProAccess = async (username: string): Promise<boolean> => {
   try {
     const wingmanDB = await connectToWingmanDB();
     const splashDB = await connectToSplashDB();
@@ -77,20 +77,22 @@ export const checkProAccess = async (userId: string): Promise<boolean> => {
     const WingmanUser = wingmanDB.model<IWingmanUser>('User', wingmanUserSchema);
     const SplashUser = splashDB.model<ISplashUser>('User', splashUserSchema);
 
-    // Check both databases for pro access
+    // Try to find by username first
     const [wingmanUser, splashUser] = await Promise.all([
-      WingmanUser.findOne({ userId }),
-      SplashUser.findOne({ userId })
+      WingmanUser.findOne({ username }),
+      SplashUser.findOne({ username })
     ]);
 
-    // User has pro access if they have it in either database
+    // Optionally, fallback to userId for legacy support
+    // if (!wingmanUser && userId) { ... }
+
     return !!(
-      (wingmanUser && wingmanUser.hasProAccess) || 
+      (wingmanUser && wingmanUser.hasProAccess) ||
       (splashUser && (splashUser.hasProAccess || splashUser.isApproved))
     );
   } catch (error) {
     console.error('Error checking pro access:', error);
-    return false; // Default to no access on error
+    return false;
   }
 };
 

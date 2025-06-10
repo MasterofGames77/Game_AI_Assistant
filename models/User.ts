@@ -39,6 +39,7 @@ interface Achievement {
 
 export interface IUser extends Document {
   userId: string;
+  username: string;
   email: string;
   conversationCount: number;
   hasProAccess: boolean;
@@ -48,6 +49,14 @@ export interface IUser extends Document {
 
 const UserSchema = new Schema<IUser>({
   userId: { type: String, required: true },
+  username: {
+    type: String,
+    required: true,
+    unique: true,
+    minlength: 3,
+    maxlength: 32,
+    match: /^[\w#@.-]+$/
+  },
   email: { type: String, required: true },
   conversationCount: { type: Number, required: true, default: 0 },
   hasProAccess: { type: Boolean, default: false },

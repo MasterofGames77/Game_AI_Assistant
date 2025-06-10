@@ -1,13 +1,13 @@
 import UserViolation from '../models/UserViolation';
 import { banEmail } from './emailCheck';
 
-export const handleContentViolation = async (userId: string, offendingWords: string[], userEmail?: string) => {
-  const violation = await UserViolation.findOne({ userId });
+export const handleContentViolation = async (username: string, offendingWords: string[], userEmail?: string) => {
+  const violation = await UserViolation.findOne({ username });
   
   if (!violation) {
     // First violation - create record and warn
     await UserViolation.create({
-      userId,
+      username,
       violations: [{ offendingWords, content: offendingWords.join(', ') }],
       warningCount: 1,
       banCount: 0,
@@ -64,7 +64,7 @@ export const handleContentViolation = async (userId: string, offendingWords: str
       
       // If we have the user's email, ban it
       if (userEmail) {
-        await banEmail(userEmail, userId);
+        await banEmail(userEmail, username);
       }
       
       return { action: 'permanent_ban' };

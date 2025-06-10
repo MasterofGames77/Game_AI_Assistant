@@ -36,13 +36,20 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
   const createForum = useCallback(async (forumData: Partial<Forum>) => {
     try {
       setLoading(true);
-      const response = await axios.post("/api/createForum", forumData, {
-        headers: {
-          Authorization: `Bearer ${
-            localStorage.getItem("userId") || "test-user"
-          }`,
+      const response = await axios.post(
+        "/api/createForum",
+        {
+          ...forumData,
+          username: localStorage.getItem("username"),
         },
-      });
+        {
+          headers: {
+            Authorization: `Bearer ${
+              localStorage.getItem("userId") || "test-user"
+            }`,
+          },
+        }
+      );
       const newForum = response.data.forum;
       setForums((prevForums) => [...prevForums, newForum]);
       return newForum;
@@ -88,7 +95,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
           {
             forumId,
             message,
-            userId: localStorage.getItem("userId"),
+            username: localStorage.getItem("username"),
           },
           {
             headers: {
@@ -157,7 +164,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
           {
             forumId,
             postId,
-            userId: localStorage.getItem("userId"),
+            username: localStorage.getItem("username"),
           },
           {
             headers: {

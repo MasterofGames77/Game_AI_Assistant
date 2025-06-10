@@ -98,7 +98,7 @@ export default function ForumList() {
                     <span>Status: {forum.metadata?.status || "active"}</span>
                   </div>
                 </div>
-                {forum.createdBy === localStorage.getItem("userId") && (
+                {forum.createdBy === localStorage.getItem("username") && (
                   <button
                     onClick={() => handleDelete(forum._id)}
                     className="text-red-500 hover:text-red-700"

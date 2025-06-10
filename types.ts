@@ -1,6 +1,6 @@
 export interface Conversation {
   _id: string;
-  userId: string;
+  username: string;
   question: string;
   response: string;
   timestamp: Date;
@@ -27,7 +27,7 @@ export interface UserViolation {
 }
 
 export interface Post {
-  userId: string;
+  username: string;
   message: string;
   timestamp: Date;
 }
@@ -56,11 +56,11 @@ export interface ForumMetadata {
 
 export interface ForumPost {
   _id: string;
-  userId: string;
+  username: string;
   message: string;
   timestamp: Date;
   createdBy: string;
-  likes: string[]; // Array of user IDs who liked the post
+  likes: string[]; // Array of usernames who liked the post
   metadata: {
     edited: boolean;
     editedAt?: Date;

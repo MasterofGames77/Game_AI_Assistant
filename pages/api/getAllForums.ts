@@ -11,14 +11,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     await connectToMongoDB();
     // Use test user for local development if user-id is not provided
-    let userId = req.headers['user-id'] as string;
-    if (!userId) {
-      userId = 'test-user';
+    let username = req.headers['username'] as string;
+    if (!username) {
+      username = 'test-user';
     }
 
     // Validate user authentication only if not test user
-    if (userId !== 'test-user') {
-      const userAuthErrors = validateUserAuthentication(userId);
+    if (username !== 'test-user') {
+      const userAuthErrors = validateUserAuthentication(username);
       if (userAuthErrors.length > 0) {
         return res.status(401).json({ error: userAuthErrors[0] });
       }
@@ -33,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const forums = await Forum.find({
       $or: [
         { isPrivate: false },
-        { allowedUsers: userId }
+        { allowedUsers: username }
       ],
       'metadata.status': 'active'
     })
@@ -56,7 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const total = await Forum.countDocuments({
       $or: [
         { isPrivate: false },
-        { allowedUsers: userId }
+        { allowedUsers: username }
       ],
       'metadata.status': 'active'
     });

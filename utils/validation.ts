@@ -2,16 +2,16 @@ import { Forum } from '../types';
 
 /**
  * Validates user authentication
- * @param userId - The user's ID to validate
+ * @param username - The user's username to validate
  * @returns Array of error messages, empty if validation passes
  */
-export const validateUserAuthentication = (userId: string | null) => {
+export const validateUserAuthentication = (username: string | null) => {
   const errors: string[] = [];
 
-  if (!userId) {
+  if (!username) {
     errors.push('User authentication required');
-  } else if (typeof userId !== 'string' || userId.length < 1) {
-    errors.push('Invalid user ID format');
+  } else if (typeof username !== 'string' || username.length < 1) {
+    errors.push('Invalid username format');
   }
 
   return errors;
@@ -60,10 +60,10 @@ export const validateForumData = (data: Partial<Forum>) => {
     } else if (data.allowedUsers.length === 0) {
       errors.push('Private forums must have at least one allowed user');
     } else {
-      // Validate each user ID in allowedUsers
-      data.allowedUsers.forEach((userId, index) => {
-        if (typeof userId !== 'string' || userId.length < 1) {
-          errors.push(`Invalid user ID at position ${index}`);
+      // Validate each username in allowedUsers
+      data.allowedUsers.forEach((username, index) => {
+        if (typeof username !== 'string' || username.length < 1) {
+          errors.push(`Invalid username at position ${index}`);
         }
       });
     }
@@ -77,7 +77,7 @@ export const validateForumData = (data: Partial<Forum>) => {
  * @param data - Object containing post data to validate
  * @returns Array of error messages, empty if validation passes
  */
-export const validatePostData = (data: { message: string; userId: string; forumId: string }) => {
+export const validatePostData = (data: { message: string; username: string; forumId: string }) => {
   const errors: string[] = [];
 
   // Validate message
@@ -89,9 +89,9 @@ export const validatePostData = (data: { message: string; userId: string; forumI
     errors.push('Message cannot be empty');
   }
 
-  // Validate user ID
-  if (!data.userId) {
-    errors.push('User ID is required');
+  // Validate username
+  if (!data.username) {
+    errors.push('Username is required');
   }
 
   // Validate forum ID
@@ -105,20 +105,20 @@ export const validatePostData = (data: { message: string; userId: string; forumI
 /**
  * Validates if a user has access to a specific forum
  * @param forum - The forum to check access for
- * @param userId - The user's ID to validate
+ * @param username - The user's username to validate
  * @returns Array of error messages, empty if user has access
  */
-export const validateUserAccess = (forum: Forum, userId: string) => {
+export const validateUserAccess = (forum: Forum, username: string) => {
   const errors: string[] = [];
 
-  // Validate user ID
-  if (!userId || typeof userId !== 'string' || userId.length < 1) {
-    errors.push('Invalid user ID');
+  // Validate username
+  if (!username || typeof username !== 'string' || username.length < 1) {
+    errors.push('Invalid username');
     return errors;
   }
 
   // Check private forum access
-  if (forum.isPrivate && !forum.allowedUsers.includes(userId)) {
+  if (forum.isPrivate && !forum.allowedUsers.includes(username)) {
     errors.push('You do not have access to this private forum');
   }
 

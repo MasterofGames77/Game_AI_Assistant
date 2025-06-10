@@ -8,18 +8,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { content, userId } = req.body;
+    const { content, username } = req.body;
 
-    if (!content || !userId) {
+    if (!content || !username) {
       return res.status(400).json({ error: 'Content and userId are required' });
     }
 
     // Check content for violations
-    const contentCheck = await containsOffensiveContent(content, userId);
+    const contentCheck = await containsOffensiveContent(content, username);
     
     if (contentCheck.isOffensive) {
       // Handle violation on server side
-      const violationResult = await handleContentViolation(userId, contentCheck.offendingWords);
+      const violationResult = await handleContentViolation(username, contentCheck.offendingWords);
       return res.status(403).json({
         error: 'Content violation detected',
         offendingWords: contentCheck.offendingWords,

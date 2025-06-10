@@ -10,15 +10,15 @@ const updateAchievementsForUser = async (email: string) => {
   try {
     // First, get the current user data
     const user = await User.findOne({ email });
-    if (!user) {
-      console.log('User not found');
-      return;
+    if (!user || !user.username) {
+      // Handle missing username (legacy user)
+      throw new Error('User does not have a username');
     }
 
     console.log('Found user:', user.email);
 
     // Get all questions for this user
-    const questions = await Question.find({ userId: user.userId });
+    const questions = await Question.find({ username: user.username });
     console.log(`Found ${questions.length} questions for user`);
 
     // Initialize progress with all possible fields
@@ -68,21 +68,14 @@ const updateAchievementsForUser = async (email: string) => {
 
     // Update user's progress
     const updateResult = await User.findOneAndUpdate(
-      { 
-        $or: [
-          { email },
-          { userId: user.userId }
-        ]
-      },
-      { 
-        $set: { progress }
-      },
+      { username: user.username },
+      { $set: { progress } },
       { new: true }
     );
 
     if (updateResult) {
       // Now check and award achievements based on the progress
-      const newAchievements = await checkAndAwardAchievements(user.userId, progress);
+      const newAchievements = await checkAndAwardAchievements(user.username, progress);
       console.log('Awarded achievements:', newAchievements);
     }
 
@@ -135,11 +128,11 @@ const updateAchievementsForAllUsers = async () => {
 
     // Process each user
     for (const user of users) {
-      console.log(`Processing user: ${user.email || user.userId}`);
+      console.log(`Processing user: ${user.email || user.username}`);
       
       try {
         // Get user's questions to calculate progress
-        const questions = await Question.find({ userId: user.userId });
+        const questions = await Question.find({ username: user.username });
         console.log(`Found ${questions.length} questions for user`);
 
         // Initialize progress with all possible fields
@@ -187,7 +180,7 @@ const updateAchievementsForAllUsers = async () => {
 
         // Update user's progress
         const updateResult = await User.findOneAndUpdate(
-          { userId: user.userId },
+          { username: user.username },
           { 
             $set: { progress }
           },
@@ -196,15 +189,15 @@ const updateAchievementsForAllUsers = async () => {
 
         // Check and award achievements
         if (updateResult) {
-          const newAchievements = await checkAndAwardAchievements(user.userId, progress);
+          const newAchievements = await checkAndAwardAchievements(user.username, progress);
           if (newAchievements.length > 0) {
-            console.log(`Awarded ${newAchievements.length} new achievements to user ${user.email || user.userId}`);
+            console.log(`Awarded ${newAchievements.length} new achievements to user ${user.email || user.username}`);
           }
         }
 
-        console.log(`Completed processing for user: ${user.email || user.userId}`);
+        console.log(`Completed processing for user: ${user.email || user.username}`);
       } catch (userError) {
-        console.error(`Error processing user ${user.email || user.userId}:`, userError);
+        console.error(`Error processing user ${user.email || user.username}:`, userError);
         // Continue with next user even if one fails
         continue;
       }
@@ -221,12 +214,12 @@ const updateAchievementsForAllUsers = async () => {
 };
 
 // Verify update function
-const verifyUpdate = async (userId: string) => {
+const verifyUpdate = async (username: string) => {
   await connectToMongoDB();
   try {
-    const user = await User.findOne({ userId });
+    const user = await User.findOne({ username });
     console.log('User data:', {
-      userId: user?.userId,
+      username: user?.username,
       hasAchievements: !!user?.achievements,
       hasProgress: !!user?.progress
     });
@@ -236,11 +229,11 @@ const verifyUpdate = async (userId: string) => {
 };
 
 // Update achievements from history
-const updateAchievementsFromHistory = async (userId: string) => {
+const updateAchievementsFromHistory = async (username: string) => {
   await connectToMongoDB();
   
   try {
-    const questions = await Question.find({ userId });
+    const questions = await Question.find({ username });
     const progress: Record<string, number> = {};
     
     // Process questions sequentially due to async nature
@@ -253,16 +246,16 @@ const updateAchievementsFromHistory = async (userId: string) => {
     
     // Update user's progress
     const user = await User.findOneAndUpdate(
-      { userId },
+      { username },
       { $set: { progress } },
       { new: true }
     );
     
     if (user) {
-      await checkAndAwardAchievements(userId, user.progress, null);
+      await checkAndAwardAchievements(user.username, user.progress, null);
     }
     
-    console.log('Updated achievements from history for user:', userId);
+    console.log('Updated achievements from history for user:', username);
   } catch (error) {
     console.error('Error updating achievements from history:', error);
   } finally {

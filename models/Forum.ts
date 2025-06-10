@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 // Define the schema for individual posts within a forum topic
 const PostSchema = new mongoose.Schema({
   _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
-  userId: { type: String, required: true },
+  username: { type: String, required: true },
   message: { 
     type: String, 
     required: true,

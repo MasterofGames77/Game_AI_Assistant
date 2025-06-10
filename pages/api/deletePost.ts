@@ -15,13 +15,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     await connectToMongoDB();
+    let username = 'test-user';
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      username = authHeader.split(' ')[1] || 'test-user';
+    }
     const forum = await Forum.findOne({ forumId });
     if (!forum) {
       return res.status(404).json({ error: 'Forum not found' });
     }
 
+    // Find the post
+    const post = forum.posts.id(postId);
+    if (!post) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    // Only allow post creator to delete
+    if (post.createdBy !== username) {
+      return res.status(403).json({ error: 'Only the post creator can delete this post' });
+    }
+
     // Remove the post
-    forum.posts = forum.posts.filter((post: any) => post._id.toString() !== postId);
+    forum.posts = forum.posts.filter((p: any) => p._id.toString() !== postId);
     forum.metadata.totalPosts = forum.posts.length;
     await forum.save();
 

@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const userViolationSchema = new mongoose.Schema({
-  userId: { 
+  username: { 
     type: String, 
     required: true,
     unique: true 

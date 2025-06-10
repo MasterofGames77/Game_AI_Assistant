@@ -9,9 +9,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     await connectToMongoDB();
-    const { forumId, postId, userId } = req.body;
+    const { forumId, postId, username } = req.body;
 
-    if (!forumId || !postId || !userId) {
+    if (!forumId || !postId || !username) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -25,14 +25,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: "Post not found" });
     }
 
-    // Ensure likes is an array of userIds in post.metadata
+    // Ensure likes is an array of usernames in post.metadata
     if (!post.metadata.likes) post.metadata.likes = 0;
     if (!post.metadata.likedBy) post.metadata.likedBy = [];
 
-    const userIndex = post.metadata.likedBy.indexOf(userId);
+    const userIndex = post.metadata.likedBy.indexOf(username);
     if (userIndex === -1) {
       // User has not liked yet, so like
-      post.metadata.likedBy.push(userId);
+      post.metadata.likedBy.push(username);
     } else {
       // User has already liked, so unlike
       post.metadata.likedBy.splice(userIndex, 1);

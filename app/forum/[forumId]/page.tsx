@@ -29,7 +29,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
   useEffect(() => {
     const fetchForum = async () => {
       try {
-        const userId = localStorage.getItem("userId") || "test-user";
+        const userId = localStorage.getItem("username") || "test-user";
         const response = await axios.get(
           `/api/getForumTopic?forumId=${params.forumId}&userId=${userId}`
         );
@@ -52,7 +52,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       await addPost(params.forumId, message);
       setMessage("");
       // Fetch updated forum data
-      const userId = localStorage.getItem("userId") || "test-user";
+      const userId = localStorage.getItem("username") || "test-user";
       const response = await axios.get(
         `/api/getForumTopic?forumId=${params.forumId}&userId=${userId}`
       );
@@ -68,7 +68,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     try {
       await deletePost(params.forumId, postId);
       // Fetch updated forum data
-      const userId = localStorage.getItem("userId") || "test-user";
+      const userId = localStorage.getItem("username") || "test-user";
       const response = await axios.get(
         `/api/getForumTopic?forumId=${params.forumId}&userId=${userId}`
       );
@@ -82,7 +82,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     try {
       await likePost(params.forumId, postId);
       // Fetch updated forum data so the UI reflects the new like state/count
-      const userId = localStorage.getItem("userId") || "test-user";
+      const userId = localStorage.getItem("username") || "test-user";
       const response = await axios.get(
         `/api/getForumTopic?forumId=${params.forumId}&userId=${userId}`
       );
@@ -166,7 +166,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
                     onClick={() => handleLikePost(post._id)}
                     className={`flex items-center space-x-1 ${
                       post.metadata.likedBy?.includes(
-                        localStorage.getItem("userId") || "test-user"
+                        localStorage.getItem("username") || "test-user"
                       )
                         ? "text-blue-600"
                         : "text-gray-400"
@@ -174,7 +174,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
                   >
                     {/* Heart icon: filled if liked, outline if not */}
                     {post.metadata.likedBy?.includes(
-                      localStorage.getItem("userId") || "test-user"
+                      localStorage.getItem("username") || "test-user"
                     ) ? (
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -204,7 +204,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
                       {(post.metadata.likes || 0) !== 1 ? "s" : ""}
                     </span>
                   </button>
-                  {post.createdBy === localStorage.getItem("userId") && (
+                  {post.createdBy === localStorage.getItem("username") && (
                     <button
                       onClick={() => handleDeletePost(post._id)}
                       className="text-red-500 hover:text-red-700"

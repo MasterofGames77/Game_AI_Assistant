@@ -30,8 +30,8 @@ function parseQueryParams(query: any) {
 }
 
 // Helper function to check cache
-function getCachedData(userId: string): any[] | null {
-  const cached = conversationCache.get(userId);
+function getCachedData(username: string): any[] | null {
+  const cached = conversationCache.get(username);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.data;
   }
@@ -39,16 +39,16 @@ function getCachedData(userId: string): any[] | null {
 }
 
 // Helper function to update cache
-function updateCache(userId: string, data: any[]): void {
-  conversationCache.set(userId, {
+function updateCache(username: string, data: any[]): void {
+  conversationCache.set(username, {
     data,
     timestamp: Date.now()
   });
 }
 
 // Helper function to clear cache for a user
-function clearUserCache(userId: string): void {
-  conversationCache.delete(userId);
+function clearUserCache(username: string): void {
+  conversationCache.delete(username);
 }
 
 // get conversation
@@ -58,11 +58,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { userId } = req.query;
+  const { username } = req.query;
 
-  // Validate userId
-  if (!userId || typeof userId !== 'string') {
-    return res.status(400).json({ error: 'Invalid userId parameter' });
+  // Validate username
+  if (!username || typeof username !== 'string') {
+    return res.status(400).json({ error: 'Invalid username parameter' });
   }
 
   try {
@@ -70,9 +70,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { page, pageSize, skip } = parseQueryParams(req.query);
 
     // Check cache first
-    const cachedData = getCachedData(userId);
+    const cachedData = getCachedData(username);
     if (cachedData) {
-      logger.info('Cache hit for conversations', { userId });
+      logger.info('Cache hit for conversations', { username });
       return res.status(200).json({
         conversations: cachedData.slice(skip, skip + pageSize),
         pagination: {
@@ -85,14 +85,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Connect to MongoDB
-    logger.info('Fetching conversations from database', { userId });
+    logger.info('Fetching conversations from database', { username });
     await connectToMongoDB();
 
     // Get total count for pagination
-    const total = await Question.countDocuments({ userId });
+    const total = await Question.countDocuments({ username });
 
     // Fetch conversations with pagination and lean query
-    const conversations = await Question.find({ userId })
+    const conversations = await Question.find({ username })
       .sort({ timestamp: -1 })
       .skip(skip)
       .limit(pageSize)
@@ -100,11 +100,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .select('question response timestamp -_id'); // Changed 'answer' to 'response'
 
     // Update cache with full dataset
-    updateCache(userId, conversations);
+    updateCache(username, conversations);
 
     // Log success
     logger.info('Conversations fetched successfully', {
-      userId,
+      username,
       count: conversations.length,
       page,
       pageSize
@@ -126,7 +126,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     logger.error('Error fetching conversations:', {
       error: error.message,
       stack: error.stack,
-      userId
+      username
     });
 
     // Send appropriate error response
@@ -143,20 +143,20 @@ export async function clearCache(req: NextApiRequest, res: NextApiResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { userId } = req.query;
+  const { username } = req.query;
 
-  if (!userId || typeof userId !== 'string') {
-    return res.status(400).json({ error: 'Invalid userId parameter' });
+  if (!username || typeof username !== 'string') {
+    return res.status(400).json({ error: 'Invalid username parameter' });
   }
 
   try {
-    clearUserCache(userId);
-    logger.info('Cache cleared for user', { userId });
+    clearUserCache(username);
+    logger.info('Cache cleared for user', { username });
     res.status(200).json({ message: 'Cache cleared successfully' });
   } catch (error: any) {
     logger.error('Error clearing cache:', {
       error: error.message,
-      userId
+      username
     });
     res.status(500).json({ error: 'Failed to clear cache' });
   }

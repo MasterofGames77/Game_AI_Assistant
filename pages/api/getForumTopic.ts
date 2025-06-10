@@ -7,7 +7,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { forumId, userId, incrementView } = req.query;
+  const { forumId, username, incrementView } = req.query;
 
   if (!forumId) {
     return res.status(400).json({ error: 'Forum ID is required' });
@@ -22,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Check if forum is private and user has access
-    if (forum.isPrivate && !forum.allowedUsers.includes(userId as string)) {
+    if (forum.isPrivate && !forum.allowedUsers.includes(username as string)) {
       return res.status(403).json({ error: 'Access denied to private forum' });
     }
 
@@ -33,9 +33,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (incrementView !== "false") {
       // Only increment view count if user hasn't viewed this forum before
-      if (!forum.metadata.viewedBy?.includes(userId as string)) {
+      if (!forum.metadata.viewedBy?.includes(username as string)) {
         forum.metadata.viewCount += 1;
-        forum.metadata.viewedBy = [...(forum.metadata.viewedBy || []), userId];
+        forum.metadata.viewedBy = [...(forum.metadata.viewedBy || []), username];
         await Forum.updateOne(
           { forumId },
           { 

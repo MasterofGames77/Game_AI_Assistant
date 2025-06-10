@@ -44,3 +44,6 @@ dotenvTest.mjs
 
 logs/*
 !logs/.gitkeep
+
+migrate_questions.cjs
+migrate_forums.cjs

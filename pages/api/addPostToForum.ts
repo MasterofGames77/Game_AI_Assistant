@@ -10,10 +10,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     await connectToMongoDB();
-    const { forumId, message, userId } = req.body;
+    const { forumId, message, username } = req.body;
 
     // Validate required fields
-    if (!forumId || !message || !userId) {
+    if (!forumId || !message || !username) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -24,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Check if forum is private and user is allowed
-    if (forum.isPrivate && !forum.allowedUsers.includes(userId)) {
+    if (forum.isPrivate && !forum.allowedUsers.includes(username)) {
       return res.status(403).json({ error: 'Not authorized to post in this forum' });
     }
 
@@ -34,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Check for offensive content
-    const contentCheck = await containsOffensiveContent(message, userId);
+    const contentCheck = await containsOffensiveContent(message, username);
     if (contentCheck.isOffensive) {
       return res.status(400).json({ 
         error: `The following words violate our policy: ${contentCheck.offendingWords.join(', ')}`,
@@ -44,10 +44,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Create new post
     const newPost = {
-      userId,
+      username,
       message: message.trim(),
       timestamp: new Date(),
-      createdBy: userId,
+      createdBy: username,
       likes: [],
       metadata: {
         edited: false

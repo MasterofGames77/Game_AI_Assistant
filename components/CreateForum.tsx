@@ -18,13 +18,13 @@ export default function CreateForum() {
     setError("");
 
     try {
-      const userId = localStorage.getItem("userId") || "test-user";
+      const username = localStorage.getItem("username") || "test-user";
       const forumData = {
         title,
         gameTitle,
         category,
         isPrivate,
-        allowedUsers: isPrivate ? [userId] : [],
+        allowedUsers: isPrivate ? [username] : [],
       };
 
       const success = await createForum(forumData);

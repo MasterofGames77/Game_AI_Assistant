@@ -15,7 +15,7 @@ export default function ContentModeration() {
       // Validate post data
       const validationErrors = validatePostData({
         message,
-        userId: localStorage.getItem("userId") || "test-user",
+        username: localStorage.getItem("username") || "test-user",
         forumId: "your-forum-id", // Replace with actual forum ID if needed
       });
       if (validationErrors.length > 0) {
@@ -26,7 +26,7 @@ export default function ContentModeration() {
       // Check for offensive content
       const contentCheck = await containsOffensiveContent(
         message,
-        localStorage.getItem("userId") || "test-user"
+        localStorage.getItem("username") || "test-user"
       );
       if (contentCheck.isOffensive) {
         setError(

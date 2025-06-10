@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import connectToMongoDB from '../../utils/mongodb';
 import Forum from '../../models/Forum';
-import { validateUserAuthentication, validateUserAccess } from '../../utils/validation';
+import { validateUserAuthentication } from '../../utils/validation';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'DELETE') {
@@ -10,15 +10,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     await connectToMongoDB();
-    let userId = 'test-user';
+    let username = 'test-user';
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
-      userId = authHeader.split(' ')[1] || 'test-user';
+      username = authHeader.split(' ')[1] || 'test-user';
     }
     const { forumId } = req.query;
 
     // Validate user authentication
-    const userAuthErrors = validateUserAuthentication(userId);
+    const userAuthErrors = validateUserAuthentication(username);
     if (userAuthErrors.length > 0) {
       return res.status(401).json({ error: userAuthErrors[0] });
     }
@@ -39,7 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Only allow forum creator to delete
-    if (forum.createdBy !== userId) {
+    if (forum.createdBy !== username) {
       return res.status(403).json({ error: 'Only the forum creator can delete this forum' });
     }
 
