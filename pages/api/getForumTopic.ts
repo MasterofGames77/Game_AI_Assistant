@@ -16,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     await connectToMongoDB();
     
-    const forum = await Forum.findOne({ forumId }).lean() as any;
+    const forum = await Forum.findOne({ forumId });
     if (!forum) {
       return res.status(404).json({ error: 'Forum not found' });
     }
@@ -36,15 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!forum.metadata.viewedBy?.includes(username as string)) {
         forum.metadata.viewCount += 1;
         forum.metadata.viewedBy = [...(forum.metadata.viewedBy || []), username];
-        await Forum.updateOne(
-          { forumId },
-          { 
-            $set: { 
-              'metadata.viewCount': forum.metadata.viewCount,
-              'metadata.viewedBy': forum.metadata.viewedBy
-            } 
-          }
-        );
+        await forum.save();
       }
     }
 
