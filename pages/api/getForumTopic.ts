@@ -31,11 +31,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ error: 'Forum is not active' });
     }
 
-    if (incrementView !== "false") {
-      // Only increment view count if user hasn't viewed this forum before
-      if (!forum.metadata.viewedBy?.includes(username as string)) {
+    // Only increment view count if incrementView is not explicitly set to false
+    // and the user hasn't viewed this forum before
+    if (incrementView !== "false" && username) {
+      // Initialize viewedBy array if it doesn't exist
+      if (!forum.metadata.viewedBy) {
+        forum.metadata.viewedBy = [];
+      }
+
+      // Only increment if this is the user's first view
+      if (!forum.metadata.viewedBy.includes(username as string)) {
         forum.metadata.viewCount += 1;
-        forum.metadata.viewedBy = [...(forum.metadata.viewedBy || []), username];
+        forum.metadata.viewedBy.push(username as string);
         await forum.save();
       }
     }
