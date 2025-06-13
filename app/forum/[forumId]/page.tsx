@@ -150,11 +150,11 @@ function ForumPage({ params }: { params: { forumId: string } }) {
         {currentForum.posts?.map((post) => (
           <div
             key={post._id}
-            className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow hover:shadow-md transition-shadow"
+            className="bg-white dark:bg-gray-900 p-4 rounded-lg shadow hover:shadow-md transition-shadow"
           >
             <div className="flex justify-between items-start">
               <div>
-                <p className="mb-2 text-gray-800 dark:text-gray-200">
+                <p className="mb-2 text-gray-900 dark:text-gray-200">
                   Posted by {post.createdBy} on{" "}
                   {new Date(post.timestamp).toLocaleString()}
                 </p>

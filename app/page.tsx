@@ -7,7 +7,7 @@ import Image from "next/image";
 import { Conversation } from "../types";
 import ForumList from "../components/ForumList";
 import { ForumProvider } from "../context/ForumContext";
-import { useRouter } from "next/navigation";
+// import { useRouter } from "next/navigation";
 // import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 // import { faPaperclip } from "@fortawesome/free-solid-svg-icons";
 
@@ -28,7 +28,7 @@ export default function Home() {
   // const [image, setImage] = useState<File | null>(null);
   // const [imageUrl, setImageUrl] = useState<string | null>(null);
 
-  const router = useRouter();
+  //const router = useRouter();
 
   const [username, setUsername] = useState<string | null>(null);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
@@ -136,7 +136,7 @@ export default function Home() {
     }
   }, [selectedConversation]);
 
-  // Display conversation count in the UI
+  // Display conversation and forum count in the UI
   const conversationCount = conversations.length;
 
   // function to handle form submission
@@ -235,25 +235,6 @@ export default function Home() {
     fetchConversations();
   };
 
-  // function to reset user id
-  // const handleResetUserId = () => {
-  //   console.log("Resetting User ID.");
-
-  //   const newUserId = prompt("Enter your new user ID or create a new one:");
-
-  //   if (newUserId) {
-  //     localStorage.setItem("userId", newUserId);
-  //     setUserId(newUserId);
-  //     setConversations([]);
-  //     handleClear();
-  //     alert(
-  //       `Your new user ID is: ${newUserId}. Please save it for future use.`
-  //     );
-  //   } else {
-  //     alert("User ID reset canceled.");
-  //   }
-  // };
-
   const handleResetUsername = async () => {
     const newUsername = prompt("Enter your new username:");
 
@@ -340,7 +321,7 @@ export default function Home() {
       // Use a dummy userId and email for now, or fetch from localStorage if needed
       const userId =
         localStorage.getItem("userId") ||
-        "legacy-" + Math.random().toString(36).substr(2, 9);
+        "legacy-" + Math.random().toString(36).substring(2, 11);
       const email = localStorage.getItem("userEmail") || "user@example.com";
       const res = await axios.post("/api/syncUser", {
         userId,
@@ -430,6 +411,7 @@ export default function Home() {
                 priority={true}
               />
 
+              {/* Display conversation count in the UI */}
               {conversationCount > 0 && (
                 <p className="text-sm text-gray-600 mt-2">
                   You have {conversationCount} saved conversation
