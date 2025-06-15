@@ -170,6 +170,7 @@ export default function Home() {
         "/api/assistant",
         {
           userId,
+          username,
           question,
           // imageFilePath, // Comment out this line
         },
@@ -230,9 +231,13 @@ export default function Home() {
   };
 
   // delete conversation from database
-  const handleDeleteConversation = () => {
-    handleClear();
-    fetchConversations();
+  const handleDeleteConversation = async (id: string) => {
+    try {
+      await axios.post("/api/deleteInteraction", { id });
+      fetchConversations(); // Refresh the sidebar list
+    } catch (error) {
+      console.error("Error deleting conversation:", error);
+    }
   };
 
   const handleResetUsername = async () => {
@@ -350,9 +355,9 @@ export default function Home() {
     // Optionally clear other user data from state here
   };
 
-  if (typeof window !== "undefined") {
-    console.log("Current username:", localStorage.getItem("username"));
-  }
+  // if (typeof window !== "undefined") {
+  //   console.log("Current username:", localStorage.getItem("username"));
+  // }
 
   return (
     <div className="flex min-h-screen">

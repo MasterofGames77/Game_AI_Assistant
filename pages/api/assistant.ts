@@ -16,6 +16,40 @@ import { containsOffensiveContent } from '../../utils/contentModeration';
 // import { ImageAnnotatorClient } from '@google-cloud/vision';
 // import fs from 'fs';
 
+// Add type definitions at the top
+interface Metrics {
+  initialMemory?: {
+    heapTotal: string;
+    heapUsed: string;
+    rss: string;
+    external: string;
+  };
+  finalMemory?: {
+    heapTotal: string;
+    heapUsed: string;
+    rss: string;
+    external: string;
+  };
+  dbConnection?: number;
+  questionProcessing?: number;
+  databaseMetrics?: {
+    operation: string;
+    executionTime: string;
+    memoryUsed: string;
+    result: any;
+  };
+  aiCacheMetrics?: any;
+  responseSize?: {
+    bytes: number;
+    kilobytes: string;
+  };
+  requestRate?: {
+    totalRequests: number;
+    requestsPerSecond: string;
+  };
+  totalTime?: number;
+}
+
 // Add performance monitoring
 const measureLatency = async (operation: string, callback: () => Promise<any>) => {
   const start = performance.now();
@@ -357,7 +391,8 @@ export const checkQuestionType = (question: string): string | null => {
     'wipeout', 'crash team racing', 'sonic racing', 'crazy taxi',
     'destruction derby', 'excitebike', 'f-zero', 'hot wheels',
     'monster jam', 'monster energy', 'rally', 'ridge racer',
-    'trackmania', 'twisted metal'
+    'trackmania', 'twisted metal', 'sonic riders', 'sonic racing',
+    'all-star racing'
   ];
 
   const stealthGames = [
@@ -568,13 +603,19 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
 
     console.log('Update result:', updateResult);
 
-    // Emit achievement event
-    const io = getIO();
-    io.emit('achievementEarned', { 
-      username, 
-      achievements: newAchievements,
-      message: `Congratulations! You've earned ${newAchievements.length} new achievement(s)!`
-    });
+    // Emit achievement event (safe-guard Socket.IO)
+    try {
+      const io = getIO();
+      if (io) {
+        io.emit('achievementEarned', { 
+          username, 
+          achievements: newAchievements,
+          message: `Congratulations! You've earned ${newAchievements.length} new achievement(s)!`
+        });
+      }
+    } catch (e) {
+      console.warn('Socket.IO not initialized, skipping achievement emit.');
+    }
 
     return newAchievements;
   }
@@ -648,24 +689,40 @@ const logger = winston.createLogger({
   ]
 });
 
+// Add custom error classes
+class AssistantError extends Error {
+  constructor(message: string, public statusCode: number = 500) {
+    super(message);
+    this.name = 'AssistantError';
+  }
+}
+
+class ValidationError extends AssistantError {
+  constructor(message: string) {
+    super(message, 400);
+    this.name = 'ValidationError';
+  }
+}
+
 // Main API handler function that processes incoming requests
 const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
   const startTime = performance.now();
   const { username, question, code } = req.body;
-  const metrics: any = {};
+  const metrics: Metrics = {};
   const requestMonitor = new RequestMonitor();
   const aiCache = getAICache();
   
   try {
     // Validate question
     if (!question || typeof question !== 'string') {
-      throw new Error('Invalid question format - question must be a non-empty string');
+      throw new ValidationError('Invalid question format - question must be a non-empty string');
     }
 
     // Check for offensive content first
     const contentCheck = await containsOffensiveContent(question, username);
     if (contentCheck.isOffensive) {
       if (contentCheck.violationResult?.action === 'banned') {
+        logger.warn('User banned for offensive content', { username, question });
         return res.status(403).json({
           error: 'Account Suspended',
           message: 'Your account is temporarily suspended',
@@ -675,6 +732,7 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
       }
       
       if (contentCheck.violationResult?.action === 'warning') {
+        logger.warn('A warning has been issued for offensive content', { username, question, warningCount: contentCheck.violationResult.count });
         return res.status(400).json({
           error: 'Content Warning',
           message: `Warning ${contentCheck.violationResult.count}/3: Please avoid using inappropriate language`,
@@ -894,15 +952,19 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     metrics.totalTime = endTime - startTime;
     metrics.aiCacheMetrics = aiCache.getMetrics();
     
-    // Log error metrics
+    // Enhanced error logging
     logger.error('API request failed', {
       username,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      } : 'Unknown error',
       metrics
     });
     
-    if (error instanceof Error) {
-      res.status(500).json({ 
+    if (error instanceof AssistantError) {
+      res.status(error.statusCode).json({ 
         error: error.message,
         details: 'An error occurred while processing your request',
         metrics

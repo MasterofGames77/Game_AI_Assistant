@@ -86,9 +86,9 @@ const Sidebar = ({
     return title.length > 50 ? `${title.substring(0, 45)}...` : title;
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (id: string) => {
     try {
-      await onDeleteConversation();
+      await onDeleteConversation(id);
     } catch (error) {
       console.error("Error deleting conversation:", error);
     }
@@ -127,7 +127,7 @@ const Sidebar = ({
                       sideOffset={5}
                     >
                       <DropdownMenu.Item
-                        onSelect={handleDelete}
+                        onSelect={() => handleDelete(convo._id)}
                         className="outline-none cursor-pointer hover:bg-gray-600 px-2 py-1 rounded"
                         disabled={!convo._id}
                       >

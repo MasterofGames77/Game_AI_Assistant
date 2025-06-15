@@ -9,7 +9,7 @@ export interface Conversation {
 export interface SideBarProps {
   conversations: Conversation[];
   onSelectConversation: (conversation: Conversation) => void;
-  onDeleteConversation: () => void;
+  onDeleteConversation: (id: string) => void;
   onClear: () => void;
   onResetUserId: () => void;
   onTwitchAuth: () => void;

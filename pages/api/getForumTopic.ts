@@ -31,8 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ error: 'Forum is not active' });
     }
 
-    // Only increment view count if incrementView is not explicitly set to false
-    // and the user hasn't viewed this forum before
+    // Only increment view count if incrementView is not explicitly set to false and the user hasn't viewed this forum before
     if (incrementView !== "false" && username) {
       // Initialize viewedBy array if it doesn't exist
       if (!forum.metadata.viewedBy) {
