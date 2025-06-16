@@ -431,29 +431,6 @@ export default function Home() {
                 <li>Access detailed game guides.</li>
               </ul>
 
-              <div className="flex space-x-4 mb-4">
-                <button
-                  className={`px-4 py-2 rounded ${
-                    activeView === "chat"
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-200 text-gray-700"
-                  }`}
-                  onClick={() => setActiveView("chat")}
-                >
-                  Chat
-                </button>
-                <button
-                  className={`px-4 py-2 rounded ${
-                    activeView === "forum"
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-200 text-gray-700"
-                  }`}
-                  onClick={() => setActiveView("forum")}
-                >
-                  Forum
-                </button>
-              </div>
-
               {activeView === "chat" && (
                 <form onSubmit={handleSubmit} className="w-full max-w-md mt-2">
                   <input

@@ -1,5 +1,7 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { SideBarProps } from "../types";
+import ProStatus from "./ProStatus";
+import { useState, useEffect } from "react";
 
 // Precompile the keyword pattern once
 const keywords = [
@@ -60,11 +62,43 @@ const keywords = [
 const titlePattern = new RegExp(keywords, "i");
 
 // Sidebar component that displays conversation history
-const Sidebar = ({
+const Sidebar: React.FC<SideBarProps> = ({
   conversations,
   onSelectConversation,
   onDeleteConversation,
-}: SideBarProps) => {
+  activeView,
+  setActiveView,
+}) => {
+  const [hasProAccess, setHasProAccess] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Get username from localStorage
+    const storedUsername = localStorage.getItem("username");
+    setUsername(storedUsername);
+
+    // Check Pro access
+    const checkProAccess = async () => {
+      try {
+        const response = await fetch("/api/checkProAccess", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ username: storedUsername }),
+        });
+        const data = await response.json();
+        setHasProAccess(data.hasProAccess);
+      } catch (error) {
+        console.error("Error checking Pro access:", error);
+      }
+    };
+
+    if (storedUsername) {
+      checkProAccess();
+    }
+  }, []);
+
   // Memoize the shorten function
   const shortenQuestion = (question: string): string => {
     const match = question.match(titlePattern);
@@ -95,7 +129,35 @@ const Sidebar = ({
   };
 
   return (
-    <div className="w-64 h-screen bg-gray-800 text-white p-4 flex flex-col fixed left-0 top-0">
+    <div className="fixed left-0 top-0 h-full w-64 bg-[#1a1b2e] text-white p-4 flex flex-col">
+      <div className="mb-4">
+        <ProStatus hasProAccess={hasProAccess} username={username} />
+      </div>
+
+      {/* View Switching Buttons */}
+      <div className="flex space-x-2 mb-6">
+        <button
+          className={`flex-1 px-3 py-2 rounded ${
+            activeView === "chat"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-700 text-gray-300"
+          }`}
+          onClick={() => setActiveView("chat")}
+        >
+          Chat
+        </button>
+        <button
+          className={`flex-1 px-3 py-2 rounded ${
+            activeView === "forum"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-700 text-gray-300"
+          }`}
+          onClick={() => setActiveView("forum")}
+        >
+          Forum
+        </button>
+      </div>
+
       <h2 className="text-2xl font-bold mb-4">Conversations</h2>
       <div className="flex-1 overflow-y-auto">
         {conversations.map((convo, index) => {
