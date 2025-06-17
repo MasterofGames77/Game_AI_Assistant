@@ -5,6 +5,8 @@ import { io, Socket } from "socket.io-client";
 interface AchievementData {
   userId: string;
   achievements: { name: string; dateEarned: Date }[];
+  isPro?: boolean;
+  totalAchievements?: number;
 }
 
 const useSocket = (url: string): Socket => {

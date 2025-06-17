@@ -28,10 +28,10 @@ const ProFeatures = [
 ];
 
 export default function UpgradePage() {
-  const handleUpgrade = async () => {
-    // TODO: Implement upgrade logic
-    console.log("Upgrade clicked");
-  };
+  //   const handleUpgrade = async () => {
+  //     // TODO: Implement upgrade logic
+  //     console.log("Upgrade clicked");
+  //   };
 
   return (
     <div className="min-h-screen bg-[#1a1b2e] text-white py-12 px-4">
@@ -70,12 +70,12 @@ export default function UpgradePage() {
             </p>
           </div>
 
-          <button
+          {/* <button
             onClick={handleUpgrade}
             className="px-8 py-4 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] text-white text-xl font-bold rounded-lg hover:from-[#00e6e6] hover:to-[#ff4da6] transition-all duration-200 shadow-lg hover:shadow-xl"
           >
             Upgrade Now
-          </button>
+          </button> */}
         </div>
       </div>
     </div>

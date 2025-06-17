@@ -30,6 +30,16 @@ interface Progress {
   dataDiver?: number;
   performanceTweaker?: number;
   conversationalist?: number;
+  proAchievements: {
+    gameMaster: number;
+    speedDemon: number;
+    communityLeader: number;
+    achievementHunter: number;
+    proStreak: number;
+    expertAdvisor: number;
+    genreSpecialist: number;
+    proContributor: number;
+  };
 }
 
 interface Achievement {
@@ -96,6 +106,16 @@ const UserSchema = new Schema<IUser>({
     dataDiver: { type: Number, default: 0 },
     performanceTweaker: { type: Number, default: 0 },
     conversationalist: { type: Number, default: 0 },
+    proAchievements: {
+      gameMaster: { type: Number, default: 0 },
+      speedDemon: { type: Number, default: 0 },
+      communityLeader: { type: Number, default: 0 },
+      achievementHunter: { type: Number, default: 0 },
+      proStreak: { type: Number, default: 0 },
+      expertAdvisor: { type: Number, default: 0 },
+      genreSpecialist: { type: Number, default: 0 },
+      proContributor: { type: Number, default: 0 }
+    }
   },
 }, { collection: 'users' });
 

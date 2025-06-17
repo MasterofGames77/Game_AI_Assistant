@@ -22,7 +22,7 @@ const updateAchievementsForUser = async (email: string) => {
     console.log(`Found ${questions.length} questions for user`);
 
     // Initialize progress with all possible fields
-    const progress: Record<string, number> = {
+    const progress: Record<string, any> = {
       firstQuestion: 0,
       frequentAsker: 0,
       rpgEnthusiast: 0,
@@ -51,7 +51,17 @@ const updateAchievementsForUser = async (email: string) => {
       collectorPro: 0,
       dataDiver: 0,
       performanceTweaker: 0,
-      conversationalist: 0
+      conversationalist: 0,
+      proAchievements: {
+        gameMaster: 0,
+        speedDemon: 0,
+        communityLeader: 0,
+        achievementHunter: 0,
+        proStreak: 0,
+        expertAdvisor: 0,
+        genreSpecialist: 0,
+        proContributor: 0
+      }
     };
 
     // Process each question to update progress using the enhanced checkQuestionType
@@ -136,7 +146,7 @@ const updateAchievementsForAllUsers = async () => {
         console.log(`Found ${questions.length} questions for user`);
 
         // Initialize progress with all possible fields
-        const progress: Record<string, number> = {
+        const progress: Record<string, any> = {
           firstQuestion: 0,
           frequentAsker: 0,
           rpgEnthusiast: 0,
@@ -148,6 +158,8 @@ const updateAchievementsForAllUsers = async () => {
           battleRoyale: 0,
           sportsChampion: 0,
           adventureAddict: 0,
+          fightingFanatic: 0,
+          simulationSpecialist: 0,
           shooterSpecialist: 0,
           puzzlePro: 0,
           racingRenegade: 0,
@@ -163,7 +175,17 @@ const updateAchievementsForAllUsers = async () => {
           collectorPro: 0,
           dataDiver: 0,
           performanceTweaker: 0,
-          conversationalist: 0
+          conversationalist: 0,
+          proAchievements: {
+            gameMaster: 0,
+            speedDemon: 0,
+            communityLeader: 0,
+            achievementHunter: 0,
+            proStreak: 0,
+            expertAdvisor: 0,
+            genreSpecialist: 0,
+            proContributor: 0
+          }
         };
         
         // Process each question to update progress using the enhanced checkQuestionType

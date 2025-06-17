@@ -588,6 +588,82 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
     }
   }
 
+  // Check Pro achievements if user has Pro access
+  if (user?.hasProAccess) {
+    const proAchievementChecks = [
+      { 
+        name: 'Game Master', 
+        field: 'proAchievements.gameMaster', 
+        threshold: 10,
+        condition: () => {
+          const genreCounts = Object.entries(progress)
+            .filter(([key]) => !key.startsWith('proAchievements'))
+            .filter(([_, value]) => (value as number) >= 5)
+            .length;
+          return genreCounts >= 5;
+        }
+      },
+      { 
+        name: 'Speed Demon', 
+        field: 'proAchievements.speedDemon', 
+        threshold: 20,
+        condition: () => progress.totalQuestions >= 100
+      },
+      { 
+        name: 'Community Leader', 
+        field: 'proAchievements.communityLeader', 
+        threshold: 15,
+        condition: () => progress.totalQuestions >= 200
+      },
+      { 
+        name: 'Achievement Hunter', 
+        field: 'proAchievements.achievementHunter', 
+        threshold: 1,
+        condition: () => currentAchievements.length >= 15
+      },
+      { 
+        name: 'Pro Streak', 
+        field: 'proAchievements.proStreak', 
+        threshold: 7,
+        condition: () => progress.dailyExplorer >= 7
+      },
+      { 
+        name: 'Expert Advisor', 
+        field: 'proAchievements.expertAdvisor', 
+        threshold: 50,
+        condition: () => progress.totalQuestions >= 500
+      },
+      { 
+        name: 'Genre Specialist', 
+        field: 'proAchievements.genreSpecialist', 
+        threshold: 1,
+        condition: () => {
+          const maxGenre = Object.entries(progress)
+            .filter(([key]) => !key.startsWith('proAchievements'))
+            .reduce((max, [_, value]) => Math.max(max, value as number), 0);
+          return maxGenre >= 20;
+        }
+      },
+      { 
+        name: 'Pro Contributor', 
+        field: 'proAchievements.proContributor', 
+        threshold: 1,
+        condition: () => progress.totalQuestions >= 1000
+      }
+    ];
+
+    for (const check of proAchievementChecks) {
+      if (check.condition() && 
+          !currentAchievements.some((a: { name: string; }) => a.name === check.name)) {
+        newAchievements.push({ 
+          name: check.name, 
+          dateEarned: new Date() 
+        });
+        console.log(`Pro achievement earned: ${check.name}`);
+      }
+    }
+  }
+
   if (newAchievements.length > 0) {
     console.log('New achievements to award:', newAchievements);
 
@@ -603,14 +679,16 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
 
     console.log('Update result:', updateResult);
 
-    // Emit achievement event (safe-guard Socket.IO)
+    // Emit achievement event with enhanced data for Pro users
     try {
       const io = getIO();
       if (io) {
         io.emit('achievementEarned', { 
           username, 
           achievements: newAchievements,
-          message: `Congratulations! You've earned ${newAchievements.length} new achievement(s)!`
+          isPro: user?.hasProAccess || false,
+          message: `Congratulations! You've earned ${newAchievements.length} new achievement${newAchievements.length > 1 ? 's' : ''}!`,
+          totalAchievements: (currentAchievements.length + newAchievements.length)
         });
       }
     } catch (e) {
