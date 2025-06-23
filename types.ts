@@ -39,6 +39,7 @@ export interface Forum {
   gameTitle: string;
   category: string;
   isPrivate: boolean;
+  isProOnly: boolean;
   allowedUsers: string[];
   posts: ForumPost[];
   createdAt: Date;
