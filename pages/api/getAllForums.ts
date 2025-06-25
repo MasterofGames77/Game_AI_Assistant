@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import connectToMongoDB from '../../utils/mongodb';
 import Forum from '../../models/Forum';
 import { validateUserAuthentication } from '../../utils/validation';
+import { checkProAccess } from '../../utils/checkProAccess';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -24,19 +25,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
+    // Check Pro access for the user
+    const hasProAccess = await checkProAccess(username);
+
     // Get pagination parameters
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
 
-    // Find forums that are either public or private but accessible to the user
-    const forums = await Forum.find({
+    // Build query conditions
+    const baseConditions: Record<string, any> = {
       $or: [
         { isPrivate: false },
         { allowedUsers: username }
       ],
       'metadata.status': 'active'
-    })
+    };
+
+    // Add Pro-only filter for non-Pro users
+    if (!hasProAccess) {
+      baseConditions['isProOnly'] = false;
+    }
+
+    // Find forums that are either public or private but accessible to the user
+    const forums = await Forum.find(baseConditions)
     .sort({ 'metadata.lastActivityAt': -1 })
     .skip(skip)
     .limit(limit);
@@ -52,14 +64,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }));
 
-    // Get total count for pagination
-    const total = await Forum.countDocuments({
-      $or: [
-        { isPrivate: false },
-        { allowedUsers: username }
-      ],
-      'metadata.status': 'active'
-    });
+    // Get total count for pagination (using same conditions)
+    const total = await Forum.countDocuments(baseConditions);
 
     return res.status(200).json({
       forums: processedForums,

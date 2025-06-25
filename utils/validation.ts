@@ -131,6 +131,40 @@ export const validateUserAccess = (forum: Forum, username: string) => {
 };
 
 /**
+ * Validates if a user has Pro access for Pro-only forums
+ * @param forum - The forum to check Pro access for
+ * @param hasProAccess - Whether the user has Pro access
+ * @returns Array of error messages, empty if user has Pro access
+ */
+export const validateProAccess = (forum: Forum, hasProAccess: boolean) => {
+  const errors: string[] = [];
+
+  // Check Pro-only forum access
+  if (forum.isProOnly && !hasProAccess) {
+    errors.push('This forum is Pro-only. Upgrade to Wingman Pro to access exclusive forums.');
+  }
+
+  return errors;
+};
+
+/**
+ * Validates Pro access for forum creation
+ * @param isProOnly - Whether the forum being created is Pro-only
+ * @param hasProAccess - Whether the user has Pro access
+ * @returns Array of error messages, empty if user can create the forum
+ */
+export const validateForumCreationAccess = (isProOnly: boolean, hasProAccess: boolean) => {
+  const errors: string[] = [];
+
+  // Check if user is trying to create a Pro-only forum without Pro access
+  if (isProOnly && !hasProAccess) {
+    errors.push('Pro access required to create Pro-only forums. Upgrade to Wingman Pro to create exclusive forums.');
+  }
+
+  return errors;
+};
+
+/**
  * Validates if a forum status is valid
  * @param status - The status to validate
  * @returns Boolean indicating if the status is valid

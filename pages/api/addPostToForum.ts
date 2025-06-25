@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import connectToMongoDB from '../../utils/mongodb';
 import Forum from '../../models/Forum';
 import { containsOffensiveContent } from '../../utils/contentModeration';
+import { checkProAccess } from '../../utils/checkProAccess';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -15,6 +16,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Validate required fields
     if (!forumId || !message || !username) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Pro access check
+    const hasProAccess = await checkProAccess(username);
+    if (!hasProAccess) {
+      return res.status(403).json({ error: 'Pro access required to post in forums. Upgrade to Wingman Pro to participate.' });
     }
 
     // Find the forum

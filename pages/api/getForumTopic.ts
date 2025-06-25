@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import connectToMongoDB from '../../utils/mongodb';
 import Forum from '../../models/Forum';
+import { checkProAccess } from '../../utils/checkProAccess';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -19,6 +20,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const forum = await Forum.findOne({ forumId });
     if (!forum) {
       return res.status(404).json({ error: 'Forum not found' });
+    }
+
+    // Pro access check for Pro-only forums
+    const hasProAccess = await checkProAccess(username as string);
+    if (forum.isProOnly && !hasProAccess) {
+      return res.status(403).json({ error: 'This forum is Pro-only. Upgrade to Wingman Pro to access exclusive forums.' });
     }
 
     // Check if forum is private and user has access

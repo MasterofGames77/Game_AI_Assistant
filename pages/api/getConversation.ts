@@ -122,14 +122,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
   } catch (error: any) {
-    // Log error with details
+    console.error('Error fetching conversations:', error);
     logger.error('Error fetching conversations:', {
       error: error.message,
       stack: error.stack,
       username
     });
-
-    // Send appropriate error response
     res.status(500).json({
       error: 'Failed to fetch conversations',
       message: process.env.NODE_ENV === 'development' ? error.message : undefined

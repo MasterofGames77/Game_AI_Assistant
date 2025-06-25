@@ -19,6 +19,31 @@ export default function ForumList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [hasProAccess, setHasProAccess] = useState(false);
+
+  // Check Pro access on component mount
+  useEffect(() => {
+    const checkProAccess = async () => {
+      try {
+        const username = localStorage.getItem("username");
+        if (username) {
+          const response = await fetch("/api/checkProAccess", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ username }),
+          });
+          const data = await response.json();
+          setHasProAccess(data.hasProAccess);
+        }
+      } catch (error) {
+        console.error("Error checking Pro access:", error);
+      }
+    };
+
+    checkProAccess();
+  }, []);
 
   useEffect(() => {
     const loadForums = async () => {
@@ -58,11 +83,26 @@ export default function ForumList() {
         <h2 className="text-2xl font-bold">Forums</h2>
         <button
           onClick={() => setShowCreateForm(!showCreateForm)}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          disabled={!hasProAccess}
+          className={`px-4 py-2 rounded ${
+            hasProAccess
+              ? "bg-blue-500 text-white hover:bg-blue-600"
+              : "bg-gray-400 text-gray-600 cursor-not-allowed"
+          }`}
+          title={!hasProAccess ? "Pro access required to create forums" : ""}
         >
           {showCreateForm ? "Cancel" : "Create Forum"}
         </button>
       </div>
+
+      {!hasProAccess && (
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-blue-800 text-sm">
+            <strong>Pro Access Required:</strong> Upgrade to Wingman Pro to
+            create forums and participate in discussions.
+          </p>
+        </div>
+      )}
 
       {showCreateForm && <CreateForum />}
 
@@ -75,13 +115,25 @@ export default function ForumList() {
               className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow"
             >
               <div className="flex justify-between items-start">
-                <div>
-                  <Link
-                    href={`/forum/${forum.forumId}`}
-                    className="text-xl font-semibold text-blue-600 hover:text-blue-800"
-                  >
-                    {forum.title}
-                  </Link>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/forum/${forum.forumId}`}
+                      className="text-xl font-semibold text-blue-600 hover:text-blue-800"
+                    >
+                      {forum.title}
+                    </Link>
+                    {forum.isProOnly && (
+                      <span className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs rounded-full">
+                        Pro Only
+                      </span>
+                    )}
+                    {forum.isPrivate && (
+                      <span className="px-2 py-1 bg-gray-500 text-white text-xs rounded-full">
+                        Private
+                      </span>
+                    )}
+                  </div>
                   <p className="text-gray-600 mt-1">
                     Game: {forum.gameTitle} | Category:{" "}
                     {categoryLabels[forum.category] ||
@@ -101,7 +153,7 @@ export default function ForumList() {
                 {forum.createdBy === localStorage.getItem("username") && (
                   <button
                     onClick={() => handleDelete(forum._id)}
-                    className="text-red-500 hover:text-red-700"
+                    className="text-red-500 hover:text-red-700 ml-4"
                   >
                     Delete
                   </button>
@@ -114,6 +166,14 @@ export default function ForumList() {
         {forums.length === 0 && (
           <div className="text-center text-gray-500 py-8">
             No forums found. Create one to get started!
+            {!hasProAccess && (
+              <div className="mt-2 text-sm">
+                <p>
+                  Upgrade to Pro to access exclusive forums and create Pro-only
+                  discussions.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

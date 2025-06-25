@@ -1,6 +1,5 @@
 import { connectToSplashDB, connectToWingmanDB } from './databaseConnections';
 import { Schema, Document } from 'mongoose';
-import mongoose from 'mongoose';
 
 // WingmanDB User interface (from models/User.ts)
 interface IWingmanUser extends Document {
@@ -74,8 +73,9 @@ export const checkProAccess = async (username: string): Promise<boolean> => {
     const wingmanDB = await connectToWingmanDB();
     const splashDB = await connectToSplashDB();
 
-    const WingmanUser = wingmanDB.model<IWingmanUser>('User', wingmanUserSchema);
-    const SplashUser = splashDB.model<ISplashUser>('User', splashUserSchema);
+    // Use unique model names to avoid conflicts
+    const WingmanUser = wingmanDB.models.WingmanUser || wingmanDB.model<IWingmanUser>('WingmanUser', wingmanUserSchema);
+    const SplashUser = splashDB.models.SplashUser || splashDB.model<ISplashUser>('SplashUser', splashUserSchema);
 
     // Try to find by username first
     const [wingmanUser, splashUser] = await Promise.all([
@@ -99,12 +99,12 @@ export const checkProAccess = async (username: string): Promise<boolean> => {
 export const syncUserData = async (userId: string, email?: string): Promise<void> => {
   try {
     // Connect to databases
-    await connectToWingmanDB(); // Just connect without storing the reference
-    await connectToSplashDB();
+    const wingmanDB = await connectToWingmanDB();
+    const splashDB = await connectToSplashDB();
 
-    // Check if models already exist before compiling
-    const WingmanUser = mongoose.models.User || mongoose.model('User', wingmanUserSchema);
-    const SplashUser = mongoose.models.SplashUser || mongoose.model('SplashUser', splashUserSchema);
+    // Use unique model names to avoid conflicts
+    const WingmanUser = wingmanDB.models.WingmanUser || wingmanDB.model<IWingmanUser>('WingmanUser', wingmanUserSchema);
+    const SplashUser = splashDB.models.SplashUser || splashDB.model<ISplashUser>('SplashUser', splashUserSchema);
 
     // First check Splash DB
     const splashUser = email 

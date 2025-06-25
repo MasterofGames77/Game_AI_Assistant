@@ -19,14 +19,25 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
         `/api/getAllForums?page=${page}&limit=${limit}`,
         {
           headers: {
-            "user-id": localStorage.getItem("userId") || "test-user",
+            username: localStorage.getItem("username") || "test-user",
           },
         }
       );
       setForums(response.data.forums);
       return response.data;
     } catch (err: any) {
-      setError(err.message || "Failed to fetch forums");
+      if (
+        err.response?.status === 403 &&
+        err.response?.data?.error?.includes("Pro access")
+      ) {
+        setError(
+          "Pro access required to view forums. Upgrade to Wingman Pro to access exclusive forums."
+        );
+      } else {
+        setError(
+          err.response?.data?.error || err.message || "Failed to fetch forums"
+        );
+      }
       return [];
     } finally {
       setLoading(false);
@@ -54,7 +65,18 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
       setForums((prevForums) => [...prevForums, newForum]);
       return newForum;
     } catch (err: any) {
-      setError(err.message || "Failed to create forum");
+      if (
+        err.response?.status === 403 &&
+        err.response?.data?.error?.includes("Pro access")
+      ) {
+        setError(
+          "Pro access required to create forums. Upgrade to Wingman Pro to create forums and participate in discussions."
+        );
+      } else {
+        setError(
+          err.response?.data?.error || err.message || "Failed to create forum"
+        );
+      }
       return null;
     } finally {
       setLoading(false);
@@ -77,7 +99,9 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
           setCurrentForum(null);
         }
       } catch (err: any) {
-        setError(err.message || "Failed to delete forum");
+        setError(
+          err.response?.data?.error || err.message || "Failed to delete forum"
+        );
         throw err;
       } finally {
         setLoading(false);
@@ -114,7 +138,18 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
           setCurrentForum(updatedForum);
         }
       } catch (err: any) {
-        setError(err.message || "Failed to add post");
+        if (
+          err.response?.status === 403 &&
+          err.response?.data?.error?.includes("Pro access")
+        ) {
+          setError(
+            "Pro access required to post in forums. Upgrade to Wingman Pro to participate in discussions."
+          );
+        } else {
+          setError(
+            err.response?.data?.error || err.message || "Failed to add post"
+          );
+        }
         throw err;
       } finally {
         setLoading(false);

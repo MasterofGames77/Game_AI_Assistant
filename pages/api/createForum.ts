@@ -1,8 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import connectToMongoDB from "../../utils/mongodb";
 import Forum from "../../models/Forum";
-import { validateUserAuthentication, validateForumData } from "@/utils/validation";
+import { validateUserAuthentication, validateForumData, validateForumCreationAccess } from "@/utils/validation";
 import { containsOffensiveContent } from "@/utils/contentModeration";
+import { checkProAccess } from "../../utils/checkProAccess";
 
 // Middleware to validate authentication
 const validateAuth = (req: NextApiRequest) => {
@@ -27,11 +28,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     await connectToMongoDB();
 
-    // Extract username from request body
-    const { title, gameTitle, category, isPrivate, username } = req.body;
+    // Extract username and forum data from request body
+    const { title, gameTitle, category, isPrivate, isProOnly, username } = req.body;
 
     if (!username) {
       return res.status(400).json({ error: 'Username is required' });
+    }
+
+    // Check Pro access for the user - ALL forum creation requires Pro access
+    const hasProAccess = await checkProAccess(username);
+    if (!hasProAccess) {
+      return res.status(403).json({ error: 'Pro access required to create forums. Upgrade to Wingman Pro to create forums.' });
     }
 
     // Validate forum data
@@ -40,6 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       gameTitle,
       category,
       isPrivate,
+      isProOnly,
       allowedUsers: isPrivate ? [username] : [],
     };
     const validationErrors = validateForumData(forumData);
@@ -65,6 +73,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       gameTitle,
       category,
       isPrivate: !!isPrivate,
+      isProOnly: !!isProOnly,
       allowedUsers: isPrivate ? [username] : [],
       createdBy: username,
       posts: [],
