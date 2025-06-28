@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { checkProAccess } from '../../utils/checkProAccess';
+import { checkProAccess } from '../../utils/proAccessUtil';
 
 export default async function handler(
   req: NextApiRequest,
@@ -10,13 +10,13 @@ export default async function handler(
   }
 
   try {
-    const { username } = req.body;
+    const { username, userId } = req.body;
 
     if (!username) {
       return res.status(400).json({ message: 'Username is required' });
     }
 
-    const hasProAccess = await checkProAccess(username);
+    const hasProAccess = await checkProAccess(username, userId);
 
     return res.status(200).json({ hasProAccess });
   } catch (error) {

@@ -37,60 +37,46 @@ export default function Home() {
 
   useEffect(() => {
     const initializeUser = async () => {
-      let storedUserId: string | null = null;
+      setLoading(true);
       try {
-        storedUserId = localStorage.getItem("userId");
-        let storedEmail = localStorage.getItem("userEmail");
-
-        // For development only: Create test user if no data exists
-        if (
-          process.env.NODE_ENV === "development" &&
-          (!storedUserId || !storedEmail)
-        ) {
-          storedUserId = "test-" + Math.random().toString(36).substr(2, 9);
-          storedEmail = "test@example.com";
-          localStorage.setItem("userId", storedUserId);
-          localStorage.setItem("userEmail", storedEmail);
-        }
-
-        if (storedUserId && storedEmail) {
-          let retries = 3;
-          while (retries > 0) {
-            try {
-              const response = await axios.post(
-                "/api/syncUser",
-                {
-                  userId: storedUserId,
-                  email: storedEmail,
-                },
-                {
-                  timeout: 10000, // Increased timeout to 10 seconds
-                }
-              );
-
-              if (response.status === 200) {
-                setUserId(storedUserId);
-                break;
-              }
-            } catch (syncError) {
-              console.error(
-                `Error syncing user (attempts left: ${retries - 1}):`,
-                syncError
-              );
-              retries--;
-              if (retries === 0) {
-                // If all retries fail, still set userId to allow basic functionality
-                setUserId(storedUserId);
-              } else {
-                // Wait 1 second before retrying
-                await new Promise((resolve) => setTimeout(resolve, 1000));
-              }
+        const storedUsername = localStorage.getItem("username");
+        if (storedUsername) {
+          // Try to fetch user by username
+          try {
+            const res = await axios.get(
+              `/api/findUserByUsername?username=${storedUsername}`
+            );
+            if (res.data && res.data.user) {
+              // Existing user: sync userId/email from backend
+              localStorage.setItem("userId", res.data.user.userId);
+              localStorage.setItem("userEmail", res.data.user.email);
+              setUserId(res.data.user.userId);
+              setUsername(storedUsername);
+              setShowUsernameModal(false);
+              setLoading(false);
+              return;
+            } else {
+              // Username not found, treat as new user
+              setShowUsernameModal(true);
+              setLoading(false);
+              return;
+            }
+          } catch (err: any) {
+            // If error is 404, user not found, treat as new user
+            if (err.response && err.response.status === 404) {
+              setShowUsernameModal(true);
+              setLoading(false);
+              return;
+            } else {
+              // Other errors
+              console.error("Error fetching user by username:", err);
             }
           }
         }
+        // No username in localStorage, show modal
+        setShowUsernameModal(true);
       } catch (error) {
         console.error("Error initializing user:", error);
-        if (storedUserId) setUserId(storedUserId);
       } finally {
         setLoading(false);
       }
@@ -111,16 +97,12 @@ export default function Home() {
 
   // function to get conversations
   const fetchConversations = useCallback(async () => {
-    try {
-      const storedUsername = localStorage.getItem("username");
-      if (!storedUsername) return; // Optionally handle missing username
-      const res = await axios.get(
-        `/api/getConversation?username=${storedUsername}`
-      );
-      setConversations(res.data.conversations);
-    } catch (error) {
-      console.error("Error fetching conversations:", error);
-    }
+    const storedUsername = localStorage.getItem("username");
+    if (!storedUsername) return;
+    const res = await axios.get(
+      `/api/getConversation?username=${storedUsername}`
+    );
+    setConversations(res.data.conversations);
   }, []);
 
   useEffect(() => {
@@ -197,6 +179,17 @@ export default function Home() {
       // Clear image after successful submission
       // setImage(null);
       // setImageUrl(null);
+
+      if (res.data && res.data.user) {
+        setUsername(res.data.user.username);
+        setUserId(res.data.user.userId);
+        localStorage.setItem("username", res.data.user.username);
+        localStorage.setItem("userId", res.data.user.userId);
+        localStorage.setItem("userEmail", res.data.user.email);
+        setShowUsernameModal(false);
+        setConversations([]); // Clear old conversations
+        fetchConversations(); // Fetch new user's conversations
+      }
     } catch (error: any) {
       console.error("Error details:", {
         message: error.message,
@@ -323,11 +316,25 @@ export default function Home() {
       return;
     }
     try {
-      // Use a dummy userId and email for now, or fetch from localStorage if needed
-      const userId =
-        localStorage.getItem("userId") ||
-        "legacy-" + Math.random().toString(36).substring(2, 11);
-      const email = localStorage.getItem("userEmail") || "user@example.com";
+      // 1. Check if username exists
+      const findRes = await axios.get(
+        `/api/findUserByUsername?username=${usernameInput.trim()}`
+      );
+      let userId, email;
+      if (findRes.data && findRes.data.user) {
+        // Existing user: use their userId/email
+        userId = findRes.data.user.userId;
+        email = findRes.data.user.email;
+      } else {
+        // New user: generate new userId/email
+        userId =
+          localStorage.getItem("userId") ||
+          "legacy-" + Math.random().toString(36).substring(2, 11);
+        email = localStorage.getItem("userEmail") || "user@example.com";
+      }
+      // 2. Sync user
+      if (userId === usernameInput.trim()) userId = undefined;
+      if (email === usernameInput.trim()) email = undefined;
       const res = await axios.post("/api/syncUser", {
         userId,
         email,
@@ -336,8 +343,11 @@ export default function Home() {
       if (res.data && res.data.user) {
         setUsername(usernameInput.trim());
         localStorage.setItem("username", usernameInput.trim());
-        localStorage.setItem("username", res.data.user.username);
+        localStorage.setItem("userId", res.data.user.userId);
+        localStorage.setItem("userEmail", res.data.user.email);
         setShowUsernameModal(false);
+        setConversations([]); // Clear old conversations
+        fetchConversations(); // Fetch new user's conversations
       }
     } catch (err: any) {
       if (err.response?.data?.message) {
@@ -350,9 +360,12 @@ export default function Home() {
 
   const handleSignOut = () => {
     setUsername(null);
+    setUserId(null);
     localStorage.removeItem("username");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("userEmail");
+    // Optionally clear conversations, etc.
     setShowUsernameModal(true);
-    // Optionally clear other user data from state here
   };
 
   // if (typeof window !== "undefined") {

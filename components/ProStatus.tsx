@@ -18,10 +18,16 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
     <div className="flex items-center space-x-4">
       {hasProAccess ? (
         <div className="flex items-center space-x-2">
-          <span className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm rounded-full">
+          <span
+            className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm rounded-full whitespace-nowrap flex items-center justify-center"
+            style={{ minWidth: "90px" }}
+          >
             Pro Member
           </span>
-          <span className="text-sm text-gray-600 dark:text-gray-300">
+          <span
+            className="text-sm font-bold text-white dark:text-white ml-1 drop-shadow-sm"
+            style={{ textShadow: "0 1px 4px rgba(80,0,80,0.15)" }}
+          >
             {username}
           </span>
         </div>

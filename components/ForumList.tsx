@@ -26,17 +26,14 @@ export default function ForumList() {
     const checkProAccess = async () => {
       try {
         const username = localStorage.getItem("username");
-        if (username) {
-          const response = await fetch("/api/checkProAccess", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ username }),
-          });
-          const data = await response.json();
-          setHasProAccess(data.hasProAccess);
-        }
+        const userId = localStorage.getItem("userId");
+        const response = await fetch("/api/checkProAccess", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, userId }),
+        });
+        const data = await response.json();
+        setHasProAccess(data.hasProAccess);
       } catch (error) {
         console.error("Error checking Pro access:", error);
       }

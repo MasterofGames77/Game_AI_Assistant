@@ -3,7 +3,7 @@ import connectToMongoDB from "../../utils/mongodb";
 import Forum from "../../models/Forum";
 import { validateUserAuthentication, validateForumData, validateForumCreationAccess } from "@/utils/validation";
 import { containsOffensiveContent } from "@/utils/contentModeration";
-import { checkProAccess } from "../../utils/checkProAccess";
+import { checkProAccess } from "../../utils/proAccessUtil";
 
 // Middleware to validate authentication
 const validateAuth = (req: NextApiRequest) => {

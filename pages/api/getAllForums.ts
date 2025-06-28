@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import connectToMongoDB from '../../utils/mongodb';
 import Forum from '../../models/Forum';
 import { validateUserAuthentication } from '../../utils/validation';
-import { checkProAccess } from '../../utils/checkProAccess';
+import { checkProAccess } from '../../utils/proAccessUtil';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {

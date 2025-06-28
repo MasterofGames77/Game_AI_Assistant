@@ -75,6 +75,7 @@ const Sidebar: React.FC<SideBarProps> = ({
   useEffect(() => {
     // Get username from localStorage
     const storedUsername = localStorage.getItem("username");
+    const storedUserId = localStorage.getItem("userId");
     setUsername(storedUsername);
 
     // Check Pro access
@@ -82,10 +83,11 @@ const Sidebar: React.FC<SideBarProps> = ({
       try {
         const response = await fetch("/api/checkProAccess", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ username: storedUsername }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: storedUsername,
+            userId: storedUserId,
+          }),
         });
         const data = await response.json();
         setHasProAccess(data.hasProAccess);

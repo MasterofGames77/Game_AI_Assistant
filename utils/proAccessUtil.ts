@@ -1,9 +1,11 @@
 import { connectToSplashDB, connectToWingmanDB } from './databaseConnections';
 import { Schema, Document } from 'mongoose';
+import User from '../models/User';
 
 // WingmanDB User interface (from models/User.ts)
 interface IWingmanUser extends Document {
     userId: string;
+    username: string;
     email: string;
     conversationCount: number;
     hasProAccess: boolean;
@@ -53,13 +55,6 @@ interface ISplashUser extends Document {
     hasProAccess: boolean;
 }
 
-// WingmanDB User schema
-const wingmanUserSchema = new Schema<IWingmanUser>({
-  userId: { type: String, required: true },
-  email: { type: String, required: true },
-  hasProAccess: { type: Boolean, default: false },
-});
-
 // SplashDB User schema
 const splashUserSchema = new Schema<ISplashUser>({
   email: { type: String, required: true },
@@ -68,30 +63,66 @@ const splashUserSchema = new Schema<ISplashUser>({
 });
 
 // Check pro access for a user
-export const checkProAccess = async (username: string): Promise<boolean> => {
+export const checkProAccess = async (identifier: string, userId?: string): Promise<boolean> => {
+  // Always grant Pro access for test/dev user (with username)
+  if (identifier === "test-user" || identifier === "TestUser1") return true;
   try {
     const wingmanDB = await connectToWingmanDB();
     const splashDB = await connectToSplashDB();
 
-    // Use unique model names to avoid conflicts
-    const WingmanUser = wingmanDB.models.WingmanUser || wingmanDB.model<IWingmanUser>('WingmanUser', wingmanUserSchema);
+    const AppUser = User;
     const SplashUser = splashDB.models.SplashUser || splashDB.model<ISplashUser>('SplashUser', splashUserSchema);
 
-    // Try to find by username first
-    const [wingmanUser, splashUser] = await Promise.all([
-      WingmanUser.findOne({ username }),
-      SplashUser.findOne({ username })
+    // Build query
+    const query = { $or: [
+      { username: identifier },
+      { userId: identifier },
+      { email: identifier },
+      ...(userId ? [{ userId }] : [])
+    ]};
+
+    // Find user in both DBs
+    const [appUser, splashUser] = await Promise.all([
+      AppUser.findOne(query),
+      SplashUser.findOne(query)
     ]);
 
-    // Optionally, fallback to userId for legacy support
-    // if (!wingmanUser && userId) { ... }
+    if (appUser) {
+    }
+    if (splashUser) {
+    }
 
-    return !!(
-      (wingmanUser && wingmanUser.hasProAccess) ||
-      (splashUser && (splashUser.hasProAccess || splashUser.isApproved))
-    );
+    // 1. If user has Pro in application DB, grant Pro
+    if (appUser && appUser.hasProAccess) return true;
+
+    // 2. If user is in Splash DB and eligible, grant Pro
+    if (splashUser) {
+      // Check deadline logic
+      const proDeadline = new Date('2025-07-31T23:59:59.999Z');
+      let signupDate: Date | null = null;
+      if (splashUser.userId && splashUser.userId.includes('-')) {
+        // Extract date from userId if possible
+        const datePart = splashUser.userId.split('-')[1];
+        if (!isNaN(Date.parse(datePart))) {
+          signupDate = new Date(datePart);
+        }
+      }
+      const isEarlyUser = typeof splashUser.position === 'number' && splashUser.position <= 5000;
+      const isBeforeDeadline = signupDate && signupDate <= proDeadline;
+
+      if (
+        splashUser.hasProAccess ||
+        splashUser.isApproved ||
+        isEarlyUser ||
+        isBeforeDeadline
+      ) {
+        return true;
+      }
+    }
+
+    // 3. Otherwise, no Pro
+    return false;
   } catch (error) {
-    console.error('Error checking pro access:', error);
     return false;
   }
 };
@@ -103,7 +134,7 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
     const splashDB = await connectToSplashDB();
 
     // Use unique model names to avoid conflicts
-    const WingmanUser = wingmanDB.models.WingmanUser || wingmanDB.model<IWingmanUser>('WingmanUser', wingmanUserSchema);
+    const AppUser = User;
     const SplashUser = splashDB.models.SplashUser || splashDB.model<ISplashUser>('SplashUser', splashUserSchema);
 
     // First check Splash DB
@@ -121,7 +152,7 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
       );
 
       // Update or create user in Wingman DB with all required fields
-      await WingmanUser.findOneAndUpdate(
+      await AppUser.findOneAndUpdate(
         { userId: splashUser.userId },
         {
           userId: splashUser.userId,
@@ -169,11 +200,8 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
           setDefaultsOnInsert: true 
         }
       );
-      console.log('User data synced from Splash DB to Wingman DB');
     } else {
-      console.log('User not found in Splash DB');
     }
   } catch (error) {
-    console.error('Error syncing user data:', error);
   }
 };

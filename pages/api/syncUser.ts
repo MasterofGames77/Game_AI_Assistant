@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { syncUserData } from '../../utils/checkProAccess';
+import { syncUserData } from '../../utils/proAccessUtil';
 import { connectToWingmanDB } from '../../utils/databaseConnections';
 import User from '../../models/User';
 import mongoose from 'mongoose';
@@ -15,6 +15,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!userId || !email) {
     return res.status(400).json({ message: 'userId and email are required' });
+  }
+
+  if (userId === username || email === username) {
+    return res.status(400).json({ message: "Invalid userId or email" });
   }
 
   try {
@@ -61,21 +65,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ message: 'Username is required for new users' });
     }
 
-    // If username is provided, check for uniqueness
-    if (username) {
-      const usernameTaken = await User.findOne({ username, userId: { $ne: userId } });
-      if (usernameTaken) {
+    // Find user by username
+    const userByUsername = await User.findOne({ username });
+
+    if (userByUsername) {
+      // If the username is taken by the same userId, allow sign-in
+      if (userByUsername.userId === userId) {
+        // This is the same user, treat as sign-in
+        return res.status(200).json({ message: 'Signed in', user: userByUsername });
+      } else {
+        // Username is taken by someone else
         return res.status(409).json({ message: 'Username is already taken' });
       }
     }
 
-    // Upsert user with username
+    // If username is not taken, create or update user
     user = await User.findOneAndUpdate(
       { userId },
       {
         userId,
         email,
-        ...(username && { username }),
+        username,
         $setOnInsert: {
           conversationCount: 0,
           hasProAccess: false,
@@ -91,7 +101,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ).exec();
 
     await syncUserData(userId, email);
-    res.status(200).json({ message: 'User data synced successfully', user });
+    return res.status(200).json({ message: 'User data synced successfully', user });
   } catch (error) {
     console.error('Error in syncUser API:', error);
     res.status(500).json({
