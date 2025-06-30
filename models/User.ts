@@ -47,6 +47,27 @@ interface Achievement {
   dateEarned: Date;
 }
 
+// New subscription interface
+interface Subscription {
+  status: 'free_period' | 'active' | 'canceled' | 'past_due' | 'unpaid' | 'expired' | 'trialing';
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  currentPeriodStart?: Date;
+  currentPeriodEnd?: Date;
+  cancelAtPeriodEnd?: boolean;
+  canceledAt?: Date;
+  // Early access specific fields
+  earlyAccessGranted?: boolean;
+  earlyAccessStartDate?: Date;
+  earlyAccessEndDate?: Date;
+  transitionToPaid?: boolean;
+  // Payment details
+  paymentMethod?: string;
+  amount?: number;
+  currency?: string;
+  billingCycle?: string;
+}
+
 export interface IUser extends Document {
   userId: string;
   username: string;
@@ -55,6 +76,7 @@ export interface IUser extends Document {
   hasProAccess: boolean;
   achievements: Achievement[];
   progress: Progress;
+  subscription?: Subscription;
 }
 
 const UserSchema = new Schema<IUser>({
@@ -117,7 +139,125 @@ const UserSchema = new Schema<IUser>({
       proContributor: { type: Number, default: 0 }
     }
   },
+  // New subscription schema
+  subscription: {
+    status: { 
+      type: String, 
+      enum: ['free_period', 'active', 'canceled', 'past_due', 'unpaid', 'expired', 'trialing'],
+      default: 'expired'
+    },
+    stripeCustomerId: { type: String, sparse: true },
+    stripeSubscriptionId: { type: String, sparse: true },
+    currentPeriodStart: { type: Date },
+    currentPeriodEnd: { type: Date },
+    cancelAtPeriodEnd: { type: Boolean, default: false },
+    canceledAt: { type: Date },
+    // Early access specific fields
+    earlyAccessGranted: { type: Boolean, default: false },
+    earlyAccessStartDate: { type: Date },
+    earlyAccessEndDate: { type: Date },
+    transitionToPaid: { type: Boolean, default: false },
+    // Payment details
+    paymentMethod: { type: String },
+    amount: { type: Number },
+    currency: { type: String, default: 'usd' },
+    billingCycle: { type: String, default: 'monthly' }
+  }
 }, { collection: 'users' });
+
+// Create indexes for subscription-related queries
+UserSchema.index({ 'subscription.status': 1 });
+UserSchema.index({ 'subscription.earlyAccessGranted': 1 });
+UserSchema.index({ 'subscription.earlyAccessEndDate': 1 });
+UserSchema.index({ 'subscription.currentPeriodEnd': 1 });
+// Note: stripeCustomerId and stripeSubscriptionId already have sparse indexes from schema definition
+
+// Method to check if user has active Pro access
+UserSchema.methods.hasActiveProAccess = function(): boolean {
+  const now = new Date();
+  
+  // Check early access period
+  if (this.subscription?.earlyAccessGranted && 
+      this.subscription?.earlyAccessEndDate && 
+      this.subscription.earlyAccessEndDate > now) {
+    return true;
+  }
+  
+  // Check paid subscription
+  if (this.subscription?.status === 'active' && 
+      this.subscription?.currentPeriodEnd && 
+      this.subscription.currentPeriodEnd > now) {
+    return true;
+  }
+  
+  // Check canceled subscription (still active until period end)
+  if (this.subscription?.status === 'canceled' && 
+      this.subscription?.cancelAtPeriodEnd && 
+      this.subscription?.currentPeriodEnd && 
+      this.subscription.currentPeriodEnd > now) {
+    return true;
+  }
+  
+  return false;
+};
+
+// Method to get subscription status for display
+UserSchema.methods.getSubscriptionStatus = function() {
+  const now = new Date();
+  
+  if (this.subscription?.earlyAccessGranted) {
+    if (this.subscription.earlyAccessEndDate && this.subscription.earlyAccessEndDate > now) {
+      const daysUntilExpiration = Math.ceil(
+        (this.subscription.earlyAccessEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      
+      return {
+        type: 'free_period',
+        status: 'Free Period Active',
+        expiresAt: this.subscription.earlyAccessEndDate,
+        daysUntilExpiration,
+        canUpgrade: true,
+        showWarning: daysUntilExpiration <= 30
+      };
+    } else {
+      return {
+        type: 'expired_free',
+        status: 'Free Period Expired',
+        canUpgrade: true,
+        showWarning: true
+      };
+    }
+  }
+  
+  if (this.subscription?.status === 'active' && 
+      this.subscription?.currentPeriodEnd && 
+      this.subscription.currentPeriodEnd > now) {
+    return {
+      type: 'paid_active',
+      status: 'Paid Subscription Active',
+      expiresAt: this.subscription.currentPeriodEnd,
+      canCancel: true
+    };
+  }
+  
+  if (this.subscription?.status === 'canceled' && 
+      this.subscription?.cancelAtPeriodEnd && 
+      this.subscription?.currentPeriodEnd && 
+      this.subscription.currentPeriodEnd > now) {
+    return {
+      type: 'canceled_active',
+      status: 'Subscription Canceled (Active Until Period End)',
+      expiresAt: this.subscription.currentPeriodEnd,
+      canReactivate: true
+    };
+  }
+  
+  return {
+    type: 'no_subscription',
+    status: 'No Active Subscription',
+    canUpgrade: true
+  };
+};
 
 const User = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
 
