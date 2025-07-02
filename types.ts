@@ -118,3 +118,36 @@ export interface ContentCheckResult {
     banCount?: number;
   };
 }
+
+export interface Metrics {
+  initialMemory?: {
+    heapTotal: string;
+    heapUsed: string;
+    rss: string;
+    external: string;
+  };
+  finalMemory?: {
+    heapTotal: string;
+    heapUsed: string;
+    rss: string;
+    external: string;
+  };
+  dbConnection?: number;
+  questionProcessing?: number;
+  databaseMetrics?: {
+    operation: string;
+    executionTime: string;
+    memoryUsed: string;
+    result: any;
+  };
+  aiCacheMetrics?: any;
+  responseSize?: {
+    bytes: number;
+    kilobytes: string;
+  };
+  requestRate?: {
+    totalRequests: number;
+    requestsPerSecond: string;
+  };
+  totalTime?: number;
+}

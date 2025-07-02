@@ -13,42 +13,9 @@ import { getIO } from '../../middleware/realtime';
 import mongoose from 'mongoose';
 import winston from 'winston';
 import { containsOffensiveContent } from '../../utils/contentModeration';
+import { Metrics } from '../../types';
 // import { ImageAnnotatorClient } from '@google-cloud/vision';
 // import fs from 'fs';
-
-// Add type definitions at the top
-interface Metrics {
-  initialMemory?: {
-    heapTotal: string;
-    heapUsed: string;
-    rss: string;
-    external: string;
-  };
-  finalMemory?: {
-    heapTotal: string;
-    heapUsed: string;
-    rss: string;
-    external: string;
-  };
-  dbConnection?: number;
-  questionProcessing?: number;
-  databaseMetrics?: {
-    operation: string;
-    executionTime: string;
-    memoryUsed: string;
-    result: any;
-  };
-  aiCacheMetrics?: any;
-  responseSize?: {
-    bytes: number;
-    kilobytes: string;
-  };
-  requestRate?: {
-    totalRequests: number;
-    requestsPerSecond: string;
-  };
-  totalTime?: number;
-}
 
 // Add performance monitoring
 const measureLatency = async (operation: string, callback: () => Promise<any>) => {
