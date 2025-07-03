@@ -62,12 +62,13 @@ const keywords = [
 const titlePattern = new RegExp(keywords, "i");
 
 // Sidebar component that displays conversation history
-const Sidebar: React.FC<SideBarProps> = ({
+const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
   conversations,
   onSelectConversation,
   onDeleteConversation,
   activeView,
   setActiveView,
+  className,
 }) => {
   const [hasProAccess, setHasProAccess] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
@@ -131,9 +132,16 @@ const Sidebar: React.FC<SideBarProps> = ({
   };
 
   return (
-    <div className="fixed left-0 top-0 h-full w-64 bg-[#1a1b2e] text-white p-4 flex flex-col">
+    <div
+      className={
+        className
+          ? className
+          : "fixed left-0 top-0 h-full w-64 bg-[#1a1b2e] text-white p-4 flex flex-col"
+      }
+    >
       <div className="mb-4">
-        <ProStatus hasProAccess={hasProAccess} username={username} />
+        <ProStatus hasProAccess={hasProAccess} />
+        <span className="sidebar-username">{username}</span>
       </div>
 
       {/* View Switching Buttons */}
