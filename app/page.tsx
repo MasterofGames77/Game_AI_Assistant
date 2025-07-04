@@ -363,10 +363,13 @@ export default function Home() {
   const handleSignOut = () => {
     setUsername(null);
     setUserId(null);
+    setQuestion("");
+    setResponse("");
+    setSelectedConversation(null);
+    setError("");
     localStorage.removeItem("username");
     localStorage.removeItem("userId");
     localStorage.removeItem("userEmail");
-    // Optionally clear conversations, etc.
     setShowUsernameModal(true);
   };
 
@@ -424,12 +427,39 @@ export default function Home() {
           <button
             className="hamburger"
             aria-label="Open sidebar menu"
-            style={{ display: "none" }}
             onClick={() => setSidebarOpen(true)}
           >
-            <span></span>
-            <span></span>
-            <span></span>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect
+                x="4"
+                y="6"
+                width="16"
+                height="2.5"
+                rx="1.25"
+                fill="currentColor"
+              />
+              <rect
+                x="4"
+                y="11"
+                width="16"
+                height="2.5"
+                rx="1.25"
+                fill="currentColor"
+              />
+              <rect
+                x="4"
+                y="16"
+                width="16"
+                height="2.5"
+                rx="1.25"
+                fill="currentColor"
+              />
+            </svg>
+            <span className="hamburger-label">Menu</span>
           </button>
           {/* Show hamburger only on mobile via CSS */}
           <style>{`
