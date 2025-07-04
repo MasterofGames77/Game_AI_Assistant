@@ -144,6 +144,7 @@ img {
   overflow-y: auto;
   background-color: #1a1b2e; /* Dark background for sidebar */
   color: white; /* Make sidebar text white for better contrast */
+  -webkit-overflow-scrolling: touch;
 }
 
 .sidebar h2,
@@ -479,4 +480,8 @@ input[type="file"]:focus {
   max-width: 100%;
   display: block;
   font-size: 0.98rem;
+}
+
+.sidebar {
+  -webkit-overflow-scrolling: touch;
 }
