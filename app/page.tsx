@@ -490,7 +490,7 @@ export default function Home() {
             conversationCount={conversations.length}
             className={sidebarOpen ? "sidebar open" : "sidebar"}
           />
-          <div className="flex-1 overflow-y-auto main-content ml-64">
+          <div className="main-content flex-1">
             <div className="flex-1 flex flex-col items-center justify-center py-2">
               <Image
                 src="/assets/video-game-wingman-logo.png"
