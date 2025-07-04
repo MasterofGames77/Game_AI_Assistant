@@ -376,207 +376,254 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen">
-      {/* Hamburger menu for mobile */}
-      <button
-        className="hamburger"
-        aria-label="Open sidebar menu"
-        style={{ display: "none" }}
-        onClick={() => setSidebarOpen(true)}
-      >
-        <span></span>
-        <span></span>
-        <span></span>
-      </button>
-      {/* Show hamburger only on mobile via CSS */}
-      <style>{`
-        @media (max-width: 767px) {
-          .hamburger { display: flex !important; }
-        }
-      `}</style>
-
-      {/* Sidebar Drawer and Backdrop for mobile */}
-      {sidebarOpen && (
-        <div
-          className="sidebar-backdrop"
-          onClick={() => setSidebarOpen(false)}
-        ></div>
-      )}
-      <Sidebar
-        conversations={conversations}
-        onSelectConversation={(convo) => {
-          setSelectedConversation(convo);
-          setSidebarOpen(false); // Close sidebar on mobile after selecting
-        }}
-        onDeleteConversation={handleDeleteConversation}
-        onClear={handleClear}
-        onResetUserId={handleResetUsername}
-        onTwitchAuth={handleTwitchAuth}
-        activeView={activeView}
-        setActiveView={setActiveView}
-        conversationCount={conversationCount}
-        className={sidebarOpen ? "sidebar open" : "sidebar"}
-      />
-      <div className="flex-1 overflow-y-auto main-content ml-64">
-        <div className="flex-1 flex flex-col items-center justify-center py-2">
-          <Image
-            src="/assets/video-game-wingman-logo.png"
-            alt="Video Game Wingman Logo"
-            className="logo"
-            width={350}
-            height={350}
-            priority={true}
-          />
-
-          {/* Display conversation count in the UI */}
-          {conversationCount > 0 && (
-            <p className="text-sm text-gray-600 mt-2">
-              You have {conversationCount} saved conversation
-              {conversationCount !== 1 ? "s" : ""}
-            </p>
-          )}
-
-          <ul className="mt-4 text-lg text-center">
-            <li>Discover a game&apos;s hidden secrets.</li>
-            <li>Get personalized game recommendations.</li>
-            <li>Analyze gameplay data to improve your strategies.</li>
-            <li>Access detailed game guides.</li>
-          </ul>
-
-          {activeView === "chat" && (
-            <form onSubmit={handleSubmit} className="w-full max-w-md mt-2">
+      {/* Username Modal */}
+      {showUsernameModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+          <div className="bg-white dark:bg-gray-900 p-8 rounded-lg shadow-lg w-full max-w-md flex flex-col items-center">
+            <Image
+              src="/assets/video-game-wingman-logo.png"
+              alt="Video Game Wingman Logo"
+              width={180}
+              height={180}
+              className="mb-6"
+              priority
+            />
+            <h2 className="text-2xl font-bold mb-4 text-center">Sign In</h2>
+            <form
+              onSubmit={handleUsernameSubmit}
+              className="space-y-4 w-full mt-2"
+            >
               <input
                 type="text"
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder="Message Video Game Wingman"
-                className="w-full p-2 border border-gray-300 rounded mb-4"
+                value={usernameInput}
+                onChange={(e) => setUsernameInput(e.target.value)}
+                placeholder="Enter your username"
+                className="w-full p-2 border border-gray-300 rounded"
+                minLength={4}
+                maxLength={32}
+                required
+                autoFocus
+              />
+              {usernameError && (
+                <p className="text-red-500 text-sm">{usernameError}</p>
+              )}
+              <button
+                type="submit"
+                className="w-full p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Sign In
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Main App Content (only if signed in) */}
+      {!showUsernameModal && (
+        <>
+          {/* Hamburger menu for mobile */}
+          <button
+            className="hamburger"
+            aria-label="Open sidebar menu"
+            style={{ display: "none" }}
+            onClick={() => setSidebarOpen(true)}
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+          {/* Show hamburger only on mobile via CSS */}
+          <style>{`
+            @media (max-width: 767px) {
+              .hamburger { display: flex !important; }
+            }
+          `}</style>
+
+          {/* Sidebar Drawer and Backdrop for mobile */}
+          {sidebarOpen && (
+            <div
+              className="sidebar-backdrop"
+              onClick={() => setSidebarOpen(false)}
+            ></div>
+          )}
+          <Sidebar
+            conversations={conversations}
+            onSelectConversation={(convo) => {
+              setSelectedConversation(convo);
+              setSidebarOpen(false); // Close sidebar on mobile after selecting
+            }}
+            onDeleteConversation={handleDeleteConversation}
+            onClear={handleClear}
+            onResetUserId={handleResetUsername}
+            onTwitchAuth={handleTwitchAuth}
+            activeView={activeView}
+            setActiveView={setActiveView}
+            conversationCount={conversations.length}
+            className={sidebarOpen ? "sidebar open" : "sidebar"}
+          />
+          <div className="flex-1 overflow-y-auto main-content ml-64">
+            <div className="flex-1 flex flex-col items-center justify-center py-2">
+              <Image
+                src="/assets/video-game-wingman-logo.png"
+                alt="Video Game Wingman Logo"
+                className="logo"
+                width={350}
+                height={350}
+                priority={true}
               />
 
-              {/* Comment out image upload UI section
-              <div className="mb-4">
-                <label className="cursor-pointer flex items-center gap-2">
-                  <FontAwesomeIcon icon={faPaperclip} size="lg" />
-                  <span>Attach Screenshot</span>
+              {/* Display conversation count in the UI */}
+              {conversationCount > 0 && (
+                <p className="text-sm text-gray-600 mt-2">
+                  You have {conversationCount} saved conversation
+                  {conversationCount !== 1 ? "s" : ""}
+                </p>
+              )}
+
+              <ul className="mt-4 text-lg text-center">
+                <li>Discover a game&apos;s hidden secrets.</li>
+                <li>Get personalized game recommendations.</li>
+                <li>Analyze gameplay data to improve your strategies.</li>
+                <li>Access detailed game guides.</li>
+              </ul>
+
+              {activeView === "chat" && (
+                <form onSubmit={handleSubmit} className="w-full max-w-md mt-2">
                   <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    style={{ display: "none" }}
+                    type="text"
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    placeholder="Message Video Game Wingman"
+                    className="w-full p-2 border border-gray-300 rounded mb-4"
                   />
-                </label>
-                {imageUrl && (
-                  <div className="mt-2">
-                    <Image
-                      src={imageUrl}
-                      alt="Selected"
-                      width={200}
-                      height={200}
-                      className="rounded"
-                    />
-                  </div>
-                )}
-              </div>
-              */}
 
-              <div className="flex space-x-4">
-                <button
-                  type="submit"
-                  className="w-full p-2 bg-blue-500 text-white rounded"
-                >
-                  Submit
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  className="w-full p-2 bg-blue-500 text-white rounded"
-                >
-                  Clear
-                </button>
-              </div>
-            </form>
-          )}
-
-          {activeView === "forum" && (
-            <ForumProvider>
-              <div className="w-full mt-4">
-                <ForumList />
-              </div>
-            </ForumProvider>
-          )}
-
-          {loading && <div className="spinner mt-4"></div>}
-          {error && <div className="mt-4 text-red-500">{error}</div>}
-          {activeView === "chat" &&
-            (response || selectedConversation?.response) && (
-              <div className="mt-8 w-full max-w-3xl">
-                <h2 className="text-2xl font-bold">Response</h2>
-                <div className="bg-gray-100 p-4 rounded response-box">
-                  {formatResponse(
-                    response || selectedConversation?.response || ""
-                  )}
-                </div>
-
-                {/* Display metrics if available */}
-                {Object.keys(metrics).length > 0 && (
-                  <div className="mt-4 text-xs text-gray-500">
-                    <details>
-                      <summary>Performance Metrics</summary>
-                      <div className="mt-2 p-2 bg-gray-100 rounded">
-                        {metrics.totalTime && (
-                          <p>
-                            Total time: {Number(metrics.totalTime).toFixed(2)}
-                            ms
-                          </p>
-                        )}
-                        {metrics.responseSize && (
-                          <p>
-                            Response size:{" "}
-                            {metrics.responseSize.kilobytes || "N/A"}
-                          </p>
-                        )}
-                        {metrics.aiCacheMetrics && (
-                          <p>
-                            Cache hit rate:{" "}
-                            {metrics.aiCacheMetrics.hitRate || "N/A"}
-                          </p>
-                        )}
+                  {/* Comment out image upload UI section
+                  <div className="mb-4">
+                    <label className="cursor-pointer flex items-center gap-2">
+                      <FontAwesomeIcon icon={faPaperclip} size="lg" />
+                      <span>Attach Screenshot</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        style={{ display: "none" }}
+                      />
+                    </label>
+                    {imageUrl && (
+                      <div className="mt-2">
+                        <Image
+                          src={imageUrl}
+                          alt="Selected"
+                          width={200}
+                          height={200}
+                          className="rounded"
+                        />
                       </div>
-                    </details>
+                    )}
+                  </div>
+                  */}
+
+                  <div className="flex space-x-4">
+                    <button
+                      type="submit"
+                      className="w-full p-2 bg-blue-500 text-white rounded"
+                    >
+                      Submit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClear}
+                      className="w-full p-2 bg-blue-500 text-white rounded"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {activeView === "forum" && (
+                <ForumProvider>
+                  <div className="w-full mt-4">
+                    <ForumList />
+                  </div>
+                </ForumProvider>
+              )}
+
+              {loading && <div className="spinner mt-4"></div>}
+              {error && <div className="mt-4 text-red-500">{error}</div>}
+              {activeView === "chat" &&
+                (response || selectedConversation?.response) && (
+                  <div className="mt-8 w-full max-w-3xl">
+                    <h2 className="text-2xl font-bold">Response</h2>
+                    <div className="bg-gray-100 p-4 rounded response-box">
+                      {formatResponse(
+                        response || selectedConversation?.response || ""
+                      )}
+                    </div>
+
+                    {/* Display metrics if available */}
+                    {Object.keys(metrics).length > 0 && (
+                      <div className="mt-4 text-xs text-gray-500">
+                        <details>
+                          <summary>Performance Metrics</summary>
+                          <div className="mt-2 p-2 bg-gray-100 rounded">
+                            {metrics.totalTime && (
+                              <p>
+                                Total time:{" "}
+                                {Number(metrics.totalTime).toFixed(2)}
+                                ms
+                              </p>
+                            )}
+                            {metrics.responseSize && (
+                              <p>
+                                Response size:{" "}
+                                {metrics.responseSize.kilobytes || "N/A"}
+                              </p>
+                            )}
+                            {metrics.aiCacheMetrics && (
+                              <p>
+                                Cache hit rate:{" "}
+                                {metrics.aiCacheMetrics.hitRate || "N/A"}
+                              </p>
+                            )}
+                          </div>
+                        </details>
+                      </div>
+                    )}
+
+                    {/* Move buttons below the response */}
+                    <div className="mt-4 footer-buttons">
+                      <button
+                        onClick={handleTwitchAuth}
+                        className="mt-2 p-2 bg-blue-500 text-white rounded"
+                      >
+                        Login with Twitch
+                      </button>
+
+                      {/* <button
+                      onClick={handleDiscordAuth}
+                      className="mt-2 p-2 bg-[#5865F2] text-white rounded"
+                    >
+                      Login with Discord
+                    </button> */}
+                      <button
+                        onClick={handleResetUsername}
+                        className="mt-2 p-2 bg-blue-500 text-white rounded"
+                      >
+                        Reset Username
+                      </button>
+                    </div>
                   </div>
                 )}
-
-                {/* Move buttons below the response */}
-                <div className="mt-4 footer-buttons">
-                  <button
-                    onClick={handleTwitchAuth}
-                    className="mt-2 p-2 bg-blue-500 text-white rounded"
-                  >
-                    Login with Twitch
-                  </button>
-
-                  {/* <button
-                  onClick={handleDiscordAuth}
-                  className="mt-2 p-2 bg-[#5865F2] text-white rounded"
-                >
-                  Login with Discord
-                </button> */}
-                  <button
-                    onClick={handleResetUsername}
-                    className="mt-2 p-2 bg-blue-500 text-white rounded"
-                  >
-                    Reset Username
-                  </button>
-                </div>
-              </div>
-            )}
-          <button
-            onClick={handleSignOut}
-            className="absolute top-4 right-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 shadow"
-          >
-            Sign Out
-          </button>
-        </div>
-      </div>
+              <button
+                onClick={handleSignOut}
+                className="absolute top-4 right-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 shadow"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
