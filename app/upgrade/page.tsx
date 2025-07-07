@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
 
 const ProFeatures = [
   {
@@ -65,8 +64,8 @@ export default function UpgradePage() {
           <div className="mb-8">
             <h2 className="text-3xl font-bold mb-4">Special Offer</h2>
             <p className="text-xl text-gray-300">
-              Sign up before July 31, 2025 and get 1 year of Pro access for
-              free!
+              Sign up before December 31st, 2025 and get 1 year of Pro access
+              for free!
             </p>
           </div>
 

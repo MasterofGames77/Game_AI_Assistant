@@ -43,6 +43,16 @@ interface IWingmanUser extends Document {
       dataDiver?: number;
       performanceTweaker?: number;
       conversationalist?: number;
+      proAchievements: {
+        gameMaster: number;
+        speedDemon: number;
+        communityLeader: number;
+        achievementHunter: number;
+        proStreak: number;
+        expertAdvisor: number;
+        genreSpecialist: number;
+        proContributor: number;
+      };
   };
 }
 
@@ -98,7 +108,7 @@ export const checkProAccess = async (identifier: string, userId?: string): Promi
     // 2. If user is in Splash DB and eligible, grant Pro
     if (splashUser) {
       // Check deadline logic
-      const proDeadline = new Date('2025-07-31T23:59:59.999Z');
+      const proDeadline = new Date('2025-12-31T23:59:59.999Z');
       let signupDate: Date | null = null;
       if (splashUser.userId && splashUser.userId.includes('-')) {
         // Extract date from userId if possible
@@ -145,7 +155,7 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
     if (splashUser) {
       // Check pro access eligibility
       const signupDate = new Date(splashUser.userId.split('-')[1]); // Extract date from userId
-      const proDeadline = new Date('2025-07-31T23:59:59.999Z');
+      const proDeadline = new Date('2025-12-31T23:59:59.999Z');
       const hasProAccess = (
         (typeof splashUser.position === 'number' && splashUser.position <= 5000) || // First 5000 users
         signupDate <= proDeadline // Or signed up before deadline
@@ -190,7 +200,17 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
               collectorPro: 0,
               dataDiver: 0,
               performanceTweaker: 0,
-              conversationalist: 0
+              conversationalist: 0,
+              proAchievements: {
+                gameMaster: 0,
+                speedDemon: 0,
+                communityLeader: 0,
+                achievementHunter: 0,
+                proStreak: 0,
+                expertAdvisor: 0,
+                genreSpecialist: 0,
+                proContributor: 0
+              }
             }
           }
         },
