@@ -1,69 +1,7 @@
 import { connectToSplashDB, connectToWingmanDB } from './databaseConnections';
-import { Schema, Document } from 'mongoose';
+import { Schema } from 'mongoose';
 import User from '../models/User';
-
-// WingmanDB User interface (from models/User.ts)
-interface IWingmanUser extends Document {
-    userId: string;
-    username: string;
-    email: string;
-    conversationCount: number;
-    hasProAccess: boolean;
-    achievements: Array<{
-      name: string;
-      dateEarned: Date;
-    }>;
-    progress: {
-      firstQuestion: number;
-      frequentAsker: number;
-      rpgEnthusiast?: number;
-      bossBuster?: number;
-      platformerPro?: number;
-      survivalSpecialist?: number;
-      strategySpecialist?: number;
-      actionAficionado?: number;
-      battleRoyale?: number;
-      sportsChampion?: number;
-      adventureAddict?: number;
-      fightingFanatic?: number;
-      simulationSpecialist?: number;
-      shooterSpecialist?: number;
-      puzzlePro?: number;
-      racingRengade?: number;
-      stealthExpert?: number;
-      horrorHero?: number;
-      triviaMaster?: number;
-      storySeeker?: number;
-      beatEmUpBrawler?: number;
-      rhythmMaster?: number;
-      totalQuestions?: number;
-      dailyExplorer?: number;
-      speedrunner?: number;
-      collectorPro?: number;
-      dataDiver?: number;
-      performanceTweaker?: number;
-      conversationalist?: number;
-      proAchievements: {
-        gameMaster: number;
-        speedDemon: number;
-        communityLeader: number;
-        achievementHunter: number;
-        proStreak: number;
-        expertAdvisor: number;
-        genreSpecialist: number;
-        proContributor: number;
-      };
-  };
-}
-
-// SplashDB User interface (from splash page backend)
-interface ISplashUser extends Document {
-    email: string;
-    userId: string;
-    position: number | null;
-    isApproved: boolean;
-    hasProAccess: boolean;
-}
+import { ISplashUser } from '../types';
 
 // SplashDB User schema
 const splashUserSchema = new Schema<ISplashUser>({
@@ -77,7 +15,7 @@ export const checkProAccess = async (identifier: string, userId?: string): Promi
   // Always grant Pro access for test/dev user (with username)
   if (identifier === "test-user" || identifier === "TestUser1") return true;
   try {
-    const wingmanDB = await connectToWingmanDB();
+    await connectToWingmanDB();
     const splashDB = await connectToSplashDB();
 
     const AppUser = User;
@@ -140,7 +78,7 @@ export const checkProAccess = async (identifier: string, userId?: string): Promi
 export const syncUserData = async (userId: string, email?: string): Promise<void> => {
   try {
     // Connect to databases
-    const wingmanDB = await connectToWingmanDB();
+    // const wingmanDB = await connectToWingmanDB();
     const splashDB = await connectToSplashDB();
 
     // Use unique model names to avoid conflicts

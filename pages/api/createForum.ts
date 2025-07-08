@@ -28,17 +28,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     await connectToMongoDB();
 
+    // Validate authentication header
+    const authError = validateAuth(req);
+    if (authError) {
+      return res.status(401).json({ error: authError });
+    }
+
     // Extract username and forum data from request body
     const { title, gameTitle, category, isPrivate, isProOnly, username } = req.body;
 
-    if (!username) {
-      return res.status(400).json({ error: 'Username is required' });
+    // Validate user authentication
+    const userAuthErrors = validateUserAuthentication(username);
+    if (userAuthErrors.length > 0) {
+      return res.status(400).json({ error: userAuthErrors[0] });
     }
 
     // Check Pro access for the user - ALL forum creation requires Pro access
     const hasProAccess = await checkProAccess(username);
     if (!hasProAccess) {
       return res.status(403).json({ error: 'Pro access required to create forums. Upgrade to Wingman Pro to create forums.' });
+    }
+
+    // Validate Pro access for Pro-only forum creation
+    const proAccessErrors = validateForumCreationAccess(isProOnly, hasProAccess);
+    if (proAccessErrors.length > 0) {
+      return res.status(403).json({ error: proAccessErrors[0] });
     }
 
     // Validate forum data
@@ -87,11 +101,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         category
       },
     });
-
-    const allowedCategories = ["speedruns", "gameplay", "mods", "general", "help"];
-    if (!allowedCategories.includes(category)) {
-      return res.status(400).json({ error: "Invalid category" });
-    }
 
     return res.status(201).json({ forum });
   } catch (error: any) {

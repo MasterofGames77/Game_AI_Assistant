@@ -51,6 +51,11 @@ export const validateForumData = (data: Partial<Forum>) => {
   // Validate category
   if (!data.category?.trim()) {
     errors.push('Category is required');
+  } else {
+    const allowedCategories = ["speedruns", "gameplay", "mods", "general", "help"];
+    if (!allowedCategories.includes(data.category)) {
+      errors.push('Invalid category. Allowed categories are: speedruns, gameplay, mods, general, help');
+    }
   }
 
   // Validate private forum requirements

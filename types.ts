@@ -151,3 +151,12 @@ export interface Metrics {
   };
   totalTime?: number;
 }
+
+// SplashDB User interface (from splash page backend)
+export interface ISplashUser extends Document {
+  email: string;
+  userId: string;
+  position: number | null;
+  isApproved: boolean;
+  hasProAccess: boolean;
+}
