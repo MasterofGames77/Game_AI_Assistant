@@ -50,6 +50,7 @@ const OFFENSIVE_WORDS = [
   'Trump2028',
   'Make America Great Again',
   'Maga',
+  'Mein Kampf',
   'fascist',
   'faggot',
   'fuck',
@@ -89,7 +90,6 @@ const OFFENSIVE_WORDS = [
   'Kim Jong Un',
   'Hamas',
   'Bashar al-Assad',
-  'Ahmed al-Sharaa',
   'Hayʼat Tahrir al-Sham',
   'Hezbollah',
   'Houthi',
@@ -271,6 +271,7 @@ const OFFENSIVE_WORDS = [
   'James Murphy',
   'Scott Mayer',
   'Jordan Emery Pratt',
+  'Joe Rogan',
   'Alex Jones',
   'Liz Wheeler',
   'Robert Durst',
@@ -350,7 +351,7 @@ export const containsOffensiveContent = async (content: string, userId: string) 
     };
   }
 
-  // If we found offensive words locally, verify with the server
+  // If offensive words were found locally, verify with the server
   const result = await checkContent(content, userId);
 
   return {
