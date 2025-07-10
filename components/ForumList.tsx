@@ -165,10 +165,7 @@ export default function ForumList() {
             No forums found. Create one to get started!
             {!hasProAccess && (
               <div className="mt-2 text-sm">
-                <p>
-                  Upgrade to Pro to access exclusive forums and create Pro-only
-                  discussions.
-                </p>
+                <p>Upgrade to Pro to create and access exclusive forums.</p>
               </div>
             )}
           </div>

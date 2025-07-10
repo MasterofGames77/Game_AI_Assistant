@@ -1,10 +1,6 @@
 import React from "react";
 import { useRouter } from "next/navigation";
-
-interface ProStatusProps {
-  hasProAccess: boolean;
-  username?: string | null;
-}
+import { ProStatusProps } from "@/types";
 
 const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
   const router = useRouter();

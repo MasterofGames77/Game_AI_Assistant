@@ -1,3 +1,5 @@
+import { Decimal128 } from 'mongoose';
+
 export interface Conversation {
   _id: string;
   username: string;
@@ -16,6 +18,11 @@ export interface SideBarProps {
   activeView: "chat" | "forum";
   setActiveView: (view: "chat" | "forum") => void;
   conversationCount: number;
+}
+
+export interface ProStatusProps {
+  hasProAccess: boolean;
+  username?: string | null;
 }
 
 export interface UserViolation {
@@ -159,4 +166,16 @@ export interface ISplashUser extends Document {
   position: number | null;
   isApproved: boolean;
   hasProAccess: boolean;
+}
+
+export interface GameData {
+  title: string;
+  console: string;
+  release_date: string;
+  genre: string;
+  developer: string;
+  publisher: string;
+  critic_score: Decimal128;
+  total_sales: Decimal128;
+  // Add other fields as necessary
 }

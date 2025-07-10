@@ -265,7 +265,7 @@ export const getChatCompletion = async (question: string, systemMessage?: string
     // If no response from APIs, fall back to OpenAI completion
     if (!response) {
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4-turbo',
+        model: 'gpt-4o',
         messages: [
           { 
             role: 'system', 
