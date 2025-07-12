@@ -1,4 +1,14 @@
 import { Decimal128 } from 'mongoose';
+import { ReactNode } from "react";
+
+export interface Props {
+  children: ReactNode;
+  fallback: ReactNode;
+}
+
+export interface State {
+  hasError: boolean;
+}
 
 export interface Conversation {
   _id: string;
@@ -178,4 +188,11 @@ export interface GameData {
   critic_score: Decimal128;
   total_sales: Decimal128;
   // Add other fields as necessary
+}
+
+export interface AchievementData {
+  userId: string;
+  achievements: { name: string; dateEarned: Date }[];
+  isPro?: boolean;
+  totalAchievements?: number;
 }

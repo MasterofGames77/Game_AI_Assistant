@@ -2,14 +2,7 @@ import React from "react";
 import { useEffect, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 import { toast } from "react-hot-toast";
-
-// Declare AchievementData interface at the top
-interface AchievementData {
-  userId: string;
-  achievements: { name: string; dateEarned: Date }[];
-  isPro?: boolean;
-  totalAchievements?: number;
-}
+import { AchievementData } from "../types";
 
 const useSocket = (url: string): Socket => {
   const { current: socket } = useRef<Socket>(

@@ -138,7 +138,7 @@ export default function Home() {
       });
       // let imageFilePath = null;
 
-      // Comment out image upload section
+      // Image upload section
       // if (image) {
       //   try {
       //     const formData = new FormData();
@@ -156,7 +156,7 @@ export default function Home() {
           userId,
           username,
           question,
-          // imageFilePath, // Comment out this line
+          // imageFilePath,
         },
         {
           timeout: 30000,
@@ -208,7 +208,7 @@ export default function Home() {
     }
   };
 
-  // Comment out image handler
+  // Image handler
   // const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   //   if (e.target.files && e.target.files[0]) {
   //     setImage(e.target.files[0]);
@@ -373,6 +373,7 @@ export default function Home() {
     setShowUsernameModal(true);
   };
 
+  // Used for debugging
   // if (typeof window !== "undefined") {
   //   console.log("Current username:", localStorage.getItem("username"));
   // }
