@@ -1,4 +1,3 @@
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { SideBarProps } from "../types";
 import ProStatus from "./ProStatus";
 import { useState, useEffect } from "react";
@@ -182,32 +181,26 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
                 >
                   {shortenQuestion(convo.question || "Untitled conversation")}
                 </div>
-                <DropdownMenu.Root>
-                  <DropdownMenu.Trigger className="text-white flex-shrink-0">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      className="w-6 h-6"
-                    >
-                      <path d="M12 7a2 2 0 110-4 2 2 0 010 4zM12 13a2 2 0 110-4 2 2 0 010 4zM12 19a2 2 0 110-4 2 2 0 010 4z" />
-                    </svg>
-                  </DropdownMenu.Trigger>
-                  <DropdownMenu.Portal>
-                    <DropdownMenu.Content
-                      className="bg-gray-700 text-white p-2 rounded-md"
-                      sideOffset={5}
-                    >
-                      <DropdownMenu.Item
-                        onSelect={() => handleDelete(convo._id)}
-                        className="outline-none cursor-pointer hover:bg-gray-600 px-2 py-1 rounded"
-                        disabled={!convo._id}
-                      >
-                        Delete
-                      </DropdownMenu.Item>
-                    </DropdownMenu.Content>
-                  </DropdownMenu.Portal>
-                </DropdownMenu.Root>
+                <button
+                  onClick={() => handleDelete(convo._id)}
+                  className="text-red-400 hover:text-red-300 p-1 rounded flex-shrink-0"
+                  disabled={!convo._id}
+                  aria-label="Delete conversation"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                </button>
               </div>
             </div>
           );
