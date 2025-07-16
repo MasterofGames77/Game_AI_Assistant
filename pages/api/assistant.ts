@@ -287,18 +287,20 @@ const extractGameTitle = (question: string): string => {
 };
 
 // Function to determine question category for achievement tracking
-export const checkQuestionType = (question: string): string | null => {
+export const checkQuestionType = (question: string): string[] => {
   const lowerQuestion = question.toLowerCase();
+  const detectedGenres: string[] = [];
   
   // Comprehensive game title to genre mapping
   const platformerGames = [
-    'super mario', 'mario', 'donkey kong', 
-    'crash bandicoot', 'spyro', 'rayman', 'sonic',
+    'super mario bros', 'super mario world', 'super mario 64', 'super mario sunshine', 
+    'super mario galaxy', 'super mario odyssey', 'new super mario bros', 'donkey kong', 
+    'crash bandicoot', 'spyro', 'rayman', 'sonic the hedgehog', 'sonic adventure',
     'hollow knight', 'celeste', 'ori', 'little big planet', 'ratchet', 'clank',
     'jak', 'daxter', 'sly cooper', 'banjo', 'kazooie', 'metroid',
     'mega man', 'kirby', 'yoshi', 'platformer', 'jumping', 'a hat in time',
     'psychonauts', 'braid', 'shovel knight', 'cuphead', 'platforming', 'freedom planet',
-    'celeste', 'sackboy'
+    'sackboy'
   ];
 
   const rpgGames = [
@@ -310,7 +312,7 @@ export const checkQuestionType = (question: string): string | null => {
     'fire emblem', 'xenogears', 'xenosaga', 'saga', 'star ocean', 'ys', 'paper mario', 
     'mario & luigi', 'triangle strategy', 'mega man battle network', 'mega man star force',
     'hades', 'mana', 'rune factory', 'skies of arcadia', 'shining force', 'phantasy star',
-    'lufia', 'mother', 'earthbound'
+    'lufia', 'mother', 'earthbound', 'super mario rpg'
   ];
 
   const actionGames = [
@@ -318,7 +320,7 @@ export const checkQuestionType = (question: string): string | null => {
     'metal gear rising: revengeance', 'dynasty warriors', 'nier', 'automata',
     'darksiders', 'prototype', 'infamous', 'asura\'s wrath',
     'kingdom hearts', 'monster hunter', 'dragons dogma', 'grand theft auto',
-    'the legend of zelda', 'red dead redemption', 'batman',
+    'the legend of zelda', 'red dead redemption', 'batman', 'lego',
     'arkham', 'assassin\'s creed', 'star wars', 'dead rising'
   ];
 
@@ -349,7 +351,7 @@ export const checkQuestionType = (question: string): string | null => {
     'tony hawk', 'skate', 'mario tennis', 'mario golf',
     'mario strikers', 'rocket league', 'sports story', 'ea sports',
     'mlb', '2k', 'wwe', 'the show', 'olympic games', 'punch-out!!',
-    'ufc', 
+    'ufc', 'mario sports', 'mario superstar baseball', 'college football'
   ];
 
   const racingGames = [
@@ -386,7 +388,7 @@ export const checkQuestionType = (question: string): string | null => {
   const horrorGames = [
     'resident evil', 'silent hill', 'dead space', 'amnesia',
     'outlast', 'layers of fear', 'little nightmares', 'evil within',
-    'until dawn', 'five nights at freddy\'s', 'phasmophobia'
+    'until dawn', 'five nights at freddy\'s', 'phasmophobia', 'state of decay'
   ];
 
   const adventureGames = [
@@ -401,11 +403,11 @@ export const checkQuestionType = (question: string): string | null => {
     'marvel vs capcom', 'capcom vs snk', 'fatal fury', 'mortal kombat', 'art of fighting',
     'soulcalibur', 'dead or alive', 'king of fighters', 'guilty gear', 'injustice',
     'virtua fighter', 'blazblue', 'capcom vs', 'playstation all stars', 'brawlhalla',
-    'jump', 'dragon ball', 'fighting vipers'
+    'jump', 'dragon ball z', 'fighting vipers', 'dragon ball fighterz'
   ];
 
   const puzzleGames = [
-    'portal', 'baba is you', 'tetris', 'professor layton',
+    'dr. mario', 'portal', 'baba is you', 'tetris', 'professor layton',
     'the witness', 'talos principle', 'braid', 'fez',
     'human fall flat', 'untitled goose game', 'it takes two',
     'candy crush', 'bejeweled', 'inside', 'outer wilds'
@@ -425,12 +427,16 @@ export const checkQuestionType = (question: string): string | null => {
     'sayonara wild hearts', 'fuser'
   ];
 
+  const sandboxGames = [ 'minecraft', 'garry\'s mod', 'roblox', 'lego', 'terraria', 'teardown',
+    'no man\'s sky', 'valheim', 'astroneer', 'besiege', 'unturned'
+  ];
+
   // Check for genre keywords in the question
   const genreKeywords = {
-    platformerPro: ['platform', 'jump', 'collect coins', 'collect stars', '3d platformer', '2d platformer'],
+    platformerPro: ['platform', 'jump', 'collect coins', 'collect', '3d platformer', '2d platformer'],
     rpgEnthusiast: ['rpg', 'role playing', 'role-playing', 'jrpg', 'level up', 'stats', 'character build'],
     bossBuster: ['boss fight', 'boss battle', 'defeat boss', 'beat the boss', 'final boss', 'superboss'],
-    survivalSpecialist: ['survival', 'survive', 'horror', 'zombie', 'craft', 'resource'],
+    survivalSpecialist: ['survival', 'survive', 'horror', 'zombie', 'craft', 'resource', 'gather'],
     strategySpecialist: ['strategy', 'tactics', 'turn-based', 'rts', 'build', 'command'],
     actionAficionado: ['action', 'combat', 'combo', 'fight', 'hack and slash', 'battle system'],
     battleRoyale: ['battle royale', 'fortnite', 'pubg', 'last man standing', 'battle pass'],
@@ -440,67 +446,86 @@ export const checkQuestionType = (question: string): string | null => {
     simulationSpecialist: ['simulation', 'sim', 'management', 'construction', 'management simulation', 'town', 'city'],
     fightingFanatic: ['fighting', 'combo', 'cancel', 'air dodge', 'frame', 'mixup', 'throw', 'hit stun', 'stun lock', 'block'],
     puzzlePro: ['puzzle', 'solve', 'riddle', 'brain teaser', 'logic'],
-    racingRenegade: ['racing', 'race', 'drift', 'track', 'lap', 'speed', 'kart'],
+    racingRenegade: ['racing', 'race', 'drift', 'track', 'lap', 'speed', 'kart', 'wheelie'],
     stealthExpert: ['stealth', 'sneak', 'hide', 'assassination', 'silent'],
-    horrorHero: ['horror', 'scary', 'survival horror', 'fear', 'terror'],
+    horrorHero: ['horror', 'scary', 'survival horror', 'fear', 'terror', 'suspense', 'jump scare'],
     storySeeker: ['story', 'narrative', 'plot', 'dialogue', 'cutscene', 'cinematic', 'visual novel'],
     triviaMaster: ['trivia', 'quiz', 'knowledge', 'question', 'answer', 'category'],
     beatEmUpBrawler: ['brawler', 'side-scrolling', 'frame advantage', 'belt-scroll', 'pressure', 'dash'],
-    rhythmMaster: ['rhythm', 'music', 'beat', 'dance', 'song', 'beatmap', 'notes', 'streams', 'beats per minute']
+    rhythmMaster: ['rhythm', 'music', 'beat', 'dance', 'song', 'beatmap', 'notes', 'streams', 'beats per minute'],
+    sandboxBuilder: ['sandbox', 'build', 'construct', 'create', 'world', 'craft', 'creative', 'free-form gameplay', 'design', 'materials']
   };
 
-  // Check game titles first
-  if (platformerGames.some(game => lowerQuestion.includes(game))) return "platformerPro";
-  if (rpgGames.some(game => lowerQuestion.includes(game))) return "rpgEnthusiast";
-  if (actionGames.some(game => lowerQuestion.includes(game))) return "actionAficionado";
-  if (survivalGames.some(game => lowerQuestion.includes(game))) return "survivalSpecialist";
-  if (strategyGames.some(game => lowerQuestion.includes(game))) return "strategySpecialist";
-  if (shooterGames.some(game => lowerQuestion.includes(game))) return "shooterSpecialist";
-  if (simulationGames.some(game => lowerQuestion.includes(game))) return "simulationSpecialist";
-  if (battleRoyaleGames.some(game => lowerQuestion.includes(game))) return "battleRoyale";
-  if (sportsGames.some(game => lowerQuestion.includes(game))) return "sportsChampion";
-  if (racingGames.some(game => lowerQuestion.includes(game))) return "racingRenegade";
-  if (stealthGames.some(game => lowerQuestion.includes(game))) return "stealthExpert";
-  if (horrorGames.some(game => lowerQuestion.includes(game))) return "horrorHero";
-  if (adventureGames.some(game => lowerQuestion.includes(game))) return "adventureAddict";
-  if (fightingGames.some(game => lowerQuestion.includes(game))) return "fightingFanatic";
-  if (visualNovelGames.some(game => lowerQuestion.includes(game))) return "storySeeker";
-  if (puzzleGames.some(game => lowerQuestion.includes(game))) return "puzzlePro";
-  if (beatEmUpGames.some(game => lowerQuestion.includes(game))) return "beatEmUpBrawler";
-  if (rhythmGames.some(game => lowerQuestion.includes(game))) return "rhythmMaster";
+  // Check all game genres and collect all matches
+  const genreChecks = [
+    { games: racingGames, achievement: 'racingRenegade' },
+    { games: sportsGames, achievement: 'sportsChampion' },
+    { games: rpgGames, achievement: 'rpgEnthusiast' },
+    { games: actionGames, achievement: 'actionAficionado' },
+    { games: survivalGames, achievement: 'survivalSpecialist' },
+    { games: strategyGames, achievement: 'strategySpecialist' },
+    { games: shooterGames, achievement: 'shooterSpecialist' },
+    { games: simulationGames, achievement: 'simulationSpecialist' },
+    { games: battleRoyaleGames, achievement: 'battleRoyale' },
+    { games: stealthGames, achievement: 'stealthExpert' },
+    { games: horrorGames, achievement: 'horrorHero' },
+    { games: adventureGames, achievement: 'adventureAddict' },
+    { games: fightingGames, achievement: 'fightingFanatic' },
+    { games: visualNovelGames, achievement: 'storySeeker' },
+    { games: puzzleGames, achievement: 'puzzlePro' },
+    { games: beatEmUpGames, achievement: 'beatEmUpBrawler' },
+    { games: rhythmGames, achievement: 'rhythmMaster' },
+    { games: platformerGames, achievement: 'platformerPro' },
+    { games: sandboxGames, achievement: 'sandboxBuilder' }
+  ];
 
-  // Then check for genre keywords
+  for (const check of genreChecks) {
+    if (check.games.some((game: string) => lowerQuestion.includes(game))) {
+      detectedGenres.push(check.achievement);
+    }
+  }
+
+  // Check for genre keywords and add them
   for (const [achievement, keywords] of Object.entries(genreKeywords)) {
     if (keywords.some(keyword => lowerQuestion.includes(keyword))) {
-      return achievement;
+      if (!detectedGenres.includes(achievement)) {
+        detectedGenres.push(achievement);
+      }
     }
   }
 
   // Special achievements based on question content
   if (lowerQuestion.includes("speedrun") || lowerQuestion.includes("fast completion") ||
       lowerQuestion.includes("world record") || lowerQuestion.includes("fastest way")) {
-    return "speedrunner";
+    detectedGenres.push("speedrunner");
   }
   
   if (lowerQuestion.includes("collect") || lowerQuestion.includes("items") ||
       lowerQuestion.includes("100%") || lowerQuestion.includes("completion") ||
       lowerQuestion.includes("all items") || lowerQuestion.includes("all items") ||
       lowerQuestion.includes("achievements") || lowerQuestion.includes("trophies")) {
-    return "collectorPro";
+    detectedGenres.push("collectorPro");
   }
   
   if (lowerQuestion.includes("stats") || lowerQuestion.includes("data") ||
       lowerQuestion.includes("numbers") || lowerQuestion.includes("analysis")) {
-    return "dataDiver";
+    detectedGenres.push("dataDiver");
   }
   
   if (lowerQuestion.includes("performance") || lowerQuestion.includes("fps") ||
       lowerQuestion.includes("graphics") || lowerQuestion.includes("optimization") ||
       lowerQuestion.includes("settings") || lowerQuestion.includes("lag")) {
-    return "performanceTweaker";
+    detectedGenres.push("performanceTweaker");
   }
 
-  return null;
+  // Remove duplicates and return
+  const uniqueGenres: string[] = [];
+  for (const genre of detectedGenres) {
+    if (!uniqueGenres.includes(genre)) {
+      uniqueGenres.push(genre);
+    }
+  }
+  return uniqueGenres;
 };
 
 // Function to check and award achievements based on user progress
@@ -537,7 +562,8 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
     { name: 'Trivia Master', field: 'triviaMaster', threshold: 5 },
     { name: 'Story Seeker', field: 'storySeeker', threshold: 5 },
     { name: 'Beat Em Up Brawler', field: 'beatEmUpBrawler', threshold: 5 },
-    { name: 'Rhythm Master', field: 'rhythmMaster', threshold: 5 }
+    { name: 'Rhythm Master', field: 'rhythmMaster', threshold: 5 },
+    { name: 'Sandbox Builder', field: 'sandboxBuilder', threshold: 5 }
   ];
 
   // Check each achievement
@@ -912,6 +938,7 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
                     storySeeker: 0,
                     beatEmUpBrawler: 0,
                     rhythmMaster: 0,
+                    sandboxBuilder: 0,
                     totalQuestions: 0,
                     dailyExplorer: 0,
                     speedrunner: 0,
@@ -939,20 +966,22 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
             const questionType = await checkQuestionType(question);
             console.log('Question type detected:', questionType); // Debug log
 
-            if (questionType) {
-              // Update the specific progress counter
-              await User.findOneAndUpdate(
-                { username },
-                { $inc: { [`progress.${questionType}`]: 1 } },
-                { session, new: true }
-              );
+            if (questionType.length > 0) {
+              // Update the specific progress counter for each detected genre
+              for (const genre of questionType) {
+                await User.findOneAndUpdate(
+                  { username },
+                  { $inc: { [`progress.${genre}`]: 1 } },
+                  { session, new: true }
+                );
+              }
 
               // Get updated user data
               const updatedUser = await User.findOne({ username }).session(session);
               console.log('Updated user progress:', updatedUser?.progress); // Debug log
 
               if (updatedUser) {
-                // Check and award achievements
+                // Check and award achievements (only once with updated progress)
                 await checkAndAwardAchievements(username, updatedUser.progress, session);
               }
             }

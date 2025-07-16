@@ -15,7 +15,7 @@ interface CacheEntry {
 }
 
 // In-memory cache (consider using Redis for production)
-const conversationCache = new Map<string, CacheEntry>();
+export const conversationCache = new Map<string, CacheEntry>();
 
 // Helper function to validate and parse query parameters
 function parseQueryParams(query: any) {
@@ -47,7 +47,7 @@ function updateCache(username: string, data: any[]): void {
 }
 
 // Helper function to clear cache for a user
-function clearUserCache(username: string): void {
+export function clearUserCache(username: string): void {
   conversationCache.delete(username);
 }
 

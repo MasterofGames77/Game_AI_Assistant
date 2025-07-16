@@ -45,6 +45,7 @@ const updateAchievementsForUser = async (email: string) => {
       storySeeker: 0,
       beatEmUpBrawler: 0,
       rhythmMaster: 0,
+      sandboxBuilder: 0,
       totalQuestions: questions.length,
       dailyExplorer: 0,
       speedrunner: 0,
@@ -67,10 +68,12 @@ const updateAchievementsForUser = async (email: string) => {
     // Process each question to update progress using the enhanced checkQuestionType
     console.log('Processing questions for achievement tracking...');
     for (const question of questions) {
-      const type = await checkQuestionType(question.question);
-      if (type && type in progress) {
-        progress[type]++;
-        console.log(`Detected ${type} for question: "${question.question.substring(0, 50)}..."`);
+      const types = await checkQuestionType(question.question);
+      for (const type of types) {
+        if (type in progress) {
+          progress[type]++;
+          console.log(`Detected ${type} for question: "${question.question.substring(0, 50)}..."`);
+        }
       }
     }
 
@@ -169,6 +172,7 @@ const updateAchievementsForAllUsers = async () => {
           storySeeker: 0,
           beatEmUpBrawler: 0,
           rhythmMaster: 0,
+          sandboxBuilder: 0,
           totalQuestions: questions.length,
           dailyExplorer: 0,
           speedrunner: 0,
@@ -191,10 +195,12 @@ const updateAchievementsForAllUsers = async () => {
         // Process each question to update progress using the enhanced checkQuestionType
         console.log('Processing questions for achievement tracking...');
         for (const q of questions) {
-          const type = await checkQuestionType(q.question);
-          if (type && type in progress) {
-            progress[type]++;
-            console.log(`Detected ${type} for question: "${q.question.substring(0, 50)}..."`);
+          const types = await checkQuestionType(q.question);
+          for (const type of types) {
+            if (type in progress) {
+              progress[type]++;
+              console.log(`Detected ${type} for question: "${q.question.substring(0, 50)}..."`);
+            }
           }
         }
 
@@ -260,8 +266,8 @@ const updateAchievementsFromHistory = async (username: string) => {
     
     // Process questions sequentially due to async nature
     for (const q of questions) {
-      const type = await checkQuestionType(q.question);
-      if (type) {
+      const types = await checkQuestionType(q.question);
+      for (const type of types) {
         progress[type] = (progress[type] || 0) + 1;
       }
     }

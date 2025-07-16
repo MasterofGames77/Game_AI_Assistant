@@ -23,6 +23,7 @@ interface Progress {
   storySeeker?: number;
   beatEmUpBrawler?: number;
   rhythmMaster?: number;
+  sandboxBuilder?: number;
   totalQuestions?: number;
   dailyExplorer?: number;
   speedrunner?: number;
@@ -121,6 +122,7 @@ const UserSchema = new Schema<IUser>({
     storySeeker: { type: Number, default: 0 },
     beatEmUpBrawler: { type: Number, default: 0 },
     rhythmMaster: { type: Number, default: 0 },
+    sandboxBuilder: { type: Number, default: 0 },
     totalQuestions: { type: Number, default: 0 },
     dailyExplorer: { type: Number, default: 0 },
     speedrunner: { type: Number, default: 0 },

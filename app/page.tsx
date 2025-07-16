@@ -228,10 +228,21 @@ export default function Home() {
   // delete conversation from database
   const handleDeleteConversation = async (id: string) => {
     try {
-      await axios.post("/api/deleteInteraction", { id });
-      fetchConversations(); // Refresh the sidebar list
+      const storedUsername = localStorage.getItem("username");
+      // Optimistically remove from UI immediately
+      setConversations((prev) => prev.filter((conv) => conv._id !== id));
+
+      await axios.post("/api/deleteInteraction", {
+        id,
+        username: storedUsername,
+      });
+
+      // Refresh conversations to ensure sync with database
+      fetchConversations();
     } catch (error) {
       console.error("Error deleting conversation:", error);
+      // If deletion failed, refresh to restore the conversation
+      fetchConversations();
     }
   };
 
