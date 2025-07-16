@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import connectToMongoDB from '../../utils/mongodb';
+import { connectToWingmanDB } from '../../utils/databaseConnections';
 import Question from '../../models/Question';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -13,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    await connectToMongoDB();
+    await connectToWingmanDB();
     const result = await Question.deleteOne({ _id: id });
     if (result.deletedCount === 0) {
       return res.status(404).json({ error: 'Interaction not found' });

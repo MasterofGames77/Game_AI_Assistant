@@ -323,6 +323,7 @@ const OFFENSIVE_WORDS = [
   'buttfucked',
   'pussy hole',
   'blow me',
+  'The Federalist Society',
   'Heritage Foundation',
   'Fox News',
   'One America News Network',
