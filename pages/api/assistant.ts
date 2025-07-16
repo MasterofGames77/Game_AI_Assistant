@@ -672,20 +672,22 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
 
     console.log('Update result:', updateResult);
 
-    // Emit achievement event with enhanced data for Pro users
-    try {
-      const io = getIO();
-      if (io) {
-        io.emit('achievementEarned', { 
-          username, 
-          achievements: newAchievements,
-          isPro: user?.hasProAccess || false,
-          message: `Congratulations! You've earned ${newAchievements.length} new achievement${newAchievements.length > 1 ? 's' : ''}!`,
-          totalAchievements: (currentAchievements.length + newAchievements.length)
-        });
+    // Emit achievement event with enhanced data for Pro users (only if Socket.IO is available)
+    if (newAchievements.length > 0) {
+      try {
+        const io = getIO();
+        if (io) {
+          io.emit('achievementEarned', { 
+            username, 
+            achievements: newAchievements,
+            isPro: user?.hasProAccess || false,
+            message: `Congratulations! You've earned ${newAchievements.length} new achievement${newAchievements.length > 1 ? 's' : ''}!`,
+            totalAchievements: (currentAchievements.length + newAchievements.length)
+          });
+        }
+      } catch (e) {
+        console.warn('Socket.IO not initialized, skipping achievement emit.');
       }
-    } catch (e) {
-      console.warn('Socket.IO not initialized, skipping achievement emit.');
     }
 
     return newAchievements;
@@ -784,9 +786,13 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
   const aiCache = getAICache();
   
   try {
-    // Validate question
+    // Validate question and username
     if (!question || typeof question !== 'string') {
       throw new ValidationError('Invalid question format - question must be a non-empty string');
+    }
+
+    if (!username || typeof username !== 'string') {
+      throw new ValidationError('Username is required');
     }
 
     // Check for offensive content first
@@ -898,7 +904,7 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     answer = processedAnswer;
     metrics.questionProcessing = processingLatency;
 
-    // Measure database operations with enhanced metrics
+        // Measure database operations with enhanced metrics
     const dbMetrics = await measureDBQuery('Create Question', async () => {
       try {
         // Start a session for transaction
@@ -907,8 +913,13 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
 
         try {
           await session.withTransaction(async () => {
-            // Create question
-            const questionDoc = await Question.create([{ username, question, response: answer }], { session });
+            // Create question with proper username handling
+            const questionData = { 
+              username: username || 'anonymous', 
+              question, 
+              response: answer 
+            };
+            const questionDoc = await Question.create([questionData], { session });
 
             // Update user's conversation count and ensure achievements/progress structure exists
             const userDoc = await User.findOneAndUpdate(
@@ -993,7 +1004,8 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
           return result;
         } catch (error) {
           await session.endSession();
-          throw error;
+          console.error('Transaction error:', error);
+          throw new Error(`Database operation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       } catch (error) {
         console.error('Database operation error:', error);
