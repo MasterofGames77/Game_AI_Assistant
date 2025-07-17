@@ -117,6 +117,8 @@ const OFFENSIVE_WORDS = [
   'raped',
   'fucked',
   'fucked up',
+  'motherfucker',
+  'motherfucking',
   'J.D. Vance',
   'Elon Musk',
   'Tulsi Gabbard',
