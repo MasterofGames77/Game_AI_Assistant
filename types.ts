@@ -35,6 +35,22 @@ export interface ProStatusProps {
   username?: string | null;
 }
 
+export interface SubscriptionStatus {
+  type:
+    | "free_period"
+    | "paid_active"
+    | "canceled_active"
+    | "expired_free"
+    | "no_subscription";
+  status: string;
+  expiresAt?: Date;
+  daysUntilExpiration?: number;
+  canUpgrade?: boolean;
+  canCancel?: boolean;
+  canReactivate?: boolean;
+  showWarning?: boolean;
+}
+
 export interface UserViolation {
   type: string;
   timestamp: Date;
