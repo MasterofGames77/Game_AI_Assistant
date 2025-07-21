@@ -100,8 +100,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     ).exec();
 
+    // Sync user data (this will handle early access eligibility)
     await syncUserData(userId, email);
-    return res.status(200).json({ message: 'User data synced successfully', user });
+    
+    // Fetch the updated user to get the latest subscription data
+    const updatedUser = await User.findOne({ userId });
+    
+    // Check if user is eligible for early access and set up subscription
+    if (updatedUser && !updatedUser.subscription?.earlyAccessGranted) {
+      const earlyAccessDeadline = new Date('2025-12-31T23:59:59.999Z');
+      const currentDate = new Date();
+      
+      // Check if user signed up before the deadline
+      if (currentDate <= earlyAccessDeadline) {
+        const earlyAccessStartDate = new Date('2025-12-31T23:59:59.999Z');
+        const earlyAccessEndDate = new Date('2026-12-31T23:59:59.999Z');
+        
+        // Update user with early access subscription
+        await User.findOneAndUpdate(
+          { userId },
+          {
+            hasProAccess: true,
+            subscription: {
+              status: 'free_period',
+              earlyAccessGranted: true,
+              earlyAccessStartDate,
+              earlyAccessEndDate,
+              transitionToPaid: false,
+              currentPeriodStart: earlyAccessStartDate,
+              currentPeriodEnd: earlyAccessEndDate
+            }
+          }
+        );
+        
+        // Fetch the final updated user
+        const finalUser = await User.findOne({ userId });
+        return res.status(200).json({ 
+          message: 'User data synced successfully - Early access granted!', 
+          user: finalUser,
+          earlyAccessGranted: true
+        });
+      }
+    }
+    
+    return res.status(200).json({ message: 'User data synced successfully', user: updatedUser });
   } catch (error) {
     console.error('Error in syncUser API:', error);
     res.status(500).json({
