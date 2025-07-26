@@ -65,16 +65,25 @@ export default async function handler(
       // Already expired
       warning = {
         level: 'expired',
-        message: 'Your free Pro access has expired. Upgrade now to continue enjoying Pro features.',
+        message: 'Your Pro access has expired',
         action: 'upgrade',
         urgent: true
       };
       warningLevel = 'expired';
-    } else if (daysUntilExpiration <= 7) {
-      // Critical warning - 7 days or less
+    } else if (daysUntilExpiration === 1) {
+      // Last chance - 1 day before expiration
       warning = {
         level: 'critical',
-        message: `Your free Pro access expires in ${daysUntilExpiration} day${daysUntilExpiration === 1 ? '' : 's'}. Don't lose access to Pro features!`,
+        message: 'Last chance to upgrade',
+        action: 'upgrade',
+        urgent: true
+      };
+      warningLevel = 'critical';
+    } else if (daysUntilExpiration <= 7) {
+      // Final reminder - 7 days or less
+      warning = {
+        level: 'critical',
+        message: 'Final reminder: Upgrade to keep Pro access',
         action: 'upgrade',
         urgent: true
       };
@@ -83,7 +92,7 @@ export default async function handler(
       // Warning - 30 days or less
       warning = {
         level: 'warning',
-        message: `Your free Pro access expires in ${daysUntilExpiration} days. Consider upgrading to continue enjoying Pro features.`,
+        message: 'Your free Pro access expires soon',
         action: 'upgrade',
         urgent: false
       };
