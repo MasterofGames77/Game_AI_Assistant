@@ -177,6 +177,7 @@ const OFFENSIVE_WORDS = [
   'Neil Gorsuch',
   'Aileen Cannon',
   'Tommy Tuberville',
+  'Brandon Carr',
   'Dr. Oz',
   'Mehmet Oz',
   'Greg Abbott',
