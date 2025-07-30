@@ -303,6 +303,7 @@ const OFFENSIVE_WORDS = [
   'Joe Rogan',
   'Alex Jones',
   'Liz Wheeler',
+  'Megyn Kelly',
   'Bryan Kohberger',
   'Robert Durst',
   'Ted Bundy',
