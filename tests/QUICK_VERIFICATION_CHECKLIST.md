@@ -32,6 +32,8 @@
 - [ ] **Expected**: Returns warning level and days remaining
 - [ ] **Test**: `/api/transitionEarlyAccess` with eligible user
 - [ ] **Expected**: Returns transition eligibility and data
+- [ ] **Test**: `/api/accountData` with valid username
+- [ ] **Expected**: Returns user account data and subscription info
 
 ### 5. Database Verification
 - [ ] **Check**: User documents have subscription field
@@ -50,14 +52,24 @@ subscriptionTests.runAllTests()
 
 ### Step 2: Test Specific Scenarios
 ```javascript
+// Test subscription system
+subscriptionTests.runAllTests()
+
+// Test account dashboard
+accountTests.runAccountTests()
+
 // Test a specific user
 subscriptionTests.manualTests.testUserStatus("your-username")
+
+// Test account data for specific user
+accountTests.manualAccountTests.testUserAccountData("your-username")
 
 // Test early access expiration
 subscriptionTests.manualTests.testUserExpiration("your-username")
 
-// Create a test user
+// Create test users
 subscriptionTests.manualTests.createTestUser("testuser123", "test@example.com")
+accountTests.manualAccountTests.createAccountTestUser("accountuser123", "account@example.com")
 ```
 
 ### Step 3: Database Checks
