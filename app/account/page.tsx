@@ -249,6 +249,30 @@ export default function AccountPage() {
           </p>
         </div>
 
+        {/* Back Button */}
+        <div className="mb-8">
+          <button
+            onClick={() => router.push("/")}
+            className="px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white font-semibold rounded-lg hover:opacity-90 transition-all duration-200 shadow-lg flex items-center space-x-2"
+            aria-label="Back to main page"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
+            </svg>
+            <span>Back to Wingman</span>
+          </button>
+        </div>
+
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Account Information */}
           <div className="lg:col-span-1">

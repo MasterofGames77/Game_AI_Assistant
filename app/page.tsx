@@ -384,6 +384,10 @@ export default function Home() {
     setShowUsernameModal(true);
   };
 
+  const handleNavigateToAccount = () => {
+    window.location.href = "/account";
+  };
+
   // Used for debugging
   // if (typeof window !== "undefined") {
   //   console.log("Current username:", localStorage.getItem("username"));
@@ -497,6 +501,7 @@ export default function Home() {
             onClear={handleClear}
             onResetUserId={handleResetUsername}
             onTwitchAuth={handleTwitchAuth}
+            onNavigateToAccount={handleNavigateToAccount}
             activeView={activeView}
             setActiveView={setActiveView}
             conversationCount={conversations.length}

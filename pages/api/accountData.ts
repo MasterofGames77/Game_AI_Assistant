@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { connectToWingmanDB } from '../../utils/databaseConnections';
 import User from '../../models/User';
+import Question from '../../models/Question';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -22,12 +23,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Count actual Question documents for accurate conversation count
+    const actualConversationCount = await Question.countDocuments({ username });
+
     // Return user data without sensitive information
     const userData = {
       user: {
         username: user.username,
         email: user.email,
-        conversationCount: user.conversationCount,
+        conversationCount: actualConversationCount, // Use actual count instead of user.conversationCount
         hasProAccess: user.hasProAccess,
         achievements: user.achievements || [],
         progress: user.progress || {},

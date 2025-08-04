@@ -65,6 +65,7 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
   conversations,
   onSelectConversation,
   onDeleteConversation,
+  onNavigateToAccount,
   activeView,
   setActiveView,
   className,
@@ -164,6 +165,30 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
           onClick={() => setActiveView("forum")}
         >
           Forum
+        </button>
+      </div>
+
+      {/* Account Button */}
+      <div className="mb-6">
+        <button
+          className="w-full px-4 py-3 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] text-white font-semibold rounded-lg hover:opacity-90 transition-all duration-200 shadow-lg flex items-center justify-center space-x-2"
+          onClick={onNavigateToAccount}
+          aria-label="Go to Account Dashboard"
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+            />
+          </svg>
+          <span>Account</span>
         </button>
       </div>
 
