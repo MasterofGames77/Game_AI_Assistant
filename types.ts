@@ -25,6 +25,7 @@ export interface SideBarProps {
   onClear: () => void;
   onResetUserId: () => void;
   onTwitchAuth: () => void;
+  onNavigateToAccount: () => void;
   activeView: "chat" | "forum";
   setActiveView: (view: "chat" | "forum") => void;
   conversationCount: number;
