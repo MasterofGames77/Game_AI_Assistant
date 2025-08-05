@@ -28,12 +28,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Check for offensive content in username
     if (username) {
+      // Basic username validation
+      if (username.length < 3) {
+        return res.status(400).json({ 
+          message: 'Username must be at least 3 characters long.'
+        });
+      }
+      
+      if (username.length > 32) {
+        return res.status(400).json({ 
+          message: 'Username must be 32 characters or less.'
+        });
+      }
+      
+      // Check for valid characters (alphanumeric, underscore, hyphen)
+      if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+        return res.status(400).json({ 
+          message: 'Username can only contain letters, numbers, underscores, and hyphens.'
+        });
+      }
+      
       const contentCheck = await containsOffensiveContent(username, userId);
       if (contentCheck.isOffensive) {
         // Add a warning to the user's violation record
         const violationResult = await handleContentViolation(username, contentCheck.offendingWords);
+        
+        // Create a more detailed error message
+        let errorMessage = 'Username contains offensive content. Please try a different username.';
+        
+        if (violationResult.action === 'warning') {
+          errorMessage = `Username contains inappropriate content: "${contentCheck.offendingWords.join(', ')}". Warning ${violationResult.count}/3. Please choose a different username.`;
+        } else if (violationResult.action === 'banned') {
+          const banDate = new Date(violationResult.expiresAt).toLocaleDateString();
+          errorMessage = `Username contains inappropriate content. You are temporarily banned until ${banDate}. Please try again later.`;
+        } else if (violationResult.action === 'permanent_ban') {
+          errorMessage = `Username contains inappropriate content. You are permanently banned from using this application.`;
+        }
+        
         return res.status(400).json({ 
-          message: 'Username contains offensive content. Please try a different username.',
+          message: errorMessage,
           offendingWords: contentCheck.offendingWords,
           violationResult
         });

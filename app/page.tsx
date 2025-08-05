@@ -250,15 +250,65 @@ export default function Home() {
     const newUsername = prompt("Enter your new username:");
 
     if (newUsername && newUsername.trim().length > 0) {
-      // Optionally, you could call your backend to update the username here
-      setUsername(newUsername.trim());
-      localStorage.setItem("username", newUsername.trim());
-      setShowUsernameModal(false);
-      setConversations([]); // Optionally clear conversations if you want
-      handleClear(); // Clear form state
-      alert(
-        `Your new username is: ${newUsername.trim()}. Please remember it for future use.`
-      );
+      try {
+        // Get current user info
+        const userId = localStorage.getItem("userId");
+        const email = localStorage.getItem("userEmail");
+
+        if (!userId || !email) {
+          alert("Error: User information not found. Please sign in again.");
+          return;
+        }
+
+        // Use the syncUser API to update username with content moderation
+        const res = await axios.post("/api/syncUser", {
+          userId,
+          email,
+          username: newUsername.trim(),
+        });
+
+        if (res.data && res.data.user) {
+          setUsername(newUsername.trim());
+          localStorage.setItem("username", newUsername.trim());
+          localStorage.setItem("userId", res.data.user.userId);
+          localStorage.setItem("userEmail", res.data.user.email);
+          setShowUsernameModal(false);
+          setConversations([]); // Clear old conversations
+          fetchConversations(); // Fetch new user's conversations
+          alert(
+            `Your new username is: ${newUsername.trim()}. Please remember it for future use.`
+          );
+        }
+      } catch (err: any) {
+        if (err.response?.data?.message) {
+          // Handle content violation specifically
+          if (
+            err.response.data.offendingWords &&
+            err.response.data.violationResult
+          ) {
+            const violationResult = err.response.data.violationResult;
+            let violationMessage = err.response.data.message;
+
+            // Add specific violation details based on action
+            if (violationResult.action === "warning") {
+              violationMessage += ` Warning ${violationResult.count}/3. Please choose a different username.`;
+            } else if (violationResult.action === "banned") {
+              const banDate = new Date(
+                violationResult.expiresAt
+              ).toLocaleDateString();
+              violationMessage += ` You are temporarily banned until ${banDate}. Please try again later.`;
+            } else if (violationResult.action === "permanent_ban") {
+              violationMessage += ` You are permanently banned from using this application.`;
+            }
+
+            alert(violationMessage);
+          } else {
+            alert(err.response.data.message);
+          }
+        } else {
+          alert("Failed to update username. Please try again.");
+        }
+      }
     } else {
       alert("Username reset canceled.");
     }
@@ -328,6 +378,25 @@ export default function Home() {
       setUsernameError("Username is required");
       return;
     }
+
+    // Basic validation before API call
+    if (usernameInput.trim().length < 3) {
+      setUsernameError("Username must be at least 3 characters long.");
+      return;
+    }
+
+    if (usernameInput.trim().length > 32) {
+      setUsernameError("Username must be 32 characters or less.");
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(usernameInput.trim())) {
+      setUsernameError(
+        "Username can only contain letters, numbers, underscores, and hyphens."
+      );
+      return;
+    }
+
     try {
       // 1. Check if username exists
       const findRes = await axios.get(
@@ -364,7 +433,30 @@ export default function Home() {
       }
     } catch (err: any) {
       if (err.response?.data?.message) {
-        setUsernameError(err.response.data.message);
+        // Handle content violation specifically
+        if (
+          err.response.data.offendingWords &&
+          err.response.data.violationResult
+        ) {
+          const violationResult = err.response.data.violationResult;
+          let violationMessage = err.response.data.message;
+
+          // Add specific violation details based on action
+          if (violationResult.action === "warning") {
+            violationMessage += ` Warning ${violationResult.count}/3. Please choose a different username.`;
+          } else if (violationResult.action === "banned") {
+            const banDate = new Date(
+              violationResult.expiresAt
+            ).toLocaleDateString();
+            violationMessage += ` You are temporarily banned until ${banDate}. Please try again later.`;
+          } else if (violationResult.action === "permanent_ban") {
+            violationMessage += ` You are permanently banned from using this application.`;
+          }
+
+          setUsernameError(violationMessage);
+        } else {
+          setUsernameError(err.response.data.message);
+        }
       } else {
         setUsernameError("Failed to set username. Please try again.");
       }
@@ -416,10 +508,12 @@ export default function Home() {
                 type="text"
                 value={usernameInput}
                 onChange={(e) => setUsernameInput(e.target.value)}
-                placeholder="Enter your username"
+                placeholder="Enter your username (3-32 characters, letters, numbers, _ -)"
                 className="w-full p-2 border border-gray-300 rounded"
-                minLength={4}
+                minLength={3}
                 maxLength={32}
+                pattern="[a-zA-Z0-9_-]+"
+                title="Username can only contain letters, numbers, underscores, and hyphens"
                 required
                 autoFocus
               />
