@@ -52,6 +52,15 @@ export interface SubscriptionStatus {
   showWarning?: boolean;
 }
 
+export interface CleanupResult {
+  totalUsers: number;
+  expiredEarlyAccess: number;
+  expiredPaidSubscriptions: number;
+  updatedStatuses: number;
+  errors: string[];
+  timestamp: Date;
+}
+
 export interface UserViolation {
   type: string;
   timestamp: Date;
