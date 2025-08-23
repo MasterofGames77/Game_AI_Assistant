@@ -35,6 +35,14 @@ const measureLatency = async (operation: string, callback: () => Promise<any>) =
 // Functions for reading and processing game data from CSV file
 const CSV_FILE_PATH = path.join(process.cwd(), 'data/Video Games Data.csv');
 
+// Cache for CSV data and genre mappings
+let csvDataCache: any[] | null = null;
+let csvDataCacheTime: number = 0;
+const CSV_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Cached genre mappings
+const GENRE_MAPPING_CACHE = new Map<string, string>();
+
 // Function to read the CSV file
 const readCSVFile = async (filePath: string) => {
   const fileContent = await readFile(filePath, 'utf8');
@@ -43,8 +51,18 @@ const readCSVFile = async (filePath: string) => {
 
 // Function to get the CSV data
 const getCSVData = async () => {
+  const now = Date.now();
+  if (csvDataCache && (now - csvDataCacheTime) < CSV_CACHE_TTL) {
+    console.log('CSV data served from cache');
+    return csvDataCache;
+  }
+  
   try {
-    return await readCSVFile(CSV_FILE_PATH);
+    console.log('CSV data loaded from file');
+    const data = await readCSVFile(CSV_FILE_PATH);
+    csvDataCache = data;
+    csvDataCacheTime = now;
+    return data;
   } catch (error) {
     console.error('Error reading CSV file:', error);
     throw new Error('Failed to read CSV file');
@@ -62,6 +80,87 @@ const formatGameInfo = (gameInfo: any): string => {
   const formattedReleaseDate = formatReleaseDate(gameInfo.release_date);
   return `${gameInfo.title} was released on ${formattedReleaseDate} for ${gameInfo.console}. It is a ${gameInfo.genre} game developed by ${gameInfo.developer} and published by ${gameInfo.publisher}.`;
 };
+
+// Pre-populate genre mapping cache
+const initializeGenreCache = () => {
+  const genreMapping: { [key: string]: string } = {
+    "Xenoblade Chronicles 3": "Action RPG",
+    "Final Fantasy VII": "Role-Playing Game",
+    "Devil May Cry 5": "Hack and Slash",
+    "Fortnite": "Battle Royale",
+    "The Legend of Zelda: Ocarina of Time": "Adventure",
+    "Super Mario Galaxy": "Platformer",
+    "Resident Evil 4": "Survival Horror",
+    "Splatoon 2": "Third-Person Shooter",
+    "Castlevania: Symphony of the Night": "Metroidvania",
+    "Bioshock Infinite": "First-Person Shooter",
+    "Minecraft": "Sandbox",
+    "Hades": "Roguelike",
+    "Grand Theft Auto V": "Action-Adventure",
+    "Animal Crossing": "Social Simulation",
+    "World of Warcraft": "Massively Multiplayer Online Role-Playing Game",
+    "Dota 2": "Multiplayer Online Battle Arena",
+    "Braid": "Puzzle-Platformer",
+    "Super Smash Bros. Ultimate": "Fighting Game",
+    "Fire Emblem: Awakening": "Tactical Role-Playing Game",
+    "Bloons TD 6": "Tower Defense",
+    "Forza Horizon 5": "Racing",
+    "Mario Kart 8": "Kart Racing",
+    "Star Fox": "Rail Shooter",
+    "Metal Gear Solid": "Stealth",
+    "Gunstar Heroes": "Run and Gun",
+    "Advance Wars": "Turn-Based Strategy",
+    "Sid Meier's Civilization VI": "4X",
+    "Hotline Miami": "Top-down Shooter",
+    "Fifa 18": "Sports",
+    "Super Mario Party": "Party",
+    "Guitar Hero": "Rhythm",
+    "Five Night's at Freddy's": "Point and Click",
+    "Phoenix Wright: Ace Attorney": "Visual Novel",
+    "Command & Conquer": "Real Time Strategy",
+    "Streets of Rage 4": "Beat 'em up",
+    "Tetris": "Puzzle",
+    "XCOM: Enemy Unknown": "Turn-Based Tactics",
+    "The Stanley Parable": "Interactive Story",
+    "Pac-Man": "Maze",
+    "Roblox": "Game Creation System",
+    "Super Mario Maker": "Level Editor",
+    "Temple Run": "Endless Runner",
+    "Yu-Gi-Oh! Master Duel": "Digital Collectible Card Game",
+    "Wii Fit": "Exergaming",
+    "Deathloop": "Immersive Sim",
+    "Bejeweled": "Tile-Matching",
+    "Shellshock Live": "Artillery",
+    "Roller Coaster Tycoon 3": "Construction and Management Simulation",
+    "Stray": "Adventure",
+    "No Man's Sky": "Survival",
+    "Among Us": "Social Deduction",
+  };
+  
+  Object.entries(genreMapping).forEach(([game, genre]) => {
+    GENRE_MAPPING_CACHE.set(game.toLowerCase(), genre);
+  });
+};
+
+// Initialize cache on module load
+initializeGenreCache();
+
+// Cache cleanup function to prevent memory leaks
+const cleanupCache = () => {
+  const now = Date.now();
+  if (csvDataCache && (now - csvDataCacheTime) > CSV_CACHE_TTL * 2) {
+    csvDataCache = null;
+    csvDataCacheTime = 0;
+    console.log('CSV cache cleaned up');
+  }
+};
+
+// Set up periodic cache cleanup (every 10 minutes)
+setInterval(cleanupCache, 10 * 60 * 1000);
+
+// Log cache initialization
+console.log(`Genre mapping cache initialized with ${GENRE_MAPPING_CACHE.size} entries`);
+console.log('CSV data caching enabled with 5-minute TTL');
 
 // Function to fetch game information from IGDB API
 interface IGDBGame {
@@ -215,60 +314,7 @@ const fetchAndCombineGameData = async (question: string, answer: string): Promis
 
 // Function to get game genre from predefined mapping
 const getGenreFromMapping = (gameTitle: string): string | null => {
-  const genreMapping: { [key: string]: string } = {
-    "Xenoblade Chronicles 3": "Action RPG",
-    "Final Fantasy VII": "Role-Playing Game",
-    "Devil May Cry 5": "Hack and Slash",
-    "Fortnite": "Battle Royale",
-    "The Legend of Zelda: Ocarina of Time": "Adventure",
-    "Super Mario Galaxy": "Platformer",
-    "Resident Evil 4": "Survival Horror",
-    "Splatoon 2": "Third-Person Shooter",
-    "Castlevania: Symphony of the Night": "Metroidvania",
-    "Bioshock Infinite": "First-Person Shooter",
-    "Minecraft": "Sandbox",
-    "Hades": "Roguelike",
-    "Grand Theft Auto V": "Action-Adventure",
-    "Animal Crossing": "Social Simulation",
-    "World of Warcraft": "Massively Multiplayer Online Role-Playing Game",
-    "Dota 2": "Multiplayer Online Battle Arena",
-    "Braid": "Puzzle-Platformer",
-    "Super Smash Bros. Ultimate": "Fighting Game",
-    "Fire Emblem: Awakening": "Tactical Role-Playing Game",
-    "Bloons TD 6": "Tower Defense",
-    "Forza Horizon 5": "Racing",
-    "Mario Kart 8": "Kart Racing",
-    "Star Fox": "Rail Shooter",
-    "Metal Gear Solid": "Stealth",
-    "Gunstar Heroes": "Run and Gun",
-    "Advance Wars": "Turn-Based Strategy",
-    "Sid Meier's Civilization VI": "4X",
-    "Hotline Miami": "Top-down Shooter",
-    "Fifa 18": "Sports",
-    "Super Mario Party": "Party",
-    "Guitar Hero": "Rhythm",
-    "Five Night's at Freddy's": "Point and Click",
-    "Phoenix Wright: Ace Attorney": "Visual Novel",
-    "Command & Conquer": "Real Time Strategy",
-    "Streets of Rage 4": "Beat 'em up",
-    "Tetris": "Puzzle",
-    "XCOM: Enemy Unknown": "Turn-Based Tactics",
-    "The Stanley Parable": "Interactive Story",
-    "Pac-Man": "Maze",
-    "Roblox": "Game Creation System",
-    "Super Mario Maker": "Level Editor",
-    "Temple Run": "Endless Runner",
-    "Yu-Gi-Oh! Master Duel": "Digital Collectible Card Game",
-    "Wii Fit": "Exergaming",
-    "Deathloop": "Immersive Sim",
-    "Bejeweled": "Tile-Matching",
-    "Shellshock Live": "Artillery",
-    "Roller Coaster Tycoon 3": "Construction and Management Simulation",
-    "Stray": "Adventure",
-    "No Man's Sky": "Survival",
-    "Among Us": "Social Deduction",
-  };
-  return genreMapping[gameTitle] || null;
+  return GENRE_MAPPING_CACHE.get(gameTitle.toLowerCase()) || null;
 };
 
 // Utility function to extract game title from user questions
