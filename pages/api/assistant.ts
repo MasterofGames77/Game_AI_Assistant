@@ -335,7 +335,13 @@ const extractGameTitle = (question: string): string => {
 // Function to determine question category for achievement tracking
 export const checkQuestionType = (question: string): string[] => {
   const lowerQuestion = question.toLowerCase();
-  const detectedGenres: string[] = [];
+  const detectedGenres = new Set<string>(); // Use Set for automatic deduplication
+  
+  // Early return for very short questions (less than 10 characters)
+  if (lowerQuestion.length < 10) {
+    console.log('Question too short for genre detection:', question);
+    return [];
+  }
   
   // Comprehensive game title to genre mapping
   const platformerGames = [
@@ -527,50 +533,33 @@ export const checkQuestionType = (question: string): string[] => {
 
   for (const check of genreChecks) {
     if (check.games.some((game: string) => lowerQuestion.includes(game))) {
-      detectedGenres.push(check.achievement);
+      detectedGenres.add(check.achievement);
     }
   }
 
   // Check for genre keywords and add them
   for (const [achievement, keywords] of Object.entries(genreKeywords)) {
     if (keywords.some(keyword => lowerQuestion.includes(keyword))) {
-      if (!detectedGenres.includes(achievement)) {
-        detectedGenres.push(achievement);
-      }
+      detectedGenres.add(achievement);
     }
   }
 
-  // Special achievements based on question content
-  if (lowerQuestion.includes("speedrun") || lowerQuestion.includes("fast completion") ||
-      lowerQuestion.includes("world record") || lowerQuestion.includes("fastest way")) {
-    detectedGenres.push("speedrunner");
-  }
-  
-  if (lowerQuestion.includes("collect") || lowerQuestion.includes("items") ||
-      lowerQuestion.includes("100%") || lowerQuestion.includes("completion") ||
-      lowerQuestion.includes("all items") || lowerQuestion.includes("all items") ||
-      lowerQuestion.includes("achievements") || lowerQuestion.includes("trophies")) {
-    detectedGenres.push("collectorPro");
-  }
-  
-  if (lowerQuestion.includes("stats") || lowerQuestion.includes("data") ||
-      lowerQuestion.includes("numbers") || lowerQuestion.includes("analysis")) {
-    detectedGenres.push("dataDiver");
-  }
-  
-  if (lowerQuestion.includes("performance") || lowerQuestion.includes("fps") ||
-      lowerQuestion.includes("graphics") || lowerQuestion.includes("optimization") ||
-      lowerQuestion.includes("settings") || lowerQuestion.includes("lag")) {
-    detectedGenres.push("performanceTweaker");
+  // Special achievements based on question content with consolidated regex patterns
+  const specialPatterns = [
+    { pattern: /(speedrun|fast completion|world record|fastest way)/, achievement: 'speedrunner' },
+    { pattern: /(collect|items|100%|completion|achievements|trophies)/, achievement: 'collectorPro' },
+    { pattern: /(stats|data|numbers|analysis)/, achievement: 'dataDiver' },
+    { pattern: /(performance|fps|graphics|optimization|settings|lag)/, achievement: 'performanceTweaker' }
+  ];
+
+  for (const { pattern, achievement } of specialPatterns) {
+    if (pattern.test(lowerQuestion)) {
+      detectedGenres.add(achievement);
+    }
   }
 
   // Remove duplicates and return
-  const uniqueGenres: string[] = [];
-  for (const genre of detectedGenres) {
-    if (!uniqueGenres.includes(genre)) {
-      uniqueGenres.push(genre);
-    }
-  }
+  const uniqueGenres: string[] = Array.from(detectedGenres);
   return uniqueGenres;
 };
 

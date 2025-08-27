@@ -47,3 +47,9 @@ logs/*
 
 migrate_questions.cjs
 migrate_forums.cjs
+
+SUBSCRIPTION_SYSTEM_TEST.msd
+QUICK_VERIFICATION_CHECKLIST.md
+MANUAL_TESTS.md
+
+testSimpleCleanup.js
