@@ -956,80 +956,75 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
             };
             const questionDoc = await Question.create([questionData], { session });
 
-            // Update user's conversation count and ensure achievements/progress structure exists
-            const userDoc = await User.findOneAndUpdate(
-              { username },
-              {
-                $inc: { conversationCount: 1 },
-                $setOnInsert: {
-                  achievements: [],
-                  progress: {
-                    firstQuestion: 0,
-                    frequentAsker: 0,
-                    rpgEnthusiast: 0,
-                    bossBuster: 0,
-                    platformerPro: 0,
-                    survivalSpecialist: 0,
-                    strategySpecialist: 0,
-                    actionAficionado: 0,
-                    battleRoyale: 0,
-                    sportsChampion: 0,
-                    adventureAddict: 0,
-                    shooterSpecialist: 0,
-                    puzzlePro: 0,
-                    racingRenegade: 0,
-                    stealthExpert: 0,
-                    horrorHero: 0,
-                    triviaMaster: 0,
-                    storySeeker: 0,
-                    beatEmUpBrawler: 0,
-                    rhythmMaster: 0,
-                    sandboxBuilder: 0,
-                    totalQuestions: 0,
-                    dailyExplorer: 0,
-                    speedrunner: 0,
-                    collectorPro: 0,
-                    dataDiver: 0,
-                    performanceTweaker: 0,
-                    conversationalist: 0,
-                    proAchievements: {
-                      gameMaster: 0,
-                      speedDemon: 0,
-                      communityLeader: 0,
-                      achievementHunter: 0,
-                      proStreak: 0,
-                      expertAdvisor: 0,
-                      genreSpecialist: 0,
-                      proContributor: 0
-                    }
-                  }
-                }
-              },
-              { upsert: true, new: true, session }
-            );
-
-            // Check question type and update progress
+            // Check question type first to prepare bulk update operations
             const questionType = await checkQuestionType(question);
             console.log('Question type detected:', questionType); // Debug log
 
+            // Prepare bulk update operations
+            const updateOperations: any = {
+              $inc: { conversationCount: 1 },
+              $setOnInsert: {
+                achievements: [],
+                progress: {
+                  firstQuestion: 0,
+                  frequentAsker: 0,
+                  rpgEnthusiast: 0,
+                  bossBuster: 0,
+                  platformerPro: 0,
+                  survivalSpecialist: 0,
+                  strategySpecialist: 0,
+                  actionAficionado: 0,
+                  battleRoyale: 0,
+                  sportsChampion: 0,
+                  adventureAddict: 0,
+                  shooterSpecialist: 0,
+                  puzzlePro: 0,
+                  racingRenegade: 0,
+                  stealthExpert: 0,
+                  horrorHero: 0,
+                  triviaMaster: 0,
+                  storySeeker: 0,
+                  beatEmUpBrawler: 0,
+                  rhythmMaster: 0,
+                  sandboxBuilder: 0,
+                  totalQuestions: 0,
+                  dailyExplorer: 0,
+                  speedrunner: 0,
+                  collectorPro: 0,
+                  dataDiver: 0,
+                  performanceTweaker: 0,
+                  conversationalist: 0,
+                  proAchievements: {
+                    gameMaster: 0,
+                    speedDemon: 0,
+                    communityLeader: 0,
+                    achievementHunter: 0,
+                    proStreak: 0,
+                    expertAdvisor: 0,
+                    genreSpecialist: 0,
+                    proContributor: 0
+                  }
+                }
+              }
+            };
+
+            // Add genre increments in bulk instead of multiple database calls
             if (questionType.length > 0) {
-              // Update the specific progress counter for each detected genre
-              for (const genre of questionType) {
-                await User.findOneAndUpdate(
-                  { username },
-                  { $inc: { [`progress.${genre}`]: 1 } },
-                  { session, new: true }
-                );
-              }
+              questionType.forEach(genre => {
+                updateOperations.$inc[`progress.${genre}`] = 1;
+              });
+            }
 
-              // Get updated user data
-              const updatedUser = await User.findOne({ username }).session(session);
-              console.log('Updated user progress:', updatedUser?.progress); // Debug log
+            // Single database operation instead of multiple separate updates
+            const userDoc = await User.findOneAndUpdate(
+              { username },
+              updateOperations,
+              { upsert: true, new: true, session }
+            );
 
-              if (updatedUser) {
-                // Check and award achievements (only once with updated progress)
-                await checkAndAwardAchievements(username, updatedUser.progress, session);
-              }
+            // Check achievements only once with the updated progress
+            if (userDoc && questionType.length > 0) {
+              await checkAndAwardAchievements(username, userDoc.progress, session);
             }
 
             result = { questionDoc, userDoc };
