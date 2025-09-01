@@ -43,6 +43,14 @@ const CSV_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 // Cached genre mappings
 const GENRE_MAPPING_CACHE = new Map<string, string>();
 
+// Cache for user achievements to reduce database calls
+const userAchievementCache = new Map<string, { 
+  achievements: any[], 
+  hasProAccess: boolean,
+  lastChecked: number 
+}>();
+const ACHIEVEMENT_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+
 // Function to read the CSV file
 const readCSVFile = async (filePath: string) => {
   const fileContent = await readFile(filePath, 'utf8');
@@ -153,6 +161,20 @@ const cleanupCache = () => {
     csvDataCacheTime = 0;
     console.log('CSV cache cleaned up');
   }
+  
+  // Clean up achievement cache
+  const usernamesToDelete: string[] = [];
+  userAchievementCache.forEach((cacheData, username) => {
+    if ((now - cacheData.lastChecked) > ACHIEVEMENT_CACHE_TTL * 2) {
+      usernamesToDelete.push(username);
+    }
+  });
+  
+  usernamesToDelete.forEach(username => userAchievementCache.delete(username));
+  
+  if (usernamesToDelete.length > 0) {
+    console.log(`Achievement cache cleaned up ${usernamesToDelete.length} entries`);
+  }
 };
 
 // Set up periodic cache cleanup (every 10 minutes)
@@ -161,6 +183,7 @@ setInterval(cleanupCache, 10 * 60 * 1000);
 // Log cache initialization
 console.log(`Genre mapping cache initialized with ${GENRE_MAPPING_CACHE.size} entries`);
 console.log('CSV data caching enabled with 5-minute TTL');
+console.log('Achievement cache enabled with 2-minute TTL');
 
 // Function to fetch game information from IGDB API
 interface IGDBGame {
@@ -568,7 +591,150 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
   console.log('Checking achievements for user:', username);
   console.log('Current progress:', progress);
 
-  // First get the user's current achievements
+  const now = Date.now();
+  const cacheKey = username;
+  const cached = userAchievementCache.get(cacheKey);
+  
+  // Use cache if recent enough (within 2 minutes)
+  if (cached && (now - cached.lastChecked) < ACHIEVEMENT_CACHE_TTL) {
+    console.log('Using cached achievement data for user:', username);
+    const currentAchievements = cached.achievements;
+    const hasProAccess = cached.hasProAccess;
+    
+    // Check if any new achievements can be earned with current progress
+    const newAchievements: { name: string; dateEarned: Date }[] = [];
+    
+    // Check each achievement condition using cached data
+    const achievementChecks = [
+      { name: 'RPG Enthusiast', field: 'rpgEnthusiast', threshold: 5 },
+      { name: 'Boss Buster', field: 'bossBuster', threshold: 5 },
+      { name: 'Platformer Pro', field: 'platformerPro', threshold: 5 },
+      { name: 'Survival Specialist', field: 'survivalSpecialist', threshold: 5 },
+      { name: 'Strategy Specialist', field: 'strategySpecialist', threshold: 5 },
+      { name: 'Action Aficionado', field: 'actionAficionado', threshold: 5 },
+      { name: 'Battle Royale Master', field: 'battleRoyale', threshold: 5 },
+      { name: 'Sports Champion', field: 'sportsChampion', threshold: 5 },
+      { name: 'Adventure Addict', field: 'adventureAddict', threshold: 5 },
+      { name: 'Shooter Specialist', field: 'shooterSpecialist', threshold: 5 },
+      { name: 'Fighting Fanatic', field: 'fightingFanatic', threshold: 5 },
+      { name: 'Simulation Specialist', field: 'simulationSpecialist', threshold: 5 },
+      { name: 'Puzzle Pro', field: 'puzzlePro', threshold: 5 },
+      { name: 'Racing Renegade', field: 'racingRenegade', threshold: 5 },
+      { name: 'Stealth Expert', field: 'stealthExpert', threshold: 5 },
+      { name: 'Horror Hero', field: 'horrorHero', threshold: 5 },
+      { name: 'Trivia Master', field: 'triviaMaster', threshold: 5 },
+      { name: 'Story Seeker', field: 'storySeeker', threshold: 5 },
+      { name: 'Beat Em Up Brawler', field: 'beatEmUpBrawler', threshold: 5 },
+      { name: 'Rhythm Master', field: 'rhythmMaster', threshold: 5 },
+      { name: 'Sandbox Builder', field: 'sandboxBuilder', threshold: 5 }
+    ];
+
+    // Check each achievement
+    for (const check of achievementChecks) {
+      const progressValue = progress[check.field] || 0;
+      if (progressValue >= check.threshold && 
+          !currentAchievements.some((a: { name: string; }) => a.name === check.name)) {
+        newAchievements.push({ 
+          name: check.name, 
+          dateEarned: new Date() 
+        });
+        console.log(`Achievement earned: ${check.name}`);
+      }
+    }
+
+    // Check Pro achievements if user has Pro access
+    if (hasProAccess) {
+      const proAchievementChecks = [
+        { 
+          name: 'Game Master', 
+          field: 'proAchievements.gameMaster', 
+          threshold: 10,
+          condition: () => {
+            const genreCounts = Object.entries(progress)
+              .filter(([key]) => !key.startsWith('proAchievements'))
+              .filter(([_, value]) => (value as number) >= 5)
+              .length;
+            return genreCounts >= 5;
+          }
+        },
+        { 
+          name: 'Speed Demon', 
+          field: 'proAchievements.speedDemon', 
+          threshold: 20,
+          condition: () => progress.totalQuestions >= 100
+        },
+        { 
+          name: 'Community Leader', 
+          field: 'proAchievements.communityLeader', 
+          threshold: 15,
+          condition: () => progress.totalQuestions >= 200
+        },
+        { 
+          name: 'Achievement Hunter', 
+          field: 'proAchievements.achievementHunter', 
+          threshold: 1,
+          condition: () => currentAchievements.length >= 15
+        },
+        { 
+          name: 'Pro Streak', 
+          field: 'proAchievements.proStreak', 
+          threshold: 7,
+          condition: () => progress.dailyExplorer >= 7
+        },
+        { 
+          name: 'Expert Advisor', 
+          field: 'proAchievements.expertAdvisor', 
+          threshold: 50,
+          condition: () => progress.totalQuestions >= 500
+        },
+        { 
+          name: 'Genre Specialist', 
+          field: 'proAchievements.genreSpecialist', 
+          threshold: 1,
+          condition: () => {
+            const maxGenre = Object.entries(progress)
+              .filter(([key]) => !key.startsWith('proAchievements'))
+              .reduce((max, [_, value]) => Math.max(max, value as number), 0);
+            return maxGenre >= 20;
+          }
+        },
+        { 
+          name: 'Pro Contributor', 
+          field: 'proAchievements.proContributor', 
+          threshold: 1,
+          condition: () => progress.totalQuestions >= 1000
+        }
+      ];
+
+      for (const check of proAchievementChecks) {
+        if (check.condition() && 
+            !currentAchievements.some((a: { name: string; }) => a.name === check.name)) {
+          newAchievements.push({ 
+            name: check.name, 
+            dateEarned: new Date() 
+          });
+          console.log(`Pro achievement earned: ${check.name}`);
+        }
+      }
+    }
+
+    // If new achievements found, update cache and return them
+    if (newAchievements.length > 0) {
+      console.log('New achievements found using cache:', newAchievements.length);
+      // Update cache with new achievements
+      userAchievementCache.set(cacheKey, {
+        achievements: [...currentAchievements, ...newAchievements],
+        hasProAccess,
+        lastChecked: now
+      });
+      return newAchievements;
+    }
+
+    return []; // No new achievements
+  }
+
+  // Cache miss or expired - fetch from database
+  console.log('Cache miss for user achievements, fetching from database:', username);
   const user = await User.findOne({ username }).session(session);
   const currentAchievements = user?.achievements || [];
   const newAchievements: { name: string; dateEarned: Date }[] = [];
@@ -725,8 +891,24 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
       }
     }
 
+    // Update cache with new achievements and user data
+    userAchievementCache.set(cacheKey, {
+      achievements: [...currentAchievements, ...newAchievements],
+      hasProAccess: user?.hasProAccess || false,
+      lastChecked: now
+    });
+    console.log('Achievement cache updated for user:', username);
+    
     return newAchievements;
   }
+
+  // Update cache even when no new achievements (to avoid repeated DB calls)
+  userAchievementCache.set(cacheKey, {
+    achievements: currentAchievements,
+    hasProAccess: user?.hasProAccess || false,
+    lastChecked: now
+  });
+  console.log('Achievement cache updated (no new achievements) for user:', username);
 
   return [];
 };
@@ -960,74 +1142,99 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
             const questionType = await checkQuestionType(question);
             console.log('Question type detected:', questionType); // Debug log
 
-            // Prepare bulk update operations
-            const updateOperations: any = {
-              $inc: { conversationCount: 1 },
-              $setOnInsert: {
-                achievements: [],
-                progress: {
-                  firstQuestion: 0,
-                  frequentAsker: 0,
-                  rpgEnthusiast: 0,
-                  bossBuster: 0,
-                  platformerPro: 0,
-                  survivalSpecialist: 0,
-                  strategySpecialist: 0,
-                  actionAficionado: 0,
-                  battleRoyale: 0,
-                  sportsChampion: 0,
-                  adventureAddict: 0,
-                  shooterSpecialist: 0,
-                  puzzlePro: 0,
-                  racingRenegade: 0,
-                  stealthExpert: 0,
-                  horrorHero: 0,
-                  triviaMaster: 0,
-                  storySeeker: 0,
-                  beatEmUpBrawler: 0,
-                  rhythmMaster: 0,
-                  sandboxBuilder: 0,
-                  totalQuestions: 0,
-                  dailyExplorer: 0,
-                  speedrunner: 0,
-                  collectorPro: 0,
-                  dataDiver: 0,
-                  performanceTweaker: 0,
-                  conversationalist: 0,
-                  proAchievements: {
-                    gameMaster: 0,
-                    speedDemon: 0,
-                    communityLeader: 0,
-                    achievementHunter: 0,
-                    proStreak: 0,
-                    expertAdvisor: 0,
-                    genreSpecialist: 0,
-                    proContributor: 0
-                  }
-                }
+            // Check if user exists first to determine update strategy
+            const existingUser = await User.findOne({ username }).session(session);
+            
+            if (existingUser) {
+              // User exists - use $inc for progress fields
+              const updateOperations: any = {
+                $inc: { conversationCount: 1 }
+              };
+
+              // Add genre increments in bulk
+              if (questionType.length > 0) {
+                questionType.forEach(genre => {
+                  updateOperations.$inc[`progress.${genre}`] = 1;
+                });
               }
-            };
 
-            // Add genre increments in bulk instead of multiple database calls
-            if (questionType.length > 0) {
-              questionType.forEach(genre => {
-                updateOperations.$inc[`progress.${genre}`] = 1;
-              });
+              // Single database operation for existing user
+              const userDoc = await User.findOneAndUpdate(
+                { username },
+                updateOperations,
+                { new: true, session }
+              );
+
+              result = { questionDoc, userDoc };
+            } else {
+              // User doesn't exist - create with initial structure
+              const initialProgress = {
+                firstQuestion: 0,
+                frequentAsker: 0,
+                rpgEnthusiast: 0,
+                bossBuster: 0,
+                platformerPro: 0,
+                survivalSpecialist: 0,
+                strategySpecialist: 0,
+                actionAficionado: 0,
+                battleRoyale: 0,
+                sportsChampion: 0,
+                adventureAddict: 0,
+                shooterSpecialist: 0,
+                puzzlePro: 0,
+                racingRenegade: 0,
+                stealthExpert: 0,
+                horrorHero: 0,
+                triviaMaster: 0,
+                storySeeker: 0,
+                beatEmUpBrawler: 0,
+                rhythmMaster: 0,
+                sandboxBuilder: 0,
+                totalQuestions: 0,
+                dailyExplorer: 0,
+                speedrunner: 0,
+                collectorPro: 0,
+                dataDiver: 0,
+                performanceTweaker: 0,
+                conversationalist: 0,
+                proAchievements: {
+                  gameMaster: 0,
+                  speedDemon: 0,
+                  communityLeader: 0,
+                  achievementHunter: 0,
+                  proStreak: 0,
+                  expertAdvisor: 0,
+                  genreSpecialist: 0,
+                  proContributor: 0
+                }
+              };
+
+              // Add genre increments to initial progress
+              if (questionType.length > 0) {
+                questionType.forEach(genre => {
+                  if (genre in initialProgress) {
+                    (initialProgress as any)[genre] = 1;
+                  }
+                });
+              }
+
+              // Create new user with initial data
+              const userDoc = await User.create([{
+                userId: `user_${Date.now()}`, // Generate a unique userId
+                username,
+                email: `${username}@placeholder.com`, // Provide a placeholder email
+                conversationCount: 1,
+                achievements: [],
+                progress: initialProgress
+              }], { session });
+
+              result = { questionDoc, userDoc: userDoc[0] };
             }
-
-            // Single database operation instead of multiple separate updates
-            const userDoc = await User.findOneAndUpdate(
-              { username },
-              updateOperations,
-              { upsert: true, new: true, session }
-            );
 
             // Check achievements only once with the updated progress
-            if (userDoc && questionType.length > 0) {
-              await checkAndAwardAchievements(username, userDoc.progress, session);
+            if (result.userDoc && questionType.length > 0) {
+              await checkAndAwardAchievements(username, result.userDoc.progress, session);
             }
-
-            result = { questionDoc, userDoc };
           });
 
           await session.endSession();

@@ -53,3 +53,7 @@ QUICK_VERIFICATION_CHECKLIST.md
 MANUAL_TESTS.md
 
 testSimpleCleanup.js
+
+testAchievementCaching.js
+README_ACHIEVEMENT_CACHE_TESTS.md
+runAchievementCacheTests.js
