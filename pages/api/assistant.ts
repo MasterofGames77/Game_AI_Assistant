@@ -51,6 +51,44 @@ const userAchievementCache = new Map<string, {
 }>();
 const ACHIEVEMENT_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
 
+// Request deduplication cache to prevent duplicate API calls
+const pendingRequests = new Map<string, Promise<any>>();
+const REQUEST_DEDUP_TTL = 30 * 1000; // 30 seconds
+
+// Generic request deduplication function
+const deduplicateRequest = async <T>(
+  cacheKey: string, 
+  requestFn: () => Promise<T>,
+  ttl: number = REQUEST_DEDUP_TTL
+): Promise<T> => {
+  // Check if request is already in progress
+  if (pendingRequests.has(cacheKey)) {
+    console.log(`Request deduplication: reusing pending request for ${cacheKey}`);
+    return pendingRequests.get(cacheKey) as Promise<T>;
+  }
+  
+  // Create new request
+  const requestPromise = (async () => {
+    try {
+      const result = await requestFn();
+      console.log(`Request deduplication: completed request for ${cacheKey}`);
+      return result;
+    } catch (error) {
+      console.log(`Request deduplication: failed request for ${cacheKey}`);
+      throw error;
+    } finally {
+      // Clean up after TTL expires
+      setTimeout(() => {
+        pendingRequests.delete(cacheKey);
+        console.log(`Request deduplication: cleaned up cache for ${cacheKey}`);
+      }, ttl);
+    }
+  })();
+  
+  pendingRequests.set(cacheKey, requestPromise);
+  return requestPromise;
+};
+
 // Function to read the CSV file
 const readCSVFile = async (filePath: string) => {
   const fileContent = await readFile(filePath, 'utf8');
@@ -175,6 +213,21 @@ const cleanupCache = () => {
   if (usernamesToDelete.length > 0) {
     console.log(`Achievement cache cleaned up ${usernamesToDelete.length} entries`);
   }
+  
+  // Clean up request deduplication cache (remove completed requests)
+  const pendingKeysToDelete: string[] = [];
+  pendingRequests.forEach((promise, key) => {
+    // Check if promise is settled (completed or rejected)
+    Promise.allSettled([promise]).then(() => {
+      pendingKeysToDelete.push(key);
+    });
+  });
+  
+  pendingKeysToDelete.forEach(key => pendingRequests.delete(key));
+  
+  if (pendingKeysToDelete.length > 0) {
+    console.log(`Request deduplication cache cleaned up ${pendingKeysToDelete.length} entries`);
+  }
 };
 
 // Set up periodic cache cleanup (every 10 minutes)
@@ -184,6 +237,7 @@ setInterval(cleanupCache, 10 * 60 * 1000);
 console.log(`Genre mapping cache initialized with ${GENRE_MAPPING_CACHE.size} entries`);
 console.log('CSV data caching enabled with 5-minute TTL');
 console.log('Achievement cache enabled with 2-minute TTL');
+console.log('Request deduplication enabled with 30-second TTL');
 
 // Function to fetch game information from IGDB API
 interface IGDBGame {
@@ -197,6 +251,9 @@ interface IGDBGame {
 
 // Function to fetch game information from IGDB API
 const fetchGamesFromIGDB = async (query: string): Promise<string | null> => {
+  const cacheKey = `igdb:${query.toLowerCase().trim()}`;
+  
+  return deduplicateRequest(cacheKey, async () => {
   try {
     const accessToken = await getClientCredentialsAccessToken();
     console.log('IGDB Access Token obtained:', accessToken ? 'Yes' : 'No');
@@ -241,6 +298,7 @@ const fetchGamesFromIGDB = async (query: string): Promise<string | null> => {
     });
     return null; // Return null instead of throwing error to allow fallback to other sources
   }
+  });
 };
 
 // Function to fetch game information from RAWG API
@@ -254,6 +312,9 @@ interface RAWGGame {
 
 // Function to fetch game information from RAWG API
 const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
+  const cacheKey = `rawg:${searchQuery.toLowerCase().trim()}`;
+  
+  return deduplicateRequest(cacheKey, async () => {
   const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&search=${encodeURIComponent(searchQuery)}`;
   try {
     const response = await axios.get(url);
@@ -282,6 +343,7 @@ const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
     console.error("Error fetching data from RAWG:", error.message);
     return "Failed to fetch data from RAWG.";
   }
+  });
 };
 
 // Function to combine game data from multiple sources (RAWG, IGDB, and local CSV)
@@ -898,7 +960,7 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
       lastChecked: now
     });
     console.log('Achievement cache updated for user:', username);
-    
+
     return newAchievements;
   }
 
@@ -1060,7 +1122,8 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
       if (question.toLowerCase().includes("recommendations")) {
         const previousQuestions = await Question.find({ username });
         const genres = analyzeUserQuestions(previousQuestions);
-        const recommendations = genres.length > 0 ? await fetchRecommendations(genres[0]) : [];
+        const cacheKey = `recommendations:${username}:${genres[0] || 'default'}`;
+        const recommendations = genres.length > 0 ? await deduplicateRequest(cacheKey, () => fetchRecommendations(genres[0])) : [];
         
         return recommendations.length > 0 
           ? `Based on your previous questions, I recommend these games: ${recommendations.join(', ')}.` 
@@ -1068,8 +1131,9 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
 
       } else if (question.toLowerCase().includes("when was") || question.toLowerCase().includes("when did")) {
         // Existing release date logic
+        const cacheKey = `chat:${question.toLowerCase().trim()}`;
         const baseAnswer = await Promise.race([
-          getChatCompletion(question),
+          deduplicateRequest(cacheKey, () => getChatCompletion(question)),
           timeoutPromise
         ]) as string;
 
@@ -1088,8 +1152,12 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
           redirectToTwitch(res);
           return null;
         }
-        const accessToken = await getAccessToken(Array.isArray(code) ? code[0] : code);
-        const userData = await getTwitchUserData(accessToken);
+        const codeValue = Array.isArray(code) ? code[0] : code;
+        const accessTokenCacheKey = `twitch_token:${codeValue}`;
+        const accessToken = await deduplicateRequest(accessTokenCacheKey, () => getAccessToken(codeValue));
+        
+        const userDataCacheKey = `twitch_user:${accessToken}`;
+        const userData = await deduplicateRequest(userDataCacheKey, () => getTwitchUserData(accessToken));
         return `Twitch User Data: ${JSON.stringify(userData)}`;
       } else if (question.toLowerCase().includes("genre")) {
         // Existing genre logic
@@ -1100,8 +1168,9 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
           : `I couldn't find genre information for ${gameTitle}.`;
       } else {
         // General questions
+        const cacheKey = `chat:${question.toLowerCase().trim()}`;
         const baseAnswer = await Promise.race([
-          getChatCompletion(question),
+          deduplicateRequest(cacheKey, () => getChatCompletion(question)),
           timeoutPromise
         ]) as string;
 
@@ -1159,8 +1228,8 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
               }
 
               // Single database operation for existing user
-              const userDoc = await User.findOneAndUpdate(
-                { username },
+            const userDoc = await User.findOneAndUpdate(
+              { username },
                 updateOperations,
                 { new: true, session }
               );
@@ -1169,48 +1238,48 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
             } else {
               // User doesn't exist - create with initial structure
               const initialProgress = {
-                firstQuestion: 0,
-                frequentAsker: 0,
-                rpgEnthusiast: 0,
-                bossBuster: 0,
-                platformerPro: 0,
-                survivalSpecialist: 0,
-                strategySpecialist: 0,
-                actionAficionado: 0,
-                battleRoyale: 0,
-                sportsChampion: 0,
-                adventureAddict: 0,
-                shooterSpecialist: 0,
-                puzzlePro: 0,
-                racingRenegade: 0,
-                stealthExpert: 0,
-                horrorHero: 0,
-                triviaMaster: 0,
-                storySeeker: 0,
-                beatEmUpBrawler: 0,
-                rhythmMaster: 0,
-                sandboxBuilder: 0,
-                totalQuestions: 0,
-                dailyExplorer: 0,
-                speedrunner: 0,
-                collectorPro: 0,
-                dataDiver: 0,
-                performanceTweaker: 0,
-                conversationalist: 0,
-                proAchievements: {
-                  gameMaster: 0,
-                  speedDemon: 0,
-                  communityLeader: 0,
-                  achievementHunter: 0,
-                  proStreak: 0,
-                  expertAdvisor: 0,
-                  genreSpecialist: 0,
-                  proContributor: 0
-                }
+                    firstQuestion: 0,
+                    frequentAsker: 0,
+                    rpgEnthusiast: 0,
+                    bossBuster: 0,
+                    platformerPro: 0,
+                    survivalSpecialist: 0,
+                    strategySpecialist: 0,
+                    actionAficionado: 0,
+                    battleRoyale: 0,
+                    sportsChampion: 0,
+                    adventureAddict: 0,
+                    shooterSpecialist: 0,
+                    puzzlePro: 0,
+                    racingRenegade: 0,
+                    stealthExpert: 0,
+                    horrorHero: 0,
+                    triviaMaster: 0,
+                    storySeeker: 0,
+                    beatEmUpBrawler: 0,
+                    rhythmMaster: 0,
+                    sandboxBuilder: 0,
+                    totalQuestions: 0,
+                    dailyExplorer: 0,
+                    speedrunner: 0,
+                    collectorPro: 0,
+                    dataDiver: 0,
+                    performanceTweaker: 0,
+                    conversationalist: 0,
+                    proAchievements: {
+                      gameMaster: 0,
+                      speedDemon: 0,
+                      communityLeader: 0,
+                      achievementHunter: 0,
+                      proStreak: 0,
+                      expertAdvisor: 0,
+                      genreSpecialist: 0,
+                      proContributor: 0
+                    }
               };
 
               // Add genre increments to initial progress
-              if (questionType.length > 0) {
+            if (questionType.length > 0) {
                 questionType.forEach(genre => {
                   if (genre in initialProgress) {
                     (initialProgress as any)[genre] = 1;
