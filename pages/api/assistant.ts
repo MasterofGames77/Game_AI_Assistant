@@ -17,13 +17,18 @@ import { Metrics } from '../../types';
 // import { ImageAnnotatorClient } from '@google-cloud/vision';
 // import fs from 'fs';
 
-// Add performance monitoring
-const measureLatency = async (operation: string, callback: () => Promise<any>) => {
+// Optimized performance monitoring with conditional logging
+const measureLatency = async (operation: string, callback: () => Promise<any>, enableLogging: boolean = false) => {
   const start = performance.now();
   const result = await callback();
   const end = performance.now();
   const latency = end - start;
-  console.log(`${operation} latency: ${latency.toFixed(2)}ms`);
+  
+  // Only log if explicitly enabled or in development
+  if (enableLogging || process.env.NODE_ENV === 'development') {
+    console.log(`${operation} latency: ${latency.toFixed(2)}ms`);
+  }
+  
   return { result, latency };
 };
 
@@ -975,69 +980,133 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
   return [];
 };
 
-// measure memory usage
-const measureMemoryUsage = () => {
+// Optimized memory measurement with caching
+let memoryCache: { data: any; timestamp: number } | null = null;
+const MEMORY_CACHE_TTL = 1000; // 1 second cache
+
+const measureMemoryUsage = (forceRefresh: boolean = false) => {
+  const now = Date.now();
+  
+  // Return cached data if recent and not forcing refresh
+  if (!forceRefresh && memoryCache && (now - memoryCache.timestamp) < MEMORY_CACHE_TTL) {
+    return memoryCache.data;
+  }
+  
   const used = process.memoryUsage();
-  return {
+  const data = {
     heapTotal: Math.round(used.heapTotal / 1024 / 1024 * 100) / 100 + 'MB',
     heapUsed: Math.round(used.heapUsed / 1024 / 1024 * 100) / 100 + 'MB',
     rss: Math.round(used.rss / 1024 / 1024 * 100) / 100 + 'MB',
     external: Math.round(used.external / 1024 / 1024 * 100) / 100 + 'MB'
   };
+  
+  // Cache the result
+  memoryCache = { data, timestamp: now };
+  return data;
 };
 
-// measure response size
-const measureResponseSize = (data: any) => {
+// Optimized response size measurement
+const measureResponseSize = (data: any, estimateOnly: boolean = false) => {
+  if (estimateOnly) {
+    // Quick estimation without full JSON.stringify
+    const estimatedSize = JSON.stringify(data).length;
+    return {
+      bytes: estimatedSize,
+      kilobytes: (estimatedSize / 1024).toFixed(2) + 'KB',
+      estimated: true
+    };
+  }
+  
   const size = Buffer.byteLength(JSON.stringify(data));
   return {
     bytes: size,
-    kilobytes: (size / 1024).toFixed(2) + 'KB'
+    kilobytes: (size / 1024).toFixed(2) + 'KB',
+    estimated: false
   };
 };
 
-// measure database query
-const measureDBQuery = async (operation: string, query: () => Promise<any>) => {
-  const startMemory = process.memoryUsage().heapUsed;
+// Optimized database query measurement
+const measureDBQuery = async (operation: string, query: () => Promise<any>, enableDetailedMetrics: boolean = false) => {
   const startTime = performance.now();
+  
+  // Only measure memory if detailed metrics are enabled
+  const startMemory = enableDetailedMetrics ? process.memoryUsage().heapUsed : 0;
   
   const result = await query();
   
   const endTime = performance.now();
-  const endMemory = process.memoryUsage().heapUsed;
+  const executionTime = endTime - startTime;
   
-  return {
+  const metrics: any = {
     operation,
-    executionTime: `${(endTime - startTime).toFixed(2)}ms`,
-    memoryUsed: `${((endMemory - startMemory) / 1024 / 1024).toFixed(2)}MB`,
+    executionTime: `${executionTime.toFixed(2)}ms`,
     result
   };
+  
+  // Only add memory metrics if detailed monitoring is enabled
+  if (enableDetailedMetrics) {
+    const endMemory = process.memoryUsage().heapUsed;
+    metrics.memoryUsed = `${((endMemory - startMemory) / 1024 / 1024).toFixed(2)}MB`;
+  }
+  
+  return metrics;
 };
 
-// measure request rate
+// Optimized request rate monitoring
 class RequestMonitor {
   private requests: number = 0;
   private startTime: number = Date.now();
+  private lastRateCalculation: number = 0;
+  private cachedRate: { totalRequests: number; requestsPerSecond: string } | null = null;
+  private readonly RATE_CACHE_TTL = 5000; // 5 seconds
 
   incrementRequest() {
     this.requests++;
   }
 
   getRequestRate() {
-    const elapsed = (Date.now() - this.startTime) / 1000; // seconds
-    return {
+    const now = Date.now();
+    
+    // Return cached rate if recent
+    if (this.cachedRate && (now - this.lastRateCalculation) < this.RATE_CACHE_TTL) {
+      return this.cachedRate;
+    }
+    
+    const elapsed = (now - this.startTime) / 1000; // seconds
+    const rate = {
       totalRequests: this.requests,
       requestsPerSecond: (this.requests / elapsed).toFixed(2)
     };
+    
+    // Cache the result
+    this.cachedRate = rate;
+    this.lastRateCalculation = now;
+    
+    return rate;
   }
 }
 
-// measure performance metrics
+// Performance monitoring configuration
+const PERFORMANCE_CONFIG = {
+  enableDetailedMetrics: process.env.NODE_ENV === 'development' || process.env.ENABLE_DETAILED_METRICS === 'true',
+  enableLogging: process.env.NODE_ENV === 'development' || process.env.ENABLE_PERFORMANCE_LOGGING === 'true',
+  enableFileLogging: process.env.ENABLE_FILE_LOGGING === 'true',
+  logLevel: process.env.LOG_LEVEL || 'info'
+};
+
+// Optimized logger with conditional file transport
 const logger = winston.createLogger({
-  level: 'info',
+  level: PERFORMANCE_CONFIG.logLevel,
   format: winston.format.json(),
   defaultMeta: { service: 'game-assistant' },
   transports: [
-    new winston.transports.File({ filename: 'performance-metrics.log' })
+    new winston.transports.Console({ 
+      format: winston.format.simple(),
+      silent: !PERFORMANCE_CONFIG.enableLogging 
+    }),
+    ...(PERFORMANCE_CONFIG.enableFileLogging ? [
+      new winston.transports.File({ filename: 'performance-metrics.log' })
+    ] : [])
   ]
 });
 
@@ -1101,13 +1170,15 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     // Track request
     requestMonitor.incrementRequest();
     
-    // Measure memory at start
-    metrics.initialMemory = measureMemoryUsage();
+    // Measure memory at start (only if detailed metrics enabled)
+    if (PERFORMANCE_CONFIG.enableDetailedMetrics) {
+      metrics.initialMemory = measureMemoryUsage();
+    }
     
     // Existing MongoDB connection measurement
     const { latency: dbLatency } = await measureLatency('MongoDB Connection', async () => {
       await connectToMongoDB();
-    });
+    }, PERFORMANCE_CONFIG.enableLogging);
     metrics.dbConnection = dbLatency;
 
     let answer: string | null;
