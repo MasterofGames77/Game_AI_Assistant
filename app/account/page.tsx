@@ -120,13 +120,9 @@ export default function AccountPage() {
           borderColor: status.showWarning
             ? "border-orange-500/40"
             : "border-green-500/40",
-          action: status.showWarning ? "Upgrade Now" : "Continue Using Pro",
-          actionHandler: status.showWarning
-            ? handleUpgradeClick
-            : () => router.push("/"),
-          actionColor: status.showWarning
-            ? "from-[#00ffff] to-[#ff69b4]"
-            : "from-green-500 to-blue-500",
+          action: status.showWarning ? "Upgrade Now" : "Upgrade Now",
+          actionHandler: handleUpgradeClick,
+          actionColor: "from-[#00ffff] to-[#ff69b4]",
         };
 
       case "paid_active":
@@ -402,12 +398,6 @@ export default function AccountPage() {
                         className="w-full px-4 py-2 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] text-white rounded-lg hover:opacity-90 transition-all duration-200 text-sm"
                       >
                         Manage Subscription
-                      </button>
-                      <button
-                        onClick={() => router.push("/")}
-                        className="w-full px-4 py-2 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-lg hover:opacity-90 transition-all duration-200 text-sm"
-                      >
-                        Back to App
                       </button>
                     </div>
                   </div>

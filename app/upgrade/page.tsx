@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { SubscriptionStatus } from "@/types";
 
 const ProFeatures = [
@@ -28,14 +28,17 @@ const ProFeatures = [
   },
 ];
 
-export default function UpgradePage() {
+function UpgradePageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [userStatus, setUserStatus] = useState<{
     hasProAccess: boolean;
     subscriptionStatus: SubscriptionStatus | null;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [cancelMessage, setCancelMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUserStatus = async () => {
@@ -49,6 +52,19 @@ export default function UpgradePage() {
             subscriptionStatus: null,
           });
           return;
+        }
+
+        // Check for success/cancel parameters
+        const success = searchParams?.get("success");
+        const canceled = searchParams?.get("canceled");
+        const sessionId = searchParams?.get("session_id");
+
+        if (success === "true" && sessionId) {
+          setSuccessMessage(
+            "Payment successful! Your subscription is now active."
+          );
+        } else if (canceled === "true") {
+          setCancelMessage("Payment was canceled. You can try again anytime.");
         }
 
         const response = await fetch("/api/checkProAccess", {
@@ -79,11 +95,62 @@ export default function UpgradePage() {
     };
 
     fetchUserStatus();
-  }, []);
+  }, [searchParams]);
 
   const handleUpgradeClick = async () => {
-    // TODO: Implement Stripe checkout flow
-    console.log("Upgrade clicked");
+    try {
+      const username = localStorage.getItem("username");
+      const userId = localStorage.getItem("userId");
+
+      if (!username) {
+        alert("Please sign in to upgrade your subscription.");
+        return;
+      }
+
+      // Show loading state
+      const button = document.querySelector(
+        "[data-upgrade-button]"
+      ) as HTMLButtonElement;
+      if (button) {
+        button.disabled = true;
+        button.textContent = "Processing...";
+      }
+
+      const response = await fetch("/api/createCheckoutSession", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, userId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to create checkout session");
+      }
+
+      // Redirect to Stripe checkout
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error("No checkout URL received");
+      }
+    } catch (error) {
+      console.error("Error starting checkout:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to start checkout process"
+      );
+
+      // Reset button state
+      const button = document.querySelector(
+        "[data-upgrade-button]"
+      ) as HTMLButtonElement;
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Upgrade Now";
+      }
+    }
   };
 
   const handleContinueFreePeriod = () => {
@@ -122,6 +189,42 @@ export default function UpgradePage() {
           >
             Try Again
           </button>
+        </div>
+      );
+    }
+
+    // Show success/cancel messages
+    if (successMessage || cancelMessage) {
+      return (
+        <div className="text-center">
+          <div
+            className={`text-4xl mb-4 ${
+              successMessage ? "text-green-400" : "text-yellow-400"
+            }`}
+          >
+            {successMessage ? "✅" : "ℹ️"}
+          </div>
+          <p className="text-gray-300 mb-6 text-lg">
+            {successMessage || cancelMessage}
+          </p>
+          <div className="space-x-4">
+            <button
+              onClick={() => router.push("/")}
+              className="px-6 py-3 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] text-white rounded-lg hover:from-[#00e6e6] hover:to-[#ff4da6] transition-all duration-200"
+            >
+              Continue to App
+            </button>
+            <button
+              onClick={() => {
+                setSuccessMessage(null);
+                setCancelMessage(null);
+                window.history.replaceState({}, "", "/upgrade");
+              }}
+              className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all duration-200"
+            >
+              View Subscription Details
+            </button>
+          </div>
         </div>
       );
     }
@@ -182,17 +285,33 @@ export default function UpgradePage() {
             {showWarning ? (
               <button
                 onClick={handleUpgradeClick}
+                data-upgrade-button
                 className="px-8 py-4 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] text-white text-xl font-bold rounded-lg hover:from-[#00e6e6] hover:to-[#ff4da6] transition-all duration-200 shadow-lg hover:shadow-xl"
               >
                 Upgrade Now - $0.99/month
               </button>
             ) : (
-              <button
-                onClick={handleContinueFreePeriod}
-                className="px-8 py-4 bg-gradient-to-r from-green-500 to-blue-500 text-white text-xl font-bold rounded-lg hover:from-green-600 hover:to-blue-600 transition-all duration-200 shadow-lg hover:shadow-xl"
-              >
-                Continue Using Pro Features
-              </button>
+              <div className="space-y-4">
+                <p className="text-lg text-gray-300 mb-4">
+                  You&apos;re enjoying free Pro access! Upgrade anytime to
+                  continue after your free period.
+                </p>
+                <div className="flex justify-center space-x-4">
+                  <button
+                    onClick={handleUpgradeClick}
+                    data-upgrade-button
+                    className="px-8 py-4 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] text-white text-xl font-bold rounded-lg hover:from-[#00e6e6] hover:to-[#ff4da6] transition-all duration-200 shadow-lg hover:shadow-xl"
+                  >
+                    Upgrade Now - $0.99/month
+                  </button>
+                  <button
+                    onClick={handleContinueFreePeriod}
+                    className="px-8 py-4 bg-gradient-to-r from-green-500 to-blue-500 text-white text-xl font-bold rounded-lg hover:from-green-600 hover:to-blue-600 transition-all duration-200 shadow-lg hover:shadow-xl"
+                  >
+                    Continue Free Access
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </>
@@ -332,6 +451,7 @@ export default function UpgradePage() {
 
             <button
               onClick={handleUpgradeClick}
+              data-upgrade-button
               className="px-8 py-4 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] text-white text-xl font-bold rounded-lg hover:from-[#00e6e6] hover:to-[#ff4da6] transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               Upgrade Now - $0.99/month
@@ -380,6 +500,7 @@ export default function UpgradePage() {
 
           <button
             onClick={handleUpgradeClick}
+            data-upgrade-button
             className="px-8 py-4 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] text-white text-xl font-bold rounded-lg hover:from-[#00e6e6] hover:to-[#ff4da6] transition-all duration-200 shadow-lg hover:shadow-xl"
           >
             Upgrade Now - $0.99/month
@@ -391,7 +512,73 @@ export default function UpgradePage() {
 
   return (
     <div className="min-h-screen bg-[#1a1b2e] text-white py-12 px-4">
-      <div className="container mx-auto max-w-4xl">{getPageContent()}</div>
+      <div className="container mx-auto max-w-4xl">
+        {/* Back Buttons */}
+        <div className="mb-8 flex space-x-4">
+          <button
+            onClick={() => router.push("/")}
+            className="px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white font-semibold rounded-lg hover:opacity-90 transition-all duration-200 shadow-lg flex items-center space-x-2"
+            aria-label="Back to main page"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
+            </svg>
+            <span>Back to Wingman</span>
+          </button>
+
+          <button
+            onClick={() => router.push("/account")}
+            className="px-6 py-3 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] text-white font-semibold rounded-lg hover:opacity-90 transition-all duration-200 shadow-lg flex items-center space-x-2"
+            aria-label="Back to account page"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+              />
+            </svg>
+            <span>Back to Account</span>
+          </button>
+        </div>
+
+        {getPageContent()}
+      </div>
     </div>
+  );
+}
+
+export default function UpgradePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#1a1b2e] text-white py-12 px-4">
+          <div className="container mx-auto max-w-4xl">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00ffff] mx-auto mb-4"></div>
+              <p className="text-gray-300">Loading upgrade page...</p>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <UpgradePageContent />
+    </Suspense>
   );
 }

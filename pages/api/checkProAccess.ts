@@ -35,6 +35,19 @@ export default async function handler(
 
       if (user && user.getSubscriptionStatus) {
         subscriptionStatus = user.getSubscriptionStatus();
+      } else if (hasProAccess) {
+        // If user has Pro access but no subscription data, create a default status
+        // This handles cases like the Master account who should have free access
+        subscriptionStatus = {
+          type: "free_period",
+          status: "Active",
+          expiresAt: new Date('2026-12-31T23:59:59.999Z'),
+          daysUntilExpiration: Math.ceil((new Date('2026-12-31T23:59:59.999Z').getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)),
+          canUpgrade: true,
+          canCancel: false,
+          canReactivate: false,
+          showWarning: false
+        };
       }
     }
 
