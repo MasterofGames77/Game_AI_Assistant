@@ -57,3 +57,11 @@ testSimpleCleanup.js
 testAchievementCaching.js
 README_ACHIEVEMENT_CACHE_TESTS.md
 runAchievementCacheTests.js
+/tests/debugAccountStatus.js
+/tests/testNavigation.js
+/tests/testPaymentSystem.js
+/tests/testMigration.js
+/tests/verifyMigration.js
+/tests/testUsageLimits.js
+/scripts/runMigration.js
+bash.exe.stackdump

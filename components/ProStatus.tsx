@@ -6,33 +6,49 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
   const router = useRouter();
   const [subscriptionStatus, setSubscriptionStatus] =
     useState<SubscriptionStatus | null>(null);
+  const [usageStatus, setUsageStatus] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const fetchSubscriptionStatus = async () => {
+    const fetchData = async () => {
       if (!username) return;
 
       setLoading(true);
       try {
-        const response = await fetch("/api/checkProAccess", {
+        // Fetch subscription status for Pro users
+        if (hasProAccess) {
+          const response = await fetch("/api/checkProAccess", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username }),
+          });
+          const data = await response.json();
+
+          if (data.subscriptionStatus) {
+            setSubscriptionStatus(data.subscriptionStatus);
+          }
+        }
+
+        // Fetch usage status for all users
+        const usageResponse = await fetch("/api/usageStatus", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username }),
         });
-        const data = await response.json();
+        const usageData = await usageResponse.json();
 
-        if (data.subscriptionStatus) {
-          setSubscriptionStatus(data.subscriptionStatus);
+        if (usageData.usageStatus) {
+          setUsageStatus(usageData.usageStatus);
         }
       } catch (error) {
-        console.error("Error fetching subscription status:", error);
+        console.error("Error fetching data:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    if (hasProAccess && username) {
-      fetchSubscriptionStatus();
+    if (username) {
+      fetchData();
     }
   }, [hasProAccess, username]);
 
@@ -233,12 +249,36 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
       {hasProAccess ? (
         getStatusDisplay()
       ) : (
-        <button
-          onClick={handleUpgradeClick}
-          className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 shadow-lg hover:shadow-xl"
-        >
-          Upgrade to Pro
-        </button>
+        <div className="flex items-center space-x-3">
+          {/* Usage Status for Free Users */}
+          {usageStatus && !usageStatus.isProUser && (
+            <div className="text-sm text-gray-300">
+              <span className="font-semibold">
+                {usageStatus.questionsRemaining === -1
+                  ? "Unlimited"
+                  : `${usageStatus.questionsRemaining}/${usageStatus.questionsLimit}`}
+              </span>
+              <span className="text-gray-400 ml-1">
+                {usageStatus.questionsRemaining === -1
+                  ? "questions"
+                  : "questions left"}
+              </span>
+              {usageStatus.isInCooldown && usageStatus.cooldownUntil && (
+                <div className="text-xs text-orange-400 mt-1">
+                  Next question:{" "}
+                  {new Date(usageStatus.cooldownUntil).toLocaleTimeString()}
+                </div>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={handleUpgradeClick}
+            className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 shadow-lg hover:shadow-xl"
+          >
+            Upgrade to Pro
+          </button>
+        </div>
       )}
     </div>
   );

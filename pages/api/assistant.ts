@@ -1167,6 +1167,26 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
       }
     }
 
+    // Connect to MongoDB to check usage limits
+    await connectToMongoDB();
+    
+    // Check usage limits for free users
+    const user = await User.findOne({ username });
+    if (user) {
+      const usageCheck = user.canAskQuestion();
+      if (!usageCheck.allowed) {
+        logger.info('User hit usage limit', { username, reason: usageCheck.reason });
+        return res.status(429).json({
+          error: 'Rate Limited',
+          message: usageCheck.reason,
+          cooldownUntil: usageCheck.cooldownUntil,
+          nextWindowReset: usageCheck.nextWindowReset,
+          questionsRemaining: usageCheck.questionsRemaining,
+          metrics
+        });
+      }
+    }
+
     // Track request
     requestMonitor.incrementRequest();
     
@@ -1277,6 +1297,12 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
               response: answer 
             };
             const questionDoc = await Question.create([questionData], { session });
+
+            // Record question usage for free users
+            if (user) {
+              user.recordQuestionUsage();
+              await user.save({ session });
+            }
 
             // Check question type first to prepare bulk update operations
             const questionType = await checkQuestionType(question);

@@ -21,6 +21,7 @@ export default function Home() {
     useState<Conversation | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [metrics, setMetrics] = useState<any>({});
+  const [usageStatus, setUsageStatus] = useState<any>(null);
 
   const [activeView, setActiveView] = useState<"chat" | "forum">("chat");
 
@@ -107,11 +108,27 @@ export default function Home() {
     setConversations(res.data.conversations);
   }, []);
 
+  // function to get usage status
+  const fetchUsageStatus = useCallback(async () => {
+    const storedUsername = localStorage.getItem("username");
+    if (!storedUsername) return;
+
+    try {
+      const res = await axios.post("/api/usageStatus", {
+        username: storedUsername,
+      });
+      setUsageStatus(res.data.usageStatus);
+    } catch (error) {
+      console.error("Error fetching usage status:", error);
+    }
+  }, []);
+
   useEffect(() => {
     if (userId) {
       fetchConversations();
+      fetchUsageStatus();
     }
-  }, [userId, fetchConversations]);
+  }, [userId, fetchConversations, fetchUsageStatus]);
 
   useEffect(() => {
     if (selectedConversation) {
@@ -199,10 +216,24 @@ export default function Home() {
         status: error.response?.status,
       });
 
-      setError(
-        error.response?.data?.message ||
-          "There was an error processing your request. Please try again."
-      );
+      // Handle rate limiting specifically
+      if (error.response?.status === 429) {
+        const rateLimitData = error.response.data;
+        setError(
+          `${rateLimitData.message} ${
+            rateLimitData.cooldownUntil
+              ? `Next question available at ${new Date(
+                  rateLimitData.cooldownUntil
+                ).toLocaleTimeString()}`
+              : ""
+          }`
+        );
+      } else {
+        setError(
+          error.response?.data?.message ||
+            "There was an error processing your request. Please try again."
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -618,6 +649,39 @@ export default function Home() {
                   You have {conversationCount} saved conversation
                   {conversationCount !== 1 ? "s" : ""}
                 </p>
+              )}
+
+              {/* Display usage status for free users */}
+              {usageStatus && !usageStatus.isProUser && (
+                <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="text-sm text-blue-800 dark:text-blue-200">
+                    <span className="font-semibold">
+                      {usageStatus.questionsRemaining === -1
+                        ? "Unlimited"
+                        : `${usageStatus.questionsRemaining}/${usageStatus.questionsLimit}`}
+                    </span>
+                    <span className="ml-1">
+                      {usageStatus.questionsRemaining === -1
+                        ? "questions"
+                        : "questions remaining"}
+                    </span>
+                    {usageStatus.isInCooldown && usageStatus.cooldownUntil && (
+                      <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                        Next question available at{" "}
+                        {new Date(
+                          usageStatus.cooldownUntil
+                        ).toLocaleTimeString()}
+                      </div>
+                    )}
+                    {usageStatus.questionsRemaining === 0 &&
+                      !usageStatus.isInCooldown && (
+                        <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+                          You&apos;ve reached your limit! Upgrade to Pro for
+                          unlimited access.
+                        </div>
+                      )}
+                  </div>
+                </div>
               )}
 
               <ul className="mt-4 text-lg text-center">

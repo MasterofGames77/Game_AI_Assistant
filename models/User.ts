@@ -69,6 +69,16 @@ interface Subscription {
   billingCycle?: string;
 }
 
+// Usage limit interface for free users
+interface UsageLimit {
+  freeQuestionsUsed: number;        // Questions used in current window
+  freeQuestionsLimit: number;       // Max questions per window (default: 7)
+  windowStartTime: Date;           // When current window started
+  windowDurationHours: number;     // Window duration (default: 1 hour)
+  lastQuestionTime: Date;          // Last question timestamp
+  cooldownUntil?: Date;            // When user can ask next question
+}
+
 export interface IUser extends Document {
   userId: string;
   username: string;
@@ -78,6 +88,7 @@ export interface IUser extends Document {
   achievements: Achievement[];
   progress: Progress;
   subscription?: Subscription;
+  usageLimit?: UsageLimit;
 }
 
 const UserSchema = new Schema<IUser>({
@@ -164,6 +175,15 @@ const UserSchema = new Schema<IUser>({
     amount: { type: Number },
     currency: { type: String, default: 'usd' },
     billingCycle: { type: String, default: 'monthly' }
+  },
+  // Usage limit schema for free users
+  usageLimit: {
+    freeQuestionsUsed: { type: Number, default: 0 },
+    freeQuestionsLimit: { type: Number, default: 7 },
+    windowStartTime: { type: Date, default: Date.now },
+    windowDurationHours: { type: Number, default: 1 },
+    lastQuestionTime: { type: Date },
+    cooldownUntil: { type: Date }
   }
 }, { collection: 'users' });
 
@@ -173,6 +193,10 @@ UserSchema.index({ 'subscription.earlyAccessGranted': 1 });
 UserSchema.index({ 'subscription.earlyAccessEndDate': 1 });
 UserSchema.index({ 'subscription.currentPeriodEnd': 1 });
 // Note: stripeCustomerId and stripeSubscriptionId already have sparse indexes from schema definition
+
+// Create indexes for usage limit queries
+UserSchema.index({ 'usageLimit.windowStartTime': 1 });
+UserSchema.index({ 'usageLimit.cooldownUntil': 1 });
 
 // Method to check if user has active Pro access
 UserSchema.methods.hasActiveProAccess = function(): boolean {
@@ -258,6 +282,158 @@ UserSchema.methods.getSubscriptionStatus = function() {
     type: 'no_subscription',
     status: 'No Active Subscription',
     canUpgrade: true
+  };
+};
+
+// Method to check if user can ask a question (usage limit check)
+UserSchema.methods.canAskQuestion = function(): {
+  allowed: boolean;
+  reason?: string;
+  questionsRemaining?: number;
+  cooldownUntil?: Date;
+  nextWindowReset?: Date;
+} {
+  const now = new Date();
+  
+  // Pro users have unlimited access
+  if (this.hasActiveProAccess()) {
+    return {
+      allowed: true,
+      questionsRemaining: -1 // Unlimited
+    };
+  }
+  
+  // If no usage limit data, initialize it
+  if (!this.usageLimit) {
+    this.usageLimit = {
+      freeQuestionsUsed: 0,
+      freeQuestionsLimit: 7,
+      windowStartTime: now,
+      windowDurationHours: 1,
+      lastQuestionTime: now
+    };
+    return {
+      allowed: true,
+      questionsRemaining: 7
+    };
+  }
+  
+  const usageLimit = this.usageLimit;
+  const windowEndTime = new Date(usageLimit.windowStartTime.getTime() + (usageLimit.windowDurationHours * 60 * 60 * 1000));
+  
+  // Check if we're in cooldown period
+  if (usageLimit.cooldownUntil && usageLimit.cooldownUntil > now) {
+    return {
+      allowed: false,
+      reason: 'You are in cooldown period. Please wait before asking another question.',
+      cooldownUntil: usageLimit.cooldownUntil,
+      nextWindowReset: windowEndTime
+    };
+  }
+  
+  // Check if current window has expired
+  if (now >= windowEndTime) {
+    // Reset the window
+    usageLimit.freeQuestionsUsed = 0;
+    usageLimit.windowStartTime = now;
+    usageLimit.cooldownUntil = undefined;
+    
+    return {
+      allowed: true,
+      questionsRemaining: usageLimit.freeQuestionsLimit
+    };
+  }
+  
+  // Check if user has reached the limit
+  if (usageLimit.freeQuestionsUsed >= usageLimit.freeQuestionsLimit) {
+    // Set cooldown until window resets
+    usageLimit.cooldownUntil = windowEndTime;
+    
+    return {
+      allowed: false,
+      reason: `You've used all ${usageLimit.freeQuestionsLimit} free questions. Please wait 1 hour or upgrade to Pro for unlimited access.`,
+      cooldownUntil: usageLimit.cooldownUntil,
+      nextWindowReset: windowEndTime
+    };
+  }
+  
+  return {
+    allowed: true,
+    questionsRemaining: usageLimit.freeQuestionsLimit - usageLimit.freeQuestionsUsed
+  };
+};
+
+// Method to record question usage
+UserSchema.methods.recordQuestionUsage = function(): void {
+  const now = new Date();
+  
+  // Pro users don't need to track usage
+  if (this.hasActiveProAccess()) {
+    return;
+  }
+  
+  // Initialize usage limit if it doesn't exist
+  if (!this.usageLimit) {
+    this.usageLimit = {
+      freeQuestionsUsed: 0,
+      freeQuestionsLimit: 7,
+      windowStartTime: now,
+      windowDurationHours: 1,
+      lastQuestionTime: now
+    };
+  }
+  
+  // Increment usage count
+  this.usageLimit.freeQuestionsUsed += 1;
+  this.usageLimit.lastQuestionTime = now;
+};
+
+// Method to get usage status for display
+UserSchema.methods.getUsageStatus = function(): {
+  questionsUsed: number;
+  questionsRemaining: number;
+  questionsLimit: number;
+  windowResetTime?: Date;
+  cooldownUntil?: Date;
+  isInCooldown: boolean;
+  isProUser: boolean;
+} {
+  const now = new Date();
+  
+  // Pro users have unlimited access
+  if (this.hasActiveProAccess()) {
+    return {
+      questionsUsed: 0,
+      questionsRemaining: -1, // Unlimited
+      questionsLimit: -1,
+      isInCooldown: false,
+      isProUser: true
+    };
+  }
+  
+  // If no usage limit data, return default
+  if (!this.usageLimit) {
+    return {
+      questionsUsed: 0,
+      questionsRemaining: 7,
+      questionsLimit: 7,
+      isInCooldown: false,
+      isProUser: false
+    };
+  }
+  
+  const usageLimit = this.usageLimit;
+  const windowEndTime = new Date(usageLimit.windowStartTime.getTime() + (usageLimit.windowDurationHours * 60 * 60 * 1000));
+  const isInCooldown = usageLimit.cooldownUntil ? usageLimit.cooldownUntil > now : false;
+  
+  return {
+    questionsUsed: usageLimit.freeQuestionsUsed,
+    questionsRemaining: Math.max(0, usageLimit.freeQuestionsLimit - usageLimit.freeQuestionsUsed),
+    questionsLimit: usageLimit.freeQuestionsLimit,
+    windowResetTime: windowEndTime,
+    cooldownUntil: usageLimit.cooldownUntil,
+    isInCooldown,
+    isProUser: false
   };
 };
 
