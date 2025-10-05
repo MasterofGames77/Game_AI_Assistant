@@ -288,7 +288,7 @@ function UpgradePageContent() {
                 data-upgrade-button
                 className="px-8 py-4 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] text-white text-xl font-bold rounded-lg hover:from-[#00e6e6] hover:to-[#ff4da6] transition-all duration-200 shadow-lg hover:shadow-xl"
               >
-                Upgrade Now - $0.99/month
+                Upgrade Now - $1.99/month
               </button>
             ) : (
               <div className="space-y-4">
@@ -302,7 +302,7 @@ function UpgradePageContent() {
                     data-upgrade-button
                     className="px-8 py-4 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] text-white text-xl font-bold rounded-lg hover:from-[#00e6e6] hover:to-[#ff4da6] transition-all duration-200 shadow-lg hover:shadow-xl"
                   >
-                    Upgrade Now - $0.99/month
+                    Upgrade Now - $1.99/month
                   </button>
                   <button
                     onClick={handleContinueFreePeriod}
@@ -454,7 +454,7 @@ function UpgradePageContent() {
               data-upgrade-button
               className="px-8 py-4 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] text-white text-xl font-bold rounded-lg hover:from-[#00e6e6] hover:to-[#ff4da6] transition-all duration-200 shadow-lg hover:shadow-xl"
             >
-              Upgrade Now - $0.99/month
+              Upgrade Now - $1.99/month
             </button>
           </div>
         </>
@@ -503,7 +503,7 @@ function UpgradePageContent() {
             data-upgrade-button
             className="px-8 py-4 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] text-white text-xl font-bold rounded-lg hover:from-[#00e6e6] hover:to-[#ff4da6] transition-all duration-200 shadow-lg hover:shadow-xl"
           >
-            Upgrade Now - $0.99/month
+            Upgrade Now - $1.99/month
           </button>
         </div>
       </>

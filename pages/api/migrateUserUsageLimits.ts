@@ -33,7 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const now = new Date();
         const usageLimit = {
           freeQuestionsUsed: 0,
-          freeQuestionsLimit: 7,
+          freeQuestionsLimit: 10,
           windowStartTime: now,
           windowDurationHours: 1,
           lastQuestionTime: now

@@ -52,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Free users get standard limits
           usageLimit = {
             freeQuestionsUsed: 0,
-            freeQuestionsLimit: 7,
+            freeQuestionsLimit: 10,
             windowStartTime: now,
             windowDurationHours: 1,
             lastQuestionTime: now

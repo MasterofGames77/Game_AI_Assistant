@@ -75,7 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               name: 'Video Game Wingman Pro',
               description: 'Monthly subscription to Video Game Wingman Pro features',
             },
-            unit_amount: 99, // $0.99 in cents
+            unit_amount: 199, // $1.99 in cents
             recurring: {
               interval: 'month',
             },

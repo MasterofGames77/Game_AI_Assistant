@@ -179,7 +179,7 @@ const UserSchema = new Schema<IUser>({
   // Usage limit schema for free users
   usageLimit: {
     freeQuestionsUsed: { type: Number, default: 0 },
-    freeQuestionsLimit: { type: Number, default: 7 },
+    freeQuestionsLimit: { type: Number, default: 10 },
     windowStartTime: { type: Date, default: Date.now },
     windowDurationHours: { type: Number, default: 1 },
     lastQuestionTime: { type: Date },
@@ -307,7 +307,7 @@ UserSchema.methods.canAskQuestion = function(): {
   if (!this.usageLimit) {
     this.usageLimit = {
       freeQuestionsUsed: 0,
-      freeQuestionsLimit: 7,
+      freeQuestionsLimit: 10,
       windowStartTime: now,
       windowDurationHours: 1,
       lastQuestionTime: now
@@ -376,7 +376,7 @@ UserSchema.methods.recordQuestionUsage = function(): void {
   if (!this.usageLimit) {
     this.usageLimit = {
       freeQuestionsUsed: 0,
-      freeQuestionsLimit: 7,
+      freeQuestionsLimit: 10,
       windowStartTime: now,
       windowDurationHours: 1,
       lastQuestionTime: now
@@ -415,8 +415,8 @@ UserSchema.methods.getUsageStatus = function(): {
   if (!this.usageLimit) {
     return {
       questionsUsed: 0,
-      questionsRemaining: 7,
-      questionsLimit: 7,
+      questionsRemaining: 10,
+      questionsLimit: 10,
       isInCooldown: false,
       isProUser: false
     };

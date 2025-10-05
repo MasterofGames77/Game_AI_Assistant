@@ -123,7 +123,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
        'subscription.currentPeriodStart': new Date((subscription as any).current_period_start * 1000),
        'subscription.currentPeriodEnd': new Date((subscription as any).current_period_end * 1000),
        'subscription.cancelAtPeriodEnd': subscription.cancel_at_period_end,
-       'subscription.amount': subscription.items.data[0]?.price.unit_amount || 99,
+       'subscription.amount': subscription.items.data[0]?.price.unit_amount || 199,
        'subscription.currency': subscription.currency,
        'subscription.billingCycle': 'monthly',
        hasProAccess: true
