@@ -19,6 +19,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ message: 'Username is required' });
     }
 
+    if (!process.env.STRIPE_WINGMAN_PRO_PRICE_ID) {
+      return res.status(500).json({ 
+        message: 'Stripe price ID not configured. Please contact support.' 
+      });
+    }
+
     await connectToWingmanDB();
 
     // Find the user
@@ -69,17 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       payment_method_types: ['card'],
       line_items: [
         {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: 'Video Game Wingman Pro',
-              description: 'Monthly subscription to Video Game Wingman Pro features',
-            },
-            unit_amount: 199, // $1.99 in cents
-            recurring: {
-              interval: 'month',
-            },
-          },
+          price: process.env.STRIPE_WINGMAN_PRO_PRICE_ID, // Your Stripe price ID
           quantity: 1,
         },
       ],
