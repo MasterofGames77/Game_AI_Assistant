@@ -54,6 +54,14 @@
 - [ ] **Check**: `/api/getConversation` and `/api/accountData` return consistent counts
 - [ ] **Verify**: Counts are based on actual Question documents, not cached values
 
+### 7. Automated Cleanup Jobs
+
+- [ ] **Test**: Subscription cleanup service functionality
+- [ ] **Expected**: Expired subscriptions are properly marked as expired
+- [ ] **Check**: `/api/subscriptionCleanup` endpoints work correctly
+- [ ] **Verify**: Cron scheduler can be managed via `/api/cronManager`
+- [ ] **Test**: Daily cleanup runs automatically and updates user statuses
+
 ## 🔧 Manual Testing Steps
 
 ### Step 1: Create Test Users
@@ -65,6 +73,9 @@ subscriptionTests.runAllTests();
 
 // Or run the conversation count test directly:
 // node tests/testConversationCount.js
+
+// Or run the cleanup system test directly:
+// node tests/testSubscriptionCleanup.js
 ```
 
 ### Step 2: Test Specific Scenarios
@@ -94,6 +105,9 @@ navigationTests.manualTests.testNavigateBack();
 
 // Test conversation count consistency
 conversationTests.testConversationCountConsistency();
+
+// Test subscription cleanup system
+cleanupTests.runAllCleanupTests();
 
 // Create test users
 subscriptionTests.manualTests.createTestUser("testuser123", "test@example.com");

@@ -1,7 +1,7 @@
 // Subscription System Testing Script
 // Run this in the browser console or as a Node.js script
 
-const BASE_URL = 'http://localhost:3000'; // Adjust for your environment
+const BASE_URL = 'http://localhost:3000' / "https://assistant.videogamewingman.com"; // Adjust for your environment
 
 // Test utilities
 const testAPI = async (endpoint, data) => {
