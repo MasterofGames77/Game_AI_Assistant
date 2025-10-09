@@ -232,6 +232,7 @@ const OFFENSIVE_WORDS = [
   'Laura Loomer',
   'Rush Limbaugh',
   'Doug Collins',
+  'Lee Greenwood',
   'Mike Kehoe',
   'Brian Kemp',
   'Alina Habba',

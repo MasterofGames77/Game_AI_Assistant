@@ -1,7 +1,7 @@
 // Navigation Testing Script
 // Run this in the browser console to test the navigation functionality
 
-const BASE_URL = 'http://localhost:3000'; // Adjust for your environment
+const BASE_URL = 'http://localhost:3000' / "https://assistant.videogamewingman.com"; // Adjust for your environment
 
 // Test utilities
 const testNavigation = async () => {
