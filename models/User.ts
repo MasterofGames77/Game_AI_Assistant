@@ -83,6 +83,10 @@ export interface IUser extends Document {
   userId: string;
   username: string;
   email: string;
+  password?: string; // Optional for backward compatibility with legacy users
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
+  requiresPasswordSetup?: boolean; // Flag for legacy users who need to set password
   conversationCount: number;
   hasProAccess: boolean;
   achievements: Achievement[];
@@ -101,7 +105,11 @@ const UserSchema = new Schema<IUser>({
     maxlength: 32,
     match: /^[\w#@.-]+$/
   },
-  email: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: false }, // Optional for legacy users
+  passwordResetToken: { type: String, required: false },
+  passwordResetExpires: { type: Date, required: false },
+  requiresPasswordSetup: { type: Boolean, default: false },
   conversationCount: { type: Number, required: true, default: 0 },
   hasProAccess: { type: Boolean, default: false },
   achievements: [
@@ -198,9 +206,18 @@ UserSchema.index({ 'subscription.currentPeriodEnd': 1 });
 UserSchema.index({ 'usageLimit.windowStartTime': 1 });
 UserSchema.index({ 'usageLimit.cooldownUntil': 1 });
 
+// Create indexes for authentication queries
+UserSchema.index({ 'passwordResetToken': 1 });
+UserSchema.index({ 'requiresPasswordSetup': 1 });
+
 // Method to check if user has active Pro access
 UserSchema.methods.hasActiveProAccess = function(): boolean {
   const now = new Date();
+  
+  // Check legacy hasProAccess flag (for users who were granted Pro access before subscription system)
+  if (this.hasProAccess) {
+    return true;
+  }
   
   // Check early access period
   if (this.subscription?.earlyAccessGranted && 
@@ -231,50 +248,71 @@ UserSchema.methods.hasActiveProAccess = function(): boolean {
 UserSchema.methods.getSubscriptionStatus = function() {
   const now = new Date();
   
-  if (this.subscription?.earlyAccessGranted) {
-    if (this.subscription.earlyAccessEndDate && this.subscription.earlyAccessEndDate > now) {
-      const daysUntilExpiration = Math.ceil(
-        (this.subscription.earlyAccessEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      
+  // Check if user has Pro access (legacy or subscription-based)
+  if (this.hasProAccess) {
+    if (this.subscription?.earlyAccessGranted) {
+      if (this.subscription.earlyAccessEndDate && this.subscription.earlyAccessEndDate > now) {
+        const daysUntilExpiration = Math.ceil(
+          (this.subscription.earlyAccessEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        
+        return {
+          type: 'free_period',
+          status: 'Free Period Active',
+          expiresAt: this.subscription.earlyAccessEndDate,
+          daysUntilExpiration,
+          canUpgrade: true,
+          showWarning: daysUntilExpiration <= 30
+        };
+      } else {
+        return {
+          type: 'expired_free',
+          status: 'Free Period Expired',
+          canUpgrade: true,
+          showWarning: true
+        };
+      }
+    }
+    
+    if (this.subscription?.status === 'active' && 
+        this.subscription?.currentPeriodEnd && 
+        this.subscription.currentPeriodEnd > now) {
       return {
-        type: 'free_period',
-        status: 'Free Period Active',
-        expiresAt: this.subscription.earlyAccessEndDate,
-        daysUntilExpiration,
-        canUpgrade: true,
-        showWarning: daysUntilExpiration <= 30
-      };
-    } else {
-      return {
-        type: 'expired_free',
-        status: 'Free Period Expired',
-        canUpgrade: true,
-        showWarning: true
+        type: 'paid_active',
+        status: 'Paid Subscription Active',
+        expiresAt: this.subscription.currentPeriodEnd,
+        canCancel: true
       };
     }
-  }
-  
-  if (this.subscription?.status === 'active' && 
-      this.subscription?.currentPeriodEnd && 
-      this.subscription.currentPeriodEnd > now) {
+    
+    if (this.subscription?.status === 'canceled' && 
+        this.subscription?.cancelAtPeriodEnd && 
+        this.subscription?.currentPeriodEnd && 
+        this.subscription.currentPeriodEnd > now) {
+      return {
+        type: 'canceled_active',
+        status: 'Subscription Canceled (Active Until Period End)',
+        expiresAt: this.subscription.currentPeriodEnd,
+        canReactivate: true
+      };
+    }
+    
+    // If user has Pro access but no specific subscription data, show as active
+    if (this.subscription?.status === 'active') {
+      return {
+        type: 'paid_active',
+        status: 'Paid Subscription Active',
+        expiresAt: this.subscription.currentPeriodEnd || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        canCancel: true
+      };
+    }
+    
+    // Legacy Pro users or users with Pro access but no subscription details
     return {
       type: 'paid_active',
       status: 'Paid Subscription Active',
-      expiresAt: this.subscription.currentPeriodEnd,
+      expiresAt: this.subscription?.currentPeriodEnd || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       canCancel: true
-    };
-  }
-  
-  if (this.subscription?.status === 'canceled' && 
-      this.subscription?.cancelAtPeriodEnd && 
-      this.subscription?.currentPeriodEnd && 
-      this.subscription.currentPeriodEnd > now) {
-    return {
-      type: 'canceled_active',
-      status: 'Subscription Canceled (Active Until Period End)',
-      expiresAt: this.subscription.currentPeriodEnd,
-      canReactivate: true
     };
   }
   

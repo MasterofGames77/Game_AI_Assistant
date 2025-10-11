@@ -2,6 +2,7 @@ import { connectToSplashDB, connectToWingmanDB } from './databaseConnections';
 import { Schema } from 'mongoose';
 import User from '../models/User';
 import { ISplashUser } from '../types';
+import connectToMongoDB from './mongodb';
 
 // SplashDB User schema
 const splashUserSchema = new Schema<ISplashUser>({
@@ -39,17 +40,34 @@ export const checkProAccess = async (identifier: string, userId?: string): Promi
       SplashUser.findOne(query)
     ]);
 
-    // 1. Check if user has active subscription using new subscription system
-    if (appUser && appUser.hasActiveProAccess && appUser.hasActiveProAccess()) {
-      return true;
+    // PRIORITY 1: Check main application database first
+    if (appUser) {
+      // 1. Check if user has active subscription using new subscription system
+      if (appUser.hasActiveProAccess && appUser.hasActiveProAccess()) {
+        console.log('Pro access granted via hasActiveProAccess() method for user:', appUser.username);
+        return true;
+      }
+
+      // 2. Legacy check: If user has Pro in application DB (backward compatibility)
+      if (appUser.hasProAccess) {
+        console.log('Pro access granted via hasProAccess field for user:', appUser.username);
+        return true;
+      }
+
+      // 3. Check if user has active subscription status
+      if (appUser.subscription?.status === 'active' && appUser.subscription?.currentPeriodEnd && appUser.subscription.currentPeriodEnd > new Date()) {
+        console.log('Pro access granted via active subscription for user:', appUser.username);
+        return true;
+      }
+
+      // 4. Check if user has canceled subscription but still has access until period end
+      if (appUser.subscription?.status === 'canceled' && appUser.subscription?.cancelAtPeriodEnd && appUser.subscription?.currentPeriodEnd && appUser.subscription.currentPeriodEnd > new Date()) {
+        console.log('Pro access granted via canceled subscription (active until period end) for user:', appUser.username);
+        return true;
+      }
     }
 
-    // 2. Legacy check: If user has Pro in application DB (backward compatibility)
-    if (appUser && appUser.hasProAccess) {
-      return true;
-    }
-
-    // 3. Check early access eligibility from Splash DB
+    // PRIORITY 2: Check early access eligibility from Splash DB (only if not found in main app)
     if (splashUser) {
       // Check deadline logic
       const proDeadline = new Date('2025-12-31T23:59:59.999Z');
@@ -95,7 +113,7 @@ export const checkProAccess = async (identifier: string, userId?: string): Promi
       }
     }
 
-    // 4. Otherwise, no Pro access
+    // PRIORITY 3: Otherwise, no Pro access
     return false;
   } catch (error) {
     console.error('Error checking Pro access:', error);
@@ -106,26 +124,104 @@ export const checkProAccess = async (identifier: string, userId?: string): Promi
 export const syncUserData = async (userId: string, email?: string): Promise<void> => {
   try {
     // Connect to databases
+    await connectToMongoDB(); // Ensure MongoDB is connected
     const splashDB = await connectToSplashDB();
 
     // Use unique model names to avoid conflicts
     const AppUser = User;
     const SplashUser = splashDB.models.SplashUser || splashDB.model<ISplashUser>('SplashUser', splashUserSchema);
 
-    // First check Splash DB
+    // First check if user already exists in Wingman DB
+    const existingWingmanUser = await AppUser.findOne({ userId });
+    
+    if (existingWingmanUser) {
+      console.log('User already exists in Wingman DB, updating Discord info:', {
+        userId,
+        existingEmail: existingWingmanUser.email,
+        discordEmail: email,
+        hasProAccess: existingWingmanUser.hasProAccess
+      });
+      
+      // Update the existing user with Discord email if different
+      if (email && email !== existingWingmanUser.email) {
+        await AppUser.findOneAndUpdate(
+          { userId },
+          { 
+            email: email, // Update with Discord email
+            $addToSet: { 
+              linkedAccounts: { 
+                platform: 'discord', 
+                email: email,
+                linkedAt: new Date()
+              }
+            }
+          }
+        );
+        console.log('Updated user with Discord email');
+      }
+      return; // User already exists, no need to create new one
+    }
+
+    // Check Splash DB for early access users
     const splashUser = email 
       ? await SplashUser.findOne({ email })
       : await SplashUser.findOne({ userId });
 
+    // Also check Wingman DB by email as fallback
+    let existingWingmanUserByEmail = null;
+    if (email) {
+      existingWingmanUserByEmail = await AppUser.findOne({ email });
+    }
+
+    // If we found an existing Wingman user by email, update their userId to Discord ID
+    if (existingWingmanUserByEmail) {
+      console.log('Found existing Wingman user by email, updating with Discord ID:', {
+        existingUserId: existingWingmanUserByEmail.userId,
+        discordUserId: userId,
+        email: email,
+        hasProAccess: existingWingmanUserByEmail.hasProAccess
+      });
+      
+      // Update the existing user with Discord userId
+      await AppUser.findOneAndUpdate(
+        { email },
+        { 
+          userId: userId, // Update with Discord userId
+          $addToSet: { 
+            linkedAccounts: { 
+              platform: 'discord', 
+              userId: userId,
+              linkedAt: new Date()
+            }
+          }
+        }
+      );
+      console.log('Updated existing user with Discord ID');
+      return; // User already exists, no need to create new one
+    }
+
     if (splashUser) {
       // Check pro access eligibility
-      const signupDate = new Date(splashUser.userId.split('-')[1]); // Extract date from userId
+      let signupDate: Date | null = null;
+      
+      // Only try to parse date if userId contains a date format (not Discord IDs)
+      if (splashUser.userId.includes('-') && splashUser.userId.split('-').length > 1) {
+        try {
+          const datePart = splashUser.userId.split('-')[1];
+          if (!isNaN(Date.parse(datePart))) {
+            signupDate = new Date(datePart);
+          }
+        } catch (error) {
+          console.log('Could not parse date from userId:', splashUser.userId);
+        }
+      }
+      
       const proDeadline = new Date('2025-12-31T23:59:59.999Z');
       const earlyAccessStartDate = new Date('2025-12-31T23:59:59.999Z');
       const earlyAccessEndDate = new Date('2026-12-31T23:59:59.999Z');
       
       const isEarlyUser = (typeof splashUser.position === 'number' && splashUser.position <= 5000);
-      const isBeforeDeadline = signupDate <= proDeadline;
+      const isBeforeDeadline = signupDate ? signupDate <= proDeadline : false;
       const hasProAccess = isEarlyUser || isBeforeDeadline;
 
       // Update or create user in Wingman DB with all required fields
@@ -202,13 +298,16 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
       );
     } else {
       // Handle case where user is not in Splash DB
-      // This could be a new user or a user who signed up after the deadline
+      // This could be a new user, Discord user, or a user who signed up after the deadline
+      console.log('User not found in Splash DB, creating basic user record:', { userId, email });
+      
       await AppUser.findOneAndUpdate(
         { userId },
         {
           userId,
-          email,
-          hasProAccess: false,
+          email: email || `discord-${userId}@example.com`,
+          username: `discord-${userId}`, // Give Discord users a unique username
+          hasProAccess: false, // Discord users start without Pro access
           conversationCount: 0,
           $setOnInsert: {
             achievements: [],
@@ -265,5 +364,7 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
     }
   } catch (error) {
     console.error('Error syncing user data:', error);
+    // Don't throw the error, just log it to prevent the callback from failing
+    // The user can still proceed with Discord authentication
   }
 };

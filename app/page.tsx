@@ -7,6 +7,8 @@ import Image from "next/image";
 import { Conversation } from "../types";
 import ForumList from "../components/ForumList";
 import { ForumProvider } from "../context/ForumContext";
+import PasswordSetupModal from "../components/PasswordSetupModal";
+import EarlyAccessSetupModal from "../components/EarlyAccessSetupModal";
 // import { useRouter } from "next/navigation";
 // import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 // import { faPaperclip } from "@fortawesome/free-solid-svg-icons";
@@ -34,14 +36,86 @@ export default function Home() {
   const [username, setUsername] = useState<string | null>(null);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [usernameInput, setUsernameInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
   const [usernameError, setUsernameError] = useState("");
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordSetupModal, setShowPasswordSetupModal] = useState(false);
+  const [isLegacyUser, setIsLegacyUser] = useState(false);
+  const [showEarlyAccessSetupModal, setShowEarlyAccessSetupModal] =
+    useState(false);
+  const [isEarlyAccessUser, setIsEarlyAccessUser] = useState(false);
+  const [earlyAccessUserData, setEarlyAccessUserData] = useState<any>(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // function to get conversations
+  const fetchConversations = useCallback(async () => {
+    const storedUsername = localStorage.getItem("username");
+    if (!storedUsername) return;
+    const res = await axios.get(
+      `/api/getConversation?username=${storedUsername}`
+    );
+    setConversations(res.data.conversations);
+  }, []);
 
   useEffect(() => {
     const initializeUser = async () => {
       setLoading(true);
       try {
+        // Check for early access user parameters in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const earlyAccessUserId = urlParams.get("userId");
+        const earlyAccessEmail = urlParams.get("email");
+        const isEarlyAccess = urlParams.get("earlyAccess") === "true";
+
+        if (isEarlyAccess && earlyAccessUserId) {
+          // Handle early access user
+          try {
+            const res = await axios.post("/api/auth/splash-login", {
+              userId: earlyAccessUserId,
+              email: earlyAccessEmail,
+            });
+
+            if (res.data && res.data.user) {
+              const userData = res.data.user;
+
+              // Store user data
+              localStorage.setItem(
+                "username",
+                userData.username || earlyAccessUserId
+              );
+              localStorage.setItem("userId", userData.userId);
+              localStorage.setItem("userEmail", userData.email);
+
+              setUserId(userData.userId);
+              setUsername(userData.username || earlyAccessUserId);
+
+              // Check if user needs setup
+              if (
+                userData.requiresUsernameSetup ||
+                userData.requiresPasswordSetup
+              ) {
+                setEarlyAccessUserData(userData);
+                setShowEarlyAccessSetupModal(true);
+                setIsEarlyAccessUser(true);
+              } else {
+                // User is fully set up, proceed normally
+                setShowUsernameModal(false);
+                fetchConversations();
+              }
+
+              setLoading(false);
+              return;
+            }
+          } catch (err: any) {
+            console.error("Error authenticating early access user:", err);
+            // Fall through to normal flow
+          }
+        }
+
+        // Normal user flow
         const storedUsername = localStorage.getItem("username");
         if (storedUsername) {
           // Try to fetch user by username
@@ -86,27 +160,7 @@ export default function Home() {
     };
 
     initializeUser();
-  }, []);
-
-  useEffect(() => {
-    const storedUsername = localStorage.getItem("username");
-    if (!storedUsername) {
-      setShowUsernameModal(true);
-    } else {
-      setUsername(storedUsername);
-      setShowUsernameModal(false);
-    }
-  }, []);
-
-  // function to get conversations
-  const fetchConversations = useCallback(async () => {
-    const storedUsername = localStorage.getItem("username");
-    if (!storedUsername) return;
-    const res = await axios.get(
-      `/api/getConversation?username=${storedUsername}`
-    );
-    setConversations(res.data.conversations);
-  }, []);
+  }, [fetchConversations]);
 
   // function to get usage status
   const fetchUsageStatus = useCallback(async () => {
@@ -361,24 +415,24 @@ export default function Home() {
     window.open(twitchLoginUrl, "_blank");
   };
 
-  // const handleDiscordAuth = async () => {
-  //   try {
-  //     // Get the current domain based on environment
-  //     const domain =
-  //       process.env.NODE_ENV === "production"
-  //         ? "https://assistant.videogamewingman.com"
-  //         : "http://localhost:3000";
+  const handleDiscordAuth = async () => {
+    try {
+      // Get the current domain based on environment
+      const domain =
+        process.env.NODE_ENV === "production"
+          ? "https://assistant.videogamewingman.com"
+          : "http://localhost:3000";
 
-  //     // Construct the Discord login URL
-  //     const discordLoginUrl = `${domain}/api/discordLogin`;
+      // Construct the Discord login URL
+      const discordLoginUrl = `${domain}/api/discordLogin`;
 
-  //     // Open Discord login in new tab instead of current window
-  //     window.open(discordLoginUrl, "_blank");
-  //   } catch (error) {
-  //     console.error("Error during Discord authentication:", error);
-  //     setError("Failed to authenticate with Discord");
-  //   }
-  // };
+      // Open Discord login in new tab instead of current window
+      window.open(discordLoginUrl, "_blank");
+    } catch (error) {
+      console.error("Error during Discord authentication:", error);
+      setError("Failed to authenticate with Discord");
+    }
+  };
 
   // format assistant's response
   const formatResponse = (response: string) => {
@@ -406,105 +460,153 @@ export default function Home() {
     e.preventDefault();
     setUsernameError("");
     if (!usernameInput.trim()) {
-      setUsernameError("Username is required");
+      setUsernameError("Username or email is required");
       return;
     }
+
+    // Check if input is an email address
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(usernameInput.trim());
 
     // Basic validation before API call
-    if (usernameInput.trim().length < 3) {
-      setUsernameError("Username must be at least 3 characters long.");
-      return;
-    }
+    if (isEmail) {
+      // Email validation
+      if (usernameInput.trim().length < 5) {
+        setUsernameError("Please enter a valid email address.");
+        return;
+      }
+      if (usernameInput.trim().length > 254) {
+        setUsernameError("Email address is too long.");
+        return;
+      }
+    } else {
+      // Username validation
+      if (usernameInput.trim().length < 3) {
+        setUsernameError("Username must be at least 3 characters long.");
+        return;
+      }
 
-    if (usernameInput.trim().length > 32) {
-      setUsernameError("Username must be 32 characters or less.");
-      return;
-    }
+      if (usernameInput.trim().length > 32) {
+        setUsernameError("Username must be 32 characters or less.");
+        return;
+      }
 
-    if (!/^[a-zA-Z0-9_-]+$/.test(usernameInput.trim())) {
-      setUsernameError(
-        "Username can only contain letters, numbers, underscores, and hyphens."
-      );
-      return;
+      if (!/^[a-zA-Z0-9_-]+$/.test(usernameInput.trim())) {
+        setUsernameError(
+          "Username can only contain letters, numbers, underscores, and hyphens."
+        );
+        return;
+      }
     }
 
     try {
-      // 1. Check if username exists
-      const findRes = await axios.get(
-        `/api/findUserByUsername?username=${usernameInput.trim()}`
-      );
-      let userId, email;
-      if (findRes.data && findRes.data.user) {
-        // Existing user: use their userId/email
-        userId = findRes.data.user.userId;
-        email = findRes.data.user.email;
-      } else {
-        // New user: generate new userId/email
-        userId =
-          localStorage.getItem("userId") ||
-          "legacy-" + Math.random().toString(36).substring(2, 11);
-        email = localStorage.getItem("userEmail") || "user@example.com";
-      }
-      // 2. Sync user
-      if (userId === usernameInput.trim()) userId = undefined;
-      if (email === usernameInput.trim()) email = undefined;
-      const res = await axios.post("/api/syncUser", {
-        userId,
-        email,
-        username: usernameInput.trim(),
+      setIsSigningIn(true);
+      // Use new authentication system
+      const res = await axios.post("/api/auth/signin", {
+        identifier: usernameInput.trim(),
+        password: passwordInput,
       });
+
       if (res.data && res.data.user) {
-        setUsername(usernameInput.trim());
-        localStorage.setItem("username", usernameInput.trim());
+        setUsername(res.data.user.username);
+        localStorage.setItem("username", res.data.user.username);
         localStorage.setItem("userId", res.data.user.userId);
         localStorage.setItem("userEmail", res.data.user.email);
         setShowUsernameModal(false);
         setConversations([]); // Clear old conversations
         fetchConversations(); // Fetch new user's conversations
+
+        // Check if user needs to set up password (legacy user)
+        if (res.data.requiresPasswordSetup && res.data.isLegacyUser) {
+          setIsLegacyUser(true);
+          setShowPasswordSetupModal(true);
+        }
       }
     } catch (err: any) {
       if (err.response?.data?.message) {
-        // Handle content violation specifically
-        if (
-          err.response.data.offendingWords &&
-          err.response.data.violationResult
-        ) {
-          const violationResult = err.response.data.violationResult;
-          let violationMessage = err.response.data.message;
-
-          // Add specific violation details based on action
-          if (violationResult.action === "warning") {
-            violationMessage += ` Warning ${violationResult.count}/3. Please choose a different username.`;
-          } else if (violationResult.action === "banned") {
-            const banDate = new Date(
-              violationResult.expiresAt
-            ).toLocaleDateString();
-            violationMessage += ` You are temporarily banned until ${banDate}. Please try again later.`;
-          } else if (violationResult.action === "permanent_ban") {
-            violationMessage += ` You are permanently banned from using this application.`;
-          }
-
-          setUsernameError(violationMessage);
-        } else {
-          setUsernameError(err.response.data.message);
-        }
+        setUsernameError(err.response.data.message);
       } else {
-        setUsernameError("Failed to set username. Please try again.");
+        setUsernameError("Failed to sign in. Please try again.");
       }
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
+  const handlePasswordSetup = async (password: string) => {
+    const userId = localStorage.getItem("userId");
+    const username = localStorage.getItem("username");
+
+    if (!userId || !username) {
+      throw new Error("User information not found");
+    }
+
+    const res = await axios.post("/api/auth/setup-password", {
+      userId,
+      username,
+      newPassword: password,
+    });
+
+    if (res.data && res.data.user) {
+      // Update local storage with updated user data
+      localStorage.setItem("userId", res.data.user.userId);
+      localStorage.setItem("userEmail", res.data.user.email);
+    }
+  };
+
+  const handleEarlyAccessSetup = async (
+    username: string,
+    password?: string
+  ) => {
+    const userId = localStorage.getItem("userId");
+
+    if (!userId) {
+      throw new Error("User information not found");
+    }
+
+    const res = await axios.post("/api/auth/setup-early-access", {
+      userId,
+      username,
+      password,
+    });
+
+    if (res.data && res.data.user) {
+      // Update local storage with updated user data
+      localStorage.setItem("username", res.data.user.username);
+      localStorage.setItem("userId", res.data.user.userId);
+      localStorage.setItem("userEmail", res.data.user.email);
+
+      // Update state
+      setUsername(res.data.user.username);
+      setUserId(res.data.user.userId);
+
+      // Fetch conversations for the newly set up user
+      fetchConversations();
     }
   };
 
   const handleSignOut = () => {
-    setUsername(null);
-    setUserId(null);
-    setQuestion("");
-    setResponse("");
-    setSelectedConversation(null);
-    setError("");
-    localStorage.removeItem("username");
-    localStorage.removeItem("userId");
-    localStorage.removeItem("userEmail");
-    setShowUsernameModal(true);
+    setIsSigningOut(true);
+
+    // Add a small delay to show the loading state
+    setTimeout(() => {
+      setUsername(null);
+      setUserId(null);
+      setQuestion("");
+      setResponse("");
+      setSelectedConversation(null);
+      setError("");
+      setPasswordInput("");
+      setShowPasswordSetupModal(false);
+      setIsLegacyUser(false);
+      setShowEarlyAccessSetupModal(false);
+      setIsEarlyAccessUser(false);
+      setEarlyAccessUserData(null);
+      localStorage.removeItem("username");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("userEmail");
+      setShowUsernameModal(true);
+      setIsSigningOut(false);
+    }, 500);
   };
 
   const handleNavigateToAccount = () => {
@@ -518,7 +620,7 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen">
-      {/* Username Modal */}
+      {/* Sign In Modal */}
       {showUsernameModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
           <div className="bg-white dark:bg-gray-900 p-8 rounded-lg shadow-lg w-full max-w-md flex flex-col items-center">
@@ -535,32 +637,131 @@ export default function Home() {
               onSubmit={handleUsernameSubmit}
               className="space-y-4 w-full mt-2"
             >
-              <input
-                type="text"
-                value={usernameInput}
-                onChange={(e) => setUsernameInput(e.target.value)}
-                placeholder="Enter your username (3-32 characters, letters, numbers, _ -)"
-                className="w-full p-2 border border-gray-300 rounded"
-                minLength={3}
-                maxLength={32}
-                pattern="[a-zA-Z0-9_-]+"
-                title="Username can only contain letters, numbers, underscores, and hyphens"
-                required
-                autoFocus
-              />
+              <div>
+                <input
+                  type="text"
+                  value={usernameInput}
+                  onChange={(e) => setUsernameInput(e.target.value)}
+                  placeholder="Username or email"
+                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                  minLength={3}
+                  maxLength={32}
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  placeholder="Password (optional for legacy users)"
+                  className="w-full p-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                >
+                  {showPassword ? (
+                    <svg
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
+                      />
+                    </svg>
+                  )}
+                </button>
+              </div>
               {usernameError && (
                 <p className="text-red-500 text-sm">{usernameError}</p>
               )}
               <button
                 type="submit"
-                className="w-full p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                disabled={isSigningIn}
+                className="w-full p-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Sign In
+                {isSigningIn ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    Signing In...
+                  </div>
+                ) : (
+                  "Sign In"
+                )}
               </button>
             </form>
+
+            {/* Forgot Password Link */}
+            <div className="mt-4 text-center">
+              <button
+                onClick={() => (window.location.href = "/forgot-password")}
+                className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-200 text-sm"
+              >
+                Forgot Password?
+              </button>
+            </div>
+
+            {/* Sign Up Link */}
+            <div className="mt-4 text-center">
+              <p className="text-gray-600 dark:text-gray-400 text-sm">
+                Don&apos;t have an account?{" "}
+                <button
+                  onClick={() => (window.location.href = "/signup")}
+                  className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-200 font-medium"
+                >
+                  Sign Up
+                </button>
+              </p>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Password Setup Modal for Legacy Users */}
+      <PasswordSetupModal
+        isOpen={showPasswordSetupModal}
+        onClose={() => setShowPasswordSetupModal(false)}
+        onSetup={handlePasswordSetup}
+        username={username || ""}
+        userId={userId || ""}
+      />
+
+      {/* Early Access Setup Modal */}
+      <EarlyAccessSetupModal
+        isOpen={showEarlyAccessSetupModal}
+        onClose={() => setShowEarlyAccessSetupModal(false)}
+        onSetup={handleEarlyAccessSetup}
+        userEmail={earlyAccessUserData?.email || ""}
+        userId={earlyAccessUserData?.userId || ""}
+      />
       {/* Main App Content (only if signed in) */}
       {!showUsernameModal && (
         <>
@@ -804,12 +1005,12 @@ export default function Home() {
                         Login with Twitch
                       </button>
 
-                      {/* <button
-                      onClick={handleDiscordAuth}
-                      className="mt-2 p-2 bg-[#5865F2] text-white rounded"
-                    >
-                      Login with Discord
-                    </button> */}
+                      <button
+                        onClick={handleDiscordAuth}
+                        className="mt-2 p-2 bg-[#5865F2] text-white rounded"
+                      >
+                        Login with Discord
+                      </button>
                       <button
                         onClick={handleResetUsername}
                         className="mt-2 p-2 bg-blue-500 text-white rounded"
@@ -821,9 +1022,17 @@ export default function Home() {
                 )}
               <button
                 onClick={handleSignOut}
-                className="absolute top-4 right-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 shadow"
+                disabled={isSigningOut}
+                className="absolute top-4 right-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 shadow disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Sign Out
+                {isSigningOut ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 dark:border-gray-300 mr-2"></div>
+                    Signing Out...
+                  </div>
+                ) : (
+                  "Sign Out"
+                )}
               </button>
             </div>
           </div>

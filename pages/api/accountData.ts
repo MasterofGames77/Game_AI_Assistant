@@ -31,6 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       user: {
         username: user.username,
         email: user.email,
+        password: user.password, // Include password field for hasPassword check
         conversationCount: actualConversationCount, // Use actual count instead of user.conversationCount
         hasProAccess: user.hasProAccess,
         achievements: user.achievements || [],
