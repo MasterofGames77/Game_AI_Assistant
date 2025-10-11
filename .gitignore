@@ -65,3 +65,4 @@ runAchievementCacheTests.js
 /tests/testUsageLimits.js
 /scripts/runMigration.js
 bash.exe.stackdump
+passwords
