@@ -120,11 +120,6 @@ export default function ForumList() {
                     >
                       {forum.title}
                     </Link>
-                    {forum.isProOnly && (
-                      <span className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs rounded-full">
-                        Pro Only
-                      </span>
-                    )}
                     {forum.isPrivate && (
                       <span className="px-2 py-1 bg-gray-500 text-white text-xs rounded-full">
                         Private

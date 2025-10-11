@@ -5,6 +5,7 @@ import { useForum } from "../../../context/ForumContext";
 import { ForumProvider } from "../../../context/ForumContext";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import PrivateForumUserManagement from "../../../components/PrivateForumUserManagement";
 
 export default function ForumPageWrapper({
   params,
@@ -19,8 +20,14 @@ export default function ForumPageWrapper({
 }
 
 function ForumPage({ params }: { params: { forumId: string } }) {
-  const { currentForum, setCurrentForum, addPost, deletePost, likePost } =
-    useForum();
+  const {
+    currentForum,
+    setCurrentForum,
+    addPost,
+    deletePost,
+    likePost,
+    updateForumUsers,
+  } = useForum();
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -29,9 +36,9 @@ function ForumPage({ params }: { params: { forumId: string } }) {
   useEffect(() => {
     const fetchForum = async () => {
       try {
-        const userId = localStorage.getItem("username") || "test-user";
+        const username = localStorage.getItem("username") || "test-user";
         const response = await axios.get(
-          `/api/getForumTopic?forumId=${params.forumId}&userId=${userId}`
+          `/api/getForumTopic?forumId=${params.forumId}&username=${username}`
         );
         setCurrentForum(response.data);
         setLoading(false);
@@ -52,9 +59,9 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       await addPost(params.forumId, message);
       setMessage("");
       // Fetch updated forum data
-      const userId = localStorage.getItem("username") || "test-user";
+      const username = localStorage.getItem("username") || "test-user";
       const response = await axios.get(
-        `/api/getForumTopic?forumId=${params.forumId}&userId=${userId}`
+        `/api/getForumTopic?forumId=${params.forumId}&username=${username}`
       );
       setCurrentForum(response.data);
     } catch (err: any) {
@@ -68,9 +75,9 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     try {
       await deletePost(params.forumId, postId);
       // Fetch updated forum data
-      const userId = localStorage.getItem("username") || "test-user";
+      const username = localStorage.getItem("username") || "test-user";
       const response = await axios.get(
-        `/api/getForumTopic?forumId=${params.forumId}&userId=${userId}`
+        `/api/getForumTopic?forumId=${params.forumId}&username=${username}`
       );
       setCurrentForum(response.data);
     } catch (err: any) {
@@ -82,9 +89,9 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     try {
       await likePost(params.forumId, postId);
       // Fetch updated forum data so the UI reflects the new like state/count
-      const userId = localStorage.getItem("username") || "test-user";
+      const username = localStorage.getItem("username") || "test-user";
       const response = await axios.get(
-        `/api/getForumTopic?forumId=${params.forumId}&userId=${userId}`
+        `/api/getForumTopic?forumId=${params.forumId}&username=${username}`
       );
       setCurrentForum(response.data);
     } catch (err: any) {
@@ -116,7 +123,9 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       >
         ← Back to Main Page
       </button>
-      {/* <div className="mb-8">
+
+      {/* Forum Header */}
+      <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">{currentForum.title}</h1>
         <div className="mb-2 text-gray-800 dark:text-gray-200">
           <p>Game: {currentForum.gameTitle}</p>
@@ -124,8 +133,28 @@ function ForumPage({ params }: { params: { forumId: string } }) {
           <p>Status: {currentForum.metadata.status}</p>
           <p>Total Posts: {currentForum.posts?.length || 0}</p>
           <p>Views: {currentForum.metadata.viewCount}</p>
+          {currentForum.isPrivate && (
+            <p className="text-blue-600 font-semibold">🔒 Private Forum</p>
+          )}
         </div>
-      </div> */}
+      </div>
+
+      {/* User Management for Private Forums */}
+      {currentForum.isPrivate && (
+        <PrivateForumUserManagement
+          forumId={currentForum.forumId}
+          allowedUsers={currentForum.allowedUsers}
+          createdBy={currentForum.createdBy}
+          currentUsername={localStorage.getItem("username") || "test-user"}
+          onUsersUpdated={(newUsers) => {
+            // Update the current forum state
+            setCurrentForum({
+              ...currentForum,
+              allowedUsers: newUsers,
+            });
+          }}
+        />
+      )}
 
       <div className="mb-8">
         <form onSubmit={handlePostSubmit} className="space-y-4">

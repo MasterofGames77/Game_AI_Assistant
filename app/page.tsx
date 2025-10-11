@@ -587,26 +587,28 @@ export default function Home() {
   const handleSignOut = () => {
     setIsSigningOut(true);
 
-    // Add a small delay to show the loading state
+    // Clear state immediately for better UX
+    setUsername(null);
+    setUserId(null);
+    setQuestion("");
+    setResponse("");
+    setSelectedConversation(null);
+    setError("");
+    setPasswordInput("");
+    setShowPasswordSetupModal(false);
+    setIsLegacyUser(false);
+    setShowEarlyAccessSetupModal(false);
+    setIsEarlyAccessUser(false);
+    setEarlyAccessUserData(null);
+    localStorage.removeItem("username");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("userEmail");
+    setShowUsernameModal(true);
+
+    // Reset signing out state after a brief delay
     setTimeout(() => {
-      setUsername(null);
-      setUserId(null);
-      setQuestion("");
-      setResponse("");
-      setSelectedConversation(null);
-      setError("");
-      setPasswordInput("");
-      setShowPasswordSetupModal(false);
-      setIsLegacyUser(false);
-      setShowEarlyAccessSetupModal(false);
-      setIsEarlyAccessUser(false);
-      setEarlyAccessUserData(null);
-      localStorage.removeItem("username");
-      localStorage.removeItem("userId");
-      localStorage.removeItem("userEmail");
-      setShowUsernameModal(true);
       setIsSigningOut(false);
-    }, 500);
+    }, 100);
   };
 
   const handleNavigateToAccount = () => {
@@ -1020,20 +1022,22 @@ export default function Home() {
                     </div>
                   </div>
                 )}
-              <button
-                onClick={handleSignOut}
-                disabled={isSigningOut}
-                className="absolute top-4 right-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 shadow disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSigningOut ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 dark:border-gray-300 mr-2"></div>
-                    Signing Out...
-                  </div>
-                ) : (
-                  "Sign Out"
-                )}
-              </button>
+              {username && (
+                <button
+                  onClick={handleSignOut}
+                  disabled={isSigningOut}
+                  className="absolute top-4 right-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSigningOut ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 dark:border-gray-300 mr-2"></div>
+                      Signing Out...
+                    </div>
+                  ) : (
+                    "Sign Out"
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </>

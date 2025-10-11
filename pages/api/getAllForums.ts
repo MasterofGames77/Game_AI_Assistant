@@ -42,9 +42,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       'metadata.status': 'active'
     };
 
-    // Add Pro-only filter for non-Pro users
+    // All forums now require Pro access - non-Pro users cannot access any forums
     if (!hasProAccess) {
-      baseConditions['isProOnly'] = false;
+      return res.status(403).json({ error: 'Pro access required to view forums. Upgrade to Wingman Pro to access forums.' });
     }
 
     // Find forums that are either public or private but accessible to the user

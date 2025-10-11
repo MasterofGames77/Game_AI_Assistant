@@ -82,7 +82,6 @@ export interface Forum {
   gameTitle: string;
   category: string;
   isPrivate: boolean;
-  isProOnly: boolean;
   allowedUsers: string[];
   posts: ForumPost[];
   createdAt: Date;
@@ -141,6 +140,7 @@ export interface ForumContextType {
   addPost: (forumId: string, message: string) => Promise<void>;
   deletePost: (forumId: string, postId: string) => Promise<void>;
   likePost: (forumId: string, postId: string) => Promise<void>;
+  updateForumUsers: (forumId: string, allowedUsers: string[]) => Promise<boolean>;
   setCurrentForum: (forum: Forum | null) => void;
   setError: (error: string | null) => void;
 }
@@ -221,4 +221,12 @@ export interface AchievementData {
   achievements: { name: string; dateEarned: Date }[];
   isPro?: boolean;
   totalAchievements?: number;
+}
+
+export interface PrivateForumUserManagementProps {
+  forumId: string;
+  allowedUsers: string[];
+  createdBy: string;
+  currentUsername: string;
+  onUsersUpdated: (newUsers: string[]) => void;
 }

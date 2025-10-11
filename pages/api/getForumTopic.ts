@@ -22,10 +22,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Forum not found' });
     }
 
-    // Pro access check for Pro-only forums
+    // Pro access check - all forums now require Pro access
     const hasProAccess = await checkProAccess(username as string);
-    if (forum.isProOnly && !hasProAccess) {
-      return res.status(403).json({ error: 'This forum is Pro-only. Upgrade to Wingman Pro to access exclusive forums.' });
+    if (!hasProAccess) {
+      return res.status(403).json({ error: 'Pro access required to access forums. Upgrade to Wingman Pro to access forums.' });
     }
 
     // Check if forum is private and user has access

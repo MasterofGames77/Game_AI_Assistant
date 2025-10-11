@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import connectToMongoDB from "../../utils/mongodb";
 import Forum from "../../models/Forum";
-import { validateUserAuthentication, validateForumData, validateForumCreationAccess } from "@/utils/validation";
+import { validateUserAuthentication, validateForumData } from "@/utils/validation";
 import { containsOffensiveContent } from "@/utils/contentModeration";
 import { checkProAccess } from "../../utils/proAccessUtil";
 
@@ -35,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Extract username and forum data from request body
-    const { title, gameTitle, category, isPrivate, isProOnly, username } = req.body;
+    const { title, gameTitle, category, isPrivate, username } = req.body;
 
     // Validate user authentication
     const userAuthErrors = validateUserAuthentication(username);
@@ -49,11 +49,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ error: 'Pro access required to create forums. Upgrade to Wingman Pro to create forums.' });
     }
 
-    // Validate Pro access for Pro-only forum creation
-    const proAccessErrors = validateForumCreationAccess(isProOnly, hasProAccess);
-    if (proAccessErrors.length > 0) {
-      return res.status(403).json({ error: proAccessErrors[0] });
-    }
 
     // Validate forum data
     const forumData = {
@@ -61,7 +56,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       gameTitle,
       category,
       isPrivate,
-      isProOnly,
       allowedUsers: isPrivate ? [username] : [],
     };
     const validationErrors = validateForumData(forumData);
@@ -87,7 +81,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       gameTitle,
       category,
       isPrivate: !!isPrivate,
-      isProOnly: !!isProOnly,
       allowedUsers: isPrivate ? [username] : [],
       createdBy: username,
       posts: [],

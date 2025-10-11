@@ -227,6 +227,48 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
     [currentForum]
   );
 
+  const updateForumUsers = useCallback(
+    async (forumId: string, allowedUsers: string[]) => {
+      try {
+        setLoading(true);
+        const response = await axios.post(
+          "/api/updateForumsAllowedUsers",
+          {
+            forumId,
+            allowedUsers,
+            username: localStorage.getItem("username"),
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${
+                localStorage.getItem("userId") || "test-user"
+              }`,
+            },
+          }
+        );
+
+        const updatedForum = response.data.forum;
+        setForums((prevForums) =>
+          prevForums.map((f) => (f.forumId === forumId ? updatedForum : f))
+        );
+        if (currentForum?.forumId === forumId) {
+          setCurrentForum(updatedForum);
+        }
+        return true;
+      } catch (err: any) {
+        setError(
+          err.response?.data?.error ||
+            err.message ||
+            "Failed to update forum users"
+        );
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [currentForum]
+  );
+
   const value = {
     forums,
     currentForum,
@@ -238,6 +280,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
     addPost,
     deletePost,
     likePost,
+    updateForumUsers,
     setCurrentForum,
     setError,
   };

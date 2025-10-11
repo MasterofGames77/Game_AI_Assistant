@@ -86,7 +86,6 @@ const ForumSchema = new mongoose.Schema({
   },
   category: { type: String, required: true },
   isPrivate: { type: Boolean, default: false },
-  isProOnly: { type: Boolean, default: false },
   allowedUsers: [{ type: String }],
   createdAt: {
     type: Date,

@@ -8,7 +8,6 @@ export default function CreateForum() {
   const [gameTitle, setGameTitle] = useState("");
   const [category, setCategory] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
-  const [isProOnly, setIsProOnly] = useState(false);
   const [hasProAccess, setHasProAccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -47,7 +46,6 @@ export default function CreateForum() {
         gameTitle,
         category,
         isPrivate,
-        isProOnly,
         allowedUsers: isPrivate ? [username] : [],
       };
 
@@ -58,7 +56,6 @@ export default function CreateForum() {
         setGameTitle("");
         setCategory("");
         setIsPrivate(false);
-        setIsProOnly(false);
       }
     } catch (err: any) {
       setError(err.message || "Failed to create forum");
@@ -166,23 +163,6 @@ export default function CreateForum() {
             className="ml-2 block text-sm text-gray-900 dark:text-gray-200"
           >
             Make this forum private
-          </label>
-        </div>
-
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            id="isProOnly"
-            checked={isProOnly}
-            onChange={(e) => setIsProOnly(e.target.checked)}
-            className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-            disabled={!hasProAccess}
-          />
-          <label
-            htmlFor="isProOnly"
-            className="ml-2 block text-sm text-gray-900 dark:text-gray-200"
-          >
-            Make this forum Pro-only
           </label>
         </div>
 
