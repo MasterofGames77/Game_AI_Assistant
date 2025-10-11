@@ -132,6 +132,10 @@ const ForgotPasswordPage: React.FC = () => {
         setMessage(
           "Verification successful! Redirecting you to reset your password..."
         );
+        // Clear any stored session data to ensure fresh login after password reset
+        localStorage.removeItem("username");
+        localStorage.removeItem("userId");
+        localStorage.removeItem("userEmail");
         // Redirect to reset password page after a short delay
         setTimeout(() => {
           if (response.data.resetToken) {
@@ -307,7 +311,10 @@ const ForgotPasswordPage: React.FC = () => {
         {message && (
           <div
             className={`mt-4 p-3 rounded-lg text-sm ${
-              message.includes("sent")
+              message.includes("sent") ||
+              message.includes("successful") ||
+              message.includes("verification") ||
+              message.includes("redirecting")
                 ? "bg-green-100 text-green-800"
                 : "bg-red-100 text-red-800"
             }`}

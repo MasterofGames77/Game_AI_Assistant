@@ -84,6 +84,10 @@ const ResetPasswordContent: React.FC = () => {
         setMessage(
           "Password has been reset successfully! Redirecting to sign in..."
         );
+        // Clear any stored session data to force fresh login
+        localStorage.removeItem("username");
+        localStorage.removeItem("userId");
+        localStorage.removeItem("userEmail");
         setTimeout(() => router.push("/"), 2000);
       } else {
         setMessage(
