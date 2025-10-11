@@ -7,6 +7,13 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-05-28.basil',
 });
 
+// Disable body parsing for webhook signature verification
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -25,7 +32,9 @@ export default async function handler(
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+    // Get raw body for signature verification
+    const rawBody = JSON.stringify(req.body);
+    event = stripe.webhooks.constructEvent(rawBody, sig, endpointSecret);
   } catch (err) {
     console.error('Webhook signature verification failed:', err);
     return res.status(400).json({ message: 'Invalid signature' });
@@ -34,24 +43,33 @@ export default async function handler(
   try {
     await connectToWingmanDB();
 
+    console.log(`Processing webhook event: ${event.type}`);
+    console.log('Event data:', JSON.stringify(event.data, null, 2));
+
     switch (event.type) {
       case 'customer.subscription.created':
+        console.log('Handling subscription created');
         await handleSubscriptionCreated(event.data.object as Stripe.Subscription);
         break;
       
       case 'customer.subscription.updated':
+        console.log('Handling subscription updated');
         await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
         break;
       
       case 'customer.subscription.deleted':
+        console.log('Handling subscription deleted');
         await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
         break;
       
       case 'invoice.payment_succeeded':
+        console.log('Handling payment succeeded');
         await handlePaymentSucceeded(event.data.object as Stripe.Invoice);
         break;
       
+      
       case 'invoice.payment_failed':
+        console.log('Handling payment failed');
         await handlePaymentFailed(event.data.object as Stripe.Invoice);
         break;
       
@@ -202,19 +220,26 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
   const subscriptionId = (invoice as any).subscription as string;
+  const customerId = (invoice as any).customer as string;
   
   if (!subscriptionId) {
     console.error('No subscription ID in payment succeeded event');
     return;
   }
 
-  // Find user by subscription ID
-  const user = await User.findOne({
+  // Find user by subscription ID first, then by customer ID
+  let user = await User.findOne({
     'subscription.stripeSubscriptionId': subscriptionId
   });
 
+  if (!user && customerId) {
+    user = await User.findOne({
+      'subscription.stripeCustomerId': customerId
+    });
+  }
+
   if (!user) {
-    console.error('User not found for payment succeeded:', subscriptionId);
+    console.error('User not found for payment succeeded:', { subscriptionId, customerId });
     return;
   }
 
@@ -222,13 +247,20 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
   await User.findOneAndUpdate(
     { _id: user._id },
     {
+      'subscription.stripeSubscriptionId': subscriptionId,
+      'subscription.stripeCustomerId': customerId,
       'subscription.paymentMethod': (invoice as any).payment_method as string,
       'subscription.status': 'active',
+      'subscription.currentPeriodStart': new Date((invoice as any).period_start * 1000),
+      'subscription.currentPeriodEnd': new Date((invoice as any).period_end * 1000),
+      'subscription.amount': (invoice as any).amount_paid || 199,
+      'subscription.currency': (invoice as any).currency || 'usd',
+      'subscription.billingCycle': 'monthly',
       hasProAccess: true
     }
   );
 
-  console.log(`Payment succeeded for subscription ${subscriptionId}`);
+  console.log(`Payment succeeded for subscription ${subscriptionId}, user ${user.username}`);
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {

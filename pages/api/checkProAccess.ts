@@ -25,29 +25,47 @@ export default async function handler(
     let subscriptionStatus = null;
     if (hasProAccess) {
       await connectToWingmanDB();
-      const user = await User.findOne({ 
+      
+      // Debug: Find all users with this username to see what's happening
+      const allUsers = await User.find({ 
         $or: [
           { username },
           { userId },
           ...(userId ? [{ userId }] : [])
         ]
       });
+      
+      console.log('checkProAccess - all users found:', allUsers.map(u => ({
+        username: u.username,
+        userId: u.userId,
+        hasProAccess: u.hasProAccess,
+        subscription: u.subscription
+      })));
+      
+      const user = allUsers.find(u => u.hasProAccess) || allUsers[0];
 
-      if (user && user.getSubscriptionStatus) {
-        subscriptionStatus = user.getSubscriptionStatus();
-      } else if (hasProAccess) {
-        // If user has Pro access but no subscription data, create a default status
-        // This handles cases like the Master account who should have free access
-        subscriptionStatus = {
-          type: "free_period",
-          status: "Active",
-          expiresAt: new Date('2026-12-31T23:59:59.999Z'),
-          daysUntilExpiration: Math.ceil((new Date('2026-12-31T23:59:59.999Z').getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)),
-          canUpgrade: true,
-          canCancel: false,
-          canReactivate: false,
-          showWarning: false
-        };
+      // If user has Pro access, get detailed subscription status
+      if (user && user.hasProAccess) {
+        console.log('checkProAccess - user found with Pro access:', {
+          username: user.username,
+          hasProAccess: user.hasProAccess,
+          subscription: user.subscription,
+          hasGetSubscriptionStatus: typeof user.getSubscriptionStatus === 'function'
+        });
+        
+        try {
+          subscriptionStatus = user.getSubscriptionStatus();
+          console.log('checkProAccess - user.getSubscriptionStatus() returned:', subscriptionStatus);
+        } catch (error) {
+          console.error('Error calling getSubscriptionStatus:', error);
+          subscriptionStatus = null;
+        }
+      } else {
+        console.log('checkProAccess - no user found or no Pro access:', {
+          userFound: !!user,
+          hasProAccess: user?.hasProAccess,
+          allUsersCount: allUsers.length
+        });
       }
     }
 
