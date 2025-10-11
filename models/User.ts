@@ -87,6 +87,10 @@ export interface IUser extends Document {
   passwordResetToken?: string;
   passwordResetExpires?: Date;
   requiresPasswordSetup?: boolean; // Flag for legacy users who need to set password
+  // New fields for enhanced security
+  passwordResetCode?: string; // 6-digit verification code
+  passwordResetCodeExpires?: Date; // Code expiration time
+  lastPasswordResetRequest?: Date; // For rate limiting
   conversationCount: number;
   hasProAccess: boolean;
   achievements: Achievement[];
@@ -110,6 +114,10 @@ const UserSchema = new Schema<IUser>({
   passwordResetToken: { type: String, required: false },
   passwordResetExpires: { type: Date, required: false },
   requiresPasswordSetup: { type: Boolean, default: false },
+  // New fields for enhanced security
+  passwordResetCode: { type: String, required: false },
+  passwordResetCodeExpires: { type: Date, required: false },
+  lastPasswordResetRequest: { type: Date, required: false },
   conversationCount: { type: Number, required: true, default: 0 },
   hasProAccess: { type: Boolean, default: false },
   achievements: [
@@ -209,6 +217,9 @@ UserSchema.index({ 'usageLimit.cooldownUntil': 1 });
 // Create indexes for authentication queries
 UserSchema.index({ 'passwordResetToken': 1 });
 UserSchema.index({ 'requiresPasswordSetup': 1 });
+// New indexes for enhanced security
+UserSchema.index({ 'passwordResetCode': 1 });
+UserSchema.index({ 'lastPasswordResetRequest': 1 });
 
 // Method to check if user has active Pro access
 UserSchema.methods.hasActiveProAccess = function(): boolean {

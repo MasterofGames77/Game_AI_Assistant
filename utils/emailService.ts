@@ -1,10 +1,10 @@
 import nodemailer from 'nodemailer';
 
 // Email configuration
-const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
-const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587');
-const SMTP_USER = process.env.SMTP_USER;
-const SMTP_PASS = process.env.SMTP_PASS;
+const SMTP_HOST = process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com';
+const SMTP_PORT = parseInt(process.env.EMAIL_PORT || process.env.SMTP_PORT || '587');
+const SMTP_USER = process.env.EMAIL_USER || process.env.SMTP_USER;
+const SMTP_PASS = process.env.EMAIL_PASS || process.env.SMTP_PASS;
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 
 // Create transporter
@@ -22,6 +22,13 @@ const createTransporter = () => {
       user: SMTP_USER,
       pass: SMTP_PASS,
     },
+    // Additional Gmail-specific settings
+    tls: {
+      rejectUnauthorized: false
+    },
+    connectionTimeout: 60000, // 60 seconds
+    greetingTimeout: 30000,   // 30 seconds
+    socketTimeout: 60000,     // 60 seconds
   });
 };
 
@@ -187,6 +194,85 @@ export const sendWelcomeEmail = async (
     return true;
   } catch (error) {
     console.error('Error sending welcome email:', error);
+    return false;
+  }
+};
+
+/**
+ * Send password reset verification code
+ * @param email - User's email address
+ * @param verificationCode - 6-digit verification code
+ * @param username - User's username
+ */
+export const sendPasswordResetVerificationCode = async (
+  email: string, 
+  verificationCode: string, 
+  username: string
+): Promise<boolean> => {
+  const transporter = createTransporter();
+  if (!transporter) {
+    console.error('Email service not configured');
+    return false;
+  }
+
+  const mailOptions = {
+    from: `"Video Game Wingman" <${SMTP_USER}>`,
+    to: email,
+    subject: 'Password Reset Verification Code - Video Game Wingman',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #4F46E5;">Video Game Wingman</h1>
+        </div>
+        
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+          <h2 style="color: #333; margin-top: 0;">Password Reset Verification</h2>
+          <p>Hello ${username},</p>
+          <p>We received a request to reset your password for your Video Game Wingman account.</p>
+          <p>To proceed with the password reset, please enter the following verification code:</p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <div style="background-color: #4F46E5; color: white; padding: 20px; border-radius: 8px; font-size: 32px; font-weight: bold; letter-spacing: 4px; display: inline-block; min-width: 200px;">
+              ${verificationCode}
+            </div>
+          </div>
+          
+          <p style="font-size: 14px; color: #666; text-align: center;">
+            This code will expire in 60 seconds for security reasons.
+          </p>
+        </div>
+        
+        <div style="font-size: 12px; color: #666; text-align: center;">
+          <p>If you didn't request this password reset, please ignore this email.</p>
+          <p>© 2024 Video Game Wingman. All rights reserved.</p>
+        </div>
+      </div>
+    `,
+    text: `
+      Password Reset Verification - Video Game Wingman
+      
+      Hello ${username},
+      
+      We received a request to reset your password for your Video Game Wingman account.
+      
+      To proceed with the password reset, please enter the following verification code:
+      
+      ${verificationCode}
+      
+      This code will expire in 60 seconds for security reasons.
+      
+      If you didn't request this password reset, please ignore this email.
+      
+      © 2024 Video Game Wingman. All rights reserved.
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Password reset verification code sent to ${email}`);
+    return true;
+  } catch (error) {
+    console.error('Error sending password reset verification code:', error);
     return false;
   }
 };

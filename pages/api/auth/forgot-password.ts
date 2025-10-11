@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { connectToWingmanDB } from '../../../utils/databaseConnections';
 import User from '../../../models/User';
-import { generateResetToken } from '../../../utils/passwordUtils';
-import { sendPasswordResetEmail } from '../../../utils/emailService';
+import { generateVerificationCode, checkPasswordResetRateLimit } from '../../../utils/passwordUtils';
+import { sendPasswordResetVerificationCode } from '../../../utils/emailService';
 import mongoose from 'mongoose';
 
 // Email validation regex
@@ -39,33 +39,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const user = await User.findOne({ email });
 
     // Always return success message for security (don't reveal if email exists)
-    // But only send email if user actually exists
+    // But only process if user actually exists
     if (user) {
-      // Generate reset token
-      const resetToken = generateResetToken();
-      const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+      // Check rate limiting
+      const rateLimitCheck = checkPasswordResetRateLimit(user.lastPasswordResetRequest, 60);
+      
+      if (!rateLimitCheck.canRequest) {
+        return res.status(429).json({
+          message: `Please wait ${rateLimitCheck.timeRemaining} seconds before requesting another password reset.`,
+          timeRemaining: rateLimitCheck.timeRemaining
+        });
+      }
 
-      // Update user with reset token
+      // Generate verification code
+      const verificationCode = generateVerificationCode();
+      const codeExpires = new Date(Date.now() + 60 * 1000); // 60 seconds from now
+
+      // Update user with verification code and rate limiting
       await User.findOneAndUpdate(
         { email },
         {
-          passwordResetToken: resetToken,
-          passwordResetExpires: resetExpires
+          passwordResetCode: verificationCode,
+          passwordResetCodeExpires: codeExpires,
+          lastPasswordResetRequest: new Date()
         }
       );
 
-      // Send password reset email
-      const emailSent = await sendPasswordResetEmail(email, resetToken, user.username);
+      // Send verification code email
+      const emailSent = await sendPasswordResetVerificationCode(email, verificationCode, user.username);
       
       if (!emailSent) {
-        console.error(`Failed to send password reset email to ${email}`);
+        console.error(`Failed to send password reset verification code to ${email}`);
         // Still return success to user for security
       }
     }
 
     // Always return success message (security best practice)
     return res.status(200).json({
-      message: 'If an account with that email exists, we\'ve sent a password reset link.'
+      message: 'If an account with that email exists, we\'ve sent a verification code. Please check your email and enter the 6-digit code to proceed.'
     });
 
   } catch (error) {

@@ -1,18 +1,44 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import Image from "next/image";
 
 const ForgotPasswordPage: React.FC = () => {
   const [email, setEmail] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [step, setStep] = useState<"email" | "verify">("email");
+  const [timeRemaining, setTimeRemaining] = useState(0);
+  const [cooldownTime, setCooldownTime] = useState(0);
   const router = useRouter();
 
-  const validateForm = () => {
+  // Countdown timer effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    if (timeRemaining > 0) {
+      interval = setInterval(() => {
+        setTimeRemaining((prev) => {
+          if (prev <= 1) {
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [timeRemaining]);
+
+  const validateEmailForm = () => {
     const newErrors: { [key: string]: string } = {};
 
     // Email validation
@@ -26,13 +52,27 @@ const ForgotPasswordPage: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const validateCodeForm = () => {
+    const newErrors: { [key: string]: string } = {};
+
+    // Verification code validation
+    if (!verificationCode) {
+      newErrors.verificationCode = "Verification code is required";
+    } else if (!/^\d{6}$/.test(verificationCode)) {
+      newErrors.verificationCode = "Verification code must be 6 digits";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage("");
     setErrors({});
 
-    if (!validateForm()) {
+    if (!validateEmailForm()) {
       setLoading(false);
       return;
     }
@@ -44,8 +84,10 @@ const ForgotPasswordPage: React.FC = () => {
 
       if (response.status === 200) {
         setMessage(
-          "If an account with that email exists, we've sent a password reset link."
+          "If an account with that email exists, we've sent a verification code. Please check your email and enter the 6-digit code to proceed."
         );
+        setStep("verify");
+        setTimeRemaining(60); // Start countdown
       } else {
         setMessage(
           response.data.message || "An error occurred. Please try again."
@@ -53,6 +95,58 @@ const ForgotPasswordPage: React.FC = () => {
       }
     } catch (error: any) {
       console.error("Forgot password error:", error);
+
+      if (error.response?.status === 429) {
+        setCooldownTime(error.response.data.timeRemaining);
+        setMessage(
+          `Please wait ${error.response.data.timeRemaining} seconds before requesting another password reset.`
+        );
+      } else if (error.response?.data?.message) {
+        setMessage(error.response.data.message);
+      } else {
+        setMessage("An error occurred. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCodeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage("");
+    setErrors({});
+
+    if (!validateCodeForm()) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await axios.post("/api/auth/verify-reset-code", {
+        email,
+        verificationCode,
+      });
+
+      if (response.status === 200) {
+        setMessage(
+          "Verification successful! Redirecting you to reset your password..."
+        );
+        // Redirect to reset password page after a short delay
+        setTimeout(() => {
+          if (response.data.resetToken) {
+            router.push(`/reset-password?token=${response.data.resetToken}`);
+          } else {
+            router.push("/reset-password");
+          }
+        }, 1500);
+      } else {
+        setMessage(
+          response.data.message || "An error occurred. Please try again."
+        );
+      }
+    } catch (error: any) {
+      console.error("Verify code error:", error);
 
       if (error.response?.data?.message) {
         setMessage(error.response.data.message);
@@ -93,47 +187,121 @@ const ForgotPasswordPage: React.FC = () => {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Email Field */}
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Email Address
-            </label>
-            <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-500 ${
-                errors.email ? "border-red-500" : "border-gray-300"
-              }`}
-              placeholder="Enter your email address"
-              required
-            />
-            {errors.email && (
-              <p className="text-red-500 text-sm mt-1">{errors.email}</p>
-            )}
-          </div>
+        {step === "email" ? (
+          <form onSubmit={handleEmailSubmit} className="space-y-4">
+            {/* Email Field */}
+            <div>
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Email Address
+              </label>
+              <input
+                type="email"
+                id="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-500 ${
+                  errors.email ? "border-red-500" : "border-gray-300"
+                }`}
+                placeholder="Enter your email address"
+                required
+              />
+              {errors.email && (
+                <p className="text-red-500 text-sm mt-1">{errors.email}</p>
+              )}
+            </div>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-6 rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-          >
-            {loading ? (
-              <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                Sending Reset Link...
-              </div>
-            ) : (
-              "Send Reset Link"
-            )}
-          </button>
-        </form>
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading || cooldownTime > 0}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-6 rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            >
+              {loading ? (
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  Sending Verification Code...
+                </div>
+              ) : cooldownTime > 0 ? (
+                `Wait ${cooldownTime}s`
+              ) : (
+                "Send Verification Code"
+              )}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleCodeSubmit} className="space-y-4">
+            {/* Verification Code Field */}
+            <div>
+              <label
+                htmlFor="verificationCode"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Verification Code
+              </label>
+              <input
+                type="text"
+                id="verificationCode"
+                value={verificationCode}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, "").slice(0, 6);
+                  setVerificationCode(value);
+                }}
+                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-500 text-center text-2xl tracking-widest ${
+                  errors.verificationCode ? "border-red-500" : "border-gray-300"
+                }`}
+                placeholder="000000"
+                maxLength={6}
+                required
+              />
+              {errors.verificationCode && (
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.verificationCode}
+                </p>
+              )}
+              {timeRemaining > 0 && (
+                <p className="text-sm text-gray-600 mt-2 text-center">
+                  Code expires in {timeRemaining} seconds
+                </p>
+              )}
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading || timeRemaining === 0}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-6 rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-105 shadow-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            >
+              {loading ? (
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  Verifying Code...
+                </div>
+              ) : timeRemaining === 0 ? (
+                "Code Expired"
+              ) : (
+                "Verify Code"
+              )}
+            </button>
+
+            {/* Back to Email Step */}
+            <button
+              type="button"
+              onClick={() => {
+                setStep("email");
+                setVerificationCode("");
+                setTimeRemaining(0);
+                setMessage("");
+                setErrors({});
+              }}
+              className="w-full text-indigo-600 hover:text-indigo-800 font-medium text-sm"
+            >
+              ← Back to email step
+            </button>
+          </form>
+        )}
 
         {/* Message Display */}
         {message && (
@@ -165,8 +333,9 @@ const ForgotPasswordPage: React.FC = () => {
         <div className="mt-4 p-3 bg-blue-50 rounded-lg">
           <p className="text-xs text-blue-800 text-center">
             <strong>Note:</strong> For security reasons, we don&apos;t reveal
-            whether an email address exists in our system. If you don&apos;t
-            receive an email within a few minutes, check your spam folder.
+            whether an email address exists in our system. The verification code
+            expires in 60 seconds. If you don&apos;t receive an email within a
+            few minutes, check your spam folder.
           </p>
         </div>
       </div>

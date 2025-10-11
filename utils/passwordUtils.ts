@@ -42,6 +42,38 @@ export const generateResetToken = (): string => {
 };
 
 /**
+ * Generate a 6-digit verification code for password reset
+ * @returns string - 6-digit code
+ */
+export const generateVerificationCode = (): string => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+/**
+ * Check if enough time has passed since last password reset request
+ * @param lastRequest - Date of last password reset request
+ * @param cooldownSeconds - Cooldown period in seconds (default: 60)
+ * @returns object with canRequest and timeRemaining
+ */
+export const checkPasswordResetRateLimit = (
+  lastRequest: Date | undefined, 
+  cooldownSeconds: number = 60
+): { canRequest: boolean; timeRemaining: number } => {
+  if (!lastRequest) {
+    return { canRequest: true, timeRemaining: 0 };
+  }
+
+  const now = new Date();
+  const timeSinceLastRequest = (now.getTime() - lastRequest.getTime()) / 1000;
+  const timeRemaining = Math.max(0, cooldownSeconds - timeSinceLastRequest);
+
+  return {
+    canRequest: timeRemaining <= 0,
+    timeRemaining: Math.ceil(timeRemaining)
+  };
+};
+
+/**
  * Validate password strength
  * @param password - Password to validate
  * @returns object with validation result and message
