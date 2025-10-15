@@ -19,7 +19,7 @@ const validateAuth = (req: NextApiRequest) => {
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  console.log("HEADERS:", req.headers);
+  // console.log("HEADERS:", req.headers); // Commented out for production
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });

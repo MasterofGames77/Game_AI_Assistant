@@ -6,7 +6,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   const applicationId = process.env.DISCORD_APPLICATION_ID || '';
 
   // Log redirect URI for debugging
-  console.log('Discord Redirect URI:', redirectUri);
+  // console.log('Discord Redirect URI:', redirectUri); // Commented out for production
 
   // Prepare OAuth URL parameters
   const encodedRedirectUri = encodeURIComponent(redirectUri);
@@ -21,7 +21,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   // Log final URL for debugging
-  console.log('Discord Login URL:', discordLoginUrl);
+  // console.log('Discord Login URL:', discordLoginUrl); // Commented out for production
 
   // Redirect user to Discord OAuth page
   res.redirect(discordLoginUrl);

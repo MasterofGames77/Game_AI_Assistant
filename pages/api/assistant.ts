@@ -26,7 +26,7 @@ const measureLatency = async (operation: string, callback: () => Promise<any>, e
   
   // Only log if explicitly enabled or in development
   if (enableLogging || process.env.NODE_ENV === 'development') {
-    console.log(`${operation} latency: ${latency.toFixed(2)}ms`);
+    // console.log(`${operation} latency: ${latency.toFixed(2)}ms`); // Commented out for production
   }
   
   return { result, latency };
@@ -68,7 +68,7 @@ const deduplicateRequest = async <T>(
 ): Promise<T> => {
   // Check if request is already in progress
   if (pendingRequests.has(cacheKey)) {
-    console.log(`Request deduplication: reusing pending request for ${cacheKey}`);
+    // console.log(`Request deduplication: reusing pending request for ${cacheKey}`); // Commented out for production
     return pendingRequests.get(cacheKey) as Promise<T>;
   }
   
@@ -76,16 +76,16 @@ const deduplicateRequest = async <T>(
   const requestPromise = (async () => {
     try {
       const result = await requestFn();
-      console.log(`Request deduplication: completed request for ${cacheKey}`);
+      // console.log(`Request deduplication: completed request for ${cacheKey}`); // Commented out for production
       return result;
     } catch (error) {
-      console.log(`Request deduplication: failed request for ${cacheKey}`);
+      // console.log(`Request deduplication: failed request for ${cacheKey}`); // Commented out for production
       throw error;
     } finally {
       // Clean up after TTL expires
       setTimeout(() => {
         pendingRequests.delete(cacheKey);
-        console.log(`Request deduplication: cleaned up cache for ${cacheKey}`);
+        // console.log(`Request deduplication: cleaned up cache for ${cacheKey}`); // Commented out for production
       }, ttl);
     }
   })();
@@ -104,12 +104,12 @@ const readCSVFile = async (filePath: string) => {
 const getCSVData = async () => {
   const now = Date.now();
   if (csvDataCache && (now - csvDataCacheTime) < CSV_CACHE_TTL) {
-    console.log('CSV data served from cache');
+    // console.log('CSV data served from cache'); // Commented out for production
     return csvDataCache;
   }
   
   try {
-    console.log('CSV data loaded from file');
+    // console.log('CSV data loaded from file'); // Commented out for production
     const data = await readCSVFile(CSV_FILE_PATH);
     csvDataCache = data;
     csvDataCacheTime = now;
@@ -202,7 +202,7 @@ const cleanupCache = () => {
   if (csvDataCache && (now - csvDataCacheTime) > CSV_CACHE_TTL * 2) {
     csvDataCache = null;
     csvDataCacheTime = 0;
-    console.log('CSV cache cleaned up');
+    // console.log('CSV cache cleaned up'); // Commented out for production
   }
   
   // Clean up achievement cache
@@ -216,7 +216,7 @@ const cleanupCache = () => {
   usernamesToDelete.forEach(username => userAchievementCache.delete(username));
   
   if (usernamesToDelete.length > 0) {
-    console.log(`Achievement cache cleaned up ${usernamesToDelete.length} entries`);
+    // console.log(`Achievement cache cleaned up ${usernamesToDelete.length} entries`); // Commented out for production
   }
   
   // Clean up request deduplication cache (remove completed requests)
@@ -231,7 +231,7 @@ const cleanupCache = () => {
   pendingKeysToDelete.forEach(key => pendingRequests.delete(key));
   
   if (pendingKeysToDelete.length > 0) {
-    console.log(`Request deduplication cache cleaned up ${pendingKeysToDelete.length} entries`);
+    // console.log(`Request deduplication cache cleaned up ${pendingKeysToDelete.length} entries`); // Commented out for production
   }
 };
 
@@ -239,10 +239,10 @@ const cleanupCache = () => {
 setInterval(cleanupCache, 10 * 60 * 1000);
 
 // Log cache initialization
-console.log(`Genre mapping cache initialized with ${GENRE_MAPPING_CACHE.size} entries`);
-console.log('CSV data caching enabled with 5-minute TTL');
-console.log('Achievement cache enabled with 2-minute TTL');
-console.log('Request deduplication enabled with 30-second TTL');
+// console.log(`Genre mapping cache initialized with ${GENRE_MAPPING_CACHE.size} entries`); // Commented out for production
+// console.log('CSV data caching enabled with 5-minute TTL'); // Commented out for production
+// console.log('Achievement cache enabled with 2-minute TTL'); // Commented out for production
+// console.log('Request deduplication enabled with 30-second TTL'); // Commented out for production
 
 // Function to fetch game information from IGDB API
 interface IGDBGame {
@@ -261,7 +261,7 @@ const fetchGamesFromIGDB = async (query: string): Promise<string | null> => {
   return deduplicateRequest(cacheKey, async () => {
   try {
     const accessToken = await getClientCredentialsAccessToken();
-    console.log('IGDB Access Token obtained:', accessToken ? 'Yes' : 'No');
+    // console.log('IGDB Access Token obtained:', accessToken ? 'Yes' : 'No'); // Commented out for production
 
     const headers = {
       'Client-ID': process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID,
@@ -278,13 +278,13 @@ const fetchGamesFromIGDB = async (query: string): Promise<string | null> => {
       limit 5;
     `;
 
-    console.log('IGDB Request:', {
-      headers: {
-        'Client-ID': 'present',
-        'Authorization': 'Bearer present'
-      },
-      body: body
-    });
+    // console.log('IGDB Request:', {
+    //   headers: {
+    //     'Client-ID': 'present',
+    //     'Authorization': 'Bearer present'
+    //   },
+    //   body: body
+    // }); // Commented out for production
 
     const response = await axios.post('https://api.igdb.com/v4/games', body, { headers });
     
@@ -323,7 +323,7 @@ const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
   const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&search=${encodeURIComponent(searchQuery)}`;
   try {
     const response = await axios.get(url);
-    //console.log("RAWG API Response:", response.data); // Log the RAWG response data
+    //console.log("RAWG API Response:", response.data); // Log the RAWG response data - commented out for production
     if (response.data && response.data.results.length > 0) {
       const games = response.data.results.map((game: RAWGGame) => ({
         name: game.name,
@@ -429,7 +429,7 @@ export const checkQuestionType = (question: string): string[] => {
   
   // Early return for very short questions (less than 10 characters)
   if (lowerQuestion.length < 10) {
-    console.log('Question too short for genre detection:', question);
+    // console.log('Question too short for genre detection:', question); // Commented out for production
     return [];
   }
   
@@ -655,8 +655,8 @@ export const checkQuestionType = (question: string): string[] => {
 
 // Function to check and award achievements based on user progress
 export const checkAndAwardAchievements = async (username: string, progress: any, session: mongoose.ClientSession | null = null) => {
-  console.log('Checking achievements for user:', username);
-  console.log('Current progress:', progress);
+  // console.log('Checking achievements for user:', username); // Commented out for production
+  // console.log('Current progress:', progress); // Commented out for production
 
   const now = Date.now();
   const cacheKey = username;
@@ -664,7 +664,7 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
   
   // Use cache if recent enough (within 2 minutes)
   if (cached && (now - cached.lastChecked) < ACHIEVEMENT_CACHE_TTL) {
-    console.log('Using cached achievement data for user:', username);
+    // console.log('Using cached achievement data for user:', username); // Commented out for production
     const currentAchievements = cached.achievements;
     const hasProAccess = cached.hasProAccess;
     
@@ -705,7 +705,7 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
           name: check.name, 
           dateEarned: new Date() 
         });
-        console.log(`Achievement earned: ${check.name}`);
+        // console.log(`Achievement earned: ${check.name}`); // Commented out for production
       }
     }
 
@@ -780,14 +780,14 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
             name: check.name, 
             dateEarned: new Date() 
           });
-          console.log(`Pro achievement earned: ${check.name}`);
+          // console.log(`Pro achievement earned: ${check.name}`); // Commented out for production
         }
       }
     }
 
     // If new achievements found, update cache and return them
     if (newAchievements.length > 0) {
-      console.log('New achievements found using cache:', newAchievements.length);
+      // console.log('New achievements found using cache:', newAchievements.length); // Commented out for production
       // Update cache with new achievements
       userAchievementCache.set(cacheKey, {
         achievements: [...currentAchievements, ...newAchievements],
@@ -801,13 +801,13 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
   }
 
   // Cache miss or expired - fetch from database
-  console.log('Cache miss for user achievements, fetching from database:', username);
+  // console.log('Cache miss for user achievements, fetching from database:', username); // Commented out for production
   const user = await User.findOne({ username }).session(session);
   const currentAchievements = user?.achievements || [];
   const newAchievements: { name: string; dateEarned: Date }[] = [];
 
   // Log current state
-  console.log('Current achievements:', currentAchievements);
+  // console.log('Current achievements:', currentAchievements); // Commented out for production
 
   // Check each achievement condition
   const achievementChecks = [
@@ -837,7 +837,7 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
   // Check each achievement
   for (const check of achievementChecks) {
     const progressValue = progress[check.field] || 0;
-    console.log(`Checking ${check.name}: ${progressValue}/${check.threshold}`);
+    // console.log(`Checking ${check.name}: ${progressValue}/${check.threshold}`); // Commented out for production
     
     if (progressValue >= check.threshold && 
         !currentAchievements.some((a: { name: string; }) => a.name === check.name)) {
@@ -845,7 +845,7 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
         name: check.name, 
         dateEarned: new Date() 
       });
-      console.log(`Achievement earned: ${check.name}`);
+      // console.log(`Achievement earned: ${check.name}`); // Commented out for production
     }
   }
 
@@ -920,13 +920,13 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
           name: check.name, 
           dateEarned: new Date() 
         });
-        console.log(`Pro achievement earned: ${check.name}`);
+        // console.log(`Pro achievement earned: ${check.name}`); // Commented out for production
       }
     }
   }
 
   if (newAchievements.length > 0) {
-    console.log('New achievements to award:', newAchievements);
+    // console.log('New achievements to award:', newAchievements); // Commented out for production
 
     // Update the user with the new achievements
     const updateResult = await User.findOneAndUpdate(
@@ -938,7 +938,7 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
       { session: session || undefined, new: true }
     );
 
-    console.log('Update result:', updateResult);
+    // console.log('Update result:', updateResult); // Commented out for production
 
     // Emit achievement event with enhanced data for Pro users (only if Socket.IO is available)
     if (newAchievements.length > 0) {
@@ -964,7 +964,7 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
       hasProAccess: user?.hasProAccess || false,
       lastChecked: now
     });
-    console.log('Achievement cache updated for user:', username);
+    // console.log('Achievement cache updated for user:', username); // Commented out for production
 
     return newAchievements;
   }
@@ -975,7 +975,7 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
     hasProAccess: user?.hasProAccess || false,
     lastChecked: now
   });
-  console.log('Achievement cache updated (no new achievements) for user:', username);
+  // console.log('Achievement cache updated (no new achievements) for user:', username); // Commented out for production
 
   return [];
 };
@@ -1306,7 +1306,7 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
 
             // Check question type first to prepare bulk update operations
             const questionType = await checkQuestionType(question);
-            console.log('Question type detected:', questionType); // Debug log
+            // console.log('Question type detected:', questionType); // Debug log - commented out for production
 
             // Check if user exists first to determine update strategy
             const existingUser = await User.findOne({ username }).session(session);

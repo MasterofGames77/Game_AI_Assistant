@@ -202,11 +202,11 @@ export default function Home() {
     const startTime = performance.now();
 
     try {
-      console.log("Submitting question:", {
-        userId,
-        question,
-        timestamp: new Date().toISOString(),
-      });
+      // console.log("Submitting question:", {
+      //   userId,
+      //   question,
+      //   timestamp: new Date().toISOString(),
+      // }); // Commented out for production
       // let imageFilePath = null;
 
       // Image upload section
@@ -238,10 +238,10 @@ export default function Home() {
       );
 
       const endTime = performance.now();
-      console.log(
-        `Total frontend latency: ${(endTime - startTime).toFixed(2)}ms`
-      );
-      console.log("Response:", res.data);
+      // console.log(
+      //   `Total frontend latency: ${(endTime - startTime).toFixed(2)}ms`
+      // ); // Commented out for production
+      // console.log("Response:", res.data); // Commented out for production
 
       setResponse(res.data.answer);
       if (res.data.metrics) {
@@ -429,7 +429,7 @@ export default function Home() {
   //     // Open Discord login in new tab instead of current window
   //     window.open(discordLoginUrl, "_blank");
   //   } catch (error) {
-  //     console.error("Error during Discord authentication:", error);
+  //     console.error("Error during Discord authentication:", error); // Already commented out
   //     setError("Failed to authenticate with Discord");
   //   }
   // };
@@ -617,7 +617,7 @@ export default function Home() {
 
   // Used for debugging
   // if (typeof window !== "undefined") {
-  //   console.log("Current username:", localStorage.getItem("username"));
+  //   console.log("Current username:", localStorage.getItem("username")); // Already commented out
   // }
 
   return (

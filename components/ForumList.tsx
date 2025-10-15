@@ -105,7 +105,7 @@ export default function ForumList() {
 
       <div className="grid gap-4">
         {forums.map((forum: Forum) => {
-          console.log("Forum object:", forum);
+          // console.log("Forum object:", forum); // Commented out for production
           return (
             <div
               key={forum._id}

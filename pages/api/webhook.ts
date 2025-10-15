@@ -43,38 +43,38 @@ export default async function handler(
   try {
     await connectToWingmanDB();
 
-    console.log(`Processing webhook event: ${event.type}`);
-    console.log('Event data:', JSON.stringify(event.data, null, 2));
+    // console.log(`Processing webhook event: ${event.type}`); // Commented out for production
+    // console.log('Event data:', JSON.stringify(event.data, null, 2)); // Commented out for production
 
     switch (event.type) {
       case 'customer.subscription.created':
-        console.log('Handling subscription created');
+        // console.log('Handling subscription created'); // Commented out for production
         await handleSubscriptionCreated(event.data.object as Stripe.Subscription);
         break;
       
       case 'customer.subscription.updated':
-        console.log('Handling subscription updated');
+        // console.log('Handling subscription updated'); // Commented out for production
         await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
         break;
       
       case 'customer.subscription.deleted':
-        console.log('Handling subscription deleted');
+        // console.log('Handling subscription deleted'); // Commented out for production
         await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
         break;
       
       case 'invoice.payment_succeeded':
-        console.log('Handling payment succeeded');
+        // console.log('Handling payment succeeded'); // Commented out for production
         await handlePaymentSucceeded(event.data.object as Stripe.Invoice);
         break;
       
       
       case 'invoice.payment_failed':
-        console.log('Handling payment failed');
+        // console.log('Handling payment failed'); // Commented out for production
         await handlePaymentFailed(event.data.object as Stripe.Invoice);
         break;
       
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        // console.log(`Unhandled event type: ${event.type}`); // Commented out for production
     }
 
     res.status(200).json({ received: true });
@@ -113,7 +113,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
       !transitionFromFree && 
       !transitionFromExpired) {
     
-    console.log(`Preventing charge for early access user: ${username}`);
+    // console.log(`Preventing charge for early access user: ${username}`); // Commented out for production
     
     // Cancel the subscription immediately
     await stripe.subscriptions.cancel(subscription.id);
@@ -127,7 +127,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
       }
     );
     
-    console.log(`Subscription ${subscription.id} canceled for early access user ${username}`);
+    // console.log(`Subscription ${subscription.id} canceled for early access user ${username}`); // Commented out for production
     return;
   }
 
@@ -148,7 +148,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
      }
    );
 
-  console.log(`Subscription ${subscription.id} processed for user ${username}`);
+  // console.log(`Subscription ${subscription.id} processed for user ${username}`); // Commented out for production
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
@@ -183,7 +183,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
      }
    );
 
-  console.log(`Subscription ${subscription.id} updated for user ${username}`);
+  // console.log(`Subscription ${subscription.id} updated for user ${username}`); // Commented out for production
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
@@ -215,7 +215,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     }
   );
 
-  console.log(`Subscription ${subscription.id} deleted for user ${username}`);
+  // console.log(`Subscription ${subscription.id} deleted for user ${username}`); // Commented out for production
 }
 
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
@@ -260,7 +260,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
     }
   );
 
-  console.log(`Payment succeeded for subscription ${subscriptionId}, user ${user.username}`);
+  // console.log(`Payment succeeded for subscription ${subscriptionId}, user ${user.username}`); // Commented out for production
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
@@ -290,5 +290,5 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
     }
   );
 
-  console.log(`Payment failed for subscription ${subscriptionId}`);
+  // console.log(`Payment failed for subscription ${subscriptionId}`); // Commented out for production
 } 

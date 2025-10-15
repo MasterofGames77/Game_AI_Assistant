@@ -12,7 +12,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   redirectUri = redirectUri.replace(/([^:]\/)\/+/g, "$1");
 
   // Log the redirect URI before encoding
-  console.log("Redirect URI before encoding:", redirectUri);
+  // console.log("Redirect URI before encoding:", redirectUri); // Commented out for production
 
   // Encode the redirect URI
   const encodedRedirectUri = encodeURIComponent(redirectUri);
@@ -23,8 +23,8 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   // Construct the Twitch OAuth2 login URL
   const twitchLoginUrl = `${authUrl}?response_type=code&client_id=${clientId}&redirect_uri=${encodedRedirectUri}&scope=${encodeURIComponent(scopes)}`;
 
-  console.log("Redirect URI after encoding:", encodedRedirectUri);
-  console.log("Twitch Login URL:", twitchLoginUrl);
+  // console.log("Redirect URI after encoding:", encodedRedirectUri); // Commented out for production
+  // console.log("Twitch Login URL:", twitchLoginUrl); // Commented out for production
 
   if (!clientId) {
     return res.status(500).json({ error: 'Missing TWITCH_CLIENT_ID environment variable' });
