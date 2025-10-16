@@ -36,10 +36,10 @@ export default async function handler(
       });
       
       console.log('checkProAccess - all users found:', allUsers.map(u => ({
-        username: u.username,
-        userId: u.userId,
-        hasProAccess: u.hasProAccess,
-        subscription: u.subscription
+        // username: u.username,
+        // userId: u.userId,
+        // hasProAccess: u.hasProAccess,
+        // subscription: u.subscription
       })));
       
       const user = allUsers.find(u => u.hasProAccess) || allUsers[0];
@@ -47,10 +47,10 @@ export default async function handler(
       // If user has Pro access, get detailed subscription status
       if (user && user.hasProAccess) {
         console.log('checkProAccess - user found with Pro access:', {
-          username: user.username,
-          hasProAccess: user.hasProAccess,
-          subscription: user.subscription,
-          hasGetSubscriptionStatus: typeof user.getSubscriptionStatus === 'function'
+          // username: user.username,
+          // hasProAccess: user.hasProAccess,
+          // subscription: user.subscription,
+          // hasGetSubscriptionStatus: typeof user.getSubscriptionStatus === 'function'
         });
         
         try {
@@ -62,9 +62,9 @@ export default async function handler(
         }
       } else {
         console.log('checkProAccess - no user found or no Pro access:', {
-          userFound: !!user,
-          hasProAccess: user?.hasProAccess,
-          allUsersCount: allUsers.length
+          // userFound: !!user,
+          // hasProAccess: user?.hasProAccess,
+          // allUsersCount: allUsers.length
         });
       }
     }

@@ -34,6 +34,7 @@ const OFFENSIVE_WORDS = [
   'Putin',
   'Pro-Putin',
   'Pro-Russia',
+  'Pro-Hitler',
   'Benjamin Netanyahu',
   'Viktor Orbán',
   'Xi Jinping',
@@ -47,6 +48,7 @@ const OFFENSIVE_WORDS = [
   'Recep Tayyip Erdoğan',
   'Boris Yeltsin',
   'unified reich',
+  'Javier Milei',
   'Donald Trump',
   'Trump',
   'Trumpism',
@@ -348,6 +350,8 @@ const OFFENSIVE_WORDS = [
   'Jeffrey Wall',
   'Marsha Blackburn',
   'Bill Lee',
+  'Michael Bartels',
+  'Alex Dwyer',
   'Tony Fabrizio',
   'Markwayne Mullin',
   'Kay Ivey',
@@ -467,9 +471,12 @@ const OFFENSIVE_WORDS = [
   'blow me',
   'blowme',
   'bulge',
+  'Under Seige',
+  'The Art of the Deal',
   'Aligator Alcatraz',
   'Let\'s Go Brandon',
   'Truth Social',
+  'Young Republicans',
   'Children\'s Health Defense',
   'Medical Ethics Defense Act',
   'The Federalist Society',
@@ -513,4 +520,4 @@ export const containsOffensiveContent = async (content: string, userId: string) 
     offendingWords: result.offendingWords || foundWords,
     violationResult: result.violationResult
   };
-}; 
+};

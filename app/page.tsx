@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import Sidebar from "../components/Sidebar";
 import Image from "next/image";
@@ -9,6 +9,8 @@ import ForumList from "../components/ForumList";
 import { ForumProvider } from "../context/ForumContext";
 import PasswordSetupModal from "../components/PasswordSetupModal";
 import EarlyAccessSetupModal from "../components/EarlyAccessSetupModal";
+// import useSocket from "../hooks/useSocket"; // DISABLED due to 404 errors
+import useAchievementPolling from "../hooks/useAchievementPolling";
 // import { useRouter } from "next/navigation";
 // import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 // import { faPaperclip } from "@fortawesome/free-solid-svg-icons";
@@ -47,6 +49,13 @@ export default function Home() {
     useState(false);
   const [isEarlyAccessUser, setIsEarlyAccessUser] = useState(false);
   const [earlyAccessUserData, setEarlyAccessUserData] = useState<any>(null);
+
+  // Achievement polling system - replaces Socket.IO for notifications
+  const { isPolling, lastChecked } = useAchievementPolling({
+    username: username,
+    isEnabled: !!username, // Only poll when user is logged in
+    pollingInterval: 30000, // Check every 30 seconds
+  });
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -190,6 +199,15 @@ export default function Home() {
       setResponse(selectedConversation.response);
     }
   }, [selectedConversation]);
+
+  // Achievement polling status logging
+  useEffect(() => {
+    if (username && isPolling) {
+      console.log("✅ Achievement polling active for user:", username);
+    } else if (username && !isPolling) {
+      console.log("⏸️ Achievement polling paused for user:", username);
+    }
+  }, [username, isPolling]);
 
   // Display conversation and forum count in the UI
   const conversationCount = conversations.length;

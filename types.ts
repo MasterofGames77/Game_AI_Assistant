@@ -217,10 +217,14 @@ export interface GameData {
 }
 
 export interface AchievementData {
-  userId: string;
-  achievements: { name: string; dateEarned: Date }[];
-  isPro?: boolean;
-  totalAchievements?: number;
+  username: string;
+  achievements: Array<{
+    name: string;
+    dateEarned: string;
+  }>;
+  isPro: boolean;
+  message: string;
+  totalAchievements: number;
 }
 
 export interface PrivateForumUserManagementProps {
@@ -229,4 +233,28 @@ export interface PrivateForumUserManagementProps {
   createdBy: string;
   currentUsername: string;
   onUsersUpdated: (newUsers: string[]) => void;
+}
+
+export interface CheckNewAchievementsRequest {
+  username: string;
+  lastChecked: string | null; // ISO string or null
+}
+
+export interface CheckNewAchievementsResponse {
+  hasNewAchievements: boolean;
+  username?: string;
+  achievements?: Array<{
+    name: string;
+    dateEarned: string;
+  }>;
+  isPro?: boolean;
+  message?: string;
+  totalAchievements?: number;
+  error?: string;
+}
+
+export interface UseAchievementPollingProps {
+  username: string | null;
+  isEnabled: boolean;
+  pollingInterval?: number; // in milliseconds, default 30000 (30 seconds)
 }

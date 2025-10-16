@@ -7,18 +7,23 @@ import { AchievementData } from "../types";
 const useSocket = (url: string): Socket => {
   const { current: socket } = useRef<Socket>(
     io(url, {
-      path: "/api/socket",
-      addTrailingSlash: false,
+      // Use default Socket.IO configuration
     })
   );
 
   useEffect(() => {
     socket.on("connect", () => {
-      console.log("Connected to socket.io server");
+      console.log("✅ Connected to socket.io server");
+      console.log("Transport:", socket.io.engine.transport.name);
     });
 
-    socket.on("disconnect", () => {
-      console.log("Disconnected from socket.io server");
+    socket.on("disconnect", (reason) => {
+      console.log("❌ Disconnected from socket.io server:", reason);
+    });
+
+    socket.on("connect_error", (error) => {
+      console.warn("⚠️ Socket.IO connection error:", error.message);
+      console.log("Error details:", error);
     });
 
     socket.on("achievementEarned", (data: AchievementData) => {
@@ -99,6 +104,7 @@ const useSocket = (url: string): Socket => {
     return () => {
       socket.off("connect");
       socket.off("disconnect");
+      socket.off("connect_error");
       socket.off("achievementEarned");
     };
   }, [socket]);
