@@ -203,9 +203,9 @@ export default function Home() {
   // Achievement polling status logging
   useEffect(() => {
     if (username && isPolling) {
-      console.log("✅ Achievement polling active for user:", username);
+      // console.log("✅ Achievement polling active for user:", username); // Commented out for production
     } else if (username && !isPolling) {
-      console.log("⏸️ Achievement polling paused for user:", username);
+      // console.log("⏸️ Achievement polling paused for user:", username); // Commented out for production
     }
   }, [username, isPolling]);
 

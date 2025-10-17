@@ -230,7 +230,7 @@ export const getChatCompletion = async (question: string, systemMessage?: string
     // Check if we have a cached response
     const cachedResponse = aiCache.get(cacheKey);
     if (cachedResponse) {
-      console.log('Cache hit for chat completion:', question.substring(0, 30) + '...');
+      // console.log('Cache hit for chat completion:', question.substring(0, 30) + '...'); // Commented out for production
       return cachedResponse;
     }
 

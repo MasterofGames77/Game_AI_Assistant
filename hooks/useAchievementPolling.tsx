@@ -41,10 +41,10 @@ const useAchievementPolling = ({
       });
 
       if (!response.ok) {
-        console.warn(
-          "Failed to check for new achievements:",
-          response.statusText
-        );
+        // console.warn(
+        //   "Failed to check for new achievements:",
+        //   response.statusText
+        // ); // Commented out for production
         return;
       }
 

@@ -13,19 +13,19 @@ const initSocket = (server: HttpServer): void => {
   });
 
   io.on("connection", (socket) => {
-    console.log(`✅ User connected via ${socket.conn.transport.name}`);
+    // console.log(`✅ User connected via ${socket.conn.transport.name}`); // Commented out for production
     
     // Log when transport upgrades
     socket.conn.on("upgrade", () => {
-      console.log(`🔄 Transport upgraded to: ${socket.conn.transport.name}`);
+      // console.log(`🔄 Transport upgraded to: ${socket.conn.transport.name}`); // Commented out for production
     });
 
     socket.on("disconnect", (reason) => {
-      console.log(`❌ User disconnected: ${reason}`);
+      // console.log(`❌ User disconnected: ${reason}`); // Commented out for production
     });
   });
 
-  console.log('🔌 Socket.IO server initialized on path: /socket.io/');
+  // console.log('🔌 Socket.IO server initialized on path: /socket.io/'); // Commented out for production
 };
 
 // Get the Socket.IO server instance

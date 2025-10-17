@@ -29,14 +29,14 @@ export const getClientCredentialsAccessToken = async (): Promise<string> => {
     params.append('client_secret', clientSecret);
     params.append('grant_type', 'client_credentials');
 
-    console.log("Requesting client credentials access token with parameters:", params.toString());
+    // console.log("Requesting client credentials access token with parameters:", params.toString()); // Commented out for production
 
     const response = await axios.post(tokenUrl, params);
 
     cachedAccessToken = response.data.access_token;
     tokenExpiryTime = Date.now() + response.data.expires_in * 1000;
 
-    console.log("Access token retrieved successfully:", cachedAccessToken);
+    // console.log("Access token retrieved successfully:", cachedAccessToken); // Commented out for production
     return cachedAccessToken || '';
   } catch (error: any) {
     console.error("Error fetching client credentials access token:", error.response?.data || error.message);
@@ -73,11 +73,11 @@ export const getAccessToken = async (code: string, refreshToken?: string): Promi
       params.append('redirect_uri', redirectUri);
     }
 
-    console.log("Requesting authorization code access token with parameters:", params.toString());
+    // console.log("Requesting authorization code access token with parameters:", params.toString()); // Commented out for production
 
     const response = await axios.post(tokenUrl, params);
 
-    console.log("Access token response:", response.data);
+    // console.log("Access token response:", response.data); // Commented out for production
 
     return response.data.access_token;
   } catch (error: any) {
@@ -94,14 +94,14 @@ export const getAccessToken = async (code: string, refreshToken?: string): Promi
  */
 export const getTwitchUserData = async (accessToken: string) => {
   try {
-    console.log('Fetching Twitch user data with access token:', accessToken);
+    // console.log('Fetching Twitch user data with access token:', accessToken); // Commented out for production
     const response = await axios.get('https://api.twitch.tv/helix/users', {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Client-Id': process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID,
       },
     });
-    console.log('Twitch user data response:', response.data);
+    // console.log('Twitch user data response:', response.data); // Commented out for production
     return response.data;
   } catch (error: any) {
     console.error('Error fetching Twitch user data:', error.response?.data || error.message);
@@ -136,12 +136,12 @@ export const redirectToTwitch = (res: NextApiResponse) => {
   // Ensure no trailing slash and no double slashes
   redirectUri = redirectUri.replace(/\/$/, '').replace(/([^:]\/)\/+/g, "$1");
 
-  console.log('Using redirect_uri (before encoding):', redirectUri);
+  // console.log('Using redirect_uri (before encoding):', redirectUri); // Commented out for production
 
   // Construct the authorization URL
   const authorizationUrl = buildTwitchAuthorizationUrl(redirectUri);
 
-  console.log('Redirecting to Twitch authorization URL:', authorizationUrl);
+  // console.log('Redirecting to Twitch authorization URL:', authorizationUrl); // Commented out for production
 
   res.redirect(authorizationUrl);
 };
