@@ -68,6 +68,10 @@ const useAchievementPolling = ({
 
         // Update last checked timestamp
         setLastChecked(new Date());
+      } else {
+        // Even if no new achievements, update the lastChecked timestamp
+        // to prevent showing the same achievements again
+        setLastChecked(new Date());
       }
     } catch (error) {
       console.error("Error checking for new achievements:", error);
@@ -139,6 +143,12 @@ const useAchievementPolling = ({
         setIsPolling(false);
       }
       return;
+    }
+
+    // If this is the first time checking (no lastChecked timestamp),
+    // set the initial timestamp to now to prevent showing existing achievements
+    if (!lastChecked) {
+      setLastChecked(new Date());
     }
 
     // Start polling

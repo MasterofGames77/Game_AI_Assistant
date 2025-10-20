@@ -36,20 +36,14 @@ export default async function handler(
       });
     }
 
-    // If no lastChecked timestamp, return all achievements (first time)
+    // If no lastChecked timestamp, don't show any achievements as "new"
+    // This prevents showing all existing achievements on page refresh
     if (!lastChecked) {
-      const achievements = user.achievements.map((achievement: any) => ({
-        name: achievement.name,
-        dateEarned: achievement.dateEarned.toISOString()
-      }));
-
       return res.status(200).json({
-        hasNewAchievements: achievements.length > 0,
+        hasNewAchievements: false,
         username: user.username,
-        achievements: achievements,
         isPro: user.hasProAccess,
-        message: `Welcome! You have ${achievements.length} achievement${achievements.length !== 1 ? 's' : ''}!`,
-        totalAchievements: achievements.length
+        totalAchievements: user.achievements.length
       });
     }
 

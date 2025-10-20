@@ -67,3 +67,4 @@ runAchievementCacheTests.js
 bash.exe.stackdump
 passwords
 tests/test-polling-system.js
+tests/testAchievementNotifications.js
