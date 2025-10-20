@@ -38,7 +38,7 @@ export default function ContentModeration() {
       }
 
       // If validation and moderation pass, proceed with posting
-      console.log("Post is valid and not offensive:", message);
+      // console.log("Post is valid and not offensive:", message); // Commented out for production
       setMessage("");
       setError("");
     } catch (err: any) {

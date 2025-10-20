@@ -35,37 +35,37 @@ export default async function handler(
         ]
       });
       
-      console.log('checkProAccess - all users found:', allUsers.map(u => ({
-        // username: u.username,
-        // userId: u.userId,
-        // hasProAccess: u.hasProAccess,
-        // subscription: u.subscription
-      })));
+      // console.log('checkProAccess - all users found:', allUsers.map(u => ({
+      //   // username: u.username,
+      //   // userId: u.userId,
+      //   // hasProAccess: u.hasProAccess,
+      //   // subscription: u.subscription
+      // }))); // Commented out for production
       
       const user = allUsers.find(u => u.hasProAccess) || allUsers[0];
 
       // If user has Pro access, get detailed subscription status
       if (user && user.hasProAccess) {
-        console.log('checkProAccess - user found with Pro access:', {
-          // username: user.username,
-          // hasProAccess: user.hasProAccess,
-          // subscription: user.subscription,
-          // hasGetSubscriptionStatus: typeof user.getSubscriptionStatus === 'function'
-        });
+        // console.log('checkProAccess - user found with Pro access:', {
+        //   // username: user.username,
+        //   // hasProAccess: user.hasProAccess,
+        //   // subscription: user.subscription,
+        //   // hasGetSubscriptionStatus: typeof user.getSubscriptionStatus === 'function'
+        // }); // Commented out for production
         
         try {
           subscriptionStatus = user.getSubscriptionStatus();
-          console.log('checkProAccess - user.getSubscriptionStatus() returned:', subscriptionStatus);
+          // console.log('checkProAccess - user.getSubscriptionStatus() returned:', subscriptionStatus); // Commented out for production
         } catch (error) {
           console.error('Error calling getSubscriptionStatus:', error);
           subscriptionStatus = null;
         }
       } else {
-        console.log('checkProAccess - no user found or no Pro access:', {
-          // userFound: !!user,
-          // hasProAccess: user?.hasProAccess,
-          // allUsersCount: allUsers.length
-        });
+        // console.log('checkProAccess - no user found or no Pro access:', {
+        //   userFound: !!user,
+        //   hasProAccess: user?.hasProAccess,
+        //   allUsersCount: allUsers.length
+        // }); // Commented out for production
       }
     }
 

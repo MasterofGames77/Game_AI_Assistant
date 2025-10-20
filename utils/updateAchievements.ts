@@ -15,11 +15,11 @@ const updateAchievementsForUser = async (email: string) => {
       throw new Error('User does not have a username');
     }
 
-    console.log('Found user:', user.email);
+    // console.log('Found user:', user.email); // Commented out for production
 
     // Get all questions for this user
     const questions = await Question.find({ username: user.username });
-    console.log(`Found ${questions.length} questions for user`);
+    // console.log(`Found ${questions.length} questions for user`); // Commented out for production
 
     // Initialize progress with all possible fields
     const progress: Record<string, any> = {
@@ -66,18 +66,18 @@ const updateAchievementsForUser = async (email: string) => {
     };
 
     // Process each question to update progress using the enhanced checkQuestionType
-    console.log('Processing questions for achievement tracking...');
+    // console.log('Processing questions for achievement tracking...'); // Commented out for production
     for (const question of questions) {
       const types = await checkQuestionType(question.question);
       for (const type of types) {
         if (type in progress) {
           progress[type]++;
-          console.log(`Detected ${type} for question: "${question.question.substring(0, 50)}..."`);
+          // console.log(`Detected ${type} for question: "${question.question.substring(0, 50)}..."`); // Commented out for production
         }
       }
     }
 
-    console.log('Calculated progress:', progress);
+    // console.log('Calculated progress:', progress); // Commented out for production
 
     // Update user's progress
     const updateResult = await User.findOneAndUpdate(
@@ -89,10 +89,10 @@ const updateAchievementsForUser = async (email: string) => {
     if (updateResult) {
       // Now check and award achievements based on the progress
       const newAchievements = await checkAndAwardAchievements(user.username, progress);
-      console.log('Awarded achievements:', newAchievements);
+      // console.log('Awarded achievements:', newAchievements); // Commented out for production
     }
 
-    console.log('Update completed for user:', email);
+    // console.log('Update completed for user:', email); // Commented out for production
     return updateResult;
   } catch (error) {
     console.error('Error updating user:', error);
@@ -129,24 +129,24 @@ const createUpdateUserEndpoint = async (req: any, res: any) => {
 
 // Update all users with new achievements progress
 const updateAchievementsForAllUsers = async () => {
-  console.log('Starting achievement update for all users...');
+  // console.log('Starting achievement update for all users...'); // Commented out for production
   
   try {
     await connectToMongoDB();
-    console.log('Connected to MongoDB successfully');
+    // console.log('Connected to MongoDB successfully'); // Commented out for production
 
     // First, get all users
     const users = await User.find({});
-    console.log(`Found ${users.length} users to process`);
+    // console.log(`Found ${users.length} users to process`); // Commented out for production
 
     // Process each user
     for (const user of users) {
-      console.log(`Processing user: ${user.email || user.username}`);
+      // console.log(`Processing user: ${user.email || user.username}`); // Commented out for production
       
       try {
         // Get user's questions to calculate progress
         const questions = await Question.find({ username: user.username });
-        console.log(`Found ${questions.length} questions for user`);
+        // console.log(`Found ${questions.length} questions for user`); // Commented out for production
 
         // Initialize progress with all possible fields
         const progress: Record<string, any> = {
@@ -193,18 +193,18 @@ const updateAchievementsForAllUsers = async () => {
         };
         
         // Process each question to update progress using the enhanced checkQuestionType
-        console.log('Processing questions for achievement tracking...');
+        // console.log('Processing questions for achievement tracking...'); // Commented out for production
         for (const q of questions) {
           const types = await checkQuestionType(q.question);
           for (const type of types) {
             if (type in progress) {
               progress[type]++;
-              console.log(`Detected ${type} for question: "${q.question.substring(0, 50)}..."`);
+              // console.log(`Detected ${type} for question: "${q.question.substring(0, 50)}..."`); // Commented out for production
             }
           }
         }
 
-        console.log(`Updated progress for user:`, progress);
+        // console.log(`Updated progress for user:`, progress); // Commented out for production
 
         // Update user's progress
         const updateResult = await User.findOneAndUpdate(
@@ -219,11 +219,11 @@ const updateAchievementsForAllUsers = async () => {
         if (updateResult) {
           const newAchievements = await checkAndAwardAchievements(user.username, progress);
           if (newAchievements.length > 0) {
-            console.log(`Awarded ${newAchievements.length} new achievements to user ${user.email || user.username}`);
+            // console.log(`Awarded ${newAchievements.length} new achievements to user ${user.email || user.username}`); // Commented out for production
           }
         }
 
-        console.log(`Completed processing for user: ${user.email || user.username}`);
+        // console.log(`Completed processing for user: ${user.email || user.username}`); // Commented out for production
       } catch (userError) {
         console.error(`Error processing user ${user.email || user.username}:`, userError);
         // Continue with next user even if one fails
@@ -231,13 +231,13 @@ const updateAchievementsForAllUsers = async () => {
       }
     }
 
-    console.log('Successfully completed achievement update for all users');
+    // console.log('Successfully completed achievement update for all users'); // Commented out for production
   } catch (error) {
     console.error('Error in updateAchievementsForAllUsers:', error);
     throw error;
   } finally {
     await mongoose.connection.close();
-    console.log('Closed MongoDB connection');
+    // console.log('Closed MongoDB connection'); // Commented out for production
   }
 };
 
@@ -246,11 +246,11 @@ const verifyUpdate = async (username: string) => {
   await connectToMongoDB();
   try {
     const user = await User.findOne({ username });
-    console.log('User data:', {
-      username: user?.username,
-      hasAchievements: !!user?.achievements,
-      hasProgress: !!user?.progress
-    });
+    // console.log('User data:', {
+    //   username: user?.username,
+    //   hasAchievements: !!user?.achievements,
+    //   hasProgress: !!user?.progress
+    // }); // Commented out for production
   } finally {
     await mongoose.connection.close();
   }
@@ -283,7 +283,7 @@ const updateAchievementsFromHistory = async (username: string) => {
       await checkAndAwardAchievements(user.username, user.progress, null);
     }
     
-    console.log('Updated achievements from history for user:', username);
+    // console.log('Updated achievements from history for user:', username); // Commented out for production
   } catch (error) {
     console.error('Error updating achievements from history:', error);
   } finally {

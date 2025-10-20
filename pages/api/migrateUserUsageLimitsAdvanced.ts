@@ -10,11 +10,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     await connectToWingmanDB();
 
-    console.log('🔄 Starting advanced user usage limits migration...');
+    // console.log('🔄 Starting advanced user usage limits migration...'); // Commented out for production
 
     // Get all users from the database
     const users = await User.find({});
-    console.log(`📊 Found ${users.length} users to migrate`);
+    // console.log(`📊 Found ${users.length} users to migrate`); // Commented out for production
 
     let migratedCount = 0;
     let skippedCount = 0;
@@ -26,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       try {
         // Check if user already has usageLimit data
         if (user.usageLimit) {
-          console.log(`⏭️  Skipping user ${user.username} - already has usage limit data`);
+          // console.log(`⏭️  Skipping user ${user.username} - already has usage limit data`); // Commented out for production
           skippedCount++;
           continue;
         }
@@ -47,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             lastQuestionTime: now
           };
           proUsersCount++;
-          console.log(`👑 Pro user: ${user.username} (${user.subscription?.status || 'legacy'})`);
+          // console.log(`👑 Pro user: ${user.username} (${user.subscription?.status || 'legacy'})`); // Commented out for production
         } else {
           // Free users get standard limits
           usageLimit = {
@@ -58,7 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             lastQuestionTime: now
           };
           freeUsersCount++;
-          console.log(`🆓 Free user: ${user.username}`);
+          // console.log(`🆓 Free user: ${user.username}`); // Commented out for production
         }
 
         // Update the user with usage limit data
@@ -72,7 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           { new: true }
         );
 
-        console.log(`✅ Migrated user: ${user.username}`);
+        // console.log(`✅ Migrated user: ${user.username}`); // Commented out for production
         migratedCount++;
 
       } catch (error) {
@@ -121,8 +121,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       timestamp: new Date().toISOString()
     };
 
-    console.log('🎉 Advanced migration completed!');
-    console.log('📈 Final Stats:', result.finalStats);
+    // console.log('🎉 Advanced migration completed!'); // Commented out for production
+    // console.log('📈 Final Stats:', result.finalStats); // Commented out for production
 
     return res.status(200).json({
       message: 'Advanced user usage limits migration completed successfully',
