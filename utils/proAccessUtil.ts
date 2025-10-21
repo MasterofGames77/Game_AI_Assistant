@@ -151,7 +151,7 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
     const existingWingmanUser = await AppUser.findOne({ userId });
     
     if (existingWingmanUser) {
-      console.log('User already exists in Wingman DB, updating Discord info:', {
+      console.log('User already exists in Wingman DB, checking for Pro access eligibility:', {
         userId,
         existingEmail: existingWingmanUser.email,
         discordEmail: email,
@@ -175,6 +175,67 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
         );
         console.log('Updated user with Discord email');
       }
+
+      // Check if user should have Pro access from splash database
+      const splashUser = email 
+        ? await SplashUser.findOne({ email })
+        : await SplashUser.findOne({ userId });
+
+      if (splashUser) {
+        const isApproved = splashUser.isApproved || splashUser.hasProAccess;
+        const isEarlyUser = (typeof splashUser.position === 'number' && splashUser.position <= 5000);
+        
+        // Check deadline logic
+        let signupDate: Date | null = null;
+        if (splashUser.userId.includes('-') && splashUser.userId.split('-').length > 1) {
+          try {
+            const datePart = splashUser.userId.split('-')[1];
+            if (!isNaN(Date.parse(datePart))) {
+              signupDate = new Date(datePart);
+            }
+          } catch (error) {
+            console.log('Could not parse date from userId:', splashUser.userId);
+          }
+        }
+        const proDeadline = new Date('2025-12-31T23:59:59.999Z');
+        const isBeforeDeadline = signupDate ? signupDate <= proDeadline : false;
+        
+        const shouldHaveProAccess = isEarlyUser || isBeforeDeadline || isApproved;
+
+        console.log('Existing user Pro access check:', {
+          userId,
+          isApproved,
+          isEarlyUser,
+          isBeforeDeadline,
+          shouldHaveProAccess,
+          currentHasProAccess: existingWingmanUser.hasProAccess
+        });
+
+        if (shouldHaveProAccess && !existingWingmanUser.hasProAccess) {
+          console.log('Granting Pro access to existing user from splash database');
+          
+          const earlyAccessStartDate = new Date('2025-12-31T23:59:59.999Z');
+          const earlyAccessEndDate = new Date('2026-12-31T23:59:59.999Z');
+          
+          await AppUser.findOneAndUpdate(
+            { userId },
+            {
+              hasProAccess: true,
+              subscription: {
+                status: 'free_period',
+                earlyAccessGranted: true,
+                earlyAccessStartDate,
+                earlyAccessEndDate,
+                transitionToPaid: false,
+                currentPeriodStart: earlyAccessStartDate,
+                currentPeriodEnd: earlyAccessEndDate
+              }
+            }
+          );
+          console.log('Updated existing user with Pro access');
+        }
+      }
+      
       return; // User already exists, no need to create new one
     }
 
@@ -238,7 +299,19 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
       
       const isEarlyUser = (typeof splashUser.position === 'number' && splashUser.position <= 5000);
       const isBeforeDeadline = signupDate ? signupDate <= proDeadline : false;
-      const hasProAccess = isEarlyUser || isBeforeDeadline;
+      const isApproved = splashUser.isApproved || splashUser.hasProAccess;
+      const hasProAccess = isEarlyUser || isBeforeDeadline || isApproved;
+
+      console.log('Pro access eligibility check:', {
+        userId: splashUser.userId,
+        email: splashUser.email,
+        isEarlyUser,
+        isBeforeDeadline,
+        isApproved,
+        hasProAccess,
+        position: splashUser.position,
+        signupDate: signupDate?.toISOString()
+      });
 
       // Update or create user in Wingman DB with all required fields
       await AppUser.findOneAndUpdate(
