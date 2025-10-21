@@ -82,11 +82,65 @@ export default function Home() {
     const initializeUser = async () => {
       setLoading(true);
       try {
-        // Check for early access user parameters in URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const earlyAccessUserId = urlParams.get("userId");
-        const earlyAccessEmail = urlParams.get("email");
-        const isEarlyAccess = urlParams.get("earlyAccess") === "true";
+        // Robust URL parameter parsing to handle malformed URLs
+        const parseEarlyAccessParams = (searchString: string) => {
+          const urlParams = new URLSearchParams(searchString);
+          let userId = urlParams.get("userId");
+          let email = urlParams.get("email");
+          let earlyAccess = urlParams.get("earlyAccess");
+          let isEarlyAccess = earlyAccess === "true";
+
+          // Debug logging
+          console.log("URL Search Params:", searchString);
+          console.log("Initial parsed parameters:", {
+            userId,
+            email,
+            earlyAccess,
+            isEarlyAccess,
+          });
+
+          // Handle malformed URLs where parameters might be incorrectly appended to email
+          if (email && email.includes("?")) {
+            console.log("Detected malformed email with URL parameters:", email);
+
+            // Extract the actual email (everything before the first ?)
+            const actualEmail = email.split("?")[0];
+            const malformedPart = email.split("?")[1];
+
+            console.log("Extracted email:", actualEmail);
+            console.log("Malformed part:", malformedPart);
+
+            // Check if the malformed part contains earlyAccess=true
+            if (malformedPart && malformedPart.includes("earlyAccess=true")) {
+              isEarlyAccess = true;
+              console.log(
+                "Found earlyAccess=true in malformed part, setting isEarlyAccess to true"
+              );
+            }
+
+            email = actualEmail;
+          }
+
+          // Additional cleanup for any remaining malformed parameters
+          if (email && email.includes("?earlyAccess=true")) {
+            email = email.replace("?earlyAccess=true", "");
+            console.log("Cleaned remaining malformed parameters from email");
+          }
+
+          console.log("Final parsed parameters:", {
+            userId,
+            email,
+            earlyAccess,
+            isEarlyAccess,
+          });
+          return { userId, email, isEarlyAccess };
+        };
+
+        const {
+          userId: earlyAccessUserId,
+          email: earlyAccessEmail,
+          isEarlyAccess,
+        } = parseEarlyAccessParams(window.location.search);
 
         if (isEarlyAccess && earlyAccessUserId) {
           // Handle early access user

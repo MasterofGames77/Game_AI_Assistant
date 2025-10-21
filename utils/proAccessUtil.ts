@@ -123,6 +123,22 @@ export const checkProAccess = async (identifier: string, userId?: string): Promi
 
 export const syncUserData = async (userId: string, email?: string): Promise<void> => {
   try {
+    // Clean the email if it has malformed parameters attached
+    if (email) {
+      // Handle various malformed email formats
+      if (email.includes("?")) {
+        // Extract the actual email (everything before the first ?)
+        email = email.split("?")[0];
+        console.log("Cleaned malformed email in syncUserData:", email);
+      }
+      
+      // Additional cleanup for any remaining malformed parameters
+      if (email.includes("?earlyAccess=true")) {
+        email = email.replace("?earlyAccess=true", "");
+        console.log("Cleaned remaining malformed parameters from email in syncUserData");
+      }
+    }
+
     // Connect to databases
     await connectToMongoDB(); // Ensure MongoDB is connected
     const splashDB = await connectToSplashDB();
