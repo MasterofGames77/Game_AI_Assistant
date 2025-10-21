@@ -14,7 +14,8 @@ Video Game Wingman is more than just an AI - it's a gamer who lives and breathes
 - **Discord Bot Integration**: Add Video Game Wingman to your Discord server for real-time gaming discussions
 - **Community Forums**: Join Pro-only forums to discuss games, share tips, and connect with other gamers
 - **Real-time Notifications**: Get instant updates about achievements, forum responses, and community activity
-- **Advanced Analytics**: Track your gaming progress and get personalized insights
+- **Progress Tracking**: Track your gaming progress and achievements with detailed analytics
+- **Health & Ergonomics Monitoring**: Get break reminders and health tips to maintain healthy gaming habits
 - **Multi-Platform Support**: Access via web interface or Discord
 
 ### What Video Game Wingman Can Help With
@@ -24,8 +25,9 @@ Video Game Wingman is more than just an AI - it's a gamer who lives and breathes
 - 🔍 **Hidden Secrets**: Discover easter eggs and hidden content
 - 💡 **Tips & Tricks**: Pro strategies to improve your gameplay
 - 📚 **Game Lore**: Deep dives into game stories and backstories
-- 📊 **Gaming Analytics**: Track your progress and achievements
-- 🏆 **Achievement Help**: Guidance on unlocking specific achievements
+- 📊 **Progress Tracking**: Track your gaming progress and achievements with detailed analytics
+- 🏆 **Achievement System**: Earn achievements based on your gaming questions and activities
+- ⏰ **Health Monitoring**: Get break reminders and ergonomics tips for healthy gaming
 - 🎪 **Game News**: Stay updated with the latest gaming industry news
 
 ## 🚀 Getting Started

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { SubscriptionStatus } from "@/types";
+import { SubscriptionStatus, HealthMonitoring } from "@/types";
 import axios from "axios";
 
 interface AccountData {
@@ -17,6 +17,7 @@ interface AccountData {
     [key: string]: number;
   };
   hasPassword?: boolean;
+  healthMonitoring?: HealthMonitoring;
 }
 
 export default function AccountPage() {
@@ -34,6 +35,19 @@ export default function AccountPage() {
   });
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
+
+  // Health settings state
+  const [healthSettings, setHealthSettings] = useState<HealthMonitoring>({
+    breakReminderEnabled: true,
+    breakIntervalMinutes: 45,
+    totalSessionTime: 0,
+    breakCount: 0,
+    healthTipsEnabled: true,
+    ergonomicsReminders: true,
+  });
+  const [healthSettingsLoading, setHealthSettingsLoading] = useState(false);
+  const [healthSettingsError, setHealthSettingsError] = useState("");
+  const [healthSettingsSuccess, setHealthSettingsSuccess] = useState("");
 
   useEffect(() => {
     const fetchAccountData = async () => {
@@ -87,7 +101,13 @@ export default function AccountPage() {
           achievements: userData.user.achievements || [],
           progress: userData.user.progress || { totalQuestions: 0 },
           hasPassword: !!userData.user.password,
+          healthMonitoring: userData.user.healthMonitoring,
         });
+
+        // Initialize health settings if available
+        if (userData.user.healthMonitoring) {
+          setHealthSettings(userData.user.healthMonitoring);
+        }
       } catch (err) {
         console.error("Error fetching account data:", err);
         setError("Failed to load account data");
@@ -206,6 +226,61 @@ export default function AccountPage() {
     });
     setPasswordError("");
     setPasswordSuccess("");
+  };
+
+  // Health settings handlers
+  const handleHealthSettingsChange = (
+    field: keyof HealthMonitoring,
+    value: any
+  ) => {
+    setHealthSettings((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleSaveHealthSettings = async () => {
+    setHealthSettingsLoading(true);
+    setHealthSettingsError("");
+    setHealthSettingsSuccess("");
+
+    try {
+      const username = localStorage.getItem("username");
+      if (!username) {
+        setHealthSettingsError("User not found. Please sign in again.");
+        return;
+      }
+
+      const response = await axios.post("/api/health/updateSettings", {
+        username,
+        settings: healthSettings,
+      });
+
+      if (response.data.success) {
+        setHealthSettingsSuccess("Health settings updated successfully!");
+        setAccountData((prev) =>
+          prev
+            ? {
+                ...prev,
+                healthMonitoring: healthSettings,
+              }
+            : null
+        );
+
+        // Clear success message after 3 seconds
+        setTimeout(() => {
+          setHealthSettingsSuccess("");
+        }, 3000);
+      }
+    } catch (error: any) {
+      console.error("Error updating health settings:", error);
+      setHealthSettingsError(
+        error.response?.data?.message ||
+          "Failed to update health settings. Please try again."
+      );
+    } finally {
+      setHealthSettingsLoading(false);
+    }
   };
 
   const getSubscriptionStatusDisplay = () => {
@@ -409,6 +484,37 @@ export default function AccountPage() {
 
   return (
     <div className="min-h-screen bg-[#1a1b2e] text-white py-12 px-4">
+      <style jsx>{`
+        .slider {
+          -webkit-appearance: none;
+          appearance: none;
+          height: 8px;
+          border-radius: 4px;
+          outline: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          background: #00ffff;
+          cursor: pointer;
+          border: 2px solid #ffffff;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .slider::-moz-range-thumb {
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          background: #00ffff;
+          cursor: pointer;
+          border: 2px solid #ffffff;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+      `}</style>
       <div className="container mx-auto max-w-6xl">
         {/* Header */}
         <div className="text-center mb-12">
@@ -582,6 +688,243 @@ export default function AccountPage() {
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Health & Wellness Settings */}
+            <div className="bg-[#252642]/50 backdrop-blur-sm rounded-2xl p-6 shadow-[0_0_15px_rgba(0,255,255,0.1)] border border-[#00ffff]/20 mt-6">
+              <h2 className="text-2xl font-bold mb-6 text-[#00ffff]">
+                Health & Wellness
+              </h2>
+
+              <div className="space-y-6">
+                {/* Break Reminders */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-white font-semibold">
+                        Break Reminders
+                      </label>
+                      <p className="text-gray-400 text-sm">
+                        Get reminders to take breaks while gaming
+                      </p>
+                    </div>
+                    <button
+                      onClick={() =>
+                        handleHealthSettingsChange(
+                          "breakReminderEnabled",
+                          !healthSettings.breakReminderEnabled
+                        )
+                      }
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        healthSettings.breakReminderEnabled
+                          ? "bg-[#00ffff]"
+                          : "bg-gray-600"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          healthSettings.breakReminderEnabled
+                            ? "translate-x-6"
+                            : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Break Interval */}
+                  {healthSettings.breakReminderEnabled && (
+                    <div className="ml-4 space-y-2">
+                      <label className="text-gray-300 text-sm">
+                        Break Interval: {healthSettings.breakIntervalMinutes}{" "}
+                        minutes
+                      </label>
+                      <div className="relative max-w-md mx-auto">
+                        <input
+                          type="range"
+                          min="15"
+                          max="90"
+                          step="15"
+                          value={healthSettings.breakIntervalMinutes}
+                          onChange={(e) => {
+                            const actualValue = parseInt(e.target.value);
+                            handleHealthSettingsChange(
+                              "breakIntervalMinutes",
+                              actualValue
+                            );
+                          }}
+                          className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                          style={{
+                            background: `linear-gradient(to right, #00ffff 0%, #00ffff ${
+                              ((healthSettings.breakIntervalMinutes - 15) /
+                                (90 - 15)) *
+                              100
+                            }%, #374151 ${
+                              ((healthSettings.breakIntervalMinutes - 15) /
+                                (90 - 15)) *
+                              100
+                            }%, #374151 100%)`,
+                          }}
+                        />
+                        <div className="relative text-xs text-gray-400 mt-2 w-full">
+                          <span
+                            className="absolute"
+                            style={{
+                              left: "0%",
+                              transform: "translateX(-50%)",
+                            }}
+                          >
+                            15m
+                          </span>
+                          <span
+                            className="absolute"
+                            style={{
+                              left: "20%",
+                              transform: "translateX(-50%)",
+                            }}
+                          >
+                            30m
+                          </span>
+                          <span
+                            className="absolute"
+                            style={{
+                              left: "40%",
+                              transform: "translateX(-50%)",
+                            }}
+                          >
+                            45m
+                          </span>
+                          <span
+                            className="absolute"
+                            style={{
+                              left: "60%",
+                              transform: "translateX(-50%)",
+                            }}
+                          >
+                            60m
+                          </span>
+                          <span
+                            className="absolute"
+                            style={{
+                              left: "80%",
+                              transform: "translateX(-50%)",
+                            }}
+                          >
+                            75m
+                          </span>
+                          <span
+                            className="absolute"
+                            style={{
+                              left: "100%",
+                              transform: "translateX(-50%)",
+                            }}
+                          >
+                            90m
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Health Tips */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-white font-semibold">
+                      Health Tips
+                    </label>
+                    <p className="text-gray-400 text-sm">
+                      Show health and ergonomics tips with reminders
+                    </p>
+                  </div>
+                  <button
+                    onClick={() =>
+                      handleHealthSettingsChange(
+                        "healthTipsEnabled",
+                        !healthSettings.healthTipsEnabled
+                      )
+                    }
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      healthSettings.healthTipsEnabled
+                        ? "bg-[#00ffff]"
+                        : "bg-gray-600"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        healthSettings.healthTipsEnabled
+                          ? "translate-x-6"
+                          : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Ergonomics Reminders */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-white font-semibold">
+                      Ergonomics Reminders
+                    </label>
+                    <p className="text-gray-400 text-sm">
+                      Get posture and setup reminders
+                    </p>
+                  </div>
+                  <button
+                    onClick={() =>
+                      handleHealthSettingsChange(
+                        "ergonomicsReminders",
+                        !healthSettings.ergonomicsReminders
+                      )
+                    }
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      healthSettings.ergonomicsReminders
+                        ? "bg-[#00ffff]"
+                        : "bg-gray-600"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        healthSettings.ergonomicsReminders
+                          ? "translate-x-6"
+                          : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Error/Success Messages */}
+                {healthSettingsError && (
+                  <div className="p-3 bg-red-500/20 border border-red-500/40 rounded-lg">
+                    <p className="text-red-200 text-sm">
+                      {healthSettingsError}
+                    </p>
+                  </div>
+                )}
+
+                {healthSettingsSuccess && (
+                  <div className="p-3 bg-green-500/20 border border-green-500/40 rounded-lg">
+                    <p className="text-green-200 text-sm">
+                      {healthSettingsSuccess}
+                    </p>
+                  </div>
+                )}
+
+                {/* Save Button */}
+                <button
+                  onClick={handleSaveHealthSettings}
+                  disabled={healthSettingsLoading}
+                  className="w-full px-4 py-2 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] text-white rounded-lg hover:opacity-90 transition-all duration-200 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {healthSettingsLoading ? (
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Saving...
+                    </div>
+                  ) : (
+                    "Save Health Settings"
+                  )}
+                </button>
               </div>
             </div>
           </div>

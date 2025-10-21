@@ -11,6 +11,8 @@ import PasswordSetupModal from "../components/PasswordSetupModal";
 import EarlyAccessSetupModal from "../components/EarlyAccessSetupModal";
 // import useSocket from "../hooks/useSocket"; // DISABLED due to 404 errors
 import useAchievementPolling from "../hooks/useAchievementPolling";
+import useHealthMonitoring from "../hooks/useHealthMonitoring";
+import HealthStatusWidget from "../components/HealthStatusWidget";
 // import { useRouter } from "next/navigation";
 // import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 // import { faPaperclip } from "@fortawesome/free-solid-svg-icons";
@@ -55,6 +57,13 @@ export default function Home() {
     username: username,
     isEnabled: !!username, // Only poll when user is logged in
     pollingInterval: 30000, // Check every 30 seconds
+  });
+
+  // Health monitoring system for break reminders
+  const { healthStatus, recordBreak, snoozeReminder } = useHealthMonitoring({
+    username: username,
+    isEnabled: !!username, // Only monitor when user is logged in
+    checkInterval: 60000, // Check every minute
   });
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -913,16 +922,27 @@ export default function Home() {
               </ul>
 
               {activeView === "chat" && (
-                <form onSubmit={handleSubmit} className="w-full max-w-md mt-2">
-                  <input
-                    type="text"
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    placeholder="Message Video Game Wingman"
-                    className="w-full p-2 border border-gray-300 rounded mb-4"
+                <>
+                  {/* Health Status Widget */}
+                  <HealthStatusWidget
+                    healthStatus={healthStatus}
+                    onRecordBreak={recordBreak}
+                    onSnoozeReminder={snoozeReminder}
                   />
 
-                  {/* Comment out image upload UI section
+                  <form
+                    onSubmit={handleSubmit}
+                    className="w-full max-w-md mt-2"
+                  >
+                    <input
+                      type="text"
+                      value={question}
+                      onChange={(e) => setQuestion(e.target.value)}
+                      placeholder="Message Video Game Wingman"
+                      className="w-full p-2 border border-gray-300 rounded mb-4"
+                    />
+
+                    {/* Comment out image upload UI section
                   <div className="mb-4">
                     <label className="cursor-pointer flex items-center gap-2">
                       <FontAwesomeIcon icon={faPaperclip} size="lg" />
@@ -948,22 +968,23 @@ export default function Home() {
                   </div>
                   */}
 
-                  <div className="flex space-x-4">
-                    <button
-                      type="submit"
-                      className="w-full p-2 bg-blue-500 text-white rounded"
-                    >
-                      Submit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleClear}
-                      className="w-full p-2 bg-blue-500 text-white rounded"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </form>
+                    <div className="flex space-x-4">
+                      <button
+                        type="submit"
+                        className="w-full p-2 bg-blue-500 text-white rounded"
+                      >
+                        Submit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleClear}
+                        className="w-full p-2 bg-blue-500 text-white rounded"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </form>
+                </>
               )}
 
               {activeView === "forum" && (

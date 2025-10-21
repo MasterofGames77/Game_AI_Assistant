@@ -1,83 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
-
-interface Progress {
-  firstQuestion?: number;
-  frequentAsker?: number;
-  rpgEnthusiast?: number;
-  bossBuster?: number;
-  platformerPro?: number;
-  survivalSpecialist?: number;
-  strategySpecialist?: number;
-  simulationSpecialist?: number;
-  fightingFanatic?: number;
-  actionAficionado?: number;
-  battleRoyale?: number;
-  sportsChampion?: number;
-  adventureAddict?: number;
-  shooterSpecialist?: number;
-  puzzlePro?: number;
-  racingRenegade?: number;
-  stealthExpert?: number;
-  horrorHero?: number;
-  triviaMaster?: number;
-  storySeeker?: number;
-  beatEmUpBrawler?: number;
-  rhythmMaster?: number;
-  sandboxBuilder?: number;
-  totalQuestions?: number;
-  dailyExplorer?: number;
-  speedrunner?: number;
-  collectorPro?: number;
-  dataDiver?: number;
-  performanceTweaker?: number;
-  conversationalist?: number;
-  proAchievements: {
-    gameMaster: number;
-    speedDemon: number;
-    communityLeader: number;
-    achievementHunter: number;
-    proStreak: number;
-    expertAdvisor: number;
-    genreSpecialist: number;
-    proContributor: number;
-  };
-}
-
-interface Achievement {
-  name: string;
-  dateEarned: Date;
-}
-
-// New subscription interface
-interface Subscription {
-  status: 'free_period' | 'active' | 'canceled' | 'past_due' | 'unpaid' | 'expired' | 'trialing';
-  stripeCustomerId?: string;
-  stripeSubscriptionId?: string;
-  currentPeriodStart?: Date;
-  currentPeriodEnd?: Date;
-  cancelAtPeriodEnd?: boolean;
-  canceledAt?: Date;
-  // Early access specific fields
-  earlyAccessGranted?: boolean;
-  earlyAccessStartDate?: Date;
-  earlyAccessEndDate?: Date;
-  transitionToPaid?: boolean;
-  // Payment details
-  paymentMethod?: string;
-  amount?: number;
-  currency?: string;
-  billingCycle?: string;
-}
-
-// Usage limit interface for free users
-interface UsageLimit {
-  freeQuestionsUsed: number;        // Questions used in current window
-  freeQuestionsLimit: number;       // Max questions per window (default: 7)
-  windowStartTime: Date;           // When current window started
-  windowDurationHours: number;     // Window duration (default: 1 hour)
-  lastQuestionTime: Date;          // Last question timestamp
-  cooldownUntil?: Date;            // When user can ask next question
-}
+import { Achievement, Progress, Subscription, UsageLimit, HealthMonitoring } from '../types';
 
 export interface IUser extends Document {
   userId: string;
@@ -97,6 +19,7 @@ export interface IUser extends Document {
   progress: Progress;
   subscription?: Subscription;
   usageLimit?: UsageLimit;
+  healthMonitoring?: HealthMonitoring;
 }
 
 const UserSchema = new Schema<IUser>({
@@ -200,6 +123,18 @@ const UserSchema = new Schema<IUser>({
     windowDurationHours: { type: Number, default: 1 },
     lastQuestionTime: { type: Date },
     cooldownUntil: { type: Date }
+  },
+  // Health monitoring schema
+  healthMonitoring: {
+    breakReminderEnabled: { type: Boolean, default: true },
+    breakIntervalMinutes: { type: Number, default: 45 },
+    lastBreakTime: { type: Date },
+    lastSessionStart: { type: Date },
+    totalSessionTime: { type: Number, default: 0 },
+    breakCount: { type: Number, default: 0 },
+    lastBreakReminder: { type: Date },
+    healthTipsEnabled: { type: Boolean, default: true },
+    ergonomicsReminders: { type: Boolean, default: true }
   }
 }, { collection: 'users' });
 
@@ -484,6 +419,89 @@ UserSchema.methods.getUsageStatus = function(): {
     isInCooldown,
     isProUser: false
   };
+};
+
+// Method to check if user needs a break reminder
+UserSchema.methods.shouldShowBreakReminder = function(): {
+  shouldShow: boolean;
+  timeSinceLastBreak: number;
+  timeSinceLastReminder: number;
+  nextBreakIn?: number;
+} {
+  const now = new Date();
+  
+  // If health monitoring is disabled, don't show reminders
+  if (!this.healthMonitoring?.breakReminderEnabled) {
+    return { shouldShow: false, timeSinceLastBreak: 0, timeSinceLastReminder: 0 };
+  }
+  
+  const health = this.healthMonitoring;
+  const breakInterval = health.breakIntervalMinutes || 45;
+  
+  // Calculate time since last break
+  // If user has taken a break, use that time; otherwise use session start time
+  const referenceTime = health.lastBreakTime || health.lastSessionStart || now;
+  const timeSinceLastBreak = Math.floor((now.getTime() - referenceTime.getTime()) / (1000 * 60));
+  
+  // Calculate time since last reminder
+  const lastReminderTime = health.lastBreakReminder || new Date(0);
+  const timeSinceLastReminder = Math.floor((now.getTime() - lastReminderTime.getTime()) / (1000 * 60));
+  
+  // Show reminder if:
+  // 1. It's been longer than the break interval since last break
+  // 2. It's been at least 5 minutes since last reminder (to avoid spam)
+  const shouldShow = timeSinceLastBreak >= breakInterval && timeSinceLastReminder >= 5;
+  
+  return {
+    shouldShow,
+    timeSinceLastBreak,
+    timeSinceLastReminder,
+    nextBreakIn: shouldShow ? 0 : Math.max(0, breakInterval - timeSinceLastBreak)
+  };
+};
+
+// Method to record a break
+UserSchema.methods.recordBreak = function(): void {
+  const now = new Date();
+  
+  if (!this.healthMonitoring) {
+    this.healthMonitoring = {
+      breakReminderEnabled: true,
+      breakIntervalMinutes: 45,
+      totalSessionTime: 0,
+      breakCount: 0,
+      healthTipsEnabled: true,
+      ergonomicsReminders: true
+    };
+  }
+  
+  // Update break tracking
+  this.healthMonitoring.lastBreakTime = now;
+  this.healthMonitoring.breakCount += 1;
+  this.healthMonitoring.lastBreakReminder = now;
+  
+  // Reset session start time
+  this.healthMonitoring.lastSessionStart = now;
+};
+
+// Method to get health tips
+UserSchema.methods.getHealthTips = function(): string[] {
+  const tips = [
+    "💡 Take a 20-second break every 20 minutes to look at something 20 feet away (20-20-20 rule)",
+    "🖱️ Keep your mouse and keyboard at the same level to avoid wrist strain",
+    "🪑 Adjust your chair so your feet are flat on the floor and your back is supported",
+    "👀 Position your monitor about an arm's length away and slightly below eye level",
+    "🤲 Take breaks to stretch your hands, wrists, and fingers",
+    "🚶 Stand up and walk around for a few minutes every hour",
+    "💧 Stay hydrated! Keep a water bottle nearby",
+    "🌱 Consider adding some plants to your gaming setup for better air quality",
+    "💡 Ensure good lighting to reduce eye strain",
+    "🎧 Use headphones at a comfortable volume to protect your hearing"
+  ];
+  
+  // Return 2-3 random tips
+  const shuffled = tips.sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, 3);
 };
 
 const User = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);

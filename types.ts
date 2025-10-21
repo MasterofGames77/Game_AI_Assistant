@@ -1,6 +1,11 @@
 import { Decimal128 } from 'mongoose';
 import { ReactNode } from "react";
 
+export interface Achievement {
+  name: string;
+  dateEarned: Date;
+}
+
 export interface Props {
   children: ReactNode;
   fallback: ReactNode;
@@ -257,4 +262,142 @@ export interface UseAchievementPollingProps {
   username: string | null;
   isEnabled: boolean;
   pollingInterval?: number; // in milliseconds, default 30000 (30 seconds)
+}
+
+// Health monitoring interfaces
+export interface HealthMonitoringProps {
+  username: string | null;
+  isEnabled: boolean;
+  checkInterval?: number; // in milliseconds, default 60000 (1 minute)
+}
+
+export interface HealthStatus {
+  shouldShowBreak: boolean;
+  timeSinceLastBreak: number;
+  nextBreakIn?: number;
+  breakCount: number;
+  isMonitoring: boolean;
+}
+
+export interface HealthStatusWidgetProps {
+  healthStatus: HealthStatus;
+  onRecordBreak: () => void;
+  onSnoozeReminder: () => void;
+}
+
+export interface SnoozeReminderResponse {
+  success: boolean;
+  snoozeUntil?: Date;
+  message?: string;
+  error?: string;
+}
+
+export interface RecordBreakResponse {
+  success: boolean;
+  breakCount: number;
+  message?: string;
+  error?: string;
+}
+
+export interface HealthStatusResponse {
+  shouldShowBreak: boolean;
+  timeSinceLastBreak: number;
+  nextBreakIn?: number;
+  breakCount: number;
+  showReminder: boolean;
+  healthTips?: string[];
+  error?: string;
+}
+
+export interface Progress {
+  firstQuestion?: number;
+  frequentAsker?: number;
+  rpgEnthusiast?: number;
+  bossBuster?: number;
+  platformerPro?: number;
+  survivalSpecialist?: number;
+  strategySpecialist?: number;
+  simulationSpecialist?: number;
+  fightingFanatic?: number;
+  actionAficionado?: number;
+  battleRoyale?: number;
+  sportsChampion?: number;
+  adventureAddict?: number;
+  shooterSpecialist?: number;
+  puzzlePro?: number;
+  racingRenegade?: number;
+  stealthExpert?: number;
+  horrorHero?: number;
+  triviaMaster?: number;
+  storySeeker?: number;
+  beatEmUpBrawler?: number;
+  rhythmMaster?: number;
+  sandboxBuilder?: number;
+  totalQuestions?: number;
+  dailyExplorer?: number;
+  speedrunner?: number;
+  collectorPro?: number;
+  dataDiver?: number;
+  performanceTweaker?: number;
+  conversationalist?: number;
+  proAchievements: {
+    gameMaster: number;
+    speedDemon: number;
+    communityLeader: number;
+    achievementHunter: number;
+    proStreak: number;
+    expertAdvisor: number;
+    genreSpecialist: number;
+    proContributor: number;
+  };
+}
+
+// New subscription interface
+export interface Subscription {
+  status: 'free_period' | 'active' | 'canceled' | 'past_due' | 'unpaid' | 'expired' | 'trialing';
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  currentPeriodStart?: Date;
+  currentPeriodEnd?: Date;
+  cancelAtPeriodEnd?: boolean;
+  canceledAt?: Date;
+  // Early access specific fields
+  earlyAccessGranted?: boolean;
+  earlyAccessStartDate?: Date;
+  earlyAccessEndDate?: Date;
+  transitionToPaid?: boolean;
+  // Payment details
+  paymentMethod?: string;
+  amount?: number;
+  currency?: string;
+  billingCycle?: string;
+}
+
+// Usage limit interface for free users
+export interface UsageLimit {
+  freeQuestionsUsed: number;        // Questions used in current window
+  freeQuestionsLimit: number;       // Max questions per window (default: 7)
+  windowStartTime: Date;           // When current window started
+  windowDurationHours: number;     // Window duration (default: 1 hour)
+  lastQuestionTime: Date;          // Last question timestamp
+  cooldownUntil?: Date;            // When user can ask next question
+}
+
+// Health monitoring interface
+export interface HealthMonitoring {
+  breakReminderEnabled: boolean;   // Whether break reminders are enabled
+  breakIntervalMinutes: number;    // Break interval in minutes (default: 45)
+  lastBreakTime?: Date;           // Last time user took a break
+  lastSessionStart?: Date;        // When current session started
+  totalSessionTime: number;       // Total session time in minutes
+  breakCount: number;             // Number of breaks taken today
+  lastBreakReminder?: Date;       // Last time break reminder was shown
+  healthTipsEnabled: boolean;     // Whether to show health tips
+  ergonomicsReminders: boolean;   // Whether to show ergonomics reminders
+}
+
+export interface UpdateHealthSettingsResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
 }
