@@ -53,6 +53,8 @@ export default function AccountPage() {
   const [usernameResetLoading, setUsernameResetLoading] = useState(false);
   const [usernameResetError, setUsernameResetError] = useState("");
   const [usernameResetSuccess, setUsernameResetSuccess] = useState("");
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
 
   useEffect(() => {
     const fetchAccountData = async () => {
@@ -288,98 +290,125 @@ export default function AccountPage() {
     }
   };
 
-  const handleResetUsername = async () => {
-    const newUsername = prompt("Enter your new username:");
+  const handleResetUsername = () => {
+    setShowUsernameModal(true);
+    setNewUsername("");
+    setUsernameResetError("");
+    setUsernameResetSuccess("");
+  };
 
-    if (newUsername && newUsername.trim().length > 0) {
-      setUsernameResetLoading(true);
-      setUsernameResetError("");
-      setUsernameResetSuccess("");
-
-      try {
-        // Get current user info
-        const userId = localStorage.getItem("userId");
-        const email = localStorage.getItem("userEmail");
-
-        if (!userId || !email) {
-          setUsernameResetError(
-            "User information not found. Please sign in again."
-          );
-          return;
-        }
-
-        // Use the syncUser API to update username with content moderation
-        const res = await axios.post("/api/syncUser", {
-          userId,
-          email,
-          username: newUsername.trim(),
-        });
-
-        if (res.data && res.data.user) {
-          // Update local storage
-          localStorage.setItem("username", newUsername.trim());
-          localStorage.setItem("userId", res.data.user.userId);
-          localStorage.setItem("userEmail", res.data.user.email);
-
-          // Update account data
-          setAccountData((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  username: newUsername.trim(),
-                }
-              : null
-          );
-
-          setUsernameResetSuccess(
-            `Username updated successfully to: ${newUsername.trim()}`
-          );
-
-          // Clear success message after 5 seconds
-          setTimeout(() => {
-            setUsernameResetSuccess("");
-          }, 5000);
-        }
-      } catch (err: any) {
-        console.error("Error resetting username:", err);
-
-        if (err.response?.data?.message) {
-          // Handle content violation specifically
-          if (
-            err.response.data.offendingWords &&
-            err.response.data.violationResult
-          ) {
-            const violationResult = err.response.data.violationResult;
-            let violationMessage = err.response.data.message;
-
-            // Add specific violation details based on action
-            if (violationResult.action === "warning") {
-              violationMessage += ` Warning ${violationResult.count}/3. Please choose a different username.`;
-            } else if (violationResult.action === "banned") {
-              const banDate = new Date(
-                violationResult.expiresAt
-              ).toLocaleDateString();
-              violationMessage += ` You are temporarily banned until ${banDate}. Please try again later.`;
-            } else if (violationResult.action === "permanent_ban") {
-              violationMessage += ` You are permanently banned from using this application.`;
-            }
-
-            setUsernameResetError(violationMessage);
-          } else {
-            setUsernameResetError(err.response.data.message);
-          }
-        } else {
-          setUsernameResetError("Failed to update username. Please try again.");
-        }
-      } finally {
-        setUsernameResetLoading(false);
-      }
-    } else {
-      setUsernameResetError("Username reset canceled.");
-      setTimeout(() => {
-        setUsernameResetError("");
-      }, 3000);
+  const handleUsernameSubmit = async () => {
+    if (!newUsername || newUsername.trim().length === 0) {
+      setUsernameResetError("Please enter a username.");
+      return;
     }
+
+    if (newUsername.trim().length < 3) {
+      setUsernameResetError("Username must be at least 3 characters long.");
+      return;
+    }
+
+    if (newUsername.trim().length > 32) {
+      setUsernameResetError("Username must be 32 characters or less.");
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(newUsername.trim())) {
+      setUsernameResetError(
+        "Username can only contain letters, numbers, underscores, and hyphens."
+      );
+      return;
+    }
+    setUsernameResetLoading(true);
+    setUsernameResetError("");
+    setUsernameResetSuccess("");
+
+    try {
+      // Get current user info
+      const userId = localStorage.getItem("userId");
+      const email = localStorage.getItem("userEmail");
+
+      if (!userId || !email) {
+        setUsernameResetError(
+          "User information not found. Please sign in again."
+        );
+        return;
+      }
+
+      // Use the syncUser API to update username with content moderation
+      const res = await axios.post("/api/syncUser", {
+        userId,
+        email,
+        username: newUsername.trim(),
+      });
+
+      if (res.data && res.data.user) {
+        // Update local storage
+        localStorage.setItem("username", newUsername.trim());
+        localStorage.setItem("userId", res.data.user.userId);
+        localStorage.setItem("userEmail", res.data.user.email);
+
+        // Update account data
+        setAccountData((prev) =>
+          prev
+            ? {
+                ...prev,
+                username: newUsername.trim(),
+              }
+            : null
+        );
+
+        setUsernameResetSuccess(
+          `Username updated successfully to: ${newUsername.trim()}`
+        );
+
+        // Close modal and clear success message after 3 seconds
+        setShowUsernameModal(false);
+        setTimeout(() => {
+          setUsernameResetSuccess("");
+        }, 3000);
+      }
+    } catch (err: any) {
+      console.error("Error resetting username:", err);
+
+      if (err.response?.data?.message) {
+        // Handle content violation specifically
+        if (
+          err.response.data.offendingWords &&
+          err.response.data.violationResult
+        ) {
+          const violationResult = err.response.data.violationResult;
+          let violationMessage = err.response.data.message;
+
+          // Add specific violation details based on action
+          if (violationResult.action === "warning") {
+            violationMessage += ` Warning ${violationResult.count}/3. Please choose a different username.`;
+          } else if (violationResult.action === "banned") {
+            const banDate = new Date(
+              violationResult.expiresAt
+            ).toLocaleDateString();
+            violationMessage += ` You are temporarily banned until ${banDate}. Please try again later.`;
+          } else if (violationResult.action === "permanent_ban") {
+            violationMessage += ` You are permanently banned from using this application.`;
+          }
+
+          setUsernameResetError(violationMessage);
+        } else {
+          setUsernameResetError(err.response.data.message);
+        }
+      } else {
+        setUsernameResetError("Failed to update username. Please try again.");
+      }
+    } finally {
+      setUsernameResetLoading(false);
+    }
+  };
+
+  const handleCloseUsernameModal = () => {
+    setShowUsernameModal(false);
+    setNewUsername("");
+    setUsernameResetError("");
+    setUsernameResetSuccess("");
   };
 
   const getSubscriptionStatusDisplay = () => {
@@ -1197,6 +1226,91 @@ export default function AccountPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Username Change Modal */}
+      {showUsernameModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm">
+          <div className="bg-[#252642]/95 backdrop-blur-sm rounded-2xl p-6 shadow-[0_0_25px_rgba(0,255,255,0.3)] border border-[#00ffff]/30 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-[#00ffff]">
+                Change Username
+              </h3>
+              <button
+                onClick={handleCloseUsernameModal}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  New Username
+                </label>
+                <input
+                  type="text"
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  placeholder="Enter your new username"
+                  className="w-full px-4 py-3 bg-[#1a1a2e]/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-[#00ffff] focus:border-transparent transition-all duration-200"
+                  maxLength={32}
+                  autoFocus
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Username must be 3-32 characters, letters, numbers,
+                  underscores, and hyphens only.
+                </p>
+              </div>
+
+              {/* Error Message */}
+              {usernameResetError && (
+                <div className="p-3 bg-red-500/20 border border-red-500/40 rounded-lg">
+                  <p className="text-red-200 text-sm">{usernameResetError}</p>
+                </div>
+              )}
+
+              {/* Success Message */}
+              {usernameResetSuccess && (
+                <div className="p-3 bg-green-500/20 border border-green-500/40 rounded-lg">
+                  <p className="text-green-200 text-sm">
+                    {usernameResetSuccess}
+                  </p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex space-x-3">
+                <button
+                  onClick={handleCloseUsernameModal}
+                  className="flex-1 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUsernameSubmit}
+                  disabled={usernameResetLoading || !newUsername.trim()}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all duration-200 font-semibold"
+                >
+                  {usernameResetLoading ? "Updating..." : "Update Username"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
