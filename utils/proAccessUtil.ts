@@ -211,28 +211,39 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
           currentHasProAccess: existingWingmanUser.hasProAccess
         });
 
-        if (shouldHaveProAccess && !existingWingmanUser.hasProAccess) {
-          console.log('Granting Pro access to existing user from splash database');
-          
+        if (shouldHaveProAccess) {
           const earlyAccessStartDate = new Date('2025-12-31T23:59:59.999Z');
           const earlyAccessEndDate = new Date('2026-12-31T23:59:59.999Z');
           
-          await AppUser.findOneAndUpdate(
-            { userId },
-            {
-              hasProAccess: true,
-              subscription: {
-                status: 'free_period',
-                earlyAccessGranted: true,
-                earlyAccessStartDate,
-                earlyAccessEndDate,
-                transitionToPaid: false,
-                currentPeriodStart: earlyAccessStartDate,
-                currentPeriodEnd: earlyAccessEndDate
+          // Check if user needs subscription data update
+          const needsSubscriptionUpdate = !existingWingmanUser.subscription?.earlyAccessGranted || 
+                                        existingWingmanUser.subscription?.status !== 'free_period';
+          
+          if (!existingWingmanUser.hasProAccess || needsSubscriptionUpdate) {
+            console.log('Updating existing user with Pro access and subscription data from splash database');
+            
+            await AppUser.findOneAndUpdate(
+              { userId },
+              {
+                hasProAccess: true,
+                subscription: {
+                  status: 'free_period',
+                  earlyAccessGranted: true,
+                  earlyAccessStartDate,
+                  earlyAccessEndDate,
+                  transitionToPaid: false,
+                  currentPeriodStart: earlyAccessStartDate,
+                  currentPeriodEnd: earlyAccessEndDate,
+                  billingCycle: 'monthly',
+                  currency: 'usd',
+                  cancelAtPeriodEnd: false
+                }
               }
-            }
-          );
-          console.log('Updated existing user with Pro access');
+            );
+            console.log('Updated existing user with Pro access and subscription data');
+          } else {
+            console.log('User already has correct Pro access and subscription data');
+          }
         }
       }
       
@@ -330,7 +341,10 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
               earlyAccessEndDate,
               transitionToPaid: false,
               currentPeriodStart: earlyAccessStartDate,
-              currentPeriodEnd: earlyAccessEndDate
+              currentPeriodEnd: earlyAccessEndDate,
+              billingCycle: 'monthly',
+              currency: 'usd',
+              cancelAtPeriodEnd: false
             }
           }),
           $setOnInsert: {

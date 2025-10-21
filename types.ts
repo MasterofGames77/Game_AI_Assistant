@@ -28,7 +28,6 @@ export interface SideBarProps {
   onSelectConversation: (conversation: Conversation) => void;
   onDeleteConversation: (id: string) => void;
   onClear: () => void;
-  onResetUserId: () => void;
   onTwitchAuth: () => void;
   onNavigateToAccount: () => void;
   activeView: "chat" | "forum";

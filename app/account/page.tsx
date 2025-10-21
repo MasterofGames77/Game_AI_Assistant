@@ -49,6 +49,11 @@ export default function AccountPage() {
   const [healthSettingsError, setHealthSettingsError] = useState("");
   const [healthSettingsSuccess, setHealthSettingsSuccess] = useState("");
 
+  // Username reset state
+  const [usernameResetLoading, setUsernameResetLoading] = useState(false);
+  const [usernameResetError, setUsernameResetError] = useState("");
+  const [usernameResetSuccess, setUsernameResetSuccess] = useState("");
+
   useEffect(() => {
     const fetchAccountData = async () => {
       try {
@@ -280,6 +285,100 @@ export default function AccountPage() {
       );
     } finally {
       setHealthSettingsLoading(false);
+    }
+  };
+
+  const handleResetUsername = async () => {
+    const newUsername = prompt("Enter your new username:");
+
+    if (newUsername && newUsername.trim().length > 0) {
+      setUsernameResetLoading(true);
+      setUsernameResetError("");
+      setUsernameResetSuccess("");
+
+      try {
+        // Get current user info
+        const userId = localStorage.getItem("userId");
+        const email = localStorage.getItem("userEmail");
+
+        if (!userId || !email) {
+          setUsernameResetError(
+            "User information not found. Please sign in again."
+          );
+          return;
+        }
+
+        // Use the syncUser API to update username with content moderation
+        const res = await axios.post("/api/syncUser", {
+          userId,
+          email,
+          username: newUsername.trim(),
+        });
+
+        if (res.data && res.data.user) {
+          // Update local storage
+          localStorage.setItem("username", newUsername.trim());
+          localStorage.setItem("userId", res.data.user.userId);
+          localStorage.setItem("userEmail", res.data.user.email);
+
+          // Update account data
+          setAccountData((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  username: newUsername.trim(),
+                }
+              : null
+          );
+
+          setUsernameResetSuccess(
+            `Username updated successfully to: ${newUsername.trim()}`
+          );
+
+          // Clear success message after 5 seconds
+          setTimeout(() => {
+            setUsernameResetSuccess("");
+          }, 5000);
+        }
+      } catch (err: any) {
+        console.error("Error resetting username:", err);
+
+        if (err.response?.data?.message) {
+          // Handle content violation specifically
+          if (
+            err.response.data.offendingWords &&
+            err.response.data.violationResult
+          ) {
+            const violationResult = err.response.data.violationResult;
+            let violationMessage = err.response.data.message;
+
+            // Add specific violation details based on action
+            if (violationResult.action === "warning") {
+              violationMessage += ` Warning ${violationResult.count}/3. Please choose a different username.`;
+            } else if (violationResult.action === "banned") {
+              const banDate = new Date(
+                violationResult.expiresAt
+              ).toLocaleDateString();
+              violationMessage += ` You are temporarily banned until ${banDate}. Please try again later.`;
+            } else if (violationResult.action === "permanent_ban") {
+              violationMessage += ` You are permanently banned from using this application.`;
+            }
+
+            setUsernameResetError(violationMessage);
+          } else {
+            setUsernameResetError(err.response.data.message);
+          }
+        } else {
+          setUsernameResetError("Failed to update username. Please try again.");
+        }
+      } finally {
+        setUsernameResetLoading(false);
+      }
+    } else {
+      setUsernameResetError("Username reset canceled.");
+      setTimeout(() => {
+        setUsernameResetError("");
+      }, 3000);
     }
   };
 
@@ -562,9 +661,30 @@ export default function AccountPage() {
               <div className="space-y-4">
                 <div>
                   <label className="text-gray-400 text-sm">Username</label>
-                  <p className="text-white font-semibold">
-                    {accountData.username}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-white font-semibold">
+                      {accountData.username}
+                    </p>
+                    <button
+                      onClick={handleResetUsername}
+                      disabled={usernameResetLoading}
+                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm rounded transition-colors duration-200"
+                    >
+                      {usernameResetLoading ? "Updating..." : "Change"}
+                    </button>
+                  </div>
+
+                  {/* Username reset messages */}
+                  {usernameResetError && (
+                    <p className="text-red-400 text-sm mt-2">
+                      {usernameResetError}
+                    </p>
+                  )}
+                  {usernameResetSuccess && (
+                    <p className="text-green-400 text-sm mt-2">
+                      {usernameResetSuccess}
+                    </p>
+                  )}
                 </div>
 
                 <div>
