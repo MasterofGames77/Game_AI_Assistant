@@ -134,7 +134,9 @@ const UserSchema = new Schema<IUser>({
     breakCount: { type: Number, default: 0 },
     lastBreakReminder: { type: Date },
     healthTipsEnabled: { type: Boolean, default: true },
-    ergonomicsReminders: { type: Boolean, default: true }
+    ergonomicsReminders: { type: Boolean, default: true },
+    isOnBreak: { type: Boolean, default: false },
+    breakStartTime: { type: Date }
   }
 }, { collection: 'users' });
 
@@ -438,9 +440,17 @@ UserSchema.methods.shouldShowBreakReminder = function(): {
   const health = this.healthMonitoring;
   const breakInterval = health.breakIntervalMinutes || 45;
   
+  // If user is currently on a break, don't show reminders
+  if (health.isOnBreak) {
+    return { shouldShow: false, timeSinceLastBreak: 0, timeSinceLastReminder: 0 };
+  }
+  
   // Calculate time since last break
   // If user has taken a break, use that time; otherwise use session start time
-  const referenceTime = health.lastBreakTime || health.lastSessionStart || now;
+  const referenceTime = health.lastBreakTime || health.lastSessionStart;
+  if (!referenceTime) {
+    return { shouldShow: false, timeSinceLastBreak: 0, timeSinceLastReminder: 0 };
+  }
   const timeSinceLastBreak = Math.floor((now.getTime() - referenceTime.getTime()) / (1000 * 60));
   
   // Calculate time since last reminder
@@ -460,8 +470,8 @@ UserSchema.methods.shouldShowBreakReminder = function(): {
   };
 };
 
-// Method to record a break
-UserSchema.methods.recordBreak = function(): void {
+// Method to start a break
+UserSchema.methods.startBreak = function(): void {
   const now = new Date();
   
   if (!this.healthMonitoring) {
@@ -475,13 +485,40 @@ UserSchema.methods.recordBreak = function(): void {
     };
   }
   
-  // Update break tracking
-  this.healthMonitoring.lastBreakTime = now;
-  this.healthMonitoring.breakCount += 1;
+  // Initialize session start time if not set
+  if (!this.healthMonitoring.lastSessionStart) {
+    this.healthMonitoring.lastSessionStart = now;
+  }
+  
+  // Start break state
+  this.healthMonitoring.isOnBreak = true;
+  this.healthMonitoring.breakStartTime = now;
   this.healthMonitoring.lastBreakReminder = now;
   
-  // Reset session start time
-  this.healthMonitoring.lastSessionStart = now;
+  // Don't update breakCount or lastBreakTime yet - that happens when break ends
+};
+
+// Method to end a break
+UserSchema.methods.endBreak = function(): void {
+  const now = new Date();
+  
+  if (!this.healthMonitoring || !this.healthMonitoring.isOnBreak) {
+    return; // Not on a break, nothing to do
+  }
+  
+  // End break state and record the completed break
+  this.healthMonitoring.isOnBreak = false;
+  this.healthMonitoring.lastBreakTime = now;
+  this.healthMonitoring.breakCount += 1;
+  this.healthMonitoring.breakStartTime = undefined;
+  
+  // Don't reset session start time - the session continues after the break
+  // Only reset session start if it's been more than 24 hours (handled in checkStatus)
+};
+
+// Legacy method for backward compatibility - now starts a break instead of completing one
+UserSchema.methods.recordBreak = function(): void {
+  this.startBreak();
 };
 
 // Method to get health tips

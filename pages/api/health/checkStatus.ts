@@ -45,6 +45,9 @@ export default async function handler(
       });
     }
 
+    // Initialize session start time if not set or if it's been more than 24 hours
+    const now = new Date();
+    
     // Initialize health monitoring if it doesn't exist
     if (!user.healthMonitoring) {
       user.healthMonitoring = {
@@ -53,21 +56,27 @@ export default async function handler(
         totalSessionTime: 0,
         breakCount: 0,
         healthTipsEnabled: true,
-        ergonomicsReminders: true
+        ergonomicsReminders: true,
+        lastSessionStart: now,
+        isOnBreak: false
       };
     }
-
-    // Initialize session start time if not set or if it's been more than 24 hours
-    const now = new Date();
     const lastSessionStart = user.healthMonitoring.lastSessionStart;
     const shouldResetSession = !lastSessionStart || 
       (now.getTime() - lastSessionStart.getTime()) > 24 * 60 * 60 * 1000; // 24 hours
 
     if (shouldResetSession) {
       user.healthMonitoring.lastSessionStart = now;
-      // Don't set lastBreakTime to now - let it be undefined so the countdown starts from session start
+      // Reset break tracking for new day
       user.healthMonitoring.lastBreakTime = undefined;
       user.healthMonitoring.breakCount = 0;
+      user.healthMonitoring.lastBreakReminder = undefined;
+      user.healthMonitoring.isOnBreak = false;
+      user.healthMonitoring.breakStartTime = undefined;
+      await user.save();
+    } else if (!lastSessionStart) {
+      // Initialize session start time if missing (shouldn't happen with the above fix, but just in case)
+      user.healthMonitoring.lastSessionStart = now;
       await user.save();
     }
 
@@ -91,7 +100,9 @@ export default async function handler(
       nextBreakIn: breakStatus.nextBreakIn,
       breakCount: user.healthMonitoring?.breakCount || 0,
       showReminder,
-      healthTips: showReminder ? healthTips : undefined
+      healthTips: showReminder ? healthTips : undefined,
+      isOnBreak: user.healthMonitoring?.isOnBreak || false,
+      breakStartTime: user.healthMonitoring?.breakStartTime
     });
 
   } catch (error) {

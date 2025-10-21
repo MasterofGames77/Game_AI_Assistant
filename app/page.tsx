@@ -60,7 +60,7 @@ export default function Home() {
   });
 
   // Health monitoring system for break reminders
-  const { healthStatus, recordBreak, snoozeReminder } = useHealthMonitoring({
+  const { healthStatus, recordBreak, endBreak, snoozeReminder } = useHealthMonitoring({
     username: username,
     isEnabled: !!username, // Only monitor when user is logged in
     checkInterval: 60000, // Check every minute
@@ -912,6 +912,7 @@ export default function Home() {
                   <HealthStatusWidget
                     healthStatus={healthStatus}
                     onRecordBreak={recordBreak}
+                    onEndBreak={endBreak}
                     onSnoozeReminder={snoozeReminder}
                   />
 

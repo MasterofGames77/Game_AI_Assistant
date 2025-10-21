@@ -276,11 +276,14 @@ export interface HealthStatus {
   nextBreakIn?: number;
   breakCount: number;
   isMonitoring: boolean;
+  isOnBreak?: boolean;
+  breakStartTime?: Date;
 }
 
 export interface HealthStatusWidgetProps {
   healthStatus: HealthStatus;
   onRecordBreak: () => void;
+  onEndBreak: () => void;
   onSnoozeReminder: () => void;
 }
 
@@ -305,6 +308,8 @@ export interface HealthStatusResponse {
   breakCount: number;
   showReminder: boolean;
   healthTips?: string[];
+  isOnBreak?: boolean;
+  breakStartTime?: Date;
   error?: string;
 }
 
@@ -393,6 +398,8 @@ export interface HealthMonitoring {
   lastBreakReminder?: Date;       // Last time break reminder was shown
   healthTipsEnabled: boolean;     // Whether to show health tips
   ergonomicsReminders: boolean;   // Whether to show ergonomics reminders
+  isOnBreak?: boolean;           // Whether user is currently on a break
+  breakStartTime?: Date;          // When the current break started
 }
 
 export interface UpdateHealthSettingsResponse {

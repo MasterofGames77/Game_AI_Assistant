@@ -43,6 +43,8 @@ const useHealthMonitoring = ({
         nextBreakIn: data.nextBreakIn,
         breakCount: data.breakCount,
         isMonitoring: true,
+        isOnBreak: data.isOnBreak,
+        breakStartTime: data.breakStartTime,
       });
 
       // Show break reminder if needed
@@ -147,7 +149,7 @@ const useHealthMonitoring = ({
     );
   };
 
-  // Function to record a break
+  // Function to start a break
   const recordBreak = async () => {
     try {
       const response = await fetch("/api/health/recordBreak", {
@@ -159,22 +161,59 @@ const useHealthMonitoring = ({
       });
 
       if (response.ok) {
-        // Update local state
+        // Update local state to show break started
         setHealthStatus((prev) => ({
           ...prev,
           shouldShowBreak: false,
-          timeSinceLastBreak: 0,
-          breakCount: prev.breakCount + 1,
+          isOnBreak: true,
+          breakStartTime: new Date(),
         }));
 
         // Show confirmation
-        toast.success("Break recorded! Keep up the healthy gaming habits! 🎮", {
+        toast.success(
+          "Break started! Take your time and come back when you're ready! 🎮",
+          {
+            duration: 3000,
+            position: "top-center",
+          }
+        );
+      }
+    } catch (error) {
+      console.error("Error starting break:", error);
+    }
+  };
+
+  // Function to end a break
+  const endBreak = async () => {
+    try {
+      const response = await fetch("/api/health/endBreak", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+
+        // Update local state
+        setHealthStatus((prev) => ({
+          ...prev,
+          isOnBreak: false,
+          breakStartTime: undefined,
+          breakCount: data.breakCount,
+          timeSinceLastBreak: 0,
+        }));
+
+        // Show confirmation
+        toast.success("Welcome back! Break completed successfully! 🎮", {
           duration: 3000,
           position: "top-center",
         });
       }
     } catch (error) {
-      console.error("Error recording break:", error);
+      console.error("Error ending break:", error);
     }
   };
 
@@ -239,6 +278,7 @@ const useHealthMonitoring = ({
   return {
     healthStatus,
     recordBreak,
+    endBreak,
     snoozeReminder,
     checkHealthStatus,
   };
