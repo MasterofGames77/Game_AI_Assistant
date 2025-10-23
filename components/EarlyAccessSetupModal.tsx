@@ -1,24 +1,15 @@
 "use client";
 
 import React, { useState } from "react";
-import axios from "axios";
 import Image from "next/image";
 import { getPasswordStrength } from "../utils/passwordUtils";
-
-interface EarlyAccessSetupModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSetup: (username: string, password?: string) => Promise<void>;
-  userEmail: string;
-  userId: string;
-}
+import { EarlyAccessSetupModalProps } from "../types";
 
 const EarlyAccessSetupModal: React.FC<EarlyAccessSetupModalProps> = ({
   isOpen,
   onClose,
   onSetup,
   userEmail,
-  userId,
 }) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -105,18 +96,6 @@ const EarlyAccessSetupModal: React.FC<EarlyAccessSetupModalProps> = ({
       );
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleClose = () => {
-    if (!loading) {
-      onClose();
-      setUsername("");
-      setPassword("");
-      setConfirmPassword("");
-      setMessage("");
-      setErrors({});
-      setSkipPassword(false);
     }
   };
 

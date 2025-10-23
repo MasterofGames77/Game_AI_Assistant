@@ -2,23 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { SubscriptionStatus, HealthMonitoring } from "@/types";
+import { SubscriptionStatus, HealthMonitoring, AccountData } from "@/types";
 import axios from "axios";
-
-interface AccountData {
-  username: string;
-  email: string;
-  hasProAccess: boolean;
-  subscriptionStatus: SubscriptionStatus | null;
-  conversationCount: number;
-  achievements: Array<{ name: string; dateEarned: Date }>;
-  progress: {
-    totalQuestions: number;
-    [key: string]: number;
-  };
-  hasPassword?: boolean;
-  healthMonitoring?: HealthMonitoring;
-}
 
 export default function AccountPage() {
   const router = useRouter();

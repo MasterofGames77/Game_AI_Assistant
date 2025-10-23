@@ -2,17 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import axios from "axios";
-
-interface SubscriptionData {
-  hasProAccess: boolean;
-  subscriptionStatus: {
-    type: string;
-    status: string;
-    expiresAt?: string;
-    canCancel?: boolean;
-  };
-}
+import { SubscriptionData } from "../../types";
 
 export default function ManageSubscriptionPage() {
   const router = useRouter();

@@ -17,7 +17,6 @@ const PasswordSetupModal: React.FC<PasswordSetupModalProps> = ({
   onClose,
   onSetup,
   username,
-  userId,
 }) => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");

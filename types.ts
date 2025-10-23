@@ -407,3 +407,36 @@ export interface UpdateHealthSettingsResponse {
   message?: string;
   error?: string;
 }
+
+export interface EarlyAccessSetupModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSetup: (username: string, password?: string) => Promise<void>;
+  userEmail: string;
+  userId: string;
+}
+
+export interface SubscriptionData {
+  hasProAccess: boolean;
+  subscriptionStatus: {
+    type: string;
+    status: string;
+    expiresAt?: string;
+    canCancel?: boolean;
+  };
+}
+
+export interface AccountData {
+  username: string;
+  email: string;
+  hasProAccess: boolean;
+  subscriptionStatus: SubscriptionStatus | null;
+  conversationCount: number;
+  achievements: Array<{ name: string; dateEarned: Date }>;
+  progress: {
+    totalQuestions: number;
+    [key: string]: number;
+  };
+  hasPassword?: boolean;
+  healthMonitoring?: HealthMonitoring;
+}
