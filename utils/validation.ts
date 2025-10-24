@@ -161,4 +161,80 @@ export const validateProAccess = (forum: Forum, hasProAccess: boolean) => {
 export const validateForumStatus = (status: string) => {
   const validStatuses = ['active', 'locked', 'archived'];
   return validStatuses.includes(status);
+};
+
+/**
+ * Validates feedback data for submission
+ * @param data - Object containing feedback data to validate
+ * @returns Array of error messages, empty if validation passes
+ */
+export const validateFeedbackData = (data: {
+  username: string;
+  email: string;
+  category: string;
+  title: string;
+  message: string;
+  priority?: string;
+}) => {
+  const errors: string[] = [];
+
+  // Validate username
+  if (!data.username?.trim()) {
+    errors.push('Username is required');
+  } else if (data.username.length < 3 || data.username.length > 32) {
+    errors.push('Username must be between 3 and 32 characters');
+  } else if (!/^[\w#@.-]+$/.test(data.username)) {
+    errors.push('Username contains invalid characters');
+  }
+
+  // Validate email
+  if (!data.email?.trim()) {
+    errors.push('Email is required');
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+    errors.push('Invalid email format');
+  } else if (data.email.length > 254) {
+    errors.push('Email is too long');
+  }
+
+  // Validate category
+  if (!data.category?.trim()) {
+    errors.push('Category is required');
+  } else {
+    const allowedCategories = ['bug_report', 'feature_request', 'improvement', 'general', 'complaint', 'praise'];
+    if (!allowedCategories.includes(data.category)) {
+      errors.push('Invalid category. Allowed categories are: bug_report, feature_request, improvement, general, complaint, praise');
+    }
+  }
+
+  // Validate title
+  if (!data.title?.trim()) {
+    errors.push('Title is required');
+  } else if (data.title.length < 5) {
+    errors.push('Title must be at least 5 characters');
+  } else if (data.title.length > 200) {
+    errors.push('Title must be less than 200 characters');
+  } else if (/[<>]/.test(data.title)) {
+    errors.push('Title contains invalid characters');
+  }
+
+  // Validate message
+  if (!data.message?.trim()) {
+    errors.push('Message is required');
+  } else if (data.message.length < 10) {
+    errors.push('Message must be at least 10 characters');
+  } else if (data.message.length > 2000) {
+    errors.push('Message must be less than 2000 characters');
+  } else if (/[<>]/.test(data.message)) {
+    errors.push('Message contains invalid characters');
+  }
+
+  // Validate priority (optional)
+  if (data.priority) {
+    const allowedPriorities = ['low', 'medium', 'high', 'critical'];
+    if (!allowedPriorities.includes(data.priority)) {
+      errors.push('Invalid priority. Allowed priorities are: low, medium, high, critical');
+    }
+  }
+
+  return errors;
 }; 
