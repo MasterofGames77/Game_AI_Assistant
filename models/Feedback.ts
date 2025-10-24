@@ -105,26 +105,12 @@ const FeedbackSchema = new Schema<IFeedback>({
   metadata: {
     isRead: { 
       type: Boolean, 
-      default: false,
-      index: true
+      default: false
     },
     isArchived: { 
       type: Boolean, 
-      default: false,
-      index: true
+      default: false
     },
-    tags: [{ 
-      type: String,
-      trim: true
-    }],
-    attachments: [{
-      type: { 
-        type: String, 
-        enum: ['image', 'file'] 
-      },
-      url: String,
-      name: String
-    }],
     violationResult: Schema.Types.Mixed // Store content moderation results
   }
 }, {
@@ -152,4 +138,9 @@ FeedbackSchema.pre('save', function(next) {
   next();
 });
 
-export default mongoose.models.Feedback || mongoose.model<IFeedback>('Feedback', FeedbackSchema);
+// Clear any existing model to avoid duplicate index warnings
+if (mongoose.models.Feedback) {
+  delete mongoose.models.Feedback;
+}
+
+export default mongoose.model<IFeedback>('Feedback', FeedbackSchema);

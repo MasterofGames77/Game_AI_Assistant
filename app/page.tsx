@@ -9,6 +9,12 @@ import ForumList from "../components/ForumList";
 import { ForumProvider } from "../context/ForumContext";
 import PasswordSetupModal from "../components/PasswordSetupModal";
 import EarlyAccessSetupModal from "../components/EarlyAccessSetupModal";
+import FeedbackForm from "../components/FeedbackForm";
+import MyFeedbackList from "../components/MyFeedbackList";
+import AdminFeedbackDashboard from "../components/AdminFeedbackDashboard";
+import FeedbackList from "../components/FeedbackList";
+import FeedbackDetail from "../components/FeedbackDetail";
+import FeedbackStats from "../components/FeedbackStats";
 // import useSocket from "../hooks/useSocket"; // DISABLED due to 404 errors
 import useAchievementPolling from "../hooks/useAchievementPolling";
 import useHealthMonitoring from "../hooks/useHealthMonitoring";
@@ -29,7 +35,9 @@ export default function Home() {
   const [metrics, setMetrics] = useState<any>({});
   const [usageStatus, setUsageStatus] = useState<any>(null);
 
-  const [activeView, setActiveView] = useState<"chat" | "forum">("chat");
+  const [activeView, setActiveView] = useState<"chat" | "forum" | "feedback">(
+    "chat"
+  );
 
   // Comment out image state variables
   // const [image, setImage] = useState<File | null>(null);
@@ -52,6 +60,14 @@ export default function Home() {
   const [isEarlyAccessUser, setIsEarlyAccessUser] = useState(false);
   const [earlyAccessUserData, setEarlyAccessUserData] = useState<any>(null);
 
+  // Feedback system state
+  const [userType, setUserType] = useState<"free" | "pro">("free");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [selectedFeedback, setSelectedFeedback] = useState<any>(null);
+  const [feedbackView, setFeedbackView] = useState<
+    "form" | "my-feedback" | "admin-dashboard" | "admin-list"
+  >("form");
+
   // Achievement polling system - replaces Socket.IO for notifications
   const { isPolling, lastChecked } = useAchievementPolling({
     username: username,
@@ -60,11 +76,12 @@ export default function Home() {
   });
 
   // Health monitoring system for break reminders
-  const { healthStatus, recordBreak, endBreak, snoozeReminder } = useHealthMonitoring({
-    username: username,
-    isEnabled: !!username, // Only monitor when user is logged in
-    checkInterval: 60000, // Check every minute
-  });
+  const { healthStatus, recordBreak, endBreak, snoozeReminder } =
+    useHealthMonitoring({
+      username: username,
+      isEnabled: !!username, // Only monitor when user is logged in
+      checkInterval: 60000, // Check every minute
+    });
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -255,6 +272,55 @@ export default function Home() {
       fetchUsageStatus();
     }
   }, [userId, fetchConversations, fetchUsageStatus]);
+
+  // Check user type and admin status
+  useEffect(() => {
+    const checkUserStatus = async () => {
+      if (!username) return;
+
+      try {
+        // Lightweight admin check - uses dedicated endpoint that doesn't trigger errors
+        const adminCheckResponse = await fetch(
+          `/api/feedback/admin/check?username=${encodeURIComponent(username)}`,
+          {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+
+        if (adminCheckResponse.ok) {
+          const checkResult = await adminCheckResponse.json();
+          if (checkResult.isAdmin) {
+            setIsAdmin(true);
+            // Set default view to admin dashboard for admins
+            setFeedbackView("admin-dashboard");
+          } else {
+            setIsAdmin(false);
+          }
+        } else {
+          setIsAdmin(false);
+        }
+
+        // Check user type (pro vs free)
+        const usageResponse = await fetch("/api/usageStatus", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username }),
+        });
+
+        if (usageResponse.ok) {
+          const usageData = await usageResponse.json();
+          setUserType(usageData.usageStatus?.isProUser ? "pro" : "free");
+        }
+      } catch (error) {
+        console.error("Error checking user status:", error);
+        setIsAdmin(false);
+        setUserType("free");
+      }
+    };
+
+    checkUserStatus();
+  }, [username]);
 
   useEffect(() => {
     if (selectedConversation) {
@@ -979,6 +1045,117 @@ export default function Home() {
                     <ForumList />
                   </div>
                 </ForumProvider>
+              )}
+
+              {activeView === "feedback" && (
+                <div className="w-full mt-4">
+                  {/* Feedback Navigation */}
+                  <div className="mb-6">
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      {!isAdmin && (
+                        <>
+                          <button
+                            onClick={() => setFeedbackView("form")}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                              feedbackView === "form"
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                            }`}
+                          >
+                            Submit Feedback
+                          </button>
+                          <button
+                            onClick={() => setFeedbackView("my-feedback")}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                              feedbackView === "my-feedback"
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                            }`}
+                          >
+                            My Feedback
+                          </button>
+                        </>
+                      )}
+                      {isAdmin && (
+                        <>
+                          <button
+                            onClick={() => setFeedbackView("admin-dashboard")}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                              feedbackView === "admin-dashboard"
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                            }`}
+                          >
+                            Dashboard
+                          </button>
+                          <button
+                            onClick={() => setFeedbackView("admin-list")}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                              feedbackView === "admin-list"
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                            }`}
+                          >
+                            All Feedback
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Feedback Content */}
+                  {feedbackView === "form" && (
+                    <FeedbackForm
+                      username={username}
+                      userType={userType}
+                      onFeedbackSubmitted={() => setFeedbackView("my-feedback")}
+                    />
+                  )}
+
+                  {feedbackView === "my-feedback" && (
+                    <MyFeedbackList username={username} />
+                  )}
+
+                  {isAdmin && feedbackView === "admin-dashboard" && (
+                    <AdminFeedbackDashboard username={username} />
+                  )}
+
+                  {isAdmin && feedbackView === "admin-list" && (
+                    <FeedbackList
+                      username={username}
+                      onFeedbackSelect={setSelectedFeedback}
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Feedback Detail Modal */}
+              {selectedFeedback && (
+                <FeedbackDetail
+                  feedback={selectedFeedback}
+                  username={username}
+                  onClose={() => setSelectedFeedback(null)}
+                  onStatusUpdate={() => {
+                    // Refresh the current view if it's an admin view
+                    if (
+                      isAdmin &&
+                      (feedbackView === "admin-list" ||
+                        feedbackView === "admin-dashboard")
+                    ) {
+                      // The components will handle their own refresh
+                    }
+                  }}
+                  onResponseSubmit={() => {
+                    // Refresh the current view if it's an admin view
+                    if (
+                      isAdmin &&
+                      (feedbackView === "admin-list" ||
+                        feedbackView === "admin-dashboard")
+                    ) {
+                      // The components will handle their own refresh
+                    }
+                  }}
+                />
               )}
 
               {loading && <div className="spinner mt-4"></div>}

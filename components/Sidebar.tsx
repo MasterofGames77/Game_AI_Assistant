@@ -145,9 +145,9 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
       </div>
 
       {/* View Switching Buttons */}
-      <div className="flex space-x-2 mb-6">
+      <div className="grid grid-cols-2 gap-1 mb-6">
         <button
-          className={`flex-1 px-3 py-2 rounded ${
+          className={`px-3 py-2 rounded text-sm ${
             activeView === "chat"
               ? "bg-blue-600 text-white"
               : "bg-gray-700 text-gray-300"
@@ -157,7 +157,7 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
           Chat
         </button>
         <button
-          className={`flex-1 px-3 py-2 rounded ${
+          className={`px-3 py-2 rounded text-sm ${
             activeView === "forum"
               ? "bg-blue-600 text-white"
               : "bg-gray-700 text-gray-300"
@@ -165,6 +165,16 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
           onClick={() => setActiveView("forum")}
         >
           Forum
+        </button>
+        <button
+          className={`px-3 py-2 rounded text-sm col-span-2 ${
+            activeView === "feedback"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-700 text-gray-300"
+          }`}
+          onClick={() => setActiveView("feedback")}
+        >
+          Feedback
         </button>
       </div>
 

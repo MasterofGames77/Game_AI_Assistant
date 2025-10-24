@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import connectToMongoDB from '../../../utils/mongodb';
 import Feedback from '../../../models/Feedback';
 import { containsOffensiveContent } from '../../../utils/contentModeration';
+import { handleContentViolation, checkUserBanStatus } from '../../../utils/violationHandler';
 import { checkProAccess } from '../../../utils/proAccessUtil';
 import { validateFeedbackData } from '../../../utils/validation';
 
@@ -48,6 +49,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const hasProAccess = await checkProAccess(username);
     const userType = hasProAccess ? 'pro' : 'free';
 
+    // Check if user is currently banned (before processing feedback)
+    const banStatus = await checkUserBanStatus(username);
+    if (banStatus.isBanned) {
+      return res.status(403).json({ 
+        error: `You are banned until ${banStatus.expiresAt}. Reason: Previous content violations.`,
+        banStatus
+      });
+    }
+
     // Check for offensive content in title and message
     const titleCheck = await containsOffensiveContent(title, username);
     const messageCheck = await containsOffensiveContent(message, username);
@@ -58,17 +68,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ...(messageCheck.offendingWords || [])
       ];
       
+      // Handle content violation using the existing violation system
+      const violationResult = await handleContentViolation(username, allOffendingWords, email);
+      
+      // Check if user is banned
+      if (violationResult.action === 'banned') {
+        return res.status(403).json({ 
+          error: `You are banned until ${violationResult.expiresAt}. Reason: Content violation.`,
+          violationResult
+        });
+      }
+      
+      if (violationResult.action === 'permanent_ban') {
+        return res.status(403).json({ 
+          error: 'You are permanently banned due to repeated content violations.',
+          violationResult
+        });
+      }
+      
+      // If it's just a warning, still reject the feedback but show warning
       return res.status(400).json({ 
-        error: `The following words violate our policy: ${allOffendingWords.join(', ')}`,
+        error: `The following words violate our policy: ${allOffendingWords.join(', ')}. This is warning ${violationResult.count} of 3.`,
         violationResult: {
           title: titleCheck.violationResult,
-          message: messageCheck.violationResult
+          message: messageCheck.violationResult,
+          userViolation: violationResult
         }
       });
     }
 
+    // Generate unique feedback ID
+    const feedbackId = `feedback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     // Create new feedback
     const feedback = await Feedback.create({
+      feedbackId,
       username,
       email,
       userType,
@@ -83,7 +117,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         attachments,
         violationResult: {
           title: titleCheck,
-          message: messageCheck
+          message: messageCheck,
+          checkedAt: new Date(),
+          isClean: true // This feedback passed moderation
         }
       }
     });

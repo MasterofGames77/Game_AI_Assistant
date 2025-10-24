@@ -16,6 +16,61 @@ const useHealthMonitoring = ({
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastReminderTimeRef = useRef<Date | null>(null);
+  const sessionStartTimeRef = useRef<Date | null>(null);
+  const lastActiveTimeRef = useRef<Date | null>(null);
+
+  // Function to start a new session
+  const startSession = async () => {
+    if (!username) return;
+
+    const now = new Date();
+    sessionStartTimeRef.current = now;
+    lastActiveTimeRef.current = now;
+
+    try {
+      // Notify server that session started
+      await fetch("/api/health/startSession", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, sessionStartTime: now.toISOString() }),
+      });
+    } catch (error) {
+      console.error("Error starting session:", error);
+    }
+  };
+
+  // Function to end the current session
+  const endSession = async () => {
+    if (!username || !sessionStartTimeRef.current) return;
+
+    const now = new Date();
+    const sessionDuration =
+      now.getTime() - sessionStartTimeRef.current.getTime();
+
+    try {
+      // Notify server that session ended
+      await fetch("/api/health/endSession", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username,
+          sessionEndTime: now.toISOString(),
+          sessionDuration: Math.floor(sessionDuration / 1000), // in seconds
+        }),
+      });
+    } catch (error) {
+      console.error("Error ending session:", error);
+    }
+
+    // Clear session tracking
+    sessionStartTimeRef.current = null;
+    lastActiveTimeRef.current = null;
+  };
+
+  // Function to update last active time
+  const updateLastActiveTime = () => {
+    lastActiveTimeRef.current = new Date();
+  };
 
   // Function to check health status
   const checkHealthStatus = async () => {
@@ -250,9 +305,15 @@ const useHealthMonitoring = ({
       return;
     }
 
+    // Start a new session
+    startSession();
+
     // Start monitoring
     setHealthStatus((prev) => ({ ...prev, isMonitoring: true }));
-    intervalRef.current = setInterval(checkHealthStatus, checkInterval);
+    intervalRef.current = setInterval(() => {
+      updateLastActiveTime();
+      checkHealthStatus();
+    }, checkInterval);
 
     // Check immediately on first load
     checkHealthStatus();
@@ -263,8 +324,54 @@ const useHealthMonitoring = ({
         intervalRef.current = null;
         setHealthStatus((prev) => ({ ...prev, isMonitoring: false }));
       }
+      // End session when component unmounts
+      endSession();
     };
   }, [username, isEnabled, checkInterval]);
+
+  // Track page visibility changes (when user switches tabs or minimizes)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Page is hidden - just update last active time, don't end session
+        // Timer continues running even when user is in another tab
+        updateLastActiveTime();
+      } else {
+        // Page is visible - update active time
+        updateLastActiveTime();
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      // Page is being unloaded - end session
+      endSession();
+    };
+
+    const handleFocus = () => {
+      // Page gained focus - update active time
+      updateLastActiveTime();
+    };
+
+    const handleBlur = () => {
+      // Page lost focus - just update the last active time
+      // Timer continues running even when user is in another tab
+      updateLastActiveTime();
+    };
+
+    // Add event listeners
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("blur", handleBlur);
+
+    return () => {
+      // Cleanup event listeners
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, [username]);
 
   // Cleanup on unmount
   useEffect(() => {

@@ -73,4 +73,44 @@ export const handleContentViolation = async (username: string, offendingWords: s
 
   await violation.save();
   return { action: 'warning', count: violation.warningCount };
+};
+
+/**
+ * Check if a user is currently banned
+ * @param username - The user's username to check
+ * @returns Object with ban status information
+ */
+export const checkUserBanStatus = async (username: string) => {
+  const violation = await UserViolation.findOne({ username });
+  
+  if (!violation) {
+    return { isBanned: false };
+  }
+
+  // Check if user is permanently banned
+  if (violation.isPermanentlyBanned) {
+    return { 
+      isBanned: true, 
+      isPermanent: true,
+      reason: 'Permanent ban due to repeated violations'
+    };
+  }
+
+  // Check if user is currently banned (ban hasn't expired)
+  if (violation.banExpiresAt && violation.banExpiresAt > new Date()) {
+    return { 
+      isBanned: true, 
+      isPermanent: false,
+      expiresAt: violation.banExpiresAt,
+      banCount: violation.banCount,
+      warningCount: violation.warningCount
+    };
+  }
+
+  // User is not currently banned
+  return { 
+    isBanned: false,
+    warningCount: violation.warningCount,
+    banCount: violation.banCount
+  };
 }; 

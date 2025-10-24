@@ -30,8 +30,8 @@ export interface SideBarProps {
   onClear: () => void;
   onTwitchAuth: () => void;
   onNavigateToAccount: () => void;
-  activeView: "chat" | "forum";
-  setActiveView: (view: "chat" | "forum") => void;
+  activeView: "chat" | "forum" | "feedback";
+  setActiveView: (view: "chat" | "forum" | "feedback") => void;
   conversationCount: number;
 }
 
@@ -439,4 +439,206 @@ export interface AccountData {
   };
   hasPassword?: boolean;
   healthMonitoring?: HealthMonitoring;
+}
+
+
+// FeedbackForm.tsx:
+export interface FeedbackFormProps {
+  username: string | null;
+  userType: "free" | "pro";
+  onFeedbackSubmitted?: () => void;
+}
+
+export interface FeedbackFormData {
+  category:
+    | "bug_report"
+    | "feature_request"
+    | "improvement"
+    | "general"
+    | "complaint"
+    | "praise";
+  title: string;
+  message: string;
+  priority: "low" | "medium" | "high" | "critical";
+}
+
+// MyFeedbackList.tsx:
+export interface Feedback {
+  feedbackId: string;
+  category:
+    | "bug_report"
+    | "feature_request"
+    | "improvement"
+    | "general"
+    | "complaint"
+    | "praise";
+  title: string;
+  message: string;
+  priority: "low" | "medium" | "high" | "critical";
+  status: "new" | "under_review" | "in_progress" | "resolved" | "closed";
+  adminResponse?: string;
+  adminResponseBy?: string;
+  adminResponseAt?: Date;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MyFeedbackListProps {
+  username: string | null;
+}
+
+// AdminFeedbackDashboard.tsx:
+export interface DashboardStats {
+  success: boolean;
+  timeframe: {
+    days: number;
+    startDate: string;
+    endDate: string;
+  };
+  overall: {
+    totalFeedback: number;
+    newFeedback: number;
+    underReview: number;
+    inProgress: number;
+    resolved: number;
+    closed: number;
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    proUsers: number;
+    freeUsers: number;
+    withResponses: number;
+  };
+  categories: {
+    [key: string]: number;
+  };
+  topUsers: {
+    feedbackId: string;
+    username: string;
+    title: string;
+    status: string;
+    createdAt: string;
+  }[];
+}
+
+export interface AdminFeedbackDashboardProps {
+  username: string | null;
+}
+
+
+// FeedbackList.tsx:
+export interface Feedback {
+  feedbackId: string;
+  username: string;
+  email: string;
+  userType: "free" | "pro";
+  category:
+    | "bug_report"
+    | "feature_request"
+    | "improvement"
+    | "general"
+    | "complaint"
+    | "praise";
+  title: string;
+  message: string;
+  priority: "low" | "medium" | "high" | "critical";
+  status: "new" | "under_review" | "in_progress" | "resolved" | "closed";
+  adminResponse?: string;
+  adminResponseBy?: string;
+  adminResponseAt?: Date;
+  createdAt: string;
+  updatedAt: string;
+  metadata: {
+    isRead: boolean;
+    isArchived: boolean;
+  };
+}
+
+export interface FeedbackListProps {
+  username: string | null;
+  onFeedbackSelect?: (feedback: Feedback) => void;
+}
+
+
+// FeedbackDetail.tsx:
+export interface Feedback {
+  feedbackId: string;
+  username: string;
+  email: string;
+  userType: "free" | "pro";
+  category:
+    | "bug_report"
+    | "feature_request"
+    | "improvement"
+    | "general"
+    | "complaint"
+    | "praise";
+  title: string;
+  message: string;
+  priority: "low" | "medium" | "high" | "critical";
+  status: "new" | "under_review" | "in_progress" | "resolved" | "closed";
+  adminResponse?: string;
+  adminResponseBy?: string;
+  adminResponseAt?: Date;
+  createdAt: string;
+  updatedAt: string;
+  metadata: {
+    isRead: boolean;
+    isArchived: boolean;
+  };
+}
+
+export interface FeedbackDetailProps {
+  feedback: Feedback;
+  username: string | null;
+  onClose: () => void;
+  onStatusUpdate?: () => void;
+  onResponseSubmit?: () => void;
+}
+
+
+// FeedbackStats.tsx:
+export interface StatsData {
+  totalFeedback: number;
+  newFeedback: number;
+  underReview: number;
+  inProgress: number;
+  resolved: number;
+  closed: number;
+  criticalPriority: number;
+  highPriority: number;
+  mediumPriority: number;
+  lowPriority: number;
+  categoryBreakdown: {
+    bug_report: number;
+    feature_request: number;
+    improvement: number;
+    general: number;
+    complaint: number;
+    praise: number;
+  };
+  userTypeBreakdown: {
+    free: number;
+    pro: number;
+  };
+  timeRangeStats: {
+    last24Hours: number;
+    last7Days: number;
+    last30Days: number;
+  };
+  responseStats: {
+    totalResponses: number;
+    averageResponseTime: number; // in hours
+    responseRate: number; // percentage
+  };
+  trends: {
+    daily: Array<{ date: string; count: number }>;
+    weekly: Array<{ week: string; count: number }>;
+    monthly: Array<{ month: string; count: number }>;
+  };
+}
+
+export interface FeedbackStatsProps {
+  username: string | null;
 }

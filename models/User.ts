@@ -445,13 +445,28 @@ UserSchema.methods.shouldShowBreakReminder = function(): {
     return { shouldShow: false, timeSinceLastBreak: 0, timeSinceLastReminder: 0 };
   }
   
-  // Calculate time since last break
-  // If user has taken a break, use that time; otherwise use session start time
-  const referenceTime = health.lastBreakTime || health.lastSessionStart;
-  if (!referenceTime) {
+  // Calculate active session time since last break
+  // Use session-based time tracking instead of wall clock time
+  let timeSinceLastBreak = 0;
+  
+  if (health.lastBreakTime) {
+    // If user has taken a break, calculate time since then
+    // But only count time when the application was actually active
+    const sessionStartTime = health.lastSessionStart;
+    if (sessionStartTime && sessionStartTime > health.lastBreakTime) {
+      // Session started after last break, so count from session start
+      timeSinceLastBreak = Math.floor((now.getTime() - sessionStartTime.getTime()) / (1000 * 60));
+    } else {
+      // Session started before last break, so count from last break
+      timeSinceLastBreak = Math.floor((now.getTime() - health.lastBreakTime.getTime()) / (1000 * 60));
+    }
+  } else if (health.lastSessionStart) {
+    // No break taken yet, count from session start
+    timeSinceLastBreak = Math.floor((now.getTime() - health.lastSessionStart.getTime()) / (1000 * 60));
+  } else {
+    // No session start time, can't calculate
     return { shouldShow: false, timeSinceLastBreak: 0, timeSinceLastReminder: 0 };
   }
-  const timeSinceLastBreak = Math.floor((now.getTime() - referenceTime.getTime()) / (1000 * 60));
   
   // Calculate time since last reminder
   const lastReminderTime = health.lastBreakReminder || new Date(0);
