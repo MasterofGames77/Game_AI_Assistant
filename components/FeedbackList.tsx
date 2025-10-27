@@ -87,10 +87,10 @@ const FeedbackList: React.FC<FeedbackListProps> = ({
         setError(result.error || "Failed to fetch feedback");
         // Don't show toast for admin access errors - these are expected for non-admin users
         if (result.error === "Access denied. Admin privileges required.") {
-          console.log(
-            "Admin access check failed (expected for non-admins):",
-            result.error
-          );
+          // console.log(
+          //   "Admin access check failed (expected for non-admins):",
+          //   result.error
+          // ); // Commented out for production
         } else {
           toast.error(result.error || "Failed to fetch feedback");
         }
@@ -99,9 +99,9 @@ const FeedbackList: React.FC<FeedbackListProps> = ({
       console.error("Error fetching feedback:", error);
       setError("Failed to fetch feedback");
       // Don't show toast for network errors during admin checks
-      console.log(
-        "Network error during admin access check (expected for non-admins)"
-      );
+      // console.log(
+      //   "Network error during admin access check (expected for non-admins)"
+      // ); // Commented out for production
     } finally {
       setLoading(false);
     }

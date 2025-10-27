@@ -21,11 +21,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (userType && userType !== 'undefined') logParams.userType = userType;
     if (search && search !== 'undefined') logParams.search = search;
     
-    console.log('Admin all feedback API called with:', logParams);
+    // console.log('Admin all feedback API called with:', logParams); // Commented out for production
 
     // Validate admin access (checks against ADMIN_USERNAME environment variable)
     requireAdminAccess(username as string);
-    console.log('Admin access validated for all feedback API');
+    // console.log('Admin access validated for all feedback API'); // Commented out for production
 
     // Validate pagination parameters
     const pageNum = parseInt(page as string);
@@ -101,8 +101,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .limit(limitNum)
       .lean();
     
-    console.log('Found feedback:', feedback.length, 'items');
-    console.log('Filter used:', filter);
+    // console.log('Found feedback:', feedback.length, 'items'); // Commented out for production
+    // console.log('Filter used:', filter); // Commented out for production
 
     // Calculate pagination info
     const totalPages = Math.ceil(totalCount / limitNum);

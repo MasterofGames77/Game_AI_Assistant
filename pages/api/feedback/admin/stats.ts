@@ -12,11 +12,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await connectToMongoDB();
     
     const { username, timeframe = '30' } = req.query;
-    console.log('Admin stats API called with username:', username);
+    // console.log('Admin stats API called with username:', username); // Commented out for production
 
     // Validate admin access
     requireAdminAccess(username as string);
-    console.log('Admin access validated successfully');
+    // console.log('Admin access validated successfully'); // Commented out for production
 
     // Validate timeframe
     const timeframeDays = parseInt(timeframe as string);
@@ -32,11 +32,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     startDate.setDate(startDate.getDate() - timeframeDays);
 
     // Get overall statistics - simplified approach
-    console.log('Starting overall stats aggregation...');
+    // console.log('Starting overall stats aggregation...'); // Commented out for production
     
     // First, let's try a simple count to see if the model works
     const totalFeedback = await Feedback.countDocuments();
-    console.log('Total feedback count:', totalFeedback);
+    // console.log('Total feedback count:', totalFeedback); // Commented out for production
     
     // Get basic stats using simple queries instead of complex aggregation
     const newFeedback = await Feedback.countDocuments({ status: 'new' });
@@ -68,14 +68,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       withResponses
     }];
     
-    console.log('Overall stats completed:', overallStats);
+    // console.log('Overall stats completed:', overallStats); // Commented out for production
 
     // Get timeframe-specific statistics - simplified
-    console.log('Getting timeframe stats...');
+    // console.log('Getting timeframe stats...'); // Commented out for production
     const timeframeTotal = await Feedback.countDocuments({ 
       createdAt: { $gte: startDate, $lte: endDate } 
     });
-    console.log('Timeframe total:', timeframeTotal);
+    // console.log('Timeframe total:', timeframeTotal); // Commented out for production
     
     const timeframeStats = [{
       totalFeedback: timeframeTotal,
@@ -94,7 +94,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }];
 
     // Get category breakdown - simplified
-    console.log('Getting category breakdown...');
+    // console.log('Getting category breakdown...'); // Commented out for production
     const categoryStats: { [key: string]: number } = {};
     const categories = ['bug_report', 'feature_request', 'improvement', 'general', 'complaint', 'praise'];
     for (const category of categories) {
@@ -103,17 +103,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         categoryStats[category] = count;
       }
     }
-    console.log('Category stats:', categoryStats);
+    // console.log('Category stats:', categoryStats); // Commented out for production
 
     // Get daily feedback count for the timeframe - simplified
-    console.log('Getting daily stats...');
+    // console.log('Getting daily stats...'); // Commented out for production
     const dailyStats: any[] = [];
-    console.log('Daily stats:', dailyStats);
+    // console.log('Daily stats:', dailyStats); // Commented out for production
 
     // Get top users by feedback count - simplified
-    console.log('Getting top users...');
+    // console.log('Getting top users...'); // Commented out for production
     const topUsers: any[] = [];
-    console.log('Top users:', topUsers);
+    // console.log('Top users:', topUsers); // Commented out for production
 
     return res.status(200).json({
       success: true,
