@@ -89,6 +89,32 @@ const UserSchema = new Schema<IUser>({
       expertAdvisor: { type: Number, default: 0 },
       genreSpecialist: { type: Number, default: 0 },
       proContributor: { type: Number, default: 0 }
+    },
+    // NEW FIELD FOR PHASE 1 - Personalized recommendations data (completely optional)
+    personalized: {
+      preferenceProfile: {
+        dominantGenres: [{ type: String }],
+        learningStyle: { type: String },
+        difficultyPreference: { type: String },
+        playstyleTags: [{ type: String }],
+        recentInterests: [{ type: String }],
+        seasonalTrends: [{ type: String }]
+      },
+      gameplayPatterns: {
+        avgQuestionsPerSession: { type: Number },
+        sessionFrequency: { type: String },
+        difficultyProgression: [{ type: Number }],
+        genreDiversity: { type: Number },
+        engagementDepth: { type: Number }
+      },
+      recommendationHistory: {
+        lastRecommendations: { type: Date },
+        recommendedGames: [{ type: String }],
+        acceptedSuggestions: [{ type: String }],
+        declinedSuggestions: [{ type: String }],
+        dismissedRecently: { type: Boolean },
+        lastAnalysisTime: { type: Date }
+      }
     }
   },
   // New subscription schema

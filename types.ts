@@ -313,6 +313,39 @@ export interface HealthStatusResponse {
   error?: string;
 }
 
+// New interfaces for Phase 1 - Enhanced Recommendations
+export interface PreferenceProfile {
+  dominantGenres?: string[];
+  learningStyle?: string;
+  difficultyPreference?: string;
+  playstyleTags?: string[];
+  recentInterests?: string[];
+  seasonalTrends?: string[];
+}
+
+export interface GameplayPatterns {
+  avgQuestionsPerSession?: number;
+  sessionFrequency?: 'daily' | 'weekly' | 'sporadic';
+  difficultyProgression?: number[];
+  genreDiversity?: number;
+  engagementDepth?: number;
+}
+
+export interface RecommendationHistory {
+  lastRecommendations?: Date;
+  recommendedGames?: string[];
+  acceptedSuggestions?: string[];
+  declinedSuggestions?: string[];
+  dismissedRecently?: boolean;
+  lastAnalysisTime?: Date;
+}
+
+export interface PersonalizedData {
+  preferenceProfile?: PreferenceProfile;
+  gameplayPatterns?: GameplayPatterns;
+  recommendationHistory?: RecommendationHistory;
+}
+
 export interface Progress {
   firstQuestion?: number;
   frequentAsker?: number;
@@ -354,6 +387,8 @@ export interface Progress {
     genreSpecialist: number;
     proContributor: number;
   };
+  // NEW FIELD FOR PHASE 1 - Completely optional
+  personalized?: PersonalizedData;
 }
 
 // New subscription interface
