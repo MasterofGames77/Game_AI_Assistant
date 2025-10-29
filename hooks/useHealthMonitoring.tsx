@@ -15,17 +15,76 @@ const useHealthMonitoring = ({
   });
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null); // For real-time countdown
   const lastReminderTimeRef = useRef<Date | null>(null);
   const sessionStartTimeRef = useRef<Date | null>(null);
   const lastActiveTimeRef = useRef<Date | null>(null);
+  const isPageVisibleRef = useRef<boolean>(true);
+  const accumulatedSessionTimeRef = useRef<number>(0); // Track accumulated session time
+  const lastBreakTimeRef = useRef<Date | null>(null); // Track when last break was taken
+  const sessionPausedTimeRef = useRef<Date | null>(null); // Track when session was paused
+  const breakIntervalMinutesRef = useRef<number>(45); // Store break interval for local calculations
 
   // Function to start a new session
   const startSession = async () => {
     if (!username) return;
 
     const now = new Date();
+
+    try {
+      // Check if there's an existing session to resume
+      const response = await fetch("/api/health/checkStatus", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+
+        // If user is on a break, don't start a new session
+        if (data.isOnBreak) {
+          sessionStartTimeRef.current = null;
+          lastActiveTimeRef.current = null;
+          accumulatedSessionTimeRef.current = 0;
+          return;
+        }
+
+        // Check if we should resume from last break time
+        if (data.lastBreakTime) {
+          const lastBreakTime = new Date(data.lastBreakTime);
+          const timeSinceLastBreak = now.getTime() - lastBreakTime.getTime();
+
+          // If it's been less than 24 hours since last break, resume session
+          if (timeSinceLastBreak < 24 * 60 * 60 * 1000) {
+            lastBreakTimeRef.current = lastBreakTime;
+            sessionStartTimeRef.current = lastBreakTime;
+            lastActiveTimeRef.current = now;
+            accumulatedSessionTimeRef.current = timeSinceLastBreak;
+
+            console.log(
+              "Resuming session from last break time:",
+              lastBreakTime.toISOString()
+            );
+            console.log(
+              "Time since last break:",
+              Math.floor(timeSinceLastBreak / (1000 * 60)),
+              "minutes"
+            );
+            return;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error checking existing session:", error);
+    }
+
+    // Start fresh session
     sessionStartTimeRef.current = now;
     lastActiveTimeRef.current = now;
+    accumulatedSessionTimeRef.current = 0;
+    lastBreakTimeRef.current = null;
+    sessionPausedTimeRef.current = null;
 
     try {
       // Notify server that session started
@@ -39,13 +98,59 @@ const useHealthMonitoring = ({
     }
   };
 
+  // Function to pause session (when page becomes hidden)
+  const pauseSession = () => {
+    if (!sessionStartTimeRef.current || !lastActiveTimeRef.current) return;
+
+    const now = new Date();
+    const sessionDuration = now.getTime() - lastActiveTimeRef.current.getTime();
+    accumulatedSessionTimeRef.current += sessionDuration;
+    sessionPausedTimeRef.current = now;
+    lastActiveTimeRef.current = null; // Mark as paused
+  };
+
+  // Function to resume session (when page becomes visible)
+  const resumeSession = () => {
+    if (!sessionStartTimeRef.current) return;
+
+    // Only resume if we were actually paused (not just tab switching)
+    if (sessionPausedTimeRef.current) {
+      const pauseDuration =
+        new Date().getTime() - sessionPausedTimeRef.current.getTime();
+
+      // If paused for more than 5 minutes, consider it a real pause
+      if (pauseDuration > 5 * 60 * 1000) {
+        console.log(
+          "Session was paused for",
+          Math.floor(pauseDuration / (1000 * 60)),
+          "minutes"
+        );
+      }
+    }
+
+    lastActiveTimeRef.current = new Date();
+    sessionPausedTimeRef.current = null;
+  };
+
+  // Function to get current session time (only counting visible time)
+  const getCurrentSessionTime = (): number => {
+    if (!sessionStartTimeRef.current) return 0;
+
+    const baseTime = accumulatedSessionTimeRef.current;
+    if (lastActiveTimeRef.current && isPageVisibleRef.current) {
+      const now = new Date();
+      return baseTime + (now.getTime() - lastActiveTimeRef.current.getTime());
+    }
+    return baseTime;
+  };
+
   // Function to end the current session
   const endSession = async () => {
     if (!username || !sessionStartTimeRef.current) return;
 
-    const now = new Date();
-    const sessionDuration =
-      now.getTime() - sessionStartTimeRef.current.getTime();
+    // Calculate final session duration using accumulated time
+    const finalSessionTime = getCurrentSessionTime();
+    const sessionDurationMinutes = Math.floor(finalSessionTime / (1000 * 60));
 
     try {
       // Notify server that session ended
@@ -54,22 +159,62 @@ const useHealthMonitoring = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username,
-          sessionEndTime: now.toISOString(),
-          sessionDuration: Math.floor(sessionDuration / 1000), // in seconds
+          sessionEndTime: new Date().toISOString(),
+          sessionDuration: sessionDurationMinutes,
         }),
       });
     } catch (error) {
       console.error("Error ending session:", error);
+    } finally {
+      // Reset session tracking
+      sessionStartTimeRef.current = null;
+      lastActiveTimeRef.current = null;
+      accumulatedSessionTimeRef.current = 0;
     }
-
-    // Clear session tracking
-    sessionStartTimeRef.current = null;
-    lastActiveTimeRef.current = null;
   };
 
   // Function to update last active time
   const updateLastActiveTime = () => {
     lastActiveTimeRef.current = new Date();
+  };
+
+  // Function to update timer locally (real-time countdown)
+  const updateTimerLocally = () => {
+    if (!username || !isEnabled) return;
+
+    // Calculate time since last break locally
+    let timeSinceLastBreak = 0;
+    if (lastBreakTimeRef.current) {
+      const timeSinceBreak =
+        new Date().getTime() - lastBreakTimeRef.current.getTime();
+      timeSinceLastBreak = Math.floor(timeSinceBreak / (1000 * 60));
+    } else if (sessionStartTimeRef.current) {
+      const currentSessionTime = getCurrentSessionTime();
+      timeSinceLastBreak = Math.floor(currentSessionTime / (1000 * 60));
+    }
+
+    const shouldShowBreak =
+      timeSinceLastBreak >= breakIntervalMinutesRef.current;
+    const nextBreakIn = shouldShowBreak
+      ? 0
+      : Math.max(0, breakIntervalMinutesRef.current - timeSinceLastBreak);
+
+    // Debug logging
+    console.log("Timer update:", {
+      timeSinceLastBreak,
+      breakInterval: breakIntervalMinutesRef.current,
+      nextBreakIn,
+      shouldShowBreak,
+      lastBreakTime: lastBreakTimeRef.current?.toISOString(),
+      sessionStart: sessionStartTimeRef.current?.toISOString(),
+    });
+
+    setHealthStatus((prev) => ({
+      ...prev,
+      shouldShowBreak: shouldShowBreak,
+      timeSinceLastBreak: timeSinceLastBreak,
+      nextBreakIn: nextBreakIn,
+    }));
   };
 
   // Function to check health status
@@ -92,10 +237,47 @@ const useHealthMonitoring = ({
 
       const data = await response.json();
 
+      // Store break interval for local calculations
+      breakIntervalMinutesRef.current = data.breakIntervalMinutes || 45;
+
+      // Update break time references from server data
+      if (data.lastBreakTime && !lastBreakTimeRef.current) {
+        lastBreakTimeRef.current = new Date(data.lastBreakTime);
+      }
+
+      // Calculate session-based time instead of using server time
+      const currentSessionTime = getCurrentSessionTime();
+      const sessionTimeMinutes = Math.floor(currentSessionTime / (1000 * 60));
+
+      // Calculate time since last break (either from session or server data)
+      let timeSinceLastBreak = 0;
+      if (data.isOnBreak) {
+        timeSinceLastBreak = 0;
+      } else if (lastBreakTimeRef.current) {
+        // Use local break time if available
+        const timeSinceBreak =
+          new Date().getTime() - lastBreakTimeRef.current.getTime();
+        timeSinceLastBreak = Math.floor(timeSinceBreak / (1000 * 60));
+      } else if (data.lastBreakTime) {
+        // Fall back to server data
+        const timeSinceBreak =
+          new Date().getTime() - new Date(data.lastBreakTime).getTime();
+        timeSinceLastBreak = Math.floor(timeSinceBreak / (1000 * 60));
+      } else {
+        // Use session time if no break time available
+        timeSinceLastBreak = sessionTimeMinutes;
+      }
+
+      const shouldShowBreak =
+        !data.isOnBreak &&
+        timeSinceLastBreak >= breakIntervalMinutesRef.current;
+
       setHealthStatus({
-        shouldShowBreak: data.shouldShowBreak,
-        timeSinceLastBreak: data.timeSinceLastBreak,
-        nextBreakIn: data.nextBreakIn,
+        shouldShowBreak: shouldShowBreak,
+        timeSinceLastBreak: timeSinceLastBreak,
+        nextBreakIn: shouldShowBreak
+          ? 0
+          : Math.max(0, breakIntervalMinutesRef.current - timeSinceLastBreak),
         breakCount: data.breakCount,
         isMonitoring: true,
         isOnBreak: data.isOnBreak,
@@ -103,7 +285,7 @@ const useHealthMonitoring = ({
       });
 
       // Show break reminder if needed
-      if (data.shouldShowBreak && data.showReminder) {
+      if (shouldShowBreak && data.showReminder) {
         showBreakReminder(data.healthTips);
       }
     } catch (error) {
@@ -216,6 +398,9 @@ const useHealthMonitoring = ({
       });
 
       if (response.ok) {
+        // Update break time but don't reset session timer
+        lastBreakTimeRef.current = new Date();
+
         // Update local state to show break started
         setHealthStatus((prev) => ({
           ...prev,
@@ -251,6 +436,9 @@ const useHealthMonitoring = ({
 
       if (response.ok) {
         const data = await response.json();
+
+        // Update break time but don't reset session timer
+        lastBreakTimeRef.current = new Date();
 
         // Update local state
         setHealthStatus((prev) => ({
@@ -300,8 +488,12 @@ const useHealthMonitoring = ({
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
-        setHealthStatus((prev) => ({ ...prev, isMonitoring: false }));
       }
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      setHealthStatus((prev) => ({ ...prev, isMonitoring: false }));
       return;
     }
 
@@ -310,10 +502,16 @@ const useHealthMonitoring = ({
 
     // Start monitoring
     setHealthStatus((prev) => ({ ...prev, isMonitoring: true }));
+
+    // Start API polling interval (every minute)
     intervalRef.current = setInterval(() => {
-      updateLastActiveTime();
       checkHealthStatus();
     }, checkInterval);
+
+    // Start local timer for real-time countdown (every second)
+    timerIntervalRef.current = setInterval(() => {
+      updateTimerLocally();
+    }, 1000);
 
     // Check immediately on first load
     checkHealthStatus();
@@ -322,8 +520,12 @@ const useHealthMonitoring = ({
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
-        setHealthStatus((prev) => ({ ...prev, isMonitoring: false }));
       }
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      setHealthStatus((prev) => ({ ...prev, isMonitoring: false }));
       // End session when component unmounts
       endSession();
     };
@@ -333,29 +535,34 @@ const useHealthMonitoring = ({
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        // Page is hidden - just update last active time, don't end session
+        // Page is hidden - don't pause immediately, just track the time
         // Timer continues running even when user is in another tab
-        updateLastActiveTime();
+        isPageVisibleRef.current = false;
       } else {
-        // Page is visible - update active time
-        updateLastActiveTime();
+        // Page is visible - resume if it was paused
+        isPageVisibleRef.current = true;
+        if (!lastActiveTimeRef.current) {
+          resumeSession();
+        }
       }
     };
 
     const handleBeforeUnload = () => {
-      // Page is being unloaded - end session
-      endSession();
+      // Page is being unloaded - pause session but don't end it
+      pauseSession();
     };
 
     const handleFocus = () => {
-      // Page gained focus - update active time
-      updateLastActiveTime();
+      // Page gained focus - ensure we're tracking time
+      isPageVisibleRef.current = true;
+      if (!lastActiveTimeRef.current) {
+        resumeSession();
+      }
     };
 
     const handleBlur = () => {
-      // Page lost focus - just update the last active time
-      // Timer continues running even when user is in another tab
-      updateLastActiveTime();
+      // Page lost focus - don't pause, just mark as not visible
+      isPageVisibleRef.current = false;
     };
 
     // Add event listeners
@@ -378,6 +585,9 @@ const useHealthMonitoring = ({
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+      }
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
       }
     };
   }, []);

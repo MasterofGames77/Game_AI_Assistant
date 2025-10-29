@@ -102,7 +102,9 @@ export default async function handler(
       showReminder,
       healthTips: showReminder ? healthTips : undefined,
       isOnBreak: user.healthMonitoring?.isOnBreak || false,
-      breakStartTime: user.healthMonitoring?.breakStartTime
+      breakStartTime: user.healthMonitoring?.breakStartTime,
+      lastBreakTime: user.healthMonitoring?.lastBreakTime,
+      breakIntervalMinutes: user.healthMonitoring?.breakIntervalMinutes || 45,
     });
 
   } catch (error) {

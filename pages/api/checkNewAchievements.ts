@@ -47,13 +47,22 @@ export default async function handler(
       });
     }
 
-    // Parse the last checked timestamp
+    // Parse the last checked timestamp and add a buffer to prevent race conditions
     const lastCheckedDate = new Date(lastChecked);
+    const bufferTime = new Date(lastCheckedDate.getTime() - 5000); // 5 second buffer
     
-    // Find achievements earned after the last checked timestamp
+    // Find achievements earned after the buffered timestamp
     const newAchievements = user.achievements.filter((achievement: any) => 
-      achievement.dateEarned > lastCheckedDate
+      achievement.dateEarned > bufferTime
     );
+
+    // Debug logging
+    console.log(`Achievement check for ${username}:`, {
+      lastChecked: lastCheckedDate.toISOString(),
+      bufferTime: bufferTime.toISOString(),
+      totalAchievements: user.achievements.length,
+      newAchievementsFound: newAchievements.length
+    });
 
     if (newAchievements.length === 0) {
       return res.status(200).json({

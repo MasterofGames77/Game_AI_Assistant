@@ -310,6 +310,8 @@ export interface HealthStatusResponse {
   healthTips?: string[];
   isOnBreak?: boolean;
   breakStartTime?: Date;
+  lastBreakTime?: Date;
+  breakIntervalMinutes?: number;
   error?: string;
 }
 

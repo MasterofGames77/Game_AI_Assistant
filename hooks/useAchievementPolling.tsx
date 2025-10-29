@@ -11,16 +11,30 @@ const useAchievementPolling = ({
   const [lastChecked, setLastChecked] = useState<Date | null>(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("lastAchievementChecked");
-      return stored ? new Date(stored) : null;
+      if (stored) {
+        const date = new Date(stored);
+        console.log(
+          "Loaded lastChecked from localStorage:",
+          date.toISOString()
+        );
+        return date;
+      }
     }
     return null;
   });
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastCheckedRef = useRef<Date | null>(lastChecked);
 
-  // Persist lastChecked to localStorage
+  // Force ref to always be in sync with state
+  useEffect(() => {
+    lastCheckedRef.current = lastChecked;
+  }, [lastChecked]);
+
+  // Persist lastChecked to localStorage and update ref
   useEffect(() => {
     if (typeof window !== "undefined" && lastChecked) {
       localStorage.setItem("lastAchievementChecked", lastChecked.toISOString());
+      lastCheckedRef.current = lastChecked;
     }
   }, [lastChecked]);
 
@@ -29,15 +43,30 @@ const useAchievementPolling = ({
     if (!username || !isEnabled) return;
 
     try {
+      // Get the most current lastChecked value from localStorage
+      const currentLastChecked =
+        typeof window !== "undefined"
+          ? localStorage.getItem("lastAchievementChecked")
+          : null;
+
+      const requestBody = {
+        username,
+        lastChecked: currentLastChecked,
+      };
+
+      console.log("Sending achievement check request:", requestBody);
+      console.log(
+        "lastCheckedRef.current:",
+        lastCheckedRef.current?.toISOString()
+      );
+      console.log("localStorage lastChecked:", currentLastChecked);
+
       const response = await fetch("/api/checkNewAchievements", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          username,
-          lastChecked: lastChecked?.toISOString() || null,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -49,6 +78,14 @@ const useAchievementPolling = ({
       }
 
       const data = await response.json();
+
+      // Debug logging
+      console.log("Achievement polling result:", {
+        hasNewAchievements: data.hasNewAchievements,
+        achievementsCount: data.achievements?.length || 0,
+        lastChecked: lastChecked?.toISOString(),
+        currentTime: new Date().toISOString(),
+      });
 
       if (data.hasNewAchievements && data.achievements) {
         const achievementData: AchievementData = {
@@ -66,13 +103,33 @@ const useAchievementPolling = ({
         // Show notification
         showAchievementNotification(achievementData);
 
-        // Update last checked timestamp
-        setLastChecked(new Date());
-      } else {
-        // Even if no new achievements, update the lastChecked timestamp
-        // to prevent showing the same achievements again
-        setLastChecked(new Date());
+        // Update last checked timestamp to NOW
+        // This ensures we don't show the same achievement again
+        const newLastChecked = new Date(); // Use current time, not achievement date
+        console.log("Updating lastChecked to:", newLastChecked.toISOString());
+        console.log(
+          "Before update - lastCheckedRef.current:",
+          lastCheckedRef.current?.toISOString()
+        );
+
+        // Update both state and ref immediately
+        setLastChecked(newLastChecked);
+        lastCheckedRef.current = newLastChecked;
+
+        console.log(
+          "After update - lastCheckedRef.current:",
+          lastCheckedRef.current?.toISOString()
+        );
+
+        // Also update localStorage immediately
+        if (typeof window !== "undefined") {
+          localStorage.setItem(
+            "lastAchievementChecked",
+            newLastChecked.toISOString()
+          );
+        }
       }
+      // Don't update lastChecked if no new achievements - this prevents resetting the timestamp
     } catch (error) {
       console.error("Error checking for new achievements:", error);
     }
