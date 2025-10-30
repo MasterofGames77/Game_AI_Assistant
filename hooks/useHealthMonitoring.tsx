@@ -174,9 +174,9 @@ const useHealthMonitoring = ({
   };
 
   // Function to update last active time
-  const updateLastActiveTime = () => {
-    lastActiveTimeRef.current = new Date();
-  };
+  // const updateLastActiveTime = () => {
+  //   lastActiveTimeRef.current = new Date();
+  // };
 
   // Function to update timer locally (real-time countdown)
   const updateTimerLocally = () => {
@@ -200,14 +200,14 @@ const useHealthMonitoring = ({
       : Math.max(0, breakIntervalMinutesRef.current - timeSinceLastBreak);
 
     // Debug logging
-    console.log("Timer update:", {
-      timeSinceLastBreak,
-      breakInterval: breakIntervalMinutesRef.current,
-      nextBreakIn,
-      shouldShowBreak,
-      lastBreakTime: lastBreakTimeRef.current?.toISOString(),
-      sessionStart: sessionStartTimeRef.current?.toISOString(),
-    });
+    // console.log("Timer update:", {
+    //   timeSinceLastBreak,
+    //   breakInterval: breakIntervalMinutesRef.current,
+    //   nextBreakIn,
+    //   shouldShowBreak,
+    //   lastBreakTime: lastBreakTimeRef.current?.toISOString(),
+    //   sessionStart: sessionStartTimeRef.current?.toISOString(),
+    // });
 
     setHealthStatus((prev) => ({
       ...prev,

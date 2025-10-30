@@ -3,7 +3,7 @@ import axios from 'axios';
 import connectToMongoDB from '../../utils/mongodb';
 import Question from '../../models/Question';
 import User from '../../models/User';
-import { getChatCompletion, fetchRecommendations, analyzeUserQuestions, getAICache } from '../../utils/aiHelper';
+import { getChatCompletion, fetchRecommendations, analyzeUserQuestions, getAICache, extractQuestionMetadata, updateQuestionMetadata } from '../../utils/aiHelper';
 import { getClientCredentialsAccessToken, getAccessToken, getTwitchUserData, redirectToTwitch } from '../../utils/twitchAuth';
 // import OpenAI from 'openai';
 import path from 'path';
@@ -1417,6 +1417,10 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     });
     metrics.databaseMetrics = dbMetrics;
 
+    // Extract question ID for metadata analysis (runs asynchronously after response)
+    // questionDoc is an array returned from Question.create
+    const questionId = dbMetrics.result?.questionDoc?.[0]?._id?.toString();
+
     // Measure final memory usage
     metrics.finalMemory = measureMemoryUsage();
     
@@ -1438,6 +1442,29 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
       questionLength: question.length,
       metrics
     });
+    
+    // Phase 2 Step 1: Question Metadata Analysis
+    // Extract and update question metadata asynchronously after response is sent
+    // This runs in the background and doesn't affect user experience
+    if (questionId) {
+      // console.log('[Background Metadata] Scheduling metadata extraction for question ID:', questionId);
+      setImmediate(async () => {
+        try {
+          // console.log('[Background Metadata] Starting background metadata extraction...');
+          // Extract metadata using the existing checkQuestionType function
+          const metadata = await extractQuestionMetadata(question, checkQuestionType);
+          
+          // Update the question document with metadata
+          await updateQuestionMetadata(questionId, metadata);
+          // console.log('[Background Metadata] Background metadata extraction completed successfully');
+        } catch (error) {
+          // Log error but don't throw - this is a background operation
+          console.error('[Background Metadata] Error in background metadata extraction:', error);
+        }
+      });
+    } else {
+      // console.log('[Background Metadata] No question ID available, skipping metadata extraction');
+    }
     
     // Return just the base answer
     return res.status(200).json({ 
