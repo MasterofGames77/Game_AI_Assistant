@@ -24,6 +24,9 @@ const useHealthMonitoring = ({
   const lastBreakTimeRef = useRef<Date | null>(null); // Track when last break was taken
   const sessionPausedTimeRef = useRef<Date | null>(null); // Track when session was paused
   const breakIntervalMinutesRef = useRef<number>(45); // Store break interval for local calculations
+  // Persisted remaining time across full page close/open
+  const remainingSecondsOverrideRef = useRef<number | null>(null);
+  const lastTickAtRef = useRef<number | null>(null);
 
   // Function to start a new session
   const startSession = async () => {
@@ -182,7 +185,43 @@ const useHealthMonitoring = ({
   const updateTimerLocally = () => {
     if (!username || !isEnabled) return;
 
-    // Calculate time since last break locally
+    // If we have an override (from a prior close), count down only while page is open
+    if (remainingSecondsOverrideRef.current !== null) {
+      const nowMs = Date.now();
+      if (isPageVisibleRef.current) {
+        if (lastTickAtRef.current === null) lastTickAtRef.current = nowMs;
+        const deltaSec = Math.max(
+          0,
+          Math.floor((nowMs - lastTickAtRef.current) / 1000)
+        );
+        if (deltaSec > 0) {
+          remainingSecondsOverrideRef.current = Math.max(
+            0,
+            remainingSecondsOverrideRef.current - deltaSec
+          );
+          lastTickAtRef.current = nowMs;
+        }
+      } else {
+        // Not visible, don't change remaining seconds
+        lastTickAtRef.current = nowMs;
+      }
+
+      const nextBreakIn = Math.ceil(remainingSecondsOverrideRef.current / 60);
+      const shouldShowBreak = nextBreakIn === 0;
+
+      setHealthStatus((prev) => ({
+        ...prev,
+        shouldShowBreak,
+        timeSinceLastBreak: shouldShowBreak
+          ? breakIntervalMinutesRef.current
+          : breakIntervalMinutesRef.current - nextBreakIn,
+        nextBreakIn,
+      }));
+
+      return;
+    }
+
+    // No override: Calculate time since last break locally
     let timeSinceLastBreak = 0;
     if (lastBreakTimeRef.current) {
       const timeSinceBreak =
@@ -272,17 +311,29 @@ const useHealthMonitoring = ({
         !data.isOnBreak &&
         timeSinceLastBreak >= breakIntervalMinutesRef.current;
 
-      setHealthStatus({
-        shouldShowBreak: shouldShowBreak,
-        timeSinceLastBreak: timeSinceLastBreak,
-        nextBreakIn: shouldShowBreak
-          ? 0
-          : Math.max(0, breakIntervalMinutesRef.current - timeSinceLastBreak),
-        breakCount: data.breakCount,
-        isMonitoring: true,
-        isOnBreak: data.isOnBreak,
-        breakStartTime: data.breakStartTime,
-      });
+      // If we have an override remaining time, don't overwrite countdown here
+      if (remainingSecondsOverrideRef.current !== null) {
+        // Keep breakCount / flags in sync though
+        setHealthStatus((prev) => ({
+          ...prev,
+          breakCount: data.breakCount,
+          isMonitoring: true,
+          isOnBreak: data.isOnBreak,
+          breakStartTime: data.breakStartTime,
+        }));
+      } else {
+        setHealthStatus({
+          shouldShowBreak: shouldShowBreak,
+          timeSinceLastBreak: timeSinceLastBreak,
+          nextBreakIn: shouldShowBreak
+            ? 0
+            : Math.max(0, breakIntervalMinutesRef.current - timeSinceLastBreak),
+          breakCount: data.breakCount,
+          isMonitoring: true,
+          isOnBreak: data.isOnBreak,
+          breakStartTime: data.breakStartTime,
+        });
+      }
 
       // Show break reminder if needed
       if (shouldShowBreak && data.showReminder) {
@@ -400,6 +451,12 @@ const useHealthMonitoring = ({
       if (response.ok) {
         // Update break time but don't reset session timer
         lastBreakTimeRef.current = new Date();
+        // Clear any persisted remaining time since a new break started
+        remainingSecondsOverrideRef.current = null;
+        try {
+          if (username)
+            localStorage.removeItem(`vgw_health_remaining_${username}`);
+        } catch (e) {}
 
         // Update local state to show break started
         setHealthStatus((prev) => ({
@@ -439,6 +496,12 @@ const useHealthMonitoring = ({
 
         // Update break time but don't reset session timer
         lastBreakTimeRef.current = new Date();
+        // Clear persisted remaining time; countdown restarts after break
+        remainingSecondsOverrideRef.current = null;
+        try {
+          if (username)
+            localStorage.removeItem(`vgw_health_remaining_${username}`);
+        } catch (e) {}
 
         // Update local state
         setHealthStatus((prev) => ({
@@ -497,7 +560,20 @@ const useHealthMonitoring = ({
       return;
     }
 
-    // Start a new session
+    // Restore remaining time override from previous close, if present
+    try {
+      const key = `vgw_health_remaining_${username}`;
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        const remainingSec = Math.max(0, parseInt(stored, 10));
+        if (!Number.isNaN(remainingSec)) {
+          remainingSecondsOverrideRef.current = remainingSec;
+          lastTickAtRef.current = Date.now();
+        }
+      }
+    } catch (e) {}
+
+    // Start a new session (only informs server; our override governs countdown if present)
     startSession();
 
     // Start monitoring
@@ -525,9 +601,19 @@ const useHealthMonitoring = ({
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
       }
+      // Persist remaining time override on navigation unmount as well
+      try {
+        if (username) {
+          const key = `vgw_health_remaining_${username}`;
+          const remainingSec = remainingSecondsOverrideRef.current;
+          if (remainingSec !== null) {
+            localStorage.setItem(key, String(remainingSec));
+          }
+        }
+      } catch (e) {}
       setHealthStatus((prev) => ({ ...prev, isMonitoring: false }));
-      // End session when component unmounts
-      endSession();
+      // Do not end the session on unmount due to in-app navigation.
+      // Session end is handled on full unload or explicit logout.
     };
   }, [username, isEnabled, checkInterval]);
 
@@ -550,6 +636,23 @@ const useHealthMonitoring = ({
     const handleBeforeUnload = () => {
       // Page is being unloaded - pause session but don't end it
       pauseSession();
+      // Persist the current remaining time so we resume from exactly where it was
+      try {
+        if (username) {
+          // Prefer override value if present; otherwise compute from current state
+          let remainingSec = remainingSecondsOverrideRef.current;
+          if (remainingSec === null) {
+            const next =
+              healthStatus.nextBreakIn ??
+              Math.max(0, breakIntervalMinutesRef.current);
+            remainingSec = Math.max(0, Math.round(next * 60));
+          }
+          localStorage.setItem(
+            `vgw_health_remaining_${username}`,
+            String(remainingSec)
+          );
+        }
+      } catch (e) {}
     };
 
     const handleFocus = () => {

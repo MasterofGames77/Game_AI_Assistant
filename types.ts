@@ -312,6 +312,7 @@ export interface HealthStatusResponse {
   breakStartTime?: Date;
   lastBreakTime?: Date;
   breakIntervalMinutes?: number;
+  lastSessionStart?: Date;
   error?: string;
 }
 

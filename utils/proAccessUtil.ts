@@ -26,11 +26,19 @@ export const checkProAccess = async (identifier: string, userId?: string): Promi
     const AppUser = User;
     const SplashUser = splashDB.models.SplashUser || splashDB.model<ISplashUser>('SplashUser', splashUserSchema);
 
-    // Build query
+    // Check if identifier is an email (contains @)
+    const isEmail = identifier.includes('@');
+    const normalizedIdentifier = isEmail ? identifier.trim().toLowerCase() : identifier;
+    
+    // Build query - use case-insensitive email matching if identifier is an email
+    const emailQuery = isEmail 
+      ? { email: new RegExp(`^${normalizedIdentifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      : { email: identifier };
+    
     const query = { $or: [
       { username: identifier },
       { userId: identifier },
-      { email: identifier },
+      emailQuery,
       ...(userId ? [{ userId }] : [])
     ]};
 
@@ -137,6 +145,9 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
         email = email.replace("?earlyAccess=true", "");
         console.log("Cleaned remaining malformed parameters from email in syncUserData");
       }
+      
+      // Normalize email to lowercase for case-insensitive matching
+      email = email.trim().toLowerCase();
     }
 
     // Connect to databases
@@ -158,8 +169,8 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
         hasProAccess: existingWingmanUser.hasProAccess
       });
       
-      // Update the existing user with Discord email if different
-      if (email && email !== existingWingmanUser.email) {
+      // Update the existing user with Discord email if different (case-insensitive comparison)
+      if (email && email.toLowerCase() !== (existingWingmanUser.email || '').toLowerCase()) {
         await AppUser.findOneAndUpdate(
           { userId },
           { 
@@ -177,9 +188,21 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
       }
 
       // Check if user should have Pro access from splash database
+      // Use case-insensitive email lookup to handle case variations
       const splashUser = email 
-        ? await SplashUser.findOne({ email })
+        ? await SplashUser.findOne({ 
+            email: new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+          })
         : await SplashUser.findOne({ userId });
+      
+      console.log('Looking up SplashUser for existing Wingman user:', {
+        email,
+        userId,
+        foundSplashUser: !!splashUser,
+        splashUserEmail: splashUser?.email,
+        splashUserIsApproved: splashUser?.isApproved,
+        splashUserHasProAccess: splashUser?.hasProAccess
+      });
 
       if (splashUser) {
         const isApproved = splashUser.isApproved || splashUser.hasProAccess;
@@ -251,14 +274,29 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
     }
 
     // Check Splash DB for early access users
+    // Use case-insensitive email lookup to handle case variations
     const splashUser = email 
-      ? await SplashUser.findOne({ email })
+      ? await SplashUser.findOne({ 
+          email: new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+        })
       : await SplashUser.findOne({ userId });
+    
+    console.log('Looking up SplashUser for new user sync:', {
+      email,
+      userId,
+      foundSplashUser: !!splashUser,
+      splashUserEmail: splashUser?.email,
+      splashUserIsApproved: splashUser?.isApproved,
+      splashUserHasProAccess: splashUser?.hasProAccess
+    });
 
     // Also check Wingman DB by email as fallback
+    // Use case-insensitive email lookup to handle case variations
     let existingWingmanUserByEmail = null;
     if (email) {
-      existingWingmanUserByEmail = await AppUser.findOne({ email });
+      existingWingmanUserByEmail = await AppUser.findOne({ 
+        email: new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+      });
     }
 
     // If we found an existing Wingman user by email, update their userId to Discord ID

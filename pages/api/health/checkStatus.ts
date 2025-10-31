@@ -105,6 +105,7 @@ export default async function handler(
       breakStartTime: user.healthMonitoring?.breakStartTime,
       lastBreakTime: user.healthMonitoring?.lastBreakTime,
       breakIntervalMinutes: user.healthMonitoring?.breakIntervalMinutes || 45,
+      lastSessionStart: user.healthMonitoring?.lastSessionStart || undefined,
     });
 
   } catch (error) {
