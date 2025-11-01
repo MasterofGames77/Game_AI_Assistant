@@ -17,13 +17,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     await connectToMongoDB();
     
+    // Log request for debugging in production
+    console.log('getForumTopic request:', {
+      forumId: req.query.forumId,
+      username: req.query.username,
+      timestamp: new Date().toISOString()
+    });
+    
     const forum = await Forum.findOne({ forumId });
     if (!forum) {
+      console.warn('Forum not found:', { forumId: req.query.forumId });
       return res.status(404).json({ error: 'Forum not found' });
     }
+    
+    // Log forum found
+    console.log('Forum found:', {
+      forumId: forum.forumId,
+      title: forum.title,
+      isPrivate: forum.isPrivate,
+      hasMetadata: !!forum.metadata,
+      postsCount: Array.isArray(forum.posts) ? forum.posts.length : 'not array'
+    });
 
     // Pro access check - all forums now require Pro access
-    const hasProAccess = await checkProAccess((username as string) || '');
+    // Wrap in try-catch in case checkProAccess throws an error
+    let hasProAccess = false;
+    try {
+      hasProAccess = await checkProAccess((username as string) || '');
+    } catch (proAccessError) {
+      console.error('Error in checkProAccess:', {
+        error: proAccessError instanceof Error ? proAccessError.message : String(proAccessError),
+        stack: proAccessError instanceof Error ? proAccessError.stack : undefined,
+        username: req.query.username,
+        forumId: req.query.forumId
+      });
+      // Default to false if check fails
+      hasProAccess = false;
+    }
+    
     if (!hasProAccess) {
       return res.status(403).json({ error: 'Pro access required to access forums. Upgrade to Wingman Pro to access forums.' });
     }
@@ -78,7 +109,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!forum.metadata.viewedBy.includes(username as string)) {
         forum.metadata.viewCount += 1;
         forum.metadata.viewedBy.push(username as string);
-        await forum.save();
+        
+        // Wrap save in try-catch - if it fails, continue anyway
+        try {
+          // Before saving, ensure all posts have required fields
+          // Some old posts might have createdBy but not username
+          if (Array.isArray(forum.posts)) {
+            forum.posts.forEach((post: any, index: number) => {
+              // If post has createdBy but no username, use createdBy as username
+              if (!post.username && post.createdBy) {
+                post.username = post.createdBy;
+              }
+              // If post has neither, set a default (shouldn't happen, but be safe)
+              if (!post.username && !post.createdBy) {
+                post.username = 'Unknown';
+              }
+            });
+          }
+          
+          // Use updateOne instead of save() to avoid full document validation
+          // This is safer when we're only updating metadata, not posts
+          await Forum.updateOne(
+            { _id: forum._id },
+            { 
+              $set: {
+                'metadata.viewCount': forum.metadata.viewCount,
+                'metadata.viewedBy': forum.metadata.viewedBy
+              }
+            }
+          );
+        } catch (saveError) {
+          console.error('Error saving forum view count increment:', {
+            error: saveError instanceof Error ? saveError.message : String(saveError),
+            stack: saveError instanceof Error ? saveError.stack : undefined,
+            forumId: req.query.forumId,
+            username: req.query.username
+          });
+          // Continue execution even if save fails - the view count increment is not critical
+        }
       }
     }
 
@@ -109,7 +177,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Return forum with posts (convert to plain object for JSON serialization)
     // Use try-catch with fallback for serialization
     try {
-      const forumObject = forum.toObject();
+      // Use toObject() with options to handle edge cases
+      const forumObject = forum.toObject({
+        transform: (doc: any, ret: any) => {
+          // Remove any internal Mongoose properties that might cause issues
+          delete ret.__v;
+          return ret;
+        }
+      });
       
       // Sanitize the object to ensure all nested values are serializable
       const sanitized = {
