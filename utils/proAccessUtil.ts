@@ -551,16 +551,52 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
       // Check if user already exists to handle requiresPasswordSetup correctly
       const existingUser = await AppUser.findOne({ userId: splashUser.userId });
       
+      // Generate a unique username if user doesn't have one (for both new and existing users with null username)
+      let username = existingUser?.username;
+      const needsUsername = !username || username === null || username === '';
+      
+      if (needsUsername) {
+        // Generate a unique username based on userId (extract numeric part or use full userId)
+        // Use a format that's unique and valid for username requirements
+        const userIdPart = splashUser.userId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+        username = `user${userIdPart}`;
+        
+        // Ensure username meets requirements (3-32 chars, valid format)
+        if (username.length < 3) {
+          username = username.padEnd(3, '0');
+        }
+        if (username.length > 32) {
+          username = username.substring(0, 32);
+        }
+        
+        // Check if this username is already taken and generate a unique one if needed
+        let counter = 1;
+        while (await AppUser.findOne({ username })) {
+          const suffix = counter.toString();
+          username = `user${userIdPart.substring(0, 32 - suffix.length)}${suffix}`;
+          counter++;
+          if (counter > 1000) {
+            // Fallback to timestamp-based username if we can't find a unique one
+            username = `user${Date.now()}`;
+            break;
+          }
+        }
+      }
+      
       // Update or create user in Wingman DB with all required fields
       const updateFields: any = {
         userId: splashUser.userId,
         email: splashUser.email,
         hasProAccess, // Use the calculated hasProAccess value
-        conversationCount: 0,
         // Set requiresPasswordSetup only if user doesn't have a password
         // (for new users from splash page, or existing users without password)
         ...((!existingUser || !existingUser.password) && { requiresPasswordSetup: true }),
       };
+      
+      // If username needs to be set (new user or existing user with null username), include it in update
+      if (needsUsername) {
+        updateFields.username = username;
+      }
 
       // Add subscription data for early access users - use $set to fully replace subscription object
       if (hasProAccess) {
@@ -583,6 +619,7 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
         {
           $set: updateFields,
           $setOnInsert: {
+            conversationCount: 0,
             achievements: [],
             progress: {
               firstQuestion: 0,
