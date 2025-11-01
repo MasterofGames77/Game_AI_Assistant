@@ -87,10 +87,106 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       forum.isPrivate = false;
     }
     
+    // Ensure posts is an array
+    if (!Array.isArray(forum.posts)) {
+      forum.posts = [];
+    }
+    
+    // Ensure required fields exist before serialization
+    if (!forum.title) {
+      forum.title = 'Untitled Forum';
+    }
+    if (!forum.gameTitle) {
+      forum.gameTitle = 'Unknown Game';
+    }
+    if (!forum.category) {
+      forum.category = 'General';
+    }
+    if (!forum.createdBy) {
+      forum.createdBy = 'Unknown';
+    }
+    
     // Return forum with posts (convert to plain object for JSON serialization)
-    // toObject() converts Mongoose document to plain JavaScript object
-    const forumObject = forum.toObject();
-    return res.status(200).json(forumObject);
+    // Use try-catch with fallback for serialization
+    try {
+      const forumObject = forum.toObject();
+      
+      // Sanitize the object to ensure all nested values are serializable
+      const sanitized = {
+        _id: forumObject._id?.toString(),
+        forumId: forumObject.forumId,
+        title: String(forumObject.title || ''),
+        gameTitle: String(forumObject.gameTitle || ''),
+        category: String(forumObject.category || ''),
+        isPrivate: Boolean(forumObject.isPrivate),
+        allowedUsers: Array.isArray(forumObject.allowedUsers) ? forumObject.allowedUsers : [],
+        createdBy: String(forumObject.createdBy || ''),
+        createdAt: forumObject.createdAt ? new Date(forumObject.createdAt).toISOString() : new Date().toISOString(),
+        updatedAt: forumObject.updatedAt ? new Date(forumObject.updatedAt).toISOString() : new Date().toISOString(),
+        posts: Array.isArray(forumObject.posts) ? forumObject.posts.map((post: any) => ({
+          _id: post._id?.toString(),
+          username: String(post.username || ''),
+          message: String(post.message || ''),
+          timestamp: post.timestamp ? new Date(post.timestamp).toISOString() : new Date().toISOString(),
+          createdBy: String(post.createdBy || ''),
+          metadata: post.metadata || {
+            edited: false,
+            likes: 0,
+            likedBy: [],
+            status: 'active'
+          }
+        })) : [],
+        metadata: {
+          totalPosts: Number(forumObject.metadata?.totalPosts || 0),
+          lastActivityAt: forumObject.metadata?.lastActivityAt ? new Date(forumObject.metadata.lastActivityAt).toISOString() : new Date().toISOString(),
+          viewCount: Number(forumObject.metadata?.viewCount || 0),
+          viewedBy: Array.isArray(forumObject.metadata?.viewedBy) ? forumObject.metadata.viewedBy : [],
+          status: String(forumObject.metadata?.status || 'active'),
+          // Preserve additional metadata fields like gameTitle and category if they exist
+          ...(forumObject.metadata?.gameTitle && { gameTitle: forumObject.metadata.gameTitle }),
+          ...(forumObject.metadata?.category && { category: forumObject.metadata.category })
+        }
+      };
+      
+      return res.status(200).json(sanitized);
+    } catch (serializationError) {
+      console.error('Error serializing forum object:', {
+        error: serializationError instanceof Error ? serializationError.message : String(serializationError),
+        stack: serializationError instanceof Error ? serializationError.stack : undefined,
+        forumId: req.query.forumId,
+        forumFields: {
+          hasTitle: !!forum.title,
+          hasGameTitle: !!forum.gameTitle,
+          hasMetadata: !!forum.metadata,
+          postsCount: Array.isArray(forum.posts) ? forum.posts.length : 'not array',
+          isPrivate: forum.isPrivate
+        }
+      });
+      
+      // Fallback: manually construct safe object
+      const safeObject = {
+        _id: forum._id?.toString(),
+        forumId: String(forum.forumId || ''),
+        title: String(forum.title || 'Untitled Forum'),
+        gameTitle: String(forum.gameTitle || 'Unknown Game'),
+        category: String(forum.category || 'General'),
+        isPrivate: Boolean(forum.isPrivate),
+        allowedUsers: Array.isArray(forum.allowedUsers) ? forum.allowedUsers : [],
+        createdBy: String(forum.createdBy || 'Unknown'),
+        createdAt: forum.createdAt ? new Date(forum.createdAt).toISOString() : new Date().toISOString(),
+        updatedAt: forum.updatedAt ? new Date(forum.updatedAt).toISOString() : new Date().toISOString(),
+        posts: [],
+        metadata: {
+          totalPosts: 0,
+          lastActivityAt: new Date().toISOString(),
+          viewCount: 0,
+          viewedBy: [],
+          status: 'active'
+        }
+      };
+      
+      return res.status(200).json(safeObject);
+    }
   } catch (error) {
     console.error('Error fetching forum:', {
       error: error instanceof Error ? error.message : String(error),
