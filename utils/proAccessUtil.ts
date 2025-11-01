@@ -83,12 +83,17 @@ export const checkProAccess = async (identifier: string, userId?: string): Promi
     // PRIORITY 2: Check early access eligibility from Splash DB (only if not found in main app)
     if (splashUser) {
       // Check deadline logic
+      // Handle both old format (user-1762023949745) and new format (user-1762029860357-0f08c4)
       const proDeadline = new Date('2025-12-31T23:59:59.999Z');
       let signupDate: Date | null = null;
       if (splashUser.userId && splashUser.userId.includes('-')) {
         // Extract date from userId if possible
+        // For both formats, the timestamp is always in split('-')[1]
+        // Old: user-1762023949745 -> ["user", "1762023949745"]
+        // New: user-1762029860357-0f08c4 -> ["user", "1762029860357", "0f08c4"]
         const datePart = splashUser.userId.split('-')[1];
-        if (!isNaN(Date.parse(datePart))) {
+        // Only parse if it's purely numeric (timestamp)
+        if (/^\d+$/.test(datePart) && !isNaN(Date.parse(datePart))) {
           signupDate = new Date(datePart);
         }
       }
@@ -353,11 +358,16 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
         const isEarlyUser = (typeof splashUser.position === 'number' && splashUser.position <= 5000);
         
         // Check deadline logic
+        // Handle both old format (user-1762023949745) and new format (user-1762029860357-0f08c4)
         let signupDate: Date | null = null;
         if (splashUser.userId.includes('-') && splashUser.userId.split('-').length > 1) {
           try {
+            // For both formats, the timestamp is always in split('-')[1]
+            // Old: user-1762023949745 -> ["user", "1762023949745"]
+            // New: user-1762029860357-0f08c4 -> ["user", "1762029860357", "0f08c4"]
             const datePart = splashUser.userId.split('-')[1];
-            if (!isNaN(Date.parse(datePart))) {
+            // Only parse if it's purely numeric (timestamp) or can be parsed as a date
+            if (/^\d+$/.test(datePart) && !isNaN(Date.parse(datePart))) {
               signupDate = new Date(datePart);
             }
           } catch (error) {
@@ -499,13 +509,18 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
 
     if (splashUser) {
       // Check pro access eligibility
+      // Handle both old format (user-1762023949745) and new format (user-1762029860357-0f08c4)
       let signupDate: Date | null = null;
       
       // Only try to parse date if userId contains a date format (not Discord IDs)
       if (splashUser.userId.includes('-') && splashUser.userId.split('-').length > 1) {
         try {
+          // For both formats, the timestamp is always in split('-')[1]
+          // Old: user-1762023949745 -> ["user", "1762023949745"]
+          // New: user-1762029860357-0f08c4 -> ["user", "1762029860357", "0f08c4"]
           const datePart = splashUser.userId.split('-')[1];
-          if (!isNaN(Date.parse(datePart))) {
+          // Only parse if it's purely numeric (timestamp) or can be parsed as a date
+          if (/^\d+$/.test(datePart) && !isNaN(Date.parse(datePart))) {
             signupDate = new Date(datePart);
           }
         } catch (error) {
