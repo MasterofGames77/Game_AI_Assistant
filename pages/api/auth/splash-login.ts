@@ -23,11 +23,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Sync user data from splash page
     await syncUserData(userId, email);
 
-    // Find the user in the Wingman database
+    // Refetch the user after sync to ensure we have the latest data (Pro access, password setup, etc.)
     const user = await User.findOne({ userId });
 
     if (!user) {
       return res.status(404).json({ message: 'User not found after sync' });
+    }
+
+    // Security: Verify email matches if provided
+    if (email) {
+      const normalizedEmail = email.trim().toLowerCase();
+      const userEmail = user.email?.trim().toLowerCase();
+      
+      if (userEmail && userEmail !== normalizedEmail) {
+        console.error('Email mismatch in splash-login:', {
+          providedEmail: normalizedEmail,
+          userEmail: userEmail,
+          userId: userId
+        });
+        return res.status(403).json({ 
+          message: 'Email does not match user account. Please use the correct link for your account.' 
+        });
+      }
     }
 
     // Check if user has early access
@@ -38,6 +55,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Return user data for automatic sign-in
+    // Check requiresPasswordSetup from database field, or fallback to checking if password exists
+    const needsPasswordSetup = user.requiresPasswordSetup !== undefined 
+      ? user.requiresPasswordSetup 
+      : !user.password;
+    
     return res.status(200).json({
       message: 'Early access user authenticated successfully',
       user: {
@@ -46,7 +68,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         email: user.email,
         hasProAccess: user.hasProAccess,
         subscription: user.subscription,
-        requiresPasswordSetup: !user.password, // Flag if they need to set up password
+        requiresPasswordSetup: needsPasswordSetup, // Flag if they need to set up password
         requiresUsernameSetup: !user.username || user.username === userId, // Flag if they need to set up username
       },
       isEarlyAccessUser: true,

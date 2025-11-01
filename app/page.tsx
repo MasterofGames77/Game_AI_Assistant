@@ -161,6 +161,11 @@ export default function Home() {
 
         if (isEarlyAccess && earlyAccessUserId) {
           // Handle early access user
+          // Clear any existing session to prevent logging in wrong user
+          localStorage.removeItem("username");
+          localStorage.removeItem("userId");
+          localStorage.removeItem("userEmail");
+          
           try {
             const res = await axios.post("/api/auth/splash-login", {
               userId: earlyAccessUserId,
@@ -200,7 +205,22 @@ export default function Home() {
             }
           } catch (err: any) {
             console.error("Error authenticating early access user:", err);
-            // Fall through to normal flow
+            
+            // Show error message to user if it's an authentication failure
+            if (err.response?.status === 403) {
+              const errorMessage = err.response?.data?.message || "Authentication failed. Please use the correct link for your account.";
+              alert(errorMessage);
+              // Show username modal for manual sign-in
+              setShowUsernameModal(true);
+            } else if (err.response?.status === 404) {
+              alert("User not found. Please contact support if you believe this is an error.");
+              setShowUsernameModal(true);
+            } else {
+              // For other errors, fall through to normal flow
+              console.error("Unexpected error during early access authentication:", err);
+            }
+            setLoading(false);
+            return;
           }
         }
 
@@ -726,7 +746,7 @@ export default function Home() {
                   placeholder="Username or email"
                   className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                   minLength={3}
-                  maxLength={32}
+                  maxLength={320}
                   required
                   autoFocus
                 />

@@ -5,10 +5,15 @@ import { ISplashUser } from '../types';
 import connectToMongoDB from './mongodb';
 
 // SplashDB User schema
+// Explicitly set collection name to 'users' since that's where the data is stored in splash database
 const splashUserSchema = new Schema<ISplashUser>({
   email: { type: String, required: true },
   isApproved: { type: Boolean, default: false },
   userId: { type: String, required: true },
+  position: { type: Number, default: null },
+  hasProAccess: { type: Boolean, default: false }
+}, {
+  collection: 'users' // Use 'users' collection, not the default 'splashusers'
 });
 
 // Check pro access for a user
@@ -157,17 +162,27 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
     // Use unique model names to avoid conflicts
     const AppUser = User;
     const SplashUser = splashDB.models.SplashUser || splashDB.model<ISplashUser>('SplashUser', splashUserSchema);
+    
+    // Debug: Verify SplashUser model is working
+    // console.log('SplashUser model status:', {
+    //   hasModel: !!SplashUser,
+    //   modelName: SplashUser?.modelName,
+    //   collectionName: SplashUser?.collection?.name,
+    //   dbName: splashDB?.name
+    // });
 
     // First check if user already exists in Wingman DB
+    // console.log('=== syncUserData called ===', { userId, email });
     const existingWingmanUser = await AppUser.findOne({ userId });
     
     if (existingWingmanUser) {
-      console.log('User already exists in Wingman DB, checking for Pro access eligibility:', {
-        userId,
-        existingEmail: existingWingmanUser.email,
-        discordEmail: email,
-        hasProAccess: existingWingmanUser.hasProAccess
-      });
+      // console.log('✓ User already exists in Wingman DB, checking for Pro access eligibility:', {
+      //   userId,
+      //   existingEmail: existingWingmanUser.email,
+      //   discordEmail: email,
+      //   existingUserId: existingWingmanUser.userId,
+      //   hasProAccess: existingWingmanUser.hasProAccess
+      // });
       
       // Update the existing user with Discord email if different (case-insensitive comparison)
       if (email && email.toLowerCase() !== (existingWingmanUser.email || '').toLowerCase()) {
@@ -184,25 +199,154 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
             }
           }
         );
-        console.log('Updated user with Discord email');
+        // console.log('Updated user with Discord email');
       }
 
       // Check if user should have Pro access from splash database
-      // Use case-insensitive email lookup to handle case variations
-      const splashUser = email 
-        ? await SplashUser.findOne({ 
-            email: new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
-          })
-        : await SplashUser.findOne({ userId });
+      // Try multiple lookup strategies to find the user
+      let splashUser = null;
       
-      console.log('Looking up SplashUser for existing Wingman user:', {
-        email,
-        userId,
-        foundSplashUser: !!splashUser,
-        splashUserEmail: splashUser?.email,
-        splashUserIsApproved: splashUser?.isApproved,
-        splashUserHasProAccess: splashUser?.hasProAccess
-      });
+      // Strategy 1: Direct userId lookup (most reliable - userIds are unique)
+      if (existingWingmanUser && existingWingmanUser.userId) {
+        // console.log('Attempting direct userId lookup in splash DB:', existingWingmanUser.userId);
+        const userIdResults = await SplashUser.find({ userId: existingWingmanUser.userId }).lean();
+        // console.log(`Found ${userIdResults.length} user(s) with userId ${existingWingmanUser.userId}`);
+        
+        if (userIdResults.length > 0) {
+          splashUser = userIdResults[0]; // userIds are unique, so should only be one
+          // console.log('✓ Found splash user by userId!', { 
+          //   email: splashUser.email, 
+          //   userId: splashUser.userId,
+          //   isApproved: splashUser.isApproved,
+          //   hasProAccess: splashUser.hasProAccess 
+          // });
+        }
+      }
+      
+      // Strategy 2: If still not found, try by function parameter userId
+      if (!splashUser && userId && userId !== existingWingmanUser?.userId) {
+        // console.log('Attempting userId lookup with parameter:', userId);
+        const userIdResults = await SplashUser.find({ userId: userId }).lean();
+        if (userIdResults.length > 0) {
+          splashUser = userIdResults[0];
+          // console.log('✓ Found splash user by parameter userId!', { 
+          //   email: splashUser.email, 
+          //   userId: splashUser.userId 
+          // });
+        }
+      }
+      
+      // Then try email lookups - use find() since findOne() seems to have issues
+      if (!splashUser && email) {
+        // Strategy 1: Exact email match first (most reliable) - use find() and take first
+        // console.log('Attempting exact email lookup:', email);
+        const emailResults = await SplashUser.find({ email: email }).lean();
+        if (emailResults.length > 0) {
+          splashUser = emailResults[0];
+          // console.log('✓ Found splash user by exact email!', { email: splashUser.email, userId: splashUser.userId });
+        }
+        
+        // Strategy 2: Case-insensitive email regex match
+        if (!splashUser) {
+          const regexResults = await SplashUser.find({ 
+            email: new RegExp(`^${email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+          }).lean();
+          if (regexResults.length > 0) {
+            splashUser = regexResults[0];
+            // console.log('✓ Found splash user by regex email!', { email: splashUser.email, userId: splashUser.userId });
+          }
+        }
+        
+        // Strategy 3: Try with trimmed email
+        if (!splashUser) {
+          const trimmedResults = await SplashUser.find({ email: email.trim() }).lean();
+          if (trimmedResults.length > 0) {
+            splashUser = trimmedResults[0];
+            // console.log('✓ Found splash user by trimmed email!', { email: splashUser.email, userId: splashUser.userId });
+          }
+        }
+      }
+      
+      // Strategy 4: Try by existing user's email (original casing) - use find()
+      if (!splashUser && existingWingmanUser && existingWingmanUser.email) {
+        // console.log('Attempting lookup with existing user email:', existingWingmanUser.email);
+        const existingEmailResults = await SplashUser.find({ email: existingWingmanUser.email }).lean();
+        if (existingEmailResults.length > 0) {
+          splashUser = existingEmailResults[0];
+          // console.log('✓ Found splash user by existing email!', { email: splashUser.email, userId: splashUser.userId });
+        }
+      }
+      
+      // Debug: Log all attempts if not found
+      // if (!splashUser) {
+      //   console.log('SplashUser lookup failed. Attempted strategies:', {
+      //     emailUsed: email,
+      //     userIdUsed: userId,
+      //     existingEmail: existingWingmanUser.email,
+      //     existingUserId: existingWingmanUser.userId
+      //   });
+      //   
+      // // Debug: Try exact queries to see what's actually in the DB
+      // console.log('Debug: Testing exact queries...');
+      // 
+      // // Debug: Check total count and sample documents in the collection
+      // const totalCount = await SplashUser.countDocuments({});
+      // console.log(`Total documents in splashusers collection: ${totalCount}`);
+      // 
+      // // Get a few sample documents to see the structure
+      // const sampleDocs = await SplashUser.find({}).limit(3).lean();
+      // console.log('Sample documents from splashusers collection:', sampleDocs.map(doc => ({
+      //   email: doc.email,
+      //   userId: doc.userId,
+      //   isApproved: doc.isApproved,
+      //   hasProAccess: doc.hasProAccess,
+      //   _id: doc._id
+      // })));
+      // 
+      // if (email) {
+      //   const exactEmailResult = await SplashUser.find({ email: email }).lean();
+      //   console.log(`Exact email match (${email}):`, exactEmailResult.length, 'results');
+      //   if (exactEmailResult.length > 0) {
+      //     console.log('Email match result:', exactEmailResult[0]);
+      //   }
+      // }
+      // if (userId) {
+      //   const exactUserIdResult = await SplashUser.find({ userId: userId }).lean();
+      //   console.log(`Exact userId match (${userId}):`, exactUserIdResult.length, 'results');
+      //   if (exactUserIdResult.length > 0) {
+      //     console.log('UserId match result:', exactUserIdResult[0]);
+      //   }
+      // }
+      // if (existingWingmanUser.userId) {
+      //   const exactExistingUserIdResult = await SplashUser.find({ userId: existingWingmanUser.userId }).lean();
+      //   console.log(`Exact existing userId match (${existingWingmanUser.userId}):`, exactExistingUserIdResult.length, 'results');
+      //   if (exactExistingUserIdResult.length > 0) {
+      //     console.log('Existing userId match result:', exactExistingUserIdResult[0]);
+      //   }
+      // }
+      // 
+      // // Also try searching by any part of the email
+      // if (email) {
+      //   const partialMatch = await SplashUser.find({ 
+      //     email: { $regex: email.split('@')[0], $options: 'i' } 
+      //   }).lean();
+      //   console.log(`Partial email match (${email.split('@')[0]}):`, partialMatch.length, 'results');
+      //   if (partialMatch.length > 0) {
+      //     console.log('Partial matches:', partialMatch.map(u => ({ email: u.email, userId: u.userId })));
+      //   }
+      // }
+      // }
+      
+      // console.log('Looking up SplashUser for existing Wingman user:', {
+      //   email,
+      //   userId,
+      //   existingEmail: existingWingmanUser.email,
+      //   foundSplashUser: !!splashUser,
+      //   splashUserEmail: splashUser?.email,
+      //   splashUserUserId: splashUser?.userId,
+      //   splashUserIsApproved: splashUser?.isApproved,
+      //   splashUserHasProAccess: splashUser?.hasProAccess
+      // });
 
       if (splashUser) {
         const isApproved = splashUser.isApproved || splashUser.hasProAccess;
@@ -225,48 +369,75 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
         
         const shouldHaveProAccess = isEarlyUser || isBeforeDeadline || isApproved;
 
-        console.log('Existing user Pro access check:', {
-          userId,
-          isApproved,
-          isEarlyUser,
-          isBeforeDeadline,
-          shouldHaveProAccess,
-          currentHasProAccess: existingWingmanUser.hasProAccess
-        });
+        // console.log('Existing user Pro access check:', {
+        //   userId,
+        //   isApproved,
+        //   isEarlyUser,
+        //   isBeforeDeadline,
+        //   shouldHaveProAccess,
+        //   currentHasProAccess: existingWingmanUser.hasProAccess
+        // });
 
+        // Prepare update data for both Pro access and password setup
+        const updateData: any = {};
+        let needsUpdate = false;
+
+        // Always check and update Pro access if they should have it (to sync changes from splash database)
         if (shouldHaveProAccess) {
           const earlyAccessStartDate = new Date('2025-12-31T23:59:59.999Z');
           const earlyAccessEndDate = new Date('2026-12-31T23:59:59.999Z');
           
           // Check if user needs subscription data update
-          const needsSubscriptionUpdate = !existingWingmanUser.subscription?.earlyAccessGranted || 
-                                        existingWingmanUser.subscription?.status !== 'free_period';
+          // Update if subscription doesn't exist, or if status is wrong, or if earlyAccessGranted is false
+          const currentStatus = existingWingmanUser.subscription?.status;
+          const hasEarlyAccess = existingWingmanUser.subscription?.earlyAccessGranted;
+          const needsSubscriptionUpdate = !existingWingmanUser.subscription || 
+                                        currentStatus !== 'free_period' || 
+                                        !hasEarlyAccess ||
+                                        currentStatus === 'expired';
           
           if (!existingWingmanUser.hasProAccess || needsSubscriptionUpdate) {
-            console.log('Updating existing user with Pro access and subscription data from splash database');
-            
-            await AppUser.findOneAndUpdate(
-              { userId },
-              {
-                hasProAccess: true,
-                subscription: {
-                  status: 'free_period',
-                  earlyAccessGranted: true,
-                  earlyAccessStartDate,
-                  earlyAccessEndDate,
-                  transitionToPaid: false,
-                  currentPeriodStart: earlyAccessStartDate,
-                  currentPeriodEnd: earlyAccessEndDate,
-                  billingCycle: 'monthly',
-                  currency: 'usd',
-                  cancelAtPeriodEnd: false
-                }
-              }
-            );
-            console.log('Updated existing user with Pro access and subscription data');
-          } else {
-            console.log('User already has correct Pro access and subscription data');
+            updateData.hasProAccess = true;
+            updateData.subscription = {
+              status: 'free_period',
+              earlyAccessGranted: true,
+              earlyAccessStartDate,
+              earlyAccessEndDate,
+              transitionToPaid: false,
+              currentPeriodStart: earlyAccessStartDate,
+              currentPeriodEnd: earlyAccessEndDate,
+              billingCycle: 'monthly',
+              currency: 'usd',
+              cancelAtPeriodEnd: false
+            };
+            needsUpdate = true;
+            // console.log('User needs Pro access update', {
+            //   currentStatus,
+            //   hasEarlyAccess,
+            //   hasProAccess: existingWingmanUser.hasProAccess
+            // });
           }
+        }
+
+        // Always check and update requiresPasswordSetup if user doesn't have a password
+        // This is separate from Pro access check so it works for all users
+        if (!existingWingmanUser.password && !existingWingmanUser.requiresPasswordSetup) {
+          updateData.requiresPasswordSetup = true;
+          needsUpdate = true;
+          // console.log('User needs password setup flag update');
+        }
+
+        // Apply updates if any are needed
+        if (needsUpdate) {
+          // console.log('Updating existing user with data from splash database:', updateData);
+          // Use $set to ensure subscription object is fully replaced, not merged
+          await AppUser.findOneAndUpdate(
+            { userId },
+            { $set: updateData }
+          );
+          // console.log('Updated existing user successfully');
+        } else {
+          // console.log('User already has correct settings');
         }
       }
       
@@ -281,14 +452,14 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
         })
       : await SplashUser.findOne({ userId });
     
-    console.log('Looking up SplashUser for new user sync:', {
-      email,
-      userId,
-      foundSplashUser: !!splashUser,
-      splashUserEmail: splashUser?.email,
-      splashUserIsApproved: splashUser?.isApproved,
-      splashUserHasProAccess: splashUser?.hasProAccess
-    });
+    // console.log('Looking up SplashUser for new user sync:', {
+    //   email,
+    //   userId,
+    //   foundSplashUser: !!splashUser,
+    //   splashUserEmail: splashUser?.email,
+    //   splashUserIsApproved: splashUser?.isApproved,
+    //   splashUserHasProAccess: splashUser?.hasProAccess
+    // });
 
     // Also check Wingman DB by email as fallback
     // Use case-insensitive email lookup to handle case variations
@@ -301,12 +472,12 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
 
     // If we found an existing Wingman user by email, update their userId to Discord ID
     if (existingWingmanUserByEmail) {
-      console.log('Found existing Wingman user by email, updating with Discord ID:', {
-        existingUserId: existingWingmanUserByEmail.userId,
-        discordUserId: userId,
-        email: email,
-        hasProAccess: existingWingmanUserByEmail.hasProAccess
-      });
+      // console.log('Found existing Wingman user by email, updating with Discord ID:', {
+      //   existingUserId: existingWingmanUserByEmail.userId,
+      //   discordUserId: userId,
+      //   email: email,
+      //   hasProAccess: existingWingmanUserByEmail.hasProAccess
+      // });
       
       // Update the existing user with Discord userId
       await AppUser.findOneAndUpdate(
@@ -322,7 +493,7 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
           }
         }
       );
-      console.log('Updated existing user with Discord ID');
+      // console.log('Updated existing user with Discord ID');
       return; // User already exists, no need to create new one
     }
 
@@ -351,40 +522,51 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
       const isApproved = splashUser.isApproved || splashUser.hasProAccess;
       const hasProAccess = isEarlyUser || isBeforeDeadline || isApproved;
 
-      console.log('Pro access eligibility check:', {
+      // console.log('Pro access eligibility check:', {
+      //   userId: splashUser.userId,
+      //   email: splashUser.email,
+      //   isEarlyUser,
+      //   isBeforeDeadline,
+      //   isApproved,
+      //   hasProAccess,
+      //   position: splashUser.position,
+      //   signupDate: signupDate?.toISOString()
+      // });
+
+      // Check if user already exists to handle requiresPasswordSetup correctly
+      const existingUser = await AppUser.findOne({ userId: splashUser.userId });
+      
+      // Update or create user in Wingman DB with all required fields
+      const updateFields: any = {
         userId: splashUser.userId,
         email: splashUser.email,
-        isEarlyUser,
-        isBeforeDeadline,
-        isApproved,
-        hasProAccess,
-        position: splashUser.position,
-        signupDate: signupDate?.toISOString()
-      });
+        hasProAccess, // Use the calculated hasProAccess value
+        conversationCount: 0,
+        // Set requiresPasswordSetup only if user doesn't have a password
+        // (for new users from splash page, or existing users without password)
+        ...((!existingUser || !existingUser.password) && { requiresPasswordSetup: true }),
+      };
 
-      // Update or create user in Wingman DB with all required fields
+      // Add subscription data for early access users - use $set to fully replace subscription object
+      if (hasProAccess) {
+        updateFields['subscription'] = {
+          status: 'free_period',
+          earlyAccessGranted: true,
+          earlyAccessStartDate,
+          earlyAccessEndDate,
+          transitionToPaid: false,
+          currentPeriodStart: earlyAccessStartDate,
+          currentPeriodEnd: earlyAccessEndDate,
+          billingCycle: 'monthly',
+          currency: 'usd',
+          cancelAtPeriodEnd: false
+        };
+      }
+
       await AppUser.findOneAndUpdate(
         { userId: splashUser.userId },
         {
-          userId: splashUser.userId,
-          email: splashUser.email,
-          hasProAccess, // Use the calculated hasProAccess value
-          conversationCount: 0,
-          // Add subscription data for early access users
-          ...(hasProAccess && {
-            subscription: {
-              status: 'free_period',
-              earlyAccessGranted: true,
-              earlyAccessStartDate,
-              earlyAccessEndDate,
-              transitionToPaid: false,
-              currentPeriodStart: earlyAccessStartDate,
-              currentPeriodEnd: earlyAccessEndDate,
-              billingCycle: 'monthly',
-              currency: 'usd',
-              cancelAtPeriodEnd: false
-            }
-          }),
+          $set: updateFields,
           $setOnInsert: {
             achievements: [],
             progress: {
@@ -440,7 +622,7 @@ export const syncUserData = async (userId: string, email?: string): Promise<void
     } else {
       // Handle case where user is not in Splash DB
       // This could be a new user, Discord user, or a user who signed up after the deadline
-      console.log('User not found in Splash DB, creating basic user record:', { userId, email });
+      // console.log('User not found in Splash DB, creating basic user record:', { userId, email });
       
       await AppUser.findOneAndUpdate(
         { userId },

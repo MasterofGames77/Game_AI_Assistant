@@ -7,11 +7,15 @@ import { containsOffensiveContent } from '../../utils/contentModeration';
 import { handleContentViolation } from '../../utils/violationHandler';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
+  // Allow both GET and POST for convenience
+  if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const { userId, email, username } = req.body;
+  // Get parameters from query (GET) or body (POST)
+  const { userId, email, username } = req.method === 'GET' 
+    ? req.query as { userId: string; email?: string; username?: string }
+    : req.body;
 
   if (!userId || !email) {
     return res.status(400).json({ message: 'userId and email are required' });
@@ -77,6 +81,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Find user by userId
     let user = await User.findOne({ userId });
 
+    // If user exists and no username provided, just sync the data (for testing/syncing existing users)
+    if (user && !username) {
+      await syncUserData(userId, email);
+      const updatedUser = await User.findOne({ userId });
+      return res.status(200).json({ 
+        message: 'User data synced successfully', 
+        user: updatedUser 
+      });
+    }
+
     // If user exists but has no username, require one to be set
     if (user && !user.username) {
       if (!username) {
@@ -105,8 +119,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (userByUsername) {
       // If the username is taken by the same userId, allow sign-in
       if (userByUsername.userId === userId) {
-        // This is the same user, treat as sign-in
-        return res.status(200).json({ message: 'Signed in', user: userByUsername });
+        // This is the same user, sync and return
+        await syncUserData(userId, email);
+        const updatedUser = await User.findOne({ userId });
+        return res.status(200).json({ message: 'Signed in', user: updatedUser });
       } else {
         // Username is taken by someone else
         return res.status(409).json({ message: 'Username is already taken' });
