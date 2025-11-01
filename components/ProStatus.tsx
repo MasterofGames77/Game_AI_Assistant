@@ -89,7 +89,7 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
     switch (subscriptionStatus.type) {
       case "free_period":
         return (
-          <div className="flex items-center space-x-2 flex-wrap min-w-0">
+          <div className="flex items-center space-x-2 whitespace-nowrap">
             <span
               className={`px-2 py-1 text-white text-sm rounded-full whitespace-nowrap flex items-center justify-center ${
                 subscriptionStatus.showWarning
@@ -102,12 +102,10 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
             </span>
             {username && (
               <span
-                className="text-sm font-bold text-white dark:text-white ml-1 drop-shadow-sm truncate"
+                className="text-sm font-bold text-white dark:text-white ml-1 drop-shadow-sm whitespace-nowrap"
                 style={{
                   textShadow: "0 1px 4px rgba(80,0,80,0.15)",
-                  maxWidth: "120px",
                 }}
-                title={username}
               >
                 {username}
               </span>
@@ -117,7 +115,7 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
 
       case "paid_active":
         return (
-          <div className="flex items-center space-x-2 flex-wrap min-w-0">
+          <div className="flex items-center space-x-2 whitespace-nowrap">
             <span
               className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm rounded-full whitespace-nowrap flex items-center justify-center"
               style={{ minWidth: "90px" }}
@@ -126,12 +124,10 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
             </span>
             {username && (
               <span
-                className="text-sm font-bold text-white dark:text-white ml-1 drop-shadow-sm truncate"
+                className="text-sm font-bold text-white dark:text-white ml-1 drop-shadow-sm whitespace-nowrap"
                 style={{
                   textShadow: "0 1px 4px rgba(80,0,80,0.15)",
-                  maxWidth: "120px",
                 }}
-                title={username}
               >
                 {username}
               </span>
@@ -149,7 +145,7 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
 
       case "canceled_active":
         return (
-          <div className="flex items-center space-x-2 flex-wrap min-w-0">
+          <div className="flex items-center space-x-2 whitespace-nowrap">
             <span
               className="px-2 py-1 bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-sm rounded-full whitespace-nowrap flex items-center justify-center"
               style={{ minWidth: "90px" }}
@@ -158,12 +154,10 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
             </span>
             {username && (
               <span
-                className="text-sm font-bold text-white dark:text-white ml-1 drop-shadow-sm truncate"
+                className="text-sm font-bold text-white dark:text-white ml-1 drop-shadow-sm whitespace-nowrap"
                 style={{
                   textShadow: "0 1px 4px rgba(80,0,80,0.15)",
-                  maxWidth: "120px",
                 }}
-                title={username}
               >
                 {username}
               </span>
@@ -181,7 +175,7 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
 
       case "expired_free":
         return (
-          <div className="flex items-center space-x-2 flex-wrap min-w-0">
+          <div className="flex items-center space-x-2 whitespace-nowrap">
             <span
               className="px-2 py-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-sm rounded-full whitespace-nowrap flex items-center justify-center"
               style={{ minWidth: "90px" }}
@@ -190,12 +184,10 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
             </span>
             {username && (
               <span
-                className="text-sm font-bold text-white dark:text-white ml-1 drop-shadow-sm truncate"
+                className="text-sm font-bold text-white dark:text-white ml-1 drop-shadow-sm whitespace-nowrap"
                 style={{
                   textShadow: "0 1px 4px rgba(80,0,80,0.15)",
-                  maxWidth: "120px",
                 }}
-                title={username}
               >
                 {username}
               </span>
@@ -223,12 +215,10 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
             </span>
             {username && (
               <span
-                className="text-sm font-bold text-white dark:text-white ml-1 drop-shadow-sm truncate"
+                className="text-sm font-bold text-white dark:text-white ml-1 drop-shadow-sm whitespace-nowrap"
                 style={{
                   textShadow: "0 1px 4px rgba(80,0,80,0.15)",
-                  maxWidth: "120px",
                 }}
-                title={username}
               >
                 {username}
               </span>
@@ -252,7 +242,7 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
   }
 
   return (
-    <div className="flex items-center space-x-2 flex-wrap min-w-0">
+    <div className="flex items-center space-x-2 whitespace-nowrap">
       {hasProAccess ? (
         getStatusDisplay()
       ) : (

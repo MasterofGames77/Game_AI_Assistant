@@ -315,6 +315,93 @@ export default function Home() {
     }
   }, [userId, fetchConversations, fetchUsageStatus]);
 
+  // Listen for localStorage changes to handle user switching (cross-tab or splash login)
+  useEffect(() => {
+    const handleStorageChange = async (e: StorageEvent | CustomEvent) => {
+      // Handle both native storage events (cross-tab) and custom events (same-tab)
+      const event = e as StorageEvent | CustomEvent<{ key: string; oldValue: string | null; newValue: string | null }>;
+      const key = 'key' in event ? event.key : event.detail?.key;
+      const newValue = 'newValue' in event ? event.newValue : event.detail?.newValue;
+      const oldValue = 'oldValue' in event ? event.oldValue : event.detail?.oldValue;
+
+      if (key === "username" && newValue !== oldValue) {
+        const newUsername = newValue;
+        const currentUsername = username;
+
+        // Only update if the username actually changed
+        if (newUsername !== currentUsername) {
+          console.log("Username changed in localStorage, updating user:", {
+            oldUsername: currentUsername,
+            newUsername: newUsername,
+          });
+
+          // Clear current state
+          setSelectedConversation(null);
+          setConversations([]);
+          setQuestion("");
+          setResponse("");
+
+          if (newUsername) {
+            // Fetch new user data
+            try {
+              const res = await axios.get(
+                `/api/findUserByUsername?username=${newUsername}`
+              );
+              if (res.data && res.data.user) {
+                // Update state with new user
+                localStorage.setItem("userId", res.data.user.userId);
+                localStorage.setItem("userEmail", res.data.user.email);
+                
+                // Update state and fetch conversations
+                setUserId(res.data.user.userId);
+                setUsername(newUsername);
+                
+                // Fetch new user's conversations and usage status
+                // Clear conversations first to show loading state
+                setConversations([]);
+                
+                // Fetch will happen automatically via the userId useEffect,
+                // but we also call it directly to ensure it happens
+                setTimeout(() => {
+                  fetchConversations();
+                  fetchUsageStatus();
+                }, 0);
+              }
+            } catch (err: any) {
+              console.error("Error fetching new user data:", err);
+              // If user not found, clear state
+              if (err.response?.status === 404) {
+                setUsername(null);
+                setUserId(null);
+              }
+            }
+          } else {
+            // Username was removed, clear state
+            setUsername(null);
+            setUserId(null);
+          }
+        }
+      } else if (key === "userId" && newValue !== oldValue) {
+        // If userId changes, update it
+        if (newValue) {
+          setUserId(newValue);
+        } else {
+          setUserId(null);
+        }
+      }
+    };
+
+    // Listen for storage changes (cross-tab synchronization)
+    window.addEventListener("storage", handleStorageChange);
+    // Listen for custom localStorage change events (same-tab synchronization)
+    window.addEventListener("localStorageChange", handleStorageChange as EventListener);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("localStorageChange", handleStorageChange as EventListener);
+    };
+  }, [username, fetchConversations, fetchUsageStatus]);
+
   // Check user type and admin status
   useEffect(() => {
     const checkUserStatus = async () => {
