@@ -23,14 +23,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Pro access check - all forums now require Pro access
-    const hasProAccess = await checkProAccess(username as string);
+    const hasProAccess = await checkProAccess((username as string) || '');
     if (!hasProAccess) {
       return res.status(403).json({ error: 'Pro access required to access forums. Upgrade to Wingman Pro to access forums.' });
     }
 
-    // Check if forum is private and user has access
-    if (forum.isPrivate && !forum.allowedUsers.includes(username as string)) {
-      return res.status(403).json({ error: 'Access denied to private forum' });
+    // Ensure metadata exists and has all required fields
+    if (!forum.metadata) {
+      forum.metadata = {
+        totalPosts: 0,
+        lastActivityAt: new Date(),
+        viewCount: 0,
+        viewedBy: [],
+        status: 'active'
+      };
+    } else {
+      // Ensure all required metadata fields exist (preserve existing fields like gameTitle, category)
+      forum.metadata.totalPosts = forum.metadata.totalPosts ?? 0;
+      forum.metadata.lastActivityAt = forum.metadata.lastActivityAt ?? new Date();
+      forum.metadata.viewCount = forum.metadata.viewCount ?? 0;
+      forum.metadata.viewedBy = forum.metadata.viewedBy ?? [];
+      forum.metadata.status = forum.metadata.status ?? 'active';
     }
 
     // Check if forum is active
@@ -38,11 +51,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ error: 'Forum is not active' });
     }
 
+    // Check if forum is private and user has access
+    if (forum.isPrivate) {
+      // Ensure allowedUsers array exists
+      if (!forum.allowedUsers || !Array.isArray(forum.allowedUsers)) {
+        forum.allowedUsers = [];
+      }
+      if (!forum.allowedUsers.includes(username as string)) {
+        return res.status(403).json({ error: 'Access denied to private forum' });
+      }
+    }
+
     // Only increment view count if incrementView is not explicitly set to false and the user hasn't viewed this forum before
     if (incrementView !== "false" && username) {
       // Initialize viewedBy array if it doesn't exist
-      if (!forum.metadata.viewedBy) {
+      if (!forum.metadata.viewedBy || !Array.isArray(forum.metadata.viewedBy)) {
         forum.metadata.viewedBy = [];
+      }
+
+      // Initialize viewCount if it doesn't exist
+      if (typeof forum.metadata.viewCount !== 'number') {
+        forum.metadata.viewCount = 0;
       }
 
       // Only increment if this is the user's first view
@@ -53,10 +82,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // Return forum with posts
-    return res.status(200).json(forum);
+    // Ensure isPrivate is a proper boolean before serialization
+    if (typeof forum.isPrivate !== 'boolean') {
+      forum.isPrivate = false;
+    }
+    
+    // Return forum with posts (convert to plain object for JSON serialization)
+    // toObject() converts Mongoose document to plain JavaScript object
+    const forumObject = forum.toObject();
+    return res.status(200).json(forumObject);
   } catch (error) {
-    console.error('Error fetching forum:', error);
-    return res.status(500).json({ error: 'Error fetching forum' });
+    console.error('Error fetching forum:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      forumId: req.query.forumId,
+      username: req.query.username,
+      timestamp: new Date().toISOString()
+    });
+    return res.status(500).json({ 
+      error: 'Error fetching forum',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 }

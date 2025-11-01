@@ -28,11 +28,29 @@ const useHealthMonitoring = ({
   const remainingSecondsOverrideRef = useRef<number | null>(null);
   const lastTickAtRef = useRef<number | null>(null);
 
-  // Function to start a new session
+  // Function to start a new session (only called for truly new sessions)
   const startSession = async () => {
     if (!username) return;
 
     const now = new Date();
+
+    // If we already have a remaining seconds override from localStorage, preserve it
+    // Don't recalculate based on lastBreakTime if we have a saved countdown
+    if (remainingSecondsOverrideRef.current !== null) {
+      console.log(
+        "Resuming session with saved remaining time:",
+        remainingSecondsOverrideRef.current,
+        "seconds - skipping startSession API call"
+      );
+      // Just ensure we have basic session refs set
+      if (!sessionStartTimeRef.current) {
+        sessionStartTimeRef.current = now;
+      }
+      if (!lastActiveTimeRef.current) {
+        lastActiveTimeRef.current = now;
+      }
+      return; // Don't call API - we're resuming, not starting fresh
+    }
 
     try {
       // Check if there's an existing session to resume
@@ -50,7 +68,7 @@ const useHealthMonitoring = ({
           sessionStartTimeRef.current = null;
           lastActiveTimeRef.current = null;
           accumulatedSessionTimeRef.current = 0;
-          return;
+          return; // Don't call API - user is on break
         }
 
         // Check if we should resume from last break time
@@ -67,22 +85,52 @@ const useHealthMonitoring = ({
 
             console.log(
               "Resuming session from last break time:",
-              lastBreakTime.toISOString()
+              lastBreakTime.toISOString(),
+              "- skipping startSession API call"
             );
             console.log(
               "Time since last break:",
               Math.floor(timeSinceLastBreak / (1000 * 60)),
               "minutes"
             );
-            return;
+            return; // Don't call API - we're resuming, not starting fresh
+          }
+        }
+
+        // If there's an existing session start time on the server (within 24 hours), we're resuming
+        if (data.lastSessionStart) {
+          const lastSessionStart = new Date(data.lastSessionStart);
+          const timeSinceSessionStart =
+            now.getTime() - lastSessionStart.getTime();
+
+          // If session is still active (less than 24 hours old), we're resuming
+          if (timeSinceSessionStart < 24 * 60 * 60 * 1000) {
+            console.log(
+              "Resuming existing session from:",
+              lastSessionStart.toISOString(),
+              "- skipping startSession API call"
+            );
+            // Initialize local refs based on server data
+            if (!sessionStartTimeRef.current) {
+              sessionStartTimeRef.current = lastSessionStart;
+            }
+            if (!lastActiveTimeRef.current) {
+              lastActiveTimeRef.current = now;
+            }
+            if (data.lastBreakTime && !lastBreakTimeRef.current) {
+              lastBreakTimeRef.current = new Date(data.lastBreakTime);
+            }
+            return; // Don't call API - we're resuming, not starting fresh
           }
         }
       }
     } catch (error) {
       console.error("Error checking existing session:", error);
+      // On error, proceed to start new session
     }
 
-    // Start fresh session
+    // Only start a truly fresh session (no existing session data found)
+    console.log("Starting fresh session - calling startSession API");
     sessionStartTimeRef.current = now;
     lastActiveTimeRef.current = now;
     accumulatedSessionTimeRef.current = 0;
@@ -90,7 +138,7 @@ const useHealthMonitoring = ({
     sessionPausedTimeRef.current = null;
 
     try {
-      // Notify server that session started
+      // Only notify server for a truly new session
       await fetch("/api/health/startSession", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -238,6 +286,10 @@ const useHealthMonitoring = ({
       ? 0
       : Math.max(0, breakIntervalMinutesRef.current - timeSinceLastBreak);
 
+    // Store the calculated remaining time in override ref so it can be saved on unmount
+    // Convert nextBreakIn (minutes) to seconds for consistency
+    remainingSecondsOverrideRef.current = nextBreakIn * 60;
+
     // Debug logging
     // console.log("Timer update:", {
     //   timeSinceLastBreak,
@@ -246,6 +298,7 @@ const useHealthMonitoring = ({
     //   shouldShowBreak,
     //   lastBreakTime: lastBreakTimeRef.current?.toISOString(),
     //   sessionStart: sessionStartTimeRef.current?.toISOString(),
+    //   remainingSeconds: remainingSecondsOverrideRef.current,
     // });
 
     setHealthStatus((prev) => ({
@@ -566,9 +619,14 @@ const useHealthMonitoring = ({
       const stored = localStorage.getItem(key);
       if (stored) {
         const remainingSec = Math.max(0, parseInt(stored, 10));
-        if (!Number.isNaN(remainingSec)) {
+        if (!Number.isNaN(remainingSec) && remainingSec > 0) {
           remainingSecondsOverrideRef.current = remainingSec;
           lastTickAtRef.current = Date.now();
+          console.log(
+            "Restored remaining time from localStorage:",
+            remainingSec,
+            "seconds"
+          );
         }
       }
     } catch (e) {}
@@ -589,8 +647,22 @@ const useHealthMonitoring = ({
       updateTimerLocally();
     }, 1000);
 
-    // Check immediately on first load
-    checkHealthStatus();
+    // If we restored a remaining time override, update the timer IMMEDIATELY
+    // before checkHealthStatus runs, so the state is correct when checkHealthStatus preserves it
+    if (remainingSecondsOverrideRef.current !== null) {
+      updateTimerLocally();
+    }
+
+    // Check immediately on first load (but only after we've set the override state if it exists)
+    // Delay checkHealthStatus slightly if we have an override to ensure updateTimerLocally runs first
+    if (remainingSecondsOverrideRef.current !== null) {
+      // Use setTimeout to ensure updateTimerLocally state update has been applied
+      setTimeout(() => {
+        checkHealthStatus();
+      }, 0);
+    } else {
+      checkHealthStatus();
+    }
 
     return () => {
       if (intervalRef.current) {
@@ -605,12 +677,65 @@ const useHealthMonitoring = ({
       try {
         if (username) {
           const key = `vgw_health_remaining_${username}`;
-          const remainingSec = remainingSecondsOverrideRef.current;
-          if (remainingSec !== null) {
+          let remainingSec = remainingSecondsOverrideRef.current;
+
+          // If we don't have an override, calculate remaining time from current state
+          if (remainingSec === null) {
+            // Calculate based on current timer state using refs
+            if (lastBreakTimeRef.current) {
+              const timeSinceBreak =
+                Date.now() - lastBreakTimeRef.current.getTime();
+              const timeSinceBreakMinutes = Math.floor(
+                timeSinceBreak / (1000 * 60)
+              );
+              const remainingMinutes = Math.max(
+                0,
+                breakIntervalMinutesRef.current - timeSinceBreakMinutes
+              );
+              remainingSec = remainingMinutes * 60;
+            } else if (
+              sessionStartTimeRef.current &&
+              lastActiveTimeRef.current
+            ) {
+              // Calculate current session time
+              const baseTime = accumulatedSessionTimeRef.current;
+              let currentSessionTime = baseTime;
+              if (lastActiveTimeRef.current && isPageVisibleRef.current) {
+                const now = new Date();
+                currentSessionTime =
+                  baseTime +
+                  (now.getTime() - lastActiveTimeRef.current.getTime());
+              }
+              const sessionTimeMinutes = Math.floor(
+                currentSessionTime / (1000 * 60)
+              );
+              const remainingMinutes = Math.max(
+                0,
+                breakIntervalMinutesRef.current - sessionTimeMinutes
+              );
+              remainingSec = remainingMinutes * 60;
+            }
+          }
+
+          // Only save if we have a valid remaining time > 0
+          if (remainingSec !== null && remainingSec > 0) {
             localStorage.setItem(key, String(remainingSec));
+            console.log(
+              "Saving remaining time to localStorage:",
+              remainingSec,
+              "seconds (",
+              Math.floor(remainingSec / 60),
+              "minutes)"
+            );
+          } else {
+            // Clear localStorage if no remaining time
+            localStorage.removeItem(key);
+            console.log("Clearing localStorage - no remaining time to save");
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error("Error saving remaining time to localStorage:", e);
+      }
       setHealthStatus((prev) => ({ ...prev, isMonitoring: false }));
       // Do not end the session on unmount due to in-app navigation.
       // Session end is handled on full unload or explicit logout.
