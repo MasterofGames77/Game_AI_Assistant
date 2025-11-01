@@ -204,7 +204,7 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
       }
       style={{ width: "256px" }}
     >
-      <div className="mb-4 overflow-x-auto">
+      <div className="mb-4">
         <ProStatus
           hasProAccess={hasProAccess}
           username={username || undefined}

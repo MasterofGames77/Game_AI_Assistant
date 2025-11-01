@@ -66,22 +66,22 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
     if (!subscriptionStatus) {
       // Fallback to original display
       return (
-        <>
+        <div className="flex flex-col space-y-1">
+          {username && (
+            <span
+              className="text-sm font-bold text-white dark:text-white drop-shadow-sm whitespace-nowrap"
+              style={{ textShadow: "0 1px 4px rgba(80,0,80,0.15)" }}
+            >
+              {username}
+            </span>
+          )}
           <span
             className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm rounded-full whitespace-nowrap flex items-center justify-center"
             style={{ minWidth: "90px" }}
           >
             Pro Member
           </span>
-          {username && (
-            <span
-              className="text-sm font-bold text-white dark:text-white ml-1 drop-shadow-sm"
-              style={{ textShadow: "0 1px 4px rgba(80,0,80,0.15)" }}
-            >
-              {username}
-            </span>
-          )}
-        </>
+        </div>
       );
     }
 
@@ -89,7 +89,17 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
     switch (subscriptionStatus.type) {
       case "free_period":
         return (
-          <div className="flex items-center space-x-2 whitespace-nowrap">
+          <div className="flex flex-col space-y-1">
+            {username && (
+              <span
+                className="text-sm font-bold text-white dark:text-white drop-shadow-sm whitespace-nowrap"
+                style={{
+                  textShadow: "0 1px 4px rgba(80,0,80,0.15)",
+                }}
+              >
+                {username}
+              </span>
+            )}
             <span
               className={`px-2 py-1 text-white text-sm rounded-full whitespace-nowrap flex items-center justify-center ${
                 subscriptionStatus.showWarning
@@ -100,31 +110,15 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
             >
               {subscriptionStatus.showWarning ? "Expires Soon" : "Free Pro"}
             </span>
-            {username && (
-              <span
-                className="text-sm font-bold text-white dark:text-white ml-1 drop-shadow-sm whitespace-nowrap"
-                style={{
-                  textShadow: "0 1px 4px rgba(80,0,80,0.15)",
-                }}
-              >
-                {username}
-              </span>
-            )}
           </div>
         );
 
       case "paid_active":
         return (
-          <div className="flex items-center space-x-2 whitespace-nowrap">
-            <span
-              className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm rounded-full whitespace-nowrap flex items-center justify-center"
-              style={{ minWidth: "90px" }}
-            >
-              Pro Member
-            </span>
+          <div className="flex flex-col space-y-1">
             {username && (
               <span
-                className="text-sm font-bold text-white dark:text-white ml-1 drop-shadow-sm whitespace-nowrap"
+                className="text-sm font-bold text-white dark:text-white drop-shadow-sm whitespace-nowrap"
                 style={{
                   textShadow: "0 1px 4px rgba(80,0,80,0.15)",
                 }}
@@ -132,29 +126,31 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
                 {username}
               </span>
             )}
-            {subscriptionStatus.canCancel && (
-              <button
-                onClick={handleManageSubscription}
-                className="ml-2 px-2 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700 transition-all duration-200 flex-shrink-0"
+            <div className="flex items-center space-x-2">
+              <span
+                className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm rounded-full whitespace-nowrap flex items-center justify-center"
+                style={{ minWidth: "90px" }}
               >
-                Manage
-              </button>
-            )}
+                Pro Member
+              </span>
+              {subscriptionStatus.canCancel && (
+                <button
+                  onClick={handleManageSubscription}
+                  className="px-2 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700 transition-all duration-200 flex-shrink-0"
+                >
+                  Manage
+                </button>
+              )}
+            </div>
           </div>
         );
 
       case "canceled_active":
         return (
-          <div className="flex items-center space-x-2 whitespace-nowrap">
-            <span
-              className="px-2 py-1 bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-sm rounded-full whitespace-nowrap flex items-center justify-center"
-              style={{ minWidth: "90px" }}
-            >
-              Expires Soon
-            </span>
+          <div className="flex flex-col space-y-1">
             {username && (
               <span
-                className="text-sm font-bold text-white dark:text-white ml-1 drop-shadow-sm whitespace-nowrap"
+                className="text-sm font-bold text-white dark:text-white drop-shadow-sm whitespace-nowrap"
                 style={{
                   textShadow: "0 1px 4px rgba(80,0,80,0.15)",
                 }}
@@ -162,29 +158,31 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
                 {username}
               </span>
             )}
-            {subscriptionStatus.canReactivate && (
-              <button
-                onClick={handleManageSubscription}
-                className="ml-2 px-2 py-1 bg-gradient-to-r from-green-500 to-blue-500 text-white text-xs rounded hover:from-green-600 hover:to-blue-600 transition-all duration-200 flex-shrink-0"
+            <div className="flex items-center space-x-2">
+              <span
+                className="px-2 py-1 bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-sm rounded-full whitespace-nowrap flex items-center justify-center"
+                style={{ minWidth: "90px" }}
               >
-                Reactivate
-              </button>
-            )}
+                Expires Soon
+              </span>
+              {subscriptionStatus.canReactivate && (
+                <button
+                  onClick={handleManageSubscription}
+                  className="px-2 py-1 bg-gradient-to-r from-green-500 to-blue-500 text-white text-xs rounded hover:from-green-600 hover:to-blue-600 transition-all duration-200 flex-shrink-0"
+                >
+                  Reactivate
+                </button>
+              )}
+            </div>
           </div>
         );
 
       case "expired_free":
         return (
-          <div className="flex items-center space-x-2 whitespace-nowrap">
-            <span
-              className="px-2 py-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-sm rounded-full whitespace-nowrap flex items-center justify-center"
-              style={{ minWidth: "90px" }}
-            >
-              Expired
-            </span>
+          <div className="flex flex-col space-y-1">
             {username && (
               <span
-                className="text-sm font-bold text-white dark:text-white ml-1 drop-shadow-sm whitespace-nowrap"
+                className="text-sm font-bold text-white dark:text-white drop-shadow-sm whitespace-nowrap"
                 style={{
                   textShadow: "0 1px 4px rgba(80,0,80,0.15)",
                 }}
@@ -192,30 +190,32 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
                 {username}
               </span>
             )}
-            {subscriptionStatus.canUpgrade && (
-              <button
-                onClick={handleUpgradeClick}
-                className="ml-2 px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs rounded hover:from-purple-600 hover:to-pink-600 transition-all duration-200 flex-shrink-0"
+            <div className="flex items-center space-x-2">
+              <span
+                className="px-2 py-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-sm rounded-full whitespace-nowrap flex items-center justify-center"
+                style={{ minWidth: "90px" }}
               >
-                Upgrade
-              </button>
-            )}
+                Expired
+              </span>
+              {subscriptionStatus.canUpgrade && (
+                <button
+                  onClick={handleUpgradeClick}
+                  className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs rounded hover:from-purple-600 hover:to-pink-600 transition-all duration-200 flex-shrink-0"
+                >
+                  Upgrade
+                </button>
+              )}
+            </div>
           </div>
         );
 
       default:
         // Fallback to original display
         return (
-          <>
-            <span
-              className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm rounded-full whitespace-nowrap flex items-center justify-center"
-              style={{ minWidth: "90px" }}
-            >
-              Pro Member
-            </span>
+          <div className="flex flex-col space-y-1">
             {username && (
               <span
-                className="text-sm font-bold text-white dark:text-white ml-1 drop-shadow-sm whitespace-nowrap"
+                className="text-sm font-bold text-white dark:text-white drop-shadow-sm whitespace-nowrap"
                 style={{
                   textShadow: "0 1px 4px rgba(80,0,80,0.15)",
                 }}
@@ -223,7 +223,13 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
                 {username}
               </span>
             )}
-          </>
+            <span
+              className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm rounded-full whitespace-nowrap flex items-center justify-center"
+              style={{ minWidth: "90px" }}
+            >
+              Pro Member
+            </span>
+          </div>
         );
     }
   };
@@ -242,7 +248,7 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
   }
 
   return (
-    <div className="flex items-center space-x-2 whitespace-nowrap">
+    <div className="flex flex-col">
       {hasProAccess ? (
         getStatusDisplay()
       ) : (
