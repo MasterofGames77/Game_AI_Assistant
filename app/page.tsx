@@ -317,12 +317,11 @@ export default function Home() {
 
   // Listen for localStorage changes to handle user switching (cross-tab or splash login)
   useEffect(() => {
-    const handleStorageChange = async (e: StorageEvent | CustomEvent) => {
+    const handleStorageChange = async (e: StorageEvent | CustomEvent<{ key: string; oldValue: string | null; newValue: string | null }>) => {
       // Handle both native storage events (cross-tab) and custom events (same-tab)
-      const event = e as StorageEvent | CustomEvent<{ key: string; oldValue: string | null; newValue: string | null }>;
-      const key = 'key' in event ? event.key : event.detail?.key;
-      const newValue = 'newValue' in event ? event.newValue : event.detail?.newValue;
-      const oldValue = 'oldValue' in event ? event.oldValue : event.detail?.oldValue;
+      const key = 'key' in e ? e.key : e.detail?.key;
+      const newValue = 'newValue' in e ? e.newValue : e.detail?.newValue;
+      const oldValue = 'oldValue' in e ? e.oldValue : e.detail?.oldValue;
 
       if (key === "username" && newValue !== oldValue) {
         const newUsername = newValue;
@@ -391,14 +390,25 @@ export default function Home() {
       }
     };
 
+    // Wrapper for native storage events
+    const handleNativeStorage = (e: StorageEvent) => {
+      handleStorageChange(e);
+    };
+
+    // Wrapper for custom events
+    const handleCustomStorage = (e: Event) => {
+      const customEvent = e as CustomEvent<{ key: string; oldValue: string | null; newValue: string | null }>;
+      handleStorageChange(customEvent);
+    };
+
     // Listen for storage changes (cross-tab synchronization)
-    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("storage", handleNativeStorage);
     // Listen for custom localStorage change events (same-tab synchronization)
-    window.addEventListener("localStorageChange", handleStorageChange as EventListener);
+    window.addEventListener("localStorageChange", handleCustomStorage);
 
     return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener("localStorageChange", handleStorageChange as EventListener);
+      window.removeEventListener("storage", handleNativeStorage);
+      window.removeEventListener("localStorageChange", handleCustomStorage);
     };
   }, [username, fetchConversations, fetchUsageStatus]);
 
