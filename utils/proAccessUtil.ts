@@ -35,23 +35,43 @@ export const checkProAccess = async (identifier: string, userId?: string): Promi
     const isEmail = identifier.includes('@');
     const normalizedIdentifier = isEmail ? identifier.trim().toLowerCase() : identifier;
     
-    // Build query - use case-insensitive email matching if identifier is an email
+    // Build query - prioritize username over userId when both are provided
+    // Use case-insensitive email matching if identifier is an email
     const emailQuery = isEmail 
       ? { email: new RegExp(`^${normalizedIdentifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
       : { email: identifier };
     
-    const query = { $or: [
-      { username: identifier },
-      { userId: identifier },
-      emailQuery,
-      ...(userId ? [{ userId }] : [])
-    ]};
-
-    // Find user in both DBs
-    const [appUser, splashUser] = await Promise.all([
-      AppUser.findOne(query),
-      SplashUser.findOne(query)
-    ]);
+    // Try to find by username first (most specific), then userId, then email
+    // This prevents matching the wrong user when userId matches a different user
+    let appUser = null;
+    let splashUser = null;
+    
+    // Priority 1: Find by username if identifier is not an email
+    if (!isEmail && identifier) {
+      appUser = await AppUser.findOne({ username: identifier });
+      if (!appUser) {
+        splashUser = await SplashUser.findOne({ username: identifier });
+      }
+    }
+    
+    // Priority 2: If not found by username, try userId (both from identifier and userId param)
+    if (!appUser) {
+      const userIdQuery = userId 
+        ? { $or: [{ userId: identifier }, { userId }] }
+        : { userId: identifier };
+      appUser = await AppUser.findOne(userIdQuery);
+      if (!appUser) {
+        splashUser = await SplashUser.findOne(userIdQuery);
+      }
+    }
+    
+    // Priority 3: If not found by username or userId, try email
+    if (!appUser && emailQuery) {
+      appUser = await AppUser.findOne(emailQuery);
+      if (!appUser) {
+        splashUser = await SplashUser.findOne(emailQuery);
+      }
+    }
 
     // PRIORITY 1: Check main application database first
     if (appUser) {

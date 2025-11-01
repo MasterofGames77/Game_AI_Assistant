@@ -162,9 +162,19 @@ export default function Home() {
         if (isEarlyAccess && earlyAccessUserId) {
           // Handle early access user
           // Clear any existing session to prevent logging in wrong user
+          const oldUsername = localStorage.getItem("username");
+          const oldUserId = localStorage.getItem("userId");
           localStorage.removeItem("username");
           localStorage.removeItem("userId");
           localStorage.removeItem("userEmail");
+          
+          // Dispatch custom event to notify components in same tab
+          window.dispatchEvent(new CustomEvent("localStorageChange", {
+            detail: { key: "username", oldValue: oldUsername, newValue: null }
+          }));
+          window.dispatchEvent(new CustomEvent("localStorageChange", {
+            detail: { key: "userId", oldValue: oldUserId, newValue: null }
+          }));
           
           try {
             const res = await axios.post("/api/auth/splash-login", {
@@ -174,17 +184,29 @@ export default function Home() {
 
             if (res.data && res.data.user) {
               const userData = res.data.user;
+              const newUsername = userData.username || earlyAccessUserId;
 
-              // Store user data
-              localStorage.setItem(
-                "username",
-                userData.username || earlyAccessUserId
-              );
+              // Store user data with logging for debugging
+              console.log("Splash login: Setting localStorage for user:", {
+                username: newUsername,
+                userId: userData.userId,
+                email: userData.email,
+              });
+              
+              localStorage.setItem("username", newUsername);
               localStorage.setItem("userId", userData.userId);
               localStorage.setItem("userEmail", userData.email);
 
+              // Dispatch custom events to notify components in same tab
+              window.dispatchEvent(new CustomEvent("localStorageChange", {
+                detail: { key: "username", oldValue: oldUsername, newValue: newUsername }
+              }));
+              window.dispatchEvent(new CustomEvent("localStorageChange", {
+                detail: { key: "userId", oldValue: oldUserId, newValue: userData.userId }
+              }));
+
               setUserId(userData.userId);
-              setUsername(userData.username || earlyAccessUserId);
+              setUsername(newUsername);
 
               // Check if user needs setup
               if (

@@ -799,6 +799,14 @@ export default function AccountPage() {
                           "No Active Subscription"}
                       </span>
                     </div>
+                    {accountData.subscriptionStatus?.daysUntilExpiration && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Days Remaining:</span>
+                        <span className="text-white font-semibold">
+                          {accountData.subscriptionStatus.daysUntilExpiration} days
+                        </span>
+                      </div>
+                    )}
                     {(statusDisplay.details?.canUpgrade ||
                       accountData.subscriptionStatus?.canUpgrade) && (
                       <div className="flex justify-between">

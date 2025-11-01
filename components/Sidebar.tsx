@@ -1,6 +1,6 @@
 import { SideBarProps } from "../types";
 import ProStatus from "./ProStatus";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 // Precompile the keyword pattern once
 const keywords = [
@@ -73,14 +73,16 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
   const [hasProAccess, setHasProAccess] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Get username from localStorage
+  // Function to update username and check Pro access
+  const updateUserData = useCallback(async () => {
     const storedUsername = localStorage.getItem("username");
     const storedUserId = localStorage.getItem("userId");
+
+    // Always read fresh from localStorage and update state
     setUsername(storedUsername);
 
-    // Check Pro access
-    const checkProAccess = async () => {
+    // Check Pro access only if we have a username
+    if (storedUsername) {
       try {
         const response = await fetch("/api/checkProAccess", {
           method: "POST",
@@ -95,12 +97,74 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
       } catch (error) {
         console.error("Error checking Pro access:", error);
       }
-    };
-
-    if (storedUsername) {
-      checkProAccess();
+    } else {
+      // Clear state if no username
+      setHasProAccess(false);
     }
   }, []);
+
+  useEffect(() => {
+    // Initial load
+    updateUserData();
+
+    // Debounce function to prevent too many API calls
+    let debounceTimer: NodeJS.Timeout;
+    const debouncedUpdate = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        updateUserData();
+      }, 500); // Wait 500ms after last event before updating
+    };
+
+    // Listen for storage changes (cross-tab synchronization)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "username" || e.key === "userId") {
+        console.log(
+          "Storage changed detected (cross-tab), updating user data:",
+          {
+            key: e.key,
+            oldValue: e.oldValue,
+            newValue: e.newValue,
+          }
+        );
+        debouncedUpdate();
+      }
+    };
+
+    // Listen for custom localStorage change events (same-tab synchronization)
+    const handleCustomStorageChange = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (
+        customEvent.detail &&
+        (customEvent.detail.key === "username" ||
+          customEvent.detail.key === "userId")
+      ) {
+        console.log(
+          "Storage changed detected (same-tab), updating user data:",
+          {
+            key: customEvent.detail.key,
+            oldValue: customEvent.detail.oldValue,
+            newValue: customEvent.detail.newValue,
+          }
+        );
+        debouncedUpdate();
+      }
+    };
+
+    // Add storage event listener for cross-tab sync
+    window.addEventListener("storage", handleStorageChange);
+    // Add custom event listener for same-tab sync
+    window.addEventListener("localStorageChange", handleCustomStorageChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener(
+        "localStorageChange",
+        handleCustomStorageChange
+      );
+      clearTimeout(debounceTimer);
+    };
+  }, [updateUserData]);
 
   // Memoize the shorten function
   const shortenQuestion = (question: string): string => {
@@ -136,12 +200,15 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
       className={
         className
           ? className
-          : "fixed left-0 top-0 h-full w-64 bg-[#1a1b2e] text-white p-4 flex flex-col"
+          : "fixed left-0 top-0 h-full w-64 bg-[#1a1b2e] text-white p-4 flex flex-col overflow-hidden"
       }
+      style={{ width: "256px" }}
     >
-      <div className="mb-4">
-        <ProStatus hasProAccess={hasProAccess} />
-        <span className="sidebar-username">{username}</span>
+      <div className="mb-4 min-w-0 overflow-hidden">
+        <ProStatus
+          hasProAccess={hasProAccess}
+          username={username || undefined}
+        />
       </div>
 
       {/* View Switching Buttons */}
@@ -203,16 +270,17 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
       </div>
 
       <h2 className="text-2xl font-bold mb-4">Conversations</h2>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {conversations.map((convo, index) => {
           const uniqueKey =
             convo._id || `temp-${index}-${convo.question?.substring(0, 10)}`;
           return (
             <div key={uniqueKey} className="mb-4">
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center gap-2">
                 <div
-                  className="cursor-pointer truncate flex-1 mr-2"
+                  className="cursor-pointer truncate flex-1 min-w-0"
                   onClick={() => onSelectConversation(convo)}
+                  title={convo.question || "Untitled conversation"}
                 >
                   {shortenQuestion(convo.question || "Untitled conversation")}
                 </div>
