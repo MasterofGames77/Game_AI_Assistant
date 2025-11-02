@@ -11,8 +11,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { content, username } = req.body;
 
     if (!content || !username) {
-      return res.status(400).json({ error: 'Content and userId are required' });
+      console.warn('checkContent missing parameters:', { hasContent: !!content, hasUsername: !!username });
+      return res.status(400).json({ error: 'Content and username are required' });
     }
+    
+    console.log('checkContent called:', { 
+      contentLength: content.length, 
+      username,
+      contentPreview: content.substring(0, 50) + '...' 
+    });
 
     // Check content for violations
     const contentCheck = await containsOffensiveContent(content, username);

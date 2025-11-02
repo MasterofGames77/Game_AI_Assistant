@@ -68,6 +68,10 @@ export default function Home() {
     "form" | "my-feedback" | "admin-dashboard" | "admin-list"
   >("form");
 
+  // Track break reminder enabled setting
+  const [breakReminderEnabled, setBreakReminderEnabled] =
+    useState<boolean>(true);
+
   // Achievement polling system - replaces Socket.IO for notifications
   const { isPolling, lastChecked } = useAchievementPolling({
     username: username,
@@ -79,7 +83,7 @@ export default function Home() {
   const { healthStatus, recordBreak, endBreak, snoozeReminder } =
     useHealthMonitoring({
       username: username,
-      isEnabled: !!username, // Only monitor when user is logged in
+      isEnabled: !!username && breakReminderEnabled, // Only monitor when user is logged in AND break reminders are enabled
       checkInterval: 60000, // Check every minute
     });
 
@@ -167,15 +171,23 @@ export default function Home() {
           localStorage.removeItem("username");
           localStorage.removeItem("userId");
           localStorage.removeItem("userEmail");
-          
+
           // Dispatch custom event to notify components in same tab
-          window.dispatchEvent(new CustomEvent("localStorageChange", {
-            detail: { key: "username", oldValue: oldUsername, newValue: null }
-          }));
-          window.dispatchEvent(new CustomEvent("localStorageChange", {
-            detail: { key: "userId", oldValue: oldUserId, newValue: null }
-          }));
-          
+          window.dispatchEvent(
+            new CustomEvent("localStorageChange", {
+              detail: {
+                key: "username",
+                oldValue: oldUsername,
+                newValue: null,
+              },
+            })
+          );
+          window.dispatchEvent(
+            new CustomEvent("localStorageChange", {
+              detail: { key: "userId", oldValue: oldUserId, newValue: null },
+            })
+          );
+
           try {
             const res = await axios.post("/api/auth/splash-login", {
               userId: earlyAccessUserId,
@@ -192,18 +204,30 @@ export default function Home() {
                 userId: userData.userId,
                 email: userData.email,
               });
-              
+
               localStorage.setItem("username", newUsername);
               localStorage.setItem("userId", userData.userId);
               localStorage.setItem("userEmail", userData.email);
 
               // Dispatch custom events to notify components in same tab
-              window.dispatchEvent(new CustomEvent("localStorageChange", {
-                detail: { key: "username", oldValue: oldUsername, newValue: newUsername }
-              }));
-              window.dispatchEvent(new CustomEvent("localStorageChange", {
-                detail: { key: "userId", oldValue: oldUserId, newValue: userData.userId }
-              }));
+              window.dispatchEvent(
+                new CustomEvent("localStorageChange", {
+                  detail: {
+                    key: "username",
+                    oldValue: oldUsername,
+                    newValue: newUsername,
+                  },
+                })
+              );
+              window.dispatchEvent(
+                new CustomEvent("localStorageChange", {
+                  detail: {
+                    key: "userId",
+                    oldValue: oldUserId,
+                    newValue: userData.userId,
+                  },
+                })
+              );
 
               setUserId(userData.userId);
               setUsername(newUsername);
@@ -227,19 +251,26 @@ export default function Home() {
             }
           } catch (err: any) {
             console.error("Error authenticating early access user:", err);
-            
+
             // Show error message to user if it's an authentication failure
             if (err.response?.status === 403) {
-              const errorMessage = err.response?.data?.message || "Authentication failed. Please use the correct link for your account.";
+              const errorMessage =
+                err.response?.data?.message ||
+                "Authentication failed. Please use the correct link for your account.";
               alert(errorMessage);
               // Show username modal for manual sign-in
               setShowUsernameModal(true);
             } else if (err.response?.status === 404) {
-              alert("User not found. Please contact support if you believe this is an error.");
+              alert(
+                "User not found. Please contact support if you believe this is an error."
+              );
               setShowUsernameModal(true);
             } else {
               // For other errors, fall through to normal flow
-              console.error("Unexpected error during early access authentication:", err);
+              console.error(
+                "Unexpected error during early access authentication:",
+                err
+              );
             }
             setLoading(false);
             return;
@@ -293,6 +324,79 @@ export default function Home() {
     initializeUser();
   }, [fetchConversations]);
 
+  // Fetch break reminder enabled setting when username changes
+  const fetchHealthSettings = useCallback(async () => {
+    if (!username) {
+      setBreakReminderEnabled(true); // Default to enabled if no user
+      return;
+    }
+
+    try {
+      const response = await axios.post("/api/accountData", {
+        username,
+      });
+
+      if (response.data?.user?.healthMonitoring) {
+        const breakReminderEnabled =
+          response.data.user.healthMonitoring.breakReminderEnabled ?? true;
+        setBreakReminderEnabled(breakReminderEnabled);
+
+        // If break reminders are disabled, clear any stored health timer data
+        if (!breakReminderEnabled) {
+          try {
+            const key = `vgw_health_remaining_${username}`;
+            localStorage.removeItem(key);
+            console.log(
+              "Break reminders disabled - cleared localStorage health timer"
+            );
+          } catch (e) {
+            // Ignore localStorage errors
+          }
+        }
+      } else {
+        // Default to enabled if no health monitoring settings found (new user)
+        setBreakReminderEnabled(true);
+      }
+    } catch (error) {
+      console.error("Error fetching health settings:", error);
+      // On error, try to preserve existing state rather than defaulting
+      // Only default to enabled if we don't have a username (no user logged in)
+      if (!username) {
+        setBreakReminderEnabled(true);
+      }
+      // If username exists but fetch failed, keep current state to avoid
+      // accidentally enabling when user might have it disabled
+    }
+  }, [username]);
+
+  useEffect(() => {
+    fetchHealthSettings();
+  }, [fetchHealthSettings]);
+
+  // Refresh health settings when page becomes visible (user might have changed settings in account page)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && username) {
+        // Refresh settings when page becomes visible
+        fetchHealthSettings();
+      }
+    };
+
+    const handleFocus = () => {
+      if (username) {
+        fetchHealthSettings();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [username, fetchHealthSettings]);
+
   // function to get usage status
   const fetchUsageStatus = useCallback(async () => {
     const storedUsername = localStorage.getItem("username");
@@ -317,11 +421,19 @@ export default function Home() {
 
   // Listen for localStorage changes to handle user switching (cross-tab or splash login)
   useEffect(() => {
-    const handleStorageChange = async (e: StorageEvent | CustomEvent<{ key: string; oldValue: string | null; newValue: string | null }>) => {
+    const handleStorageChange = async (
+      e:
+        | StorageEvent
+        | CustomEvent<{
+            key: string;
+            oldValue: string | null;
+            newValue: string | null;
+          }>
+    ) => {
       // Handle both native storage events (cross-tab) and custom events (same-tab)
-      const key = 'key' in e ? e.key : e.detail?.key;
-      const newValue = 'newValue' in e ? e.newValue : e.detail?.newValue;
-      const oldValue = 'oldValue' in e ? e.oldValue : e.detail?.oldValue;
+      const key = "key" in e ? e.key : e.detail?.key;
+      const newValue = "newValue" in e ? e.newValue : e.detail?.newValue;
+      const oldValue = "oldValue" in e ? e.oldValue : e.detail?.oldValue;
 
       if (key === "username" && newValue !== oldValue) {
         const newUsername = newValue;
@@ -350,15 +462,15 @@ export default function Home() {
                 // Update state with new user
                 localStorage.setItem("userId", res.data.user.userId);
                 localStorage.setItem("userEmail", res.data.user.email);
-                
+
                 // Update state and fetch conversations
                 setUserId(res.data.user.userId);
                 setUsername(newUsername);
-                
+
                 // Fetch new user's conversations and usage status
                 // Clear conversations first to show loading state
                 setConversations([]);
-                
+
                 // Fetch will happen automatically via the userId useEffect,
                 // but we also call it directly to ensure it happens
                 setTimeout(() => {
@@ -397,7 +509,11 @@ export default function Home() {
 
     // Wrapper for custom events
     const handleCustomStorage = (e: Event) => {
-      const customEvent = e as CustomEvent<{ key: string; oldValue: string | null; newValue: string | null }>;
+      const customEvent = e as CustomEvent<{
+        key: string;
+        oldValue: string | null;
+        newValue: string | null;
+      }>;
       handleStorageChange(customEvent);
     };
 

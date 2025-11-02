@@ -5,7 +5,7 @@ export const checkContent = async (content: string, userId: string): Promise<Con
   try {
     const response = await axios.post('/api/checkContent', {
       content,
-      userId
+      username: userId  // API expects 'username' parameter, not 'userId'
     });
 
     return {
@@ -13,6 +13,13 @@ export const checkContent = async (content: string, userId: string): Promise<Con
       ...response.data
     };
   } catch (error: any) {
+    console.error('Error in checkContent:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+      userId
+    });
+    
     if (error.response?.data) {
       return {
         isValid: false,
@@ -22,7 +29,7 @@ export const checkContent = async (content: string, userId: string): Promise<Con
     
     return {
       isValid: false,
-      error: 'Failed to check content'
+      error: error.message || 'Failed to check content'
     };
   }
 }; 

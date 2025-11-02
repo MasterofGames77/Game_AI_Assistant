@@ -499,11 +499,14 @@ const OFFENSIVE_WORDS = [
 ];
 
 export const containsOffensiveContent = async (content: string, userId: string) => {
-  // First do a quick local check
+  // First do a quick local check using word boundaries to match whole words only
   const lowercaseContent = content.toLowerCase();
-  const foundWords = OFFENSIVE_WORDS.filter(word => 
-    lowercaseContent.includes(word.toLowerCase())
-  );
+  const foundWords = OFFENSIVE_WORDS.filter(word => {
+    // Use word boundary regex to match whole words only, not substrings
+    // This prevents "class" from matching "ass" or "grass" from matching "ass"
+    const wordBoundaryRegex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    return wordBoundaryRegex.test(content);
+  });
 
   if (foundWords.length === 0) {
     return {
@@ -512,7 +515,21 @@ export const containsOffensiveContent = async (content: string, userId: string) 
     };
   }
 
-  // If offensive words were found locally, verify with the server
+  // If offensive words were found locally, handle violation directly (server-side)
+  // This avoids making unnecessary HTTP calls when already in a server context
+  if (typeof window === 'undefined') {
+    // Server-side: directly handle violation
+    const { handleContentViolation } = await import('./violationHandler');
+    const violationResult = await handleContentViolation(userId, foundWords);
+    
+    return {
+      isOffensive: true,
+      offendingWords: foundWords,
+      violationResult
+    };
+  }
+
+  // Client-side: verify with the server via HTTP
   const result = await checkContent(content, userId);
 
   return {

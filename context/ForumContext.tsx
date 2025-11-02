@@ -138,7 +138,24 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
           setCurrentForum(updatedForum);
         }
       } catch (err: any) {
+        // Check for content policy violation - show user-friendly message
         if (
+          err.response?.status === 400 &&
+          err.response?.data?.isContentViolation
+        ) {
+          // Log the 400 error to console for debugging
+          console.warn("Content policy violation (400):", {
+            status: err.response.status,
+            username: localStorage.getItem("username"),
+            message: err.response.data.message,
+            warningCount: err.response.data.warningCount,
+          });
+          // Show user-friendly message on the page
+          setError(
+            err.response.data.message ||
+              "Your message contains inappropriate content."
+          );
+        } else if (
           err.response?.status === 403 &&
           err.response?.data?.error?.includes("Pro access")
         ) {
@@ -146,8 +163,18 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
             "Pro access required to post in forums. Upgrade to Wingman Pro to participate in discussions."
           );
         } else {
+          // Log other 400 errors to console
+          if (err.response?.status === 400) {
+            console.error("Request failed with status code 400:", {
+              error: err.response?.data?.error,
+              details: err.response?.data?.details,
+            });
+          }
           setError(
-            err.response?.data?.error || err.message || "Failed to add post"
+            err.response?.data?.error ||
+              err.response?.data?.message ||
+              err.message ||
+              "Failed to add post"
           );
         }
         throw err;
