@@ -3,7 +3,8 @@ import axios from 'axios';
 import connectToMongoDB from '../../utils/mongodb';
 import Question from '../../models/Question';
 import User from '../../models/User';
-import { getChatCompletion, fetchRecommendations, analyzeUserQuestions, getAICache, extractQuestionMetadata, updateQuestionMetadata } from '../../utils/aiHelper';
+import { getChatCompletion, fetchRecommendations, analyzeUserQuestions, getAICache, extractQuestionMetadata, updateQuestionMetadata, analyzeGameplayPatterns } from '../../utils/aiHelper';
+import { storeUserPatterns } from '../../utils/storeUserPatterns';
 import { getClientCredentialsAccessToken, getAccessToken, getTwitchUserData, redirectToTwitch } from '../../utils/twitchAuth';
 // import OpenAI from 'openai';
 import path from 'path';
@@ -1464,6 +1465,32 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
       });
     } else {
       // console.log('[Background Metadata] No question ID available, skipping metadata extraction');
+    }
+
+    // Phase 2 Step 2: Pattern Analysis
+    // Analyze gameplay patterns asynchronously after response is sent
+    // This runs in the background and doesn't affect user experience
+    // Only run if user has enough questions for meaningful analysis (at least 3)
+    if (username) {
+      setImmediate(async () => {
+        try {
+          // Run pattern analysis (this will use all the helper functions we've implemented)
+          const patterns = await analyzeGameplayPatterns(username);
+          
+          // Log patterns for debugging (commented out for production)
+          // console.log('[Pattern Analysis] Completed pattern analysis for user:', username);
+          // console.log('[Pattern Analysis] Results:', JSON.stringify(patterns, null, 2));
+          
+          // Store patterns in User model for future use in recommendations
+          // Only store if we have meaningful data (at least some questions analyzed)
+          if (patterns.frequency.totalQuestions > 0) {
+            await storeUserPatterns(username, patterns);
+          }
+        } catch (error) {
+          // Log error but don't throw - this is a background operation
+          console.error('[Pattern Analysis] Error in background pattern analysis:', error);
+        }
+      });
     }
     
     // Return just the base answer

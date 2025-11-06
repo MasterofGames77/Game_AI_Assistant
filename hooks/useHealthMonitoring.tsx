@@ -231,7 +231,16 @@ const useHealthMonitoring = ({
 
   // Function to update timer locally (real-time countdown)
   const updateTimerLocally = () => {
-    if (!username || !isEnabled) return;
+    if (!username || !isEnabled) {
+      // Ensure isMonitoring is false when disabled
+      setHealthStatus((prev) => {
+        if (prev.isMonitoring) {
+          return { ...prev, isMonitoring: false };
+        }
+        return prev;
+      });
+      return;
+    }
 
     // If we have an override (from a prior close), count down only while page is open
     if (remainingSecondsOverrideRef.current !== null) {
@@ -306,6 +315,7 @@ const useHealthMonitoring = ({
       shouldShowBreak: shouldShowBreak,
       timeSinceLastBreak: timeSinceLastBreak,
       nextBreakIn: nextBreakIn,
+      isMonitoring: isEnabled, // Ensure isMonitoring matches isEnabled state
     }));
   };
 
@@ -326,6 +336,9 @@ const useHealthMonitoring = ({
         console.warn("Failed to check health status:", response.statusText);
         return;
       }
+
+      // Check again after async operation - isEnabled might have changed
+      if (!isEnabled) return;
 
       const data = await response.json();
 
@@ -370,7 +383,7 @@ const useHealthMonitoring = ({
         setHealthStatus((prev) => ({
           ...prev,
           breakCount: data.breakCount,
-          isMonitoring: true,
+          isMonitoring: isEnabled, // Use current isEnabled state
           isOnBreak: data.isOnBreak,
           breakStartTime: data.breakStartTime,
         }));
@@ -382,14 +395,14 @@ const useHealthMonitoring = ({
             ? 0
             : Math.max(0, breakIntervalMinutesRef.current - timeSinceLastBreak),
           breakCount: data.breakCount,
-          isMonitoring: true,
+          isMonitoring: isEnabled, // Use current isEnabled state
           isOnBreak: data.isOnBreak,
           breakStartTime: data.breakStartTime,
         });
       }
 
       // Show break reminder if needed
-      if (shouldShowBreak && data.showReminder) {
+      if (shouldShowBreak && data.showReminder && isEnabled) {
         showBreakReminder(data.healthTips);
       }
     } catch (error) {

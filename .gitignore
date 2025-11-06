@@ -66,8 +66,20 @@ runAchievementCacheTests.js
 /scripts/runMigration.js
 bash.exe.stackdump
 passwords
+tests/test-polling-system.ts
 tests/test-polling-system.js
-tests/testAchievementNotifications.js
+test/polling-system.js
+testAchievementCacheTests.js
+testAchievementNotifications.js
+tests/testAchievementNotifications.ts
+test-difficulty-helpers.ts
+test-behavioral-helpers.ts
+test-frequency-helpers.ts
+test-genre-helpers.ts
+test-recommendations.ts
+test-pattern-storage.ts
+test-full-flow.ts
+
 
 
 # Enhanced Tips and Recommendation System Files:

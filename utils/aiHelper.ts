@@ -386,18 +386,26 @@ export const analyzeUserQuestions = (questions: Array<{ question: string, respon
 };
 
 // Fetch game recommendations based on genre
+// Note: RAWG API accepts genre slugs (e.g., "racing", "action", "rpg") or genre IDs
 export const fetchRecommendations = async (genre: string): Promise<string[]> => {
-  const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&genres=${encodeURIComponent(genre)}`;
+  const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&genres=${encodeURIComponent(genre)}&page_size=20`;
 
   try {
     const response = await axios.get(url);
-    if (response.data && response.data.results.length > 0) {
+    if (response.data && response.data.results && response.data.results.length > 0) {
       return response.data.results.map((game: any) => game.name);
     } else {
+      // Log if no results (for debugging)
+      // console.log(`[Recommendations] No games found for genre: ${genre}`);
       return [];
     }
   } catch (error: any) {
-    console.error("Error fetching data from RAWG:", error.message);
+    // Log detailed error for debugging
+    if (error.response) {
+      console.error(`[Recommendations] RAWG API error for genre "${genre}":`, error.response.status, error.response.data);
+    } else {
+      console.error(`[Recommendations] Error fetching data from RAWG for genre "${genre}":`, error.message);
+    }
     return [];
   }
 };
@@ -415,7 +423,174 @@ export interface QuestionMetadata {
 }
 
 /**
+ * Check if a game title is a bundle, DLC, or expansion
+ */
+function isBundleOrDLC(title: string): boolean {
+  const lower = title.toLowerCase();
+  const bundleIndicators = [
+    'bundle',
+    'expansion pass',
+    'expansion pack',
+    'dlc',
+    'twin pack',
+    'double pack',
+    'collection',
+    'edition',
+    'remastered twin',
+    '&',
+    'and expansion',
+    'season pass',
+    'complete edition',
+    'ultimate edition',
+    'deluxe edition',
+  ];
+  
+  return bundleIndicators.some(indicator => lower.includes(indicator));
+}
+
+/**
+ * Extract all games from a bundle/DLC name
+ * Returns an array of game titles found in the bundle
+ * Example: "Final Fantasy VII & Final Fantasy VIII Remastered Twin Pack"
+ *          -> ["Final Fantasy VII", "Final Fantasy VIII"]
+ */
+function extractGamesFromBundle(bundleTitle: string): string[] {
+  const games: string[] = [];
+  
+  // Handle twin packs / double packs - extract both games
+  // Pattern: "Game A & Game B Twin Pack" or "Game A and Game B Twin Pack"
+  const twinPackMatch = bundleTitle.match(/^(.+?)(?:\s*&\s*|\s+and\s+)(.+?)(?:\s+(?:twin|double|pack|remastered).*)?$/i);
+  if (twinPackMatch && twinPackMatch[1] && twinPackMatch[2]) {
+    const firstGame = twinPackMatch[1].trim();
+    const secondGame = twinPackMatch[2].trim();
+    
+    // Clean up any remaining bundle suffixes from second game
+    const cleanedSecond = secondGame.replace(/\s+(?:twin|double|pack|remastered|bundle|edition).*$/i, '').trim();
+    
+    if (firstGame.length >= 5) {
+      games.push(firstGame);
+    }
+    if (cleanedSecond.length >= 5 && cleanedSecond !== firstGame) {
+      games.push(cleanedSecond);
+    }
+    
+    if (games.length > 0) {
+      return games;
+    }
+  }
+  
+  // For single-game bundles with expansion/DLC, extract the base game
+  // Pattern: "Game Name and Expansion Pass Bundle"
+  const expansionMatch = bundleTitle.match(/^(.+?)(?:\s+and\s+.*?(?:expansion|pass|bundle|pack|dlc|edition).*)$/i);
+  if (expansionMatch && expansionMatch[1]) {
+    const baseGame = expansionMatch[1].trim();
+    if (baseGame.length >= 5) {
+      games.push(baseGame);
+      return games;
+    }
+  }
+  
+  // Fallback: remove common bundle suffixes
+  let cleaned = bundleTitle
+    .replace(/\s+and\s+.*?(?:expansion|pass|bundle|pack|dlc|edition).*$/i, '')
+    .replace(/\s+&\s+.*?(?:remastered|twin|double|pack).*$/i, '')
+    .replace(/\s+(?:expansion|pass|bundle|pack|dlc|edition|collection|remastered).*$/i, '')
+    .trim();
+  
+  if (cleaned.length >= 5 && cleaned.length < bundleTitle.length * 0.7) {
+    games.push(cleaned);
+    return games;
+  }
+  
+  // If we can't extract games, return the original title
+  return [bundleTitle];
+}
+
+/**
+ * Extract base game title from bundle/DLC name (backward compatibility)
+ * For multi-game bundles, returns the first game (use extractGamesFromBundle for better results)
+ */
+function extractBaseGameFromBundle(bundleTitle: string): string {
+  const games = extractGamesFromBundle(bundleTitle);
+  return games.length > 0 ? games[0] : bundleTitle;
+}
+
+/**
+ * Determine which game from a bundle is mentioned in the question text
+ * Returns the most relevant game title, or null if none found
+ */
+function findRelevantGameFromBundle(bundleTitle: string, question: string): string | null {
+  const games = extractGamesFromBundle(bundleTitle);
+  if (games.length === 0) {
+    return null;
+  }
+  
+  // If only one game, return it
+  if (games.length === 1) {
+    return games[0];
+  }
+  
+  // For multiple games, check which one appears in the question
+  const lowerQuestion = question.toLowerCase();
+  const gameScores: Array<{ game: string; score: number }> = [];
+  
+  for (const game of games) {
+    const lowerGame = game.toLowerCase();
+    let score = 0;
+    
+    // Check for exact match (highest priority)
+    if (lowerQuestion.includes(lowerGame)) {
+      score += 100;
+      
+      // Bonus if it's mentioned as a standalone phrase (not part of another word)
+      const gameWords = lowerGame.split(/\s+/);
+      const allWordsMatch = gameWords.every(word => {
+        // Check if word appears as a whole word in the question
+        // Escape special regex characters
+        const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Match word at start/end of string or surrounded by non-alphanumeric characters
+        // This handles special characters like ö, ō correctly
+        const wordRegex = new RegExp(`(?:^|[^a-z0-9À-ÿĀ-ž])${escapedWord}(?:[^a-z0-9À-ÿĀ-ž]|$)`, 'i');
+        return wordRegex.test(lowerQuestion);
+      });
+      
+      if (allWordsMatch) {
+        score += 50;
+      }
+    }
+    
+    // Check for partial matches (key words from the game title)
+    const gameWords = lowerGame.split(/\s+/).filter(w => w.length > 3);
+    const matchingWords = gameWords.filter(word => lowerQuestion.includes(word));
+    score += matchingWords.length * 10;
+    
+    // Check for roman numerals or numbers (e.g., "VII", "VIII", "2", "3")
+    const numberMatch = game.match(/\b([IVXLCDM]+|\d+)\b/i);
+    if (numberMatch) {
+      const number = numberMatch[1].toLowerCase();
+      if (lowerQuestion.includes(number)) {
+        score += 30;
+      }
+    }
+    
+    gameScores.push({ game, score });
+  }
+  
+  // Sort by score (highest first)
+  gameScores.sort((a, b) => b.score - a.score);
+  
+  // Return the game with the highest score, but only if it has a meaningful score
+  if (gameScores.length > 0 && gameScores[0].score > 0) {
+    return gameScores[0].game;
+  }
+  
+  // If no clear winner, return the first game (fallback)
+  return games[0];
+}
+
+/**
  * Search IGDB for a game title and return the matched game name if found
+ * Prefers base games over bundles/DLC
  */
 async function searchGameInIGDB(candidateTitle: string): Promise<string | null> {
   try {
@@ -426,7 +601,7 @@ async function searchGameInIGDB(candidateTitle: string): Promise<string | null> 
       'https://api.igdb.com/v4/games',
       `search "${sanitizedTitle}";
        fields name;
-       limit 5;`,
+       limit 10;`,
       {
         headers: {
           'Client-ID': process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID!,
@@ -437,32 +612,72 @@ async function searchGameInIGDB(candidateTitle: string): Promise<string | null> 
     );
 
     if (response.data && response.data.length > 0) {
-      // Try to find exact or close match
       const lowerCandidate = candidateTitle.toLowerCase();
-      const exactMatch = response.data.find((g: any) => 
-        g.name.toLowerCase() === lowerCandidate || 
-        g.name.toLowerCase().includes(lowerCandidate) ||
-        lowerCandidate.includes(g.name.toLowerCase())
-      );
       
-      if (exactMatch) {
+      // First, try to find exact or close match
+      const exactMatch = response.data.find((g: any) => {
+        const gameName = g.name.toLowerCase();
+        return gameName === lowerCandidate || 
+               gameName.includes(lowerCandidate) ||
+               lowerCandidate.includes(gameName);
+      });
+      
+      if (exactMatch && !isBundleOrDLC(exactMatch.name)) {
         return exactMatch.name;
       }
       
-      // Return first result if it's reasonably close
-      const firstResult = response.data[0];
-      const firstResultLower = firstResult.name.toLowerCase();
-      
-      // Check if there's significant overlap in words
-      const candidateWords = lowerCandidate.split(/\s+/);
-      const resultWords = firstResultLower.split(/\s+/);
-      const matchingWords = candidateWords.filter(word => 
-        word.length > 2 && resultWords.includes(word)
-      );
-      
-      if (matchingWords.length >= 1 || candidateTitle.length <= 15) {
-        return firstResult.name;
+      // If exact match is a bundle, try to find base game
+      if (exactMatch && isBundleOrDLC(exactMatch.name)) {
+        const baseGame = extractBaseGameFromBundle(exactMatch.name);
+        // Search for the base game in results
+        const baseGameMatch = response.data.find((g: any) => {
+          const gameName = g.name.toLowerCase();
+          const baseLower = baseGame.toLowerCase();
+          return (gameName === baseLower || 
+                  gameName.includes(baseLower) ||
+                  baseLower.includes(gameName)) && 
+                 !isBundleOrDLC(g.name);
+        });
+        if (baseGameMatch) {
+          return baseGameMatch.name;
+        }
       }
+      
+      // Prefer non-bundle results
+      const nonBundleResults = response.data.filter((g: any) => !isBundleOrDLC(g.name));
+      if (nonBundleResults.length > 0) {
+        // Check if there's significant overlap in words
+        const firstResult = nonBundleResults[0];
+        const firstResultLower = firstResult.name.toLowerCase();
+        const candidateWords = lowerCandidate.split(/\s+/).filter((w: string) => w.length > 2);
+        const resultWords = firstResultLower.split(/\s+/).filter((w: string) => w.length > 2);
+        const matchingWords = candidateWords.filter(word => resultWords.includes(word));
+        
+        if (matchingWords.length >= 1 || candidateTitle.length <= 15) {
+          return firstResult.name;
+        }
+      }
+      
+      // Fallback to first result if no non-bundle found
+      const firstResult = response.data[0];
+      // If it's a bundle, try to extract base game
+      if (isBundleOrDLC(firstResult.name)) {
+        const baseGame = extractBaseGameFromBundle(firstResult.name);
+        // Try to find base game in results
+        const baseGameMatch = response.data.find((g: any) => {
+          const gameName = g.name.toLowerCase();
+          const baseLower = baseGame.toLowerCase();
+          return (gameName === baseLower || gameName.includes(baseLower)) && 
+                 !isBundleOrDLC(g.name);
+        });
+        if (baseGameMatch) {
+          return baseGameMatch.name;
+        }
+        // If no base game found, return cleaned version
+        return baseGame;
+      }
+      
+      return firstResult.name;
     }
     return null;
   } catch (error) {
@@ -473,43 +688,91 @@ async function searchGameInIGDB(candidateTitle: string): Promise<string | null> 
 
 /**
  * Search RAWG for a game title and return the matched game name if found
+ * Prefers base games over bundles/DLC
  */
 async function searchGameInRAWG(candidateTitle: string): Promise<string | null> {
   try {
     const sanitizedTitle = candidateTitle.toLowerCase().trim();
-    const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&search=${encodeURIComponent(sanitizedTitle)}&page_size=5`;
+    const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&search=${encodeURIComponent(sanitizedTitle)}&page_size=10`;
     
     const response = await axios.get(url);
 
     if (response.data && response.data.results.length > 0) {
       const lowerCandidate = sanitizedTitle;
       
-      // Try to find exact or close match
-      const exactMatch = response.data.results.find((g: any) => {
+      // First, try to find exact or close match (prefer non-bundles)
+      const nonBundleMatches = response.data.results.filter((g: any) => {
         const normalizedGameName = g.name.toLowerCase().trim();
-        return normalizedGameName === lowerCandidate || 
+        const isMatch = normalizedGameName === lowerCandidate || 
                normalizedGameName.includes(lowerCandidate) ||
                lowerCandidate.includes(normalizedGameName);
+        return isMatch && !isBundleOrDLC(g.name);
       });
       
-      if (exactMatch) {
-        return exactMatch.name;
+      if (nonBundleMatches.length > 0) {
+        return nonBundleMatches[0].name;
       }
       
-      // Return first result if it's reasonably close
+      // If only bundle matches found, try to extract base game
+      const bundleMatches = response.data.results.filter((g: any) => {
+        const normalizedGameName = g.name.toLowerCase().trim();
+        return (normalizedGameName === lowerCandidate || 
+               normalizedGameName.includes(lowerCandidate) ||
+               lowerCandidate.includes(normalizedGameName)) &&
+               isBundleOrDLC(g.name);
+      });
+      
+      if (bundleMatches.length > 0) {
+        const bundleTitle = bundleMatches[0].name;
+        const baseGame = extractBaseGameFromBundle(bundleTitle);
+        // Search for base game in results
+        const baseGameMatch = response.data.results.find((g: any) => {
+          const normalizedGameName = g.name.toLowerCase().trim();
+          const baseLower = baseGame.toLowerCase();
+          return (normalizedGameName === baseLower || 
+                  normalizedGameName.includes(baseLower) ||
+                  baseLower.includes(normalizedGameName)) &&
+                 !isBundleOrDLC(g.name);
+        });
+        if (baseGameMatch) {
+          return baseGameMatch.name;
+        }
+        // If no base game found, return cleaned version
+        return baseGame;
+      }
+      
+      // Fallback: prefer first non-bundle result
+      const nonBundleResults = response.data.results.filter((g: any) => !isBundleOrDLC(g.name));
+      if (nonBundleResults.length > 0) {
+        const firstResult = nonBundleResults[0];
+        const firstResultLower = firstResult.name.toLowerCase();
+        const candidateWords = lowerCandidate.split(/\s+/).filter((w: string) => w.length > 2);
+        const resultWords = firstResultLower.split(/\s+/).filter((w: string) => w.length > 2);
+        const matchingWords = candidateWords.filter(word => resultWords.includes(word));
+        
+        if (matchingWords.length >= 1 || candidateTitle.length <= 15) {
+          return firstResult.name;
+        }
+      }
+      
+      // Last resort: return first result (even if bundle)
       const firstResult = response.data.results[0];
-      const firstResultLower = firstResult.name.toLowerCase();
-      
-      // Check if there's significant overlap in words
-      const candidateWords = lowerCandidate.split(/\s+/);
-      const resultWords = firstResultLower.split(/\s+/);
-      const matchingWords = candidateWords.filter(word => 
-        word.length > 2 && resultWords.includes(word)
-      );
-      
-      if (matchingWords.length >= 1 || candidateTitle.length <= 15) {
-        return firstResult.name;
+      if (isBundleOrDLC(firstResult.name)) {
+        const baseGame = extractBaseGameFromBundle(firstResult.name);
+        // Try to find base game
+        const baseGameMatch = response.data.results.find((g: any) => {
+          const normalizedGameName = g.name.toLowerCase().trim();
+          const baseLower = baseGame.toLowerCase();
+          return (normalizedGameName === baseLower || normalizedGameName.includes(baseLower)) &&
+                 !isBundleOrDLC(g.name);
+        });
+        if (baseGameMatch) {
+          return baseGameMatch.name;
+        }
+        return baseGame;
       }
+      
+      return firstResult.name;
     }
     return null;
   } catch (error) {
@@ -535,21 +798,40 @@ function extractGameTitleCandidates(question: string): string[] {
   }
 
   // Strategy 2: "in [Game Title]", "for [Game Title]" patterns
-  // Updated to handle special characters (é, ü, etc.) and roman numerals (X, Y, III, etc.)
-  const inGamePattern = /\b(?:in|for|from|on)\s+(?:the\s+)?([A-ZÀ-ÿ][A-Za-z0-9À-ÿ\s:'&-]+?)(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should)|$|[?.!])/gi;
+  // Updated to handle special characters (é, ü, ö, ō, etc.) and roman numerals (X, Y, III, etc.)
+  // Improved to stop at common verbs and question words to avoid capturing too much
+  // Character class includes: À-ÿ (Latin-1), Ā-ž (Latin Extended-A), and common Unicode letters
+  const inGamePattern = /\b(?:in|for|from|on)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&-]+?)(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)|$|[?.!])/gi;
   let match: RegExpExecArray | null;
   while ((match = inGamePattern.exec(question)) !== null) {
     if (match[1]) {
       let candidate = match[1].trim();
+      // Remove leading question words
       candidate = candidate.replace(/^(?:what|which|where|when|why|how|who|the|a|an)\s+/i, '');
-      candidate = candidate.replace(/\s+(?:has|have|is|are|does|do|can|could|would|should)$/i, '');
+      // Remove trailing verbs and question words
+      candidate = candidate.replace(/\s+(?:has|have|is|are|does|do|can|could|would|should|was|were|will|did)$/i, '');
+      // Remove any text before "in" if it was accidentally captured (e.g., "kart has" before "in")
+      const inIndex = candidate.toLowerCase().indexOf(' in ');
+      if (inIndex > 0) {
+        candidate = candidate.substring(inIndex + 4).trim();
+      }
       
       if (candidate.length >= 3 && !/^(what|which|where|when|why|how|who)$/i.test(candidate)) {
-        // Check for non-game indicators
-        if (!candidate.toLowerCase().includes('kart has') && 
-            !candidate.toLowerCase().includes('is the') &&
-            !candidate.toLowerCase().includes('best way') &&
-            !candidate.toLowerCase().includes('battle and catch')) {
+        // Check for non-game indicators (phrases that indicate this isn't a game title)
+        const lowerCandidate = candidate.toLowerCase();
+        if (!lowerCandidate.includes('kart has') && 
+            !lowerCandidate.includes('is the') &&
+            !lowerCandidate.includes('best way') &&
+            !lowerCandidate.includes('battle and catch') &&
+            !lowerCandidate.includes('has the') &&
+            !lowerCandidate.includes('has highest') &&
+            !lowerCandidate.includes('has best') &&
+            !lowerCandidate.includes('has the lowest') &&
+            !lowerCandidate.includes('has the worst') &&
+            !lowerCandidate.includes('CTGP') &&
+            !lowerCandidate.includes('has the slowest') &&
+            !lowerCandidate.includes('has the easiest') &&
+            !lowerCandidate.includes('has the hardest')) {
           candidates.push(candidate);
         }
       }
@@ -557,8 +839,9 @@ function extractGameTitleCandidates(question: string): string[] {
   }
 
   // Strategy 3: Proper noun patterns (capitalized words, including special chars)
-  // Also matches patterns like "Pokémon X and Y", "Final Fantasy VII"
-  const properNounPattern = /\b([A-ZÀ-ÿ][a-zÀ-ÿ]+(?:\s+(?:[A-ZÀ-ÿ][a-zÀ-ÿ]+|[IVXLCDM]+|\band\b)){1,4})\b/g;
+  // Also matches patterns like "Pokémon X and Y", "Final Fantasy VII", "God of War Ragnarök"
+  // Character class includes: À-ÿ (Latin-1), Ā-ž (Latin Extended-A) for characters like ö, ō
+  const properNounPattern = /\b([A-ZÀ-ÿĀ-ž][a-zÀ-ÿĀ-ž]+(?:\s+(?:[A-ZÀ-ÿĀ-ž][a-zÀ-ÿĀ-ž]+|[IVXLCDM]+|\band\b)){1,4})\b/g;
   while ((match = properNounPattern.exec(question)) !== null) {
     if (match[1]) {
       let candidate = match[1].trim();
@@ -574,19 +857,49 @@ function extractGameTitleCandidates(question: string): string[] {
   }
 
   // Strategy 4: Extract from "What [item] in [game]?" patterns (with special char support)
-  const itemInGameMatch = question.match(/(?:what|which|where|how).+?\bin\s+(?:the\s+)?([A-ZÀ-ÿ][A-Za-z0-9À-ÿ\s:'&-]{3,50})(?:\??\s*$|[?.!])/i);
+  // Improved to better handle cases where the game title might have extra text before it
+  // Character class includes: À-ÿ (Latin-1), Ā-ž (Latin Extended-A) for characters like ö, ō
+  const itemInGameMatch = question.match(/(?:what|which|where|how).+?\bin\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&-]{3,50})(?:\??\s*$|[?.!])/i);
   if (itemInGameMatch && itemInGameMatch[1]) {
     let candidate = itemInGameMatch[1].trim();
     // Clean up common endings
     candidate = candidate.replace(/\s+(?:how|what|where|when|why|which|who)$/i, '');
+    // Remove any text that looks like it's part of the question, not the game title
+    // If candidate contains verbs like "has", "is", etc., try to extract just the game part
+    const verbPattern = /\s+(?:has|have|is|are|does|do|can|could|would|should|was|were|will|did)\s+/i;
+    const verbMatch = candidate.match(verbPattern);
+    if (verbMatch && verbMatch.index !== undefined) {
+      // If we find a verb, the game title is likely after it
+      // But actually, if there's a verb, the game is probably before "in"
+      // So this candidate might be malformed - skip it or try to clean it
+      const beforeVerb = candidate.substring(0, verbMatch.index).trim();
+      // If what's before the verb is short and looks like a game title, use it
+      // Check for uppercase letter or special character (À-ÿ, Ā-ž)
+      if (beforeVerb.length >= 3 && beforeVerb.length <= 30 && /^[A-ZÀ-ÿĀ-ž]/.test(beforeVerb)) {
+        candidate = beforeVerb;
+      }
+    }
     if (candidate.length >= 3 && candidate.length <= 50) {
-      candidates.push(candidate);
+      // Additional check: if candidate contains common question phrases, it's probably wrong
+      const lowerCandidate = candidate.toLowerCase();
+      if (!lowerCandidate.includes('has the') && 
+          !lowerCandidate.includes('has highest') &&
+          !lowerCandidate.includes('has best') &&
+          !lowerCandidate.includes('kart has') &&
+          !lowerCandidate.includes('has the lowest') &&
+          !lowerCandidate.includes('has the worst') &&
+          !lowerCandidate.includes('has the slowest') &&
+          !lowerCandidate.includes('has the easiest') &&
+          !lowerCandidate.includes('has the hardest')) {
+        candidates.push(candidate);
+      }
     }
   }
 
   // Strategy 5: Specific pattern for "Pokémon X and Y", "Final Fantasy VII" style titles
   // Matches: [Name] [Letter/Numeral] and [Letter/Numeral]
-  const versionedGamePattern = /\b([A-ZÀ-ÿ][a-zÀ-ÿ]+)\s+([A-ZIVXLCDM]+)\s+and\s+([A-ZIVXLCDM]+)\b/gi;
+  // Character class includes: À-ÿ (Latin-1), Ā-ž (Latin Extended-A) for characters like ö, ō
+  const versionedGamePattern = /\b([A-ZÀ-ÿĀ-ž][a-zÀ-ÿĀ-ž]+)\s+([A-ZIVXLCDM]+)\s+and\s+([A-ZIVXLCDM]+)\b/gi;
   while ((match = versionedGamePattern.exec(question)) !== null) {
     if (match[1] && match[2] && match[3]) {
       const candidate = `${match[1]} ${match[2]} and ${match[3]}`;
@@ -599,7 +912,8 @@ function extractGameTitleCandidates(question: string): string[] {
   // Remove duplicates and filter candidates
   const uniqueCandidates = Array.from(new Set(candidates))
     .filter(c => c.length >= 3 && c.length <= 60)
-    .filter(c => !isLikelyQuestionWord(c));
+    .filter(c => !isLikelyQuestionWord(c))
+    .filter(c => isValidGameTitleCandidate(c));
   
   return uniqueCandidates;
 }
@@ -611,6 +925,210 @@ function isLikelyQuestionWord(text: string): boolean {
   const questionWords = ['what', 'which', 'where', 'when', 'why', 'how', 'who', 'the', 'a', 'an'];
   return questionWords.includes(text.toLowerCase()) || 
          questionWords.some(word => text.toLowerCase().startsWith(word + ' '));
+}
+
+/**
+ * Validate if a candidate title looks like a real game title
+ * Filters out suspicious short words, common words, and non-game terms
+ */
+function isValidGameTitleCandidate(candidate: string): boolean {
+  if (!candidate || candidate.length < 3) return false;
+  
+  const lower = candidate.toLowerCase().trim();
+  
+  // Reject single common words that aren't games
+  const commonWords = [
+    'tin', 'can', 'jump', 'fly', 'migration', 'the', 'a', 'an',
+    'how', 'what', 'where', 'when', 'why', 'which', 'who',
+    'has', 'have', 'is', 'are', 'was', 'were', 'do', 'does',
+    'game', 'games', 'play', 'player', 'playing'
+  ];
+  
+  if (commonWords.includes(lower)) return false;
+  
+  // Reject if it's just one word and it's too short or common
+  const words = lower.split(/\s+/).filter(w => w.length > 0);
+  if (words.length === 1 && (words[0].length < 4 || commonWords.includes(words[0]))) {
+    return false;
+  }
+  
+  // Reject generic two-word combinations that are likely not game titles
+  // These are common words that appear in questions but aren't game titles
+  if (words.length === 2) {
+    const genericCombinations = [
+      'sword master', 'master sword', 'blue shield', 'shield alliance',
+      'best weapon', 'weapon guide', 'how to', 'what is', 'where is',
+      'game guide', 'walkthrough guide', 'strategy guide'
+    ];
+    if (genericCombinations.includes(lower)) {
+      return false;
+    }
+    
+    // Also reject if both words are very common/generic
+    const genericWords = ['sword', 'master', 'shield', 'alliance', 'blue', 'red', 'green', 'gold', 'silver', 'weapon', 'item', 'guide', 'help'];
+    if (genericWords.includes(words[0]) && genericWords.includes(words[1])) {
+      // Only reject if it's a very generic combination
+      if (words[0].length < 6 && words[1].length < 6) {
+        return false;
+      }
+    }
+  }
+  
+  // Reject if it contains only numbers or special characters
+  if (!/[a-z]/.test(lower)) return false;
+  
+  // Reject if it's too long (likely not a game title)
+  if (candidate.length > 80) return false;
+  
+  // Reject if it contains suspicious patterns
+  const suspiciousPatterns = [
+    /\b(tin can|jump fly|migration)\b/i,
+    /^[a-z]\s/i, // Single lowercase letter followed by space
+  ];
+  
+  if (suspiciousPatterns.some(pattern => pattern.test(candidate))) {
+    return false;
+  }
+  
+  return true;
+}
+
+/**
+ * Validate if an API result is acceptable given the original candidate
+ * Rejects results that contain unexpected words like "Multiplayer" that weren't in the candidate
+ */
+function isValidAPIResult(apiResult: string, originalCandidate: string): boolean {
+  if (!apiResult || !originalCandidate) return true; // If we can't validate, allow it
+  
+  const lowerResult = apiResult.toLowerCase();
+  const lowerCandidate = originalCandidate.toLowerCase();
+  
+  // Words that shouldn't appear in results unless they were in the original candidate
+  const unexpectedWords = [
+    'multiplayer',
+    'co-op',
+    'coop',
+    'online',
+    'offline',
+    'single player',
+    'singleplayer',
+    'local',
+    'split screen',
+    'splitscreen'
+  ];
+  
+  // Check if result contains unexpected words that weren't in the candidate
+  for (const word of unexpectedWords) {
+    if (lowerResult.includes(word) && !lowerCandidate.includes(word)) {
+      // Reject if the word appears in the result but not in the candidate
+      return false;
+    }
+  }
+  
+  // Additional check: if result is significantly longer than candidate and contains unexpected words
+  // This catches cases where "Multiplayer" was added
+  if (apiResult.length > originalCandidate.length * 1.3) {
+    const resultWords = lowerResult.split(/\s+/);
+    const candidateWords = lowerCandidate.split(/\s+/);
+    const newWords = resultWords.filter(w => !candidateWords.includes(w));
+    
+    // If new words include unexpected terms, reject
+    if (newWords.some(w => unexpectedWords.some(uw => w.includes(uw)))) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+/**
+ * Normalize game titles that should start with "The"
+ * Ensures titles like "Legend of Zelda" become "The Legend of Zelda"
+ */
+function normalizeGameTitle(title: string): string {
+  if (!title) return title;
+  
+  const lower = title.toLowerCase().trim();
+  
+  // Games that should always start with "The"
+  const gamesRequiringThe = [
+    'legend of zelda',
+    'elder scrolls',
+    'witcher',
+    'last of us',
+    'walking dead',
+    'sims',
+  ];
+  
+  // Check if title matches a game that requires "The" but doesn't have it
+  for (const gamePattern of gamesRequiringThe) {
+    if (lower.startsWith(gamePattern) && !lower.startsWith('the ' + gamePattern)) {
+      // Add "The" at the beginning
+      return 'The ' + title.trim();
+    }
+  }
+  
+  return title;
+}
+
+/**
+ * Check if an API result is relevant to the question text
+ * Ensures the result shares significant words with the question or candidate
+ */
+function isAPIResultRelevantToQuestion(apiResult: string, question: string, candidate: string): boolean {
+  if (!apiResult || !question) return true; // If we can't validate, allow it
+  
+  const lowerResult = apiResult.toLowerCase();
+  const lowerQuestion = question.toLowerCase();
+  const lowerCandidate = candidate.toLowerCase();
+  
+  // Extract meaningful words from each (filter out common words)
+  const commonWords = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
+    'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
+    'what', 'which', 'where', 'when', 'why', 'how', 'who', 'can', 'could', 'would', 'should',
+    'game', 'games', 'play', 'player', 'playing', 'get', 'got', 'how', 'best', 'way'
+  ]);
+  
+  const extractMeaningfulWords = (text: string): Set<string> => {
+    return new Set(
+      text
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !commonWords.has(w))
+        .map(w => w.replace(/[^a-z0-9]/g, ''))
+        .filter(w => w.length > 2)
+    );
+  };
+  
+  const resultWords = extractMeaningfulWords(apiResult);
+  const questionWords = extractMeaningfulWords(question);
+  const candidateWords = extractMeaningfulWords(candidate);
+  
+  // Check if result shares words with candidate (strong indicator of relevance)
+  const candidateMatches = Array.from(resultWords).filter(w => candidateWords.has(w));
+  if (candidateMatches.length >= 2) {
+    return true; // Strong match with candidate
+  }
+  
+  // Check if result shares words with question
+  const questionMatches = Array.from(resultWords).filter(w => questionWords.has(w));
+  
+  // For short results (likely game titles), require at least 1 meaningful match
+  // For longer results, require at least 2 matches
+  const minMatches = apiResult.split(/\s+/).length <= 6 ? 1 : 2;
+  
+  if (questionMatches.length >= minMatches) {
+    return true;
+  }
+  
+  // If no meaningful matches, the result is likely irrelevant
+  // Exception: if the candidate itself was very short or generic, be more lenient
+  if (candidate.split(/\s+/).length <= 2 && questionMatches.length >= 1) {
+    return true;
+  }
+  
+  return false;
 }
 
 /**
@@ -635,15 +1153,70 @@ async function extractGameTitleFromQuestion(question: string): Promise<string | 
     // console.log(`[Game Title] Extracted ${candidates.length} candidate(s):`, candidates);
 
     // Try each candidate against IGDB and RAWG APIs
-    for (const candidate of candidates) {
+    // Validate candidates before API calls to avoid unnecessary requests
+    const validCandidates = candidates.filter(c => isValidGameTitleCandidate(c));
+    
+    for (const candidate of validCandidates) {
       // console.log(`[Game Title] Trying candidate: "${candidate}"`);
       
       // Try IGDB first
       try {
         const igdbMatch = await searchGameInIGDB(candidate);
         if (igdbMatch) {
+          // Validate that the API result doesn't contain unexpected words
+          if (!isValidAPIResult(igdbMatch, candidate)) {
+            // console.log(`[Game Title] Rejecting IGDB result with unexpected words: "${igdbMatch}"`);
+            continue; // Try next candidate
+          }
+          
+          // Validate that the API result is relevant to the question
+          if (!isAPIResultRelevantToQuestion(igdbMatch, question, candidate)) {
+            // console.log(`[Game Title] Rejecting IGDB result as irrelevant to question: "${igdbMatch}"`);
+            continue; // Try next candidate
+          }
+          
+          // Additional validation: reject if API returned a bundle and we can extract base game
+          if (isBundleOrDLC(igdbMatch)) {
+            // Check which specific game from the bundle is mentioned in the question
+            const relevantGame = findRelevantGameFromBundle(igdbMatch, question);
+            if (relevantGame && relevantGame !== igdbMatch && isValidGameTitleCandidate(relevantGame)) {
+              // Try to find the specific game in a follow-up search
+              const specificGameMatch = await searchGameInIGDB(relevantGame);
+              if (specificGameMatch && !isBundleOrDLC(specificGameMatch) && 
+                  isValidAPIResult(specificGameMatch, relevantGame) &&
+                  isAPIResultRelevantToQuestion(specificGameMatch, question, relevantGame)) {
+                // console.log(`[Game Title] Found specific game from bundle in IGDB: "${candidate}" -> "${specificGameMatch}"`);
+                return normalizeGameTitle(specificGameMatch);
+              }
+              // If no match found, use the relevant game we extracted (validate it first)
+              if (isValidAPIResult(relevantGame, candidate) && 
+                  isAPIResultRelevantToQuestion(relevantGame, question, candidate)) {
+                // console.log(`[Game Title] Found match in IGDB (extracted from bundle): "${candidate}" -> "${relevantGame}"`);
+                return normalizeGameTitle(relevantGame);
+              }
+            }
+            // Fallback to base game extraction if relevance check fails
+            const baseGame = extractBaseGameFromBundle(igdbMatch);
+            if (baseGame !== igdbMatch && isValidGameTitleCandidate(baseGame)) {
+              // Try to find the base game in a follow-up search
+              const baseGameMatch = await searchGameInIGDB(baseGame);
+              if (baseGameMatch && !isBundleOrDLC(baseGameMatch) && 
+                  isValidAPIResult(baseGameMatch, baseGame) &&
+                  isAPIResultRelevantToQuestion(baseGameMatch, question, baseGame)) {
+                // console.log(`[Game Title] Found base game in IGDB: "${candidate}" -> "${baseGameMatch}"`);
+                return normalizeGameTitle(baseGameMatch);
+              }
+              // If no base game found, use cleaned version (validate it first)
+              if (isValidAPIResult(baseGame, candidate) && 
+                  isAPIResultRelevantToQuestion(baseGame, question, candidate)) {
+                // console.log(`[Game Title] Found match in IGDB (cleaned from bundle): "${candidate}" -> "${baseGame}"`);
+                return normalizeGameTitle(baseGame);
+              }
+            }
+          }
           // console.log(`[Game Title] Found match in IGDB: "${candidate}" -> "${igdbMatch}"`);
-          return igdbMatch;
+          // Normalize the title (e.g., ensure "The Legend of Zelda" has "The")
+          return normalizeGameTitle(igdbMatch);
         }
       } catch (error) {
         // Only log errors, not failures
@@ -654,8 +1227,60 @@ async function extractGameTitleFromQuestion(question: string): Promise<string | 
       try {
         const rawgMatch = await searchGameInRAWG(candidate);
         if (rawgMatch) {
+          // Validate that the API result doesn't contain unexpected words
+          if (!isValidAPIResult(rawgMatch, candidate)) {
+            // console.log(`[Game Title] Rejecting RAWG result with unexpected words: "${rawgMatch}"`);
+            continue; // Try next candidate
+          }
+          
+          // Validate that the API result is relevant to the question
+          if (!isAPIResultRelevantToQuestion(rawgMatch, question, candidate)) {
+            // console.log(`[Game Title] Rejecting RAWG result as irrelevant to question: "${rawgMatch}"`);
+            continue; // Try next candidate
+          }
+          
+          // Additional validation: reject if API returned a bundle and we can extract base game
+          if (isBundleOrDLC(rawgMatch)) {
+            // Check which specific game from the bundle is mentioned in the question
+            const relevantGame = findRelevantGameFromBundle(rawgMatch, question);
+            if (relevantGame && relevantGame !== rawgMatch && isValidGameTitleCandidate(relevantGame)) {
+              // Try to find the specific game in a follow-up search
+              const specificGameMatch = await searchGameInRAWG(relevantGame);
+              if (specificGameMatch && !isBundleOrDLC(specificGameMatch) && 
+                  isValidAPIResult(specificGameMatch, relevantGame) &&
+                  isAPIResultRelevantToQuestion(specificGameMatch, question, relevantGame)) {
+                // console.log(`[Game Title] Found specific game from bundle in RAWG: "${candidate}" -> "${specificGameMatch}"`);
+                return normalizeGameTitle(specificGameMatch);
+              }
+              // If no match found, use the relevant game we extracted (validate it first)
+              if (isValidAPIResult(relevantGame, candidate) && 
+                  isAPIResultRelevantToQuestion(relevantGame, question, candidate)) {
+                // console.log(`[Game Title] Found match in RAWG (extracted from bundle): "${candidate}" -> "${relevantGame}"`);
+                return normalizeGameTitle(relevantGame);
+              }
+            }
+            // Fallback to base game extraction if relevance check fails
+            const baseGame = extractBaseGameFromBundle(rawgMatch);
+            if (baseGame !== rawgMatch && isValidGameTitleCandidate(baseGame)) {
+              // Try to find the base game in a follow-up search
+              const baseGameMatch = await searchGameInRAWG(baseGame);
+              if (baseGameMatch && !isBundleOrDLC(baseGameMatch) && 
+                  isValidAPIResult(baseGameMatch, baseGame) &&
+                  isAPIResultRelevantToQuestion(baseGameMatch, question, baseGame)) {
+                // console.log(`[Game Title] Found base game in RAWG: "${candidate}" -> "${baseGameMatch}"`);
+                return normalizeGameTitle(baseGameMatch);
+              }
+              // If no base game found, use cleaned version (validate it first)
+              if (isValidAPIResult(baseGame, candidate) && 
+                  isAPIResultRelevantToQuestion(baseGame, question, candidate)) {
+                // console.log(`[Game Title] Found match in RAWG (cleaned from bundle): "${candidate}" -> "${baseGame}"`);
+                return normalizeGameTitle(baseGame);
+              }
+            }
+          }
           // console.log(`[Game Title] Found match in RAWG: "${candidate}" -> "${rawgMatch}"`);
-          return rawgMatch;
+          // Normalize the title (e.g., ensure "The Legend of Zelda" has "The")
+          return normalizeGameTitle(rawgMatch);
         }
       } catch (error) {
         // Only log errors, not failures
@@ -663,17 +1288,46 @@ async function extractGameTitleFromQuestion(question: string): Promise<string | 
       }
     }
 
-    // If no API matches, return the first candidate that looks reasonable
-    // (fallback for cases where API might fail or game isn't in database)
-    const bestCandidate = candidates.find(c => 
-      c.length >= 5 && 
-      c.split(/\s+/).length >= 2 && 
-      /^[A-Z]/.test(c)
-    );
+    // If no API matches, try to find the best candidate
+    // Filter out candidates that look like they contain question text, not game titles
+    const fallbackCandidates = candidates.filter(c => {
+      const lower = c.toLowerCase();
+      // Reject candidates that contain common question phrases
+      if (lower.includes('has the') || 
+          lower.includes('has highest') ||
+          lower.includes('has best') ||
+          lower.includes('kart has') ||
+          lower.includes('is the') ||
+          lower.includes('CTGP') ||
+          lower.includes('has the lowest') ||
+          lower.includes('has the worst') ||
+          lower.includes('has the slowest') ||
+          lower.includes('has the easiest') ||
+          lower.includes('has the hardest') ||
+          lower.match(/\b(has|have|is|are|does|do)\s+(the|a|an)\s+/)) {
+        return false;
+      }
+      // Prefer candidates that are reasonable length (3-40 chars) and start with capital or special char
+      return c.length >= 3 && c.length <= 40 && /^[A-ZÀ-ÿĀ-ž]/.test(c);
+    });
     
-    if (bestCandidate) {
+    // If we have valid candidates, return the shortest one (likely to be the actual game title)
+    if (fallbackCandidates.length > 0) {
+      const bestCandidate = fallbackCandidates.sort((a, b) => a.length - b.length)[0];
       // console.log(`[Game Title] No API match for any candidate, using best fallback: "${bestCandidate}"`);
       return bestCandidate;
+    }
+    
+    // Last resort: return first candidate that meets basic criteria
+    const fallbackCandidate = candidates.find(c => 
+      c.length >= 5 && 
+      c.split(/\s+/).length >= 2 && 
+      /^[A-ZÀ-ÿĀ-ž]/.test(c)
+    );
+    
+    if (fallbackCandidate) {
+      // console.log(`[Game Title] Using fallback candidate: "${fallbackCandidate}"`);
+      return fallbackCandidate;
     }
 
     // console.log('[Game Title] No valid game title found after trying all candidates');
@@ -1285,6 +1939,575 @@ function detectRecentGenreShifts(
   // Sort by absolute trend value (biggest changes first)
   return shifts.sort((a, b) => Math.abs(b.trend) - Math.abs(a.trend));
 }
+
+// ============================================================================
+// Difficulty Analysis Helpers
+// These functions analyze difficulty progression and challenge-seeking behavior
+// ============================================================================
+
+/**
+ * Map difficulty hint to numeric value for progression tracking
+ */
+function difficultyToNumber(difficulty: string | undefined): number {
+  if (!difficulty) return 1; // Default to intermediate if unknown
+  
+  const lower = difficulty.toLowerCase();
+  if (lower === 'beginner') return 0;
+  if (lower === 'intermediate') return 1;
+  if (lower === 'advanced') return 2;
+  
+  return 1; // Default to intermediate
+}
+
+/**
+ * Analyze difficulty progression over time
+ * Returns array of difficulty values (0=beginner, 1=intermediate, 2=advanced) ordered by time
+ */
+function analyzeDifficultyProgression(
+  questions: Array<{ difficultyHint?: string; timestamp: Date | string | number }>
+): number[] {
+  if (!questions || questions.length === 0) return [];
+
+  // Sort questions by timestamp (oldest first)
+  const sortedQuestions = [...questions].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  // Extract difficulty progression
+  const progression = sortedQuestions
+    .map((q) => difficultyToNumber(q.difficultyHint))
+    .filter((val) => val !== null);
+
+  return progression;
+}
+
+/**
+ * Estimate current difficulty level based on recent questions
+ * Returns: "beginner", "intermediate", or "advanced"
+ * Uses the most recent 10 questions (or all if less than 10)
+ */
+function estimateCurrentDifficulty(
+  questions: Array<{ difficultyHint?: string; timestamp: Date | string | number }>
+): 'beginner' | 'intermediate' | 'advanced' {
+  if (!questions || questions.length === 0) return 'intermediate';
+
+  // Sort by timestamp (newest first) and take recent questions
+  const sortedQuestions = [...questions].sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
+
+  const recentQuestions = sortedQuestions.slice(0, 10);
+  const difficulties = recentQuestions
+    .map((q) => q.difficultyHint?.toLowerCase())
+    .filter((d): d is string => !!d);
+
+  if (difficulties.length === 0) return 'intermediate';
+
+  // Count occurrences
+  const counts = {
+    beginner: 0,
+    intermediate: 0,
+    advanced: 0,
+  };
+
+  difficulties.forEach((d) => {
+    if (d === 'beginner') counts.beginner++;
+    else if (d === 'intermediate') counts.intermediate++;
+    else if (d === 'advanced') counts.advanced++;
+  });
+
+  // Return the most common difficulty
+  if (counts.advanced > counts.intermediate && counts.advanced > counts.beginner) {
+    return 'advanced';
+  }
+  if (counts.beginner > counts.intermediate && counts.beginner > counts.advanced) {
+    return 'beginner';
+  }
+
+  // Default to intermediate
+  return 'intermediate';
+}
+
+/**
+ * Detect challenge-seeking behavior
+ * Analyzes if user is moving toward harder difficulties over time
+ * Returns: "seeking_challenge", "maintaining", or "easing_up"
+ */
+function detectChallengeBehavior(
+  questions: Array<{ difficultyHint?: string; timestamp: Date | string | number }>
+): 'seeking_challenge' | 'maintaining' | 'easing_up' {
+  if (!questions || questions.length < 3) return 'maintaining';
+
+  // Sort by timestamp (oldest first)
+  const sortedQuestions = [...questions].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  // Convert to numeric progression
+  const progression = sortedQuestions.map((q) => difficultyToNumber(q.difficultyHint));
+
+  // Calculate trend (positive = increasing difficulty, negative = decreasing)
+  let trend = 0;
+  for (let i = 1; i < progression.length; i++) {
+    trend += progression[i] - progression[i - 1];
+  }
+
+  // Normalize by number of transitions
+  const avgTrend = progression.length > 1 ? trend / (progression.length - 1) : 0;
+
+  // Determine behavior
+  if (avgTrend > 0.2) {
+    return 'seeking_challenge'; // Moving toward harder difficulties
+  } else if (avgTrend < -0.2) {
+    return 'easing_up'; // Moving toward easier difficulties
+  } else {
+    return 'maintaining'; // Staying at similar difficulty
+  }
+}
+
+// ============================================================================
+// Behavioral Pattern Helpers
+// These functions analyze user behavior patterns and learning styles
+// ============================================================================
+
+/**
+ * Categorize questions by type and return distribution
+ * Uses the questionCategory field from metadata to analyze question types
+ * Returns array of question types with counts and percentages
+ */
+function categorizeQuestions(
+  questions: Array<{ questionCategory?: string }>
+): Array<{ category: string; count: number; percentage: number }> {
+  if (!questions || questions.length === 0) return [];
+
+  const categoryCounts: { [category: string]: number } = {};
+  let totalCategorized = 0;
+
+  // Count occurrences of each category
+  questions.forEach((q) => {
+    if (q.questionCategory && q.questionCategory.trim()) {
+      const category = q.questionCategory;
+      categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+      totalCategorized++;
+    }
+  });
+
+  if (totalCategorized === 0) return [];
+
+  // Convert to array and calculate percentages
+  const distribution = Object.entries(categoryCounts)
+    .map(([category, count]) => ({
+      category,
+      count,
+      percentage: (count / totalCategorized) * 100,
+    }))
+    .sort((a, b) => b.count - a.count); // Sort by count descending
+
+  return distribution;
+}
+
+/**
+ * Analyze learning curve based on question patterns
+ * Measures how quickly user progresses by analyzing:
+ * - Time between questions (faster = quicker learning)
+ * - Difficulty progression (improving = learning)
+ * - Question complexity over time
+ * Returns: "fast", "moderate", or "slow"
+ */
+function analyzeLearningCurve(
+  questions: Array<{ 
+    difficultyHint?: string; 
+    timestamp: Date | string | number;
+    questionCategory?: string;
+  }>
+): 'fast' | 'moderate' | 'slow' {
+  if (!questions || questions.length < 3) return 'moderate';
+
+  // Sort questions by timestamp (oldest first)
+  const sortedQuestions = [...questions].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  // Calculate average time between questions (in hours)
+  let totalGapHours = 0;
+  let gapCount = 0;
+  for (let i = 1; i < sortedQuestions.length; i++) {
+    const prev = new Date(sortedQuestions[i - 1].timestamp);
+    const curr = new Date(sortedQuestions[i].timestamp);
+    const gapHours = (curr.getTime() - prev.getTime()) / (1000 * 60 * 60);
+    if (gapHours > 0 && gapHours < 168) { // Ignore gaps > 1 week
+      totalGapHours += gapHours;
+      gapCount++;
+    }
+  }
+
+  const avgGapHours = gapCount > 0 ? totalGapHours / gapCount : 24;
+
+  // Analyze difficulty progression (positive trend = learning)
+  const progression = sortedQuestions.map((q) => difficultyToNumber(q.difficultyHint));
+  let difficultyTrend = 0;
+  for (let i = 1; i < progression.length; i++) {
+    difficultyTrend += progression[i] - progression[i - 1];
+  }
+  const avgDifficultyTrend = progression.length > 1 ? difficultyTrend / (progression.length - 1) : 0;
+
+  // Determine learning speed
+  // Fast: Short gaps (< 12 hours) AND increasing difficulty
+  // Slow: Long gaps (> 48 hours) OR decreasing difficulty
+  if (avgGapHours < 12 && avgDifficultyTrend > 0.1) {
+    return 'fast';
+  } else if (avgGapHours > 48 || avgDifficultyTrend < -0.1) {
+    return 'slow';
+  } else {
+    return 'moderate';
+  }
+}
+
+/**
+ * Measure exploration tendencies
+ * Analyzes how exploratory the user is based on:
+ * - Genre diversity (more genres = more exploratory)
+ * - Question category variety (more types = more exploratory)
+ * - Game variety (more games = more exploratory)
+ * Returns a score from 0 to 1 (1 = highly exploratory)
+ */
+function measureExplorationTendencies(
+  questions: Array<{ 
+    detectedGenre?: string[];
+    questionCategory?: string;
+    detectedGame?: string;
+  }>
+): number {
+  if (!questions || questions.length === 0) return 0;
+
+  // Calculate genre diversity
+  const uniqueGenres = new Set<string>();
+  questions.forEach((q) => {
+    if (q.detectedGenre && Array.isArray(q.detectedGenre)) {
+      q.detectedGenre.forEach((genre) => {
+        if (genre && genre.trim()) {
+          uniqueGenres.add(genre);
+        }
+      });
+    }
+  });
+
+  // Calculate category diversity
+  const uniqueCategories = new Set<string>();
+  questions.forEach((q) => {
+    if (q.questionCategory && q.questionCategory.trim()) {
+      uniqueCategories.add(q.questionCategory);
+    }
+  });
+
+  // Calculate game diversity
+  const uniqueGames = new Set<string>();
+  questions.forEach((q) => {
+    if (q.detectedGame && q.detectedGame.trim()) {
+      uniqueGames.add(q.detectedGame);
+    }
+  });
+
+  // Normalize scores (0-1 scale)
+  const genreScore = Math.min(uniqueGenres.size / 5, 1); // Max at 5 genres
+  const categoryScore = Math.min(uniqueCategories.size / 5, 1); // Max at 5 categories
+  const gameScore = Math.min(uniqueGames.size / 10, 1); // Max at 10 games
+
+  // Weighted average (genres and categories are more important)
+  const explorationScore = (genreScore * 0.4 + categoryScore * 0.4 + gameScore * 0.2);
+
+  return Math.round(explorationScore * 100) / 100; // Round to 2 decimal places
+}
+
+// ============================================================================
+// TEST FUNCTION: Difficulty Analysis Helpers
+// ============================================================================
+// NOTE: This function is FOR TESTING ONLY
+// It tests the difficulty helper functions but is not used in production code.
+// The helper functions themselves (analyzeDifficultyProgression, etc.) ARE used
+// in production via analyzeGameplayPatterns().
+// ============================================================================
+
+/**
+ * TEST FUNCTION: Test difficulty analysis helpers
+ * ENABLED FOR TESTING - Comment out for production
+ * 
+ * This function is only used by the test endpoint: /api/test-difficulty-helpers
+ * It is NOT used in production code.
+ */
+// export const testDifficultyHelpers = async (username: string) => {
+//   try {
+//     const Question = (await import('../models/Question')).default;
+    
+//     // Get user's questions with difficulty data
+//     const questions = await Question.find({ username })
+//       .sort({ timestamp: -1 })
+//       .limit(100)
+//       .select('difficultyHint timestamp')
+//       .lean();
+
+//     if (questions.length === 0) {
+//       console.log('[Test] No questions found for user:', username);
+//       return {
+//         error: 'No questions found',
+//         username,
+//       };
+//     }
+
+//     // Ensure questions have required properties
+//     const questionsWithData = questions
+//       .filter((q: any) => q.timestamp)
+//       .map((q: any) => ({
+//         difficultyHint: q.difficultyHint,
+//         timestamp: q.timestamp,
+//       }));
+
+//     if (questionsWithData.length === 0) {
+//       return {
+//         error: 'No questions with valid data found',
+//         username,
+//       };
+//     }
+
+//     // Test each helper function
+//     const progression = analyzeDifficultyProgression(questionsWithData);
+//     const currentDifficulty = estimateCurrentDifficulty(questionsWithData);
+//     const challengeBehavior = detectChallengeBehavior(questionsWithData);
+
+//     const results = {
+//       username,
+//       totalQuestions: questions.length,
+//       questionsWithDifficulty: questionsWithData.filter(q => q.difficultyHint).length,
+//       difficultyAnalysis: {
+//         progression: progression,
+//         currentLevel: currentDifficulty,
+//         challengeBehavior: challengeBehavior,
+//       },
+//       sampleQuestions: questionsWithData.slice(0, 5).map(q => ({
+//         timestamp: q.timestamp,
+//         difficulty: q.difficultyHint || 'none',
+//       })),
+//     };
+
+//     console.log('[Test Difficulty Helpers] Results:', JSON.stringify(results, null, 2));
+//     return results;
+//   } catch (error) {
+//     console.error('[Test Difficulty Helpers] Error:', error);
+//     return {
+//       error: error instanceof Error ? error.message : 'Unknown error',
+//       username,
+//     };
+//   }
+// };
+
+// ============================================================================
+// TEST FUNCTION: Behavioral Pattern Helpers
+// ============================================================================
+// NOTE: This function is FOR TESTING ONLY
+// It tests the behavioral helper functions but is not used in production code.
+// The helper functions themselves (categorizeQuestions, etc.) ARE used
+// in production via analyzeGameplayPatterns().
+// ============================================================================
+
+/**
+ * TEST FUNCTION: Test behavioral pattern helpers
+ * ENABLED FOR TESTING - Comment out for production
+ * 
+ * This function is only used by the test endpoint: /api/test-behavioral-helpers
+ * It is NOT used in production code.
+ */
+// export const testBehavioralHelpers = async (username: string) => {
+//   try {
+//     const Question = (await import('../models/Question')).default;
+    
+//     // Get user's questions with behavioral data
+//     const questions = await Question.find({ username })
+//       .sort({ timestamp: -1 })
+//       .limit(100)
+//       .select('questionCategory detectedGenre detectedGame difficultyHint timestamp')
+//       .lean();
+
+//     if (questions.length === 0) {
+//       console.log('[Test] No questions found for user:', username);
+//       return {
+//         error: 'No questions found',
+//         username,
+//       };
+//     }
+
+//     // Ensure questions have required properties
+//     const questionsWithData = questions
+//       .filter((q: any) => q.timestamp)
+//       .map((q: any) => ({
+//         questionCategory: q.questionCategory,
+//         detectedGenre: q.detectedGenre || [],
+//         detectedGame: q.detectedGame,
+//         difficultyHint: q.difficultyHint,
+//         timestamp: q.timestamp,
+//       }));
+
+//     if (questionsWithData.length === 0) {
+//       return {
+//         error: 'No questions with valid data found',
+//         username,
+//       };
+//     }
+
+//     // Test each helper function
+//     const questionTypes = categorizeQuestions(questionsWithData);
+//     const learningSpeed = analyzeLearningCurve(questionsWithData);
+//     const explorationDepth = measureExplorationTendencies(questionsWithData);
+
+//     const results = {
+//       username,
+//       totalQuestions: questions.length,
+//       questionsWithCategory: questionsWithData.filter(q => q.questionCategory).length,
+//       behavioralAnalysis: {
+//         questionTypes: questionTypes,
+//         learningSpeed: learningSpeed,
+//         explorationDepth: explorationDepth,
+//       },
+//       sampleQuestions: questionsWithData.slice(0, 5).map(q => ({
+//         timestamp: q.timestamp,
+//         category: q.questionCategory || 'none',
+//         genres: q.detectedGenre || [],
+//         game: q.detectedGame || 'none',
+//       })),
+//     };
+
+//     console.log('[Test Behavioral Helpers] Results:', JSON.stringify(results, null, 2));
+//     return results;
+//   } catch (error) {
+//     console.error('[Test Behavioral Helpers] Error:', error);
+//     return {
+//       error: error instanceof Error ? error.message : 'Unknown error',
+//       username,
+//     };
+//   }
+// };
+
+// ============================================================================
+// Main Pattern Analysis Function
+// This function orchestrates all helper functions to analyze user gameplay patterns
+// ============================================================================
+
+/**
+ * Main function to analyze gameplay patterns for a user
+ * Combines all helper functions to provide comprehensive pattern analysis
+ * Phase 2 Step 2: Pattern Detection - Main Orchestrator
+ */
+export const analyzeGameplayPatterns = async (username: string) => {
+  try {
+    const Question = (await import('../models/Question')).default;
+    
+    // Fetch user's questions (last 100 for analysis)
+    const questions = await Question.find({ username })
+      .sort({ timestamp: -1 })
+      .limit(100)
+      .select('timestamp detectedGenre difficultyHint questionCategory interactionType detectedGame')
+      .lean();
+
+    if (!questions || questions.length === 0) {
+      return {
+        frequency: {
+          totalQuestions: 0,
+          questionsPerWeek: 0,
+          peakActivityTimes: [],
+          sessionPattern: 'sporadic' as const,
+        },
+        difficulty: {
+          progression: [],
+          currentLevel: 'intermediate' as const,
+          challengeSeeking: 'maintaining' as const,
+        },
+        genreAnalysis: {
+          topGenres: [],
+          genreDiversity: 0,
+          recentTrends: [],
+        },
+        behavior: {
+          questionTypes: [],
+          learningSpeed: 'moderate' as const,
+          explorationDepth: 0,
+        },
+      };
+    }
+
+    // Prepare questions for analysis (ensure proper format)
+    const questionsWithTimestamp = questions
+      .filter((q: any) => q.timestamp)
+      .map((q: any) => ({
+        timestamp: q.timestamp,
+        detectedGenre: q.detectedGenre || [],
+        difficultyHint: q.difficultyHint,
+        questionCategory: q.questionCategory,
+        interactionType: q.interactionType,
+        detectedGame: q.detectedGame,
+      }));
+
+    // Analyze frequency patterns
+    const frequency = {
+      totalQuestions: questions.length,
+      questionsPerWeek: calculateWeeklyRate(questionsWithTimestamp),
+      peakActivityTimes: detectPeakHours(questionsWithTimestamp),
+      sessionPattern: detectSessionPatterns(questionsWithTimestamp),
+    };
+
+    // Analyze difficulty patterns
+    const difficulty = {
+      progression: analyzeDifficultyProgression(questionsWithTimestamp),
+      currentLevel: estimateCurrentDifficulty(questionsWithTimestamp),
+      challengeSeeking: detectChallengeBehavior(questionsWithTimestamp),
+    };
+
+    // Analyze genre patterns
+    const genreAnalysis = {
+      topGenres: analyzeGenreDistribution(questionsWithTimestamp),
+      genreDiversity: calculateDiversity(questionsWithTimestamp),
+      recentTrends: detectRecentGenreShifts(questionsWithTimestamp),
+    };
+
+    // Analyze behavioral patterns
+    const behavior = {
+      questionTypes: categorizeQuestions(questionsWithTimestamp),
+      learningSpeed: analyzeLearningCurve(questionsWithTimestamp),
+      explorationDepth: measureExplorationTendencies(questionsWithTimestamp),
+    };
+
+    return {
+      frequency,
+      difficulty,
+      genreAnalysis,
+      behavior,
+    };
+  } catch (error) {
+    console.error('[Pattern Analysis] Error analyzing gameplay patterns:', error);
+    // Return safe defaults on error
+    return {
+      frequency: {
+        totalQuestions: 0,
+        questionsPerWeek: 0,
+        peakActivityTimes: [],
+        sessionPattern: 'sporadic' as const,
+      },
+      difficulty: {
+        progression: [],
+        currentLevel: 'intermediate' as const,
+        challengeSeeking: 'maintaining' as const,
+      },
+      genreAnalysis: {
+        topGenres: [],
+        genreDiversity: 0,
+        recentTrends: [],
+      },
+      behavior: {
+        questionTypes: [],
+        learningSpeed: 'moderate' as const,
+        explorationDepth: 0,
+      },
+    };
+  }
+};
 
 /**
  * TEST FUNCTION: Test genre analysis helpers
