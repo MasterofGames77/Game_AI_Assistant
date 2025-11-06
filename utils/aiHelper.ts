@@ -948,3 +948,410 @@ export const updateQuestionMetadata = async (
     console.error('[Metadata Update] Error updating question metadata:', error);
   }
 };
+
+// ============================================================================
+// Phase 2 Step 2: Pattern Detection Helper Functions
+// ============================================================================
+
+/**
+ * Frequency Analysis Helpers
+ * These functions analyze question timing patterns
+ */
+
+/**
+ * Calculate average questions per week from question history
+ */
+function calculateWeeklyRate(questions: Array<{ timestamp: Date | string | number }>): number {
+  if (!questions || questions.length === 0) return 0;
+  if (questions.length === 1) return 1; // Single question = 1 per week
+
+  // Sort questions by timestamp
+  const sortedQuestions = [...questions].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  const firstQuestion = new Date(sortedQuestions[0].timestamp);
+  const lastQuestion = new Date(sortedQuestions[sortedQuestions.length - 1].timestamp);
+  
+  // Calculate time span in weeks
+  const timeSpanMs = lastQuestion.getTime() - firstQuestion.getTime();
+  const timeSpanWeeks = timeSpanMs / (1000 * 60 * 60 * 24 * 7);
+
+  // If questions span less than a day, assume 1 week
+  if (timeSpanWeeks < 0.14) {
+    return questions.length;
+  }
+
+  // Calculate rate
+  return questions.length / timeSpanWeeks;
+}
+
+/**
+ * Detect peak activity hours from question timestamps
+ * Returns array of hours (0-23) when user is most active
+ */
+function detectPeakHours(questions: Array<{ timestamp: Date | string | number }>): number[] {
+  if (!questions || questions.length === 0) return [];
+
+  const hourCounts: { [hour: number]: number } = {};
+  
+  // Count questions by hour of day
+  questions.forEach((q) => {
+    const hour = new Date(q.timestamp).getHours();
+    hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+  });
+
+  // Find hours with above-average activity
+  const totalQuestions = questions.length;
+  const averagePerHour = totalQuestions / 24;
+  const threshold = averagePerHour * 1.5; // 50% above average
+
+  const peakHours = Object.entries(hourCounts)
+    .filter(([_, count]) => count >= threshold)
+    .map(([hour, _]) => parseInt(hour))
+    .sort((a, b) => a - b);
+
+  return peakHours.length > 0 ? peakHours : [];
+}
+
+/**
+ * Detect session patterns from question timestamps
+ * Returns: "daily", "weekly", or "sporadic"
+ */
+function detectSessionPatterns(questions: Array<{ timestamp: Date | string | number }>): 'daily' | 'weekly' | 'sporadic' {
+  if (!questions || questions.length < 2) return 'sporadic';
+
+  const sortedQuestions = [...questions].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  // Calculate time gaps between consecutive questions (in hours)
+  const gaps: number[] = [];
+  for (let i = 1; i < sortedQuestions.length; i++) {
+    const prev = new Date(sortedQuestions[i - 1].timestamp);
+    const curr = new Date(sortedQuestions[i].timestamp);
+    const gapHours = (curr.getTime() - prev.getTime()) / (1000 * 60 * 60);
+    gaps.push(gapHours);
+  }
+
+  // Calculate average gap
+  const avgGap = gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length;
+
+  // Categorize based on average gap
+  if (avgGap <= 24) {
+    return 'daily'; // Questions within 24 hours on average
+  } else if (avgGap <= 168) {
+    return 'weekly'; // Questions within a week on average
+  } else {
+    return 'sporadic'; // Questions more than a week apart
+  }
+}
+
+/**
+ * TEST FUNCTION: Test frequency analysis helpers
+ * COMMENTED OUT FOR PRODUCTION - Uncomment for testing/debugging
+ * 
+ * export const testFrequencyHelpers = async (username: string) => {
+ *   try {
+ *     const Question = (await import('../models/Question')).default;
+ *     
+ *     // Get user's questions
+ *     const questions = await Question.find({ username })
+ *       .sort({ timestamp: -1 })
+ *       .limit(100)
+ *       .select('timestamp')
+ *       .lean();
+ * 
+ *     if (questions.length === 0) {
+ *       console.log('[Test] No questions found for user:', username);
+ *       return {
+ *         error: 'No questions found',
+ *         username,
+ *       };
+ *     }
+ * 
+ *     // Ensure questions have timestamp property and convert to expected format
+ *     const questionsWithTimestamp = questions
+ *       .filter((q: any) => q.timestamp)
+ *       .map((q: any) => ({ timestamp: q.timestamp }));
+ * 
+ *     if (questionsWithTimestamp.length === 0) {
+ *       return {
+ *         error: 'No questions with valid timestamps found',
+ *         username,
+ *       };
+ *     }
+ * 
+ *     // Test each helper function
+ *     const weeklyRate = calculateWeeklyRate(questionsWithTimestamp);
+ *     const peakHours = detectPeakHours(questionsWithTimestamp);
+ *     const sessionPattern = detectSessionPatterns(questionsWithTimestamp);
+ * 
+ *     const results = {
+ *       username,
+ *       totalQuestions: questions.length,
+ *       frequency: {
+ *         questionsPerWeek: weeklyRate,
+ *         peakActivityHours: peakHours,
+ *         sessionPattern: sessionPattern,
+ *       },
+ *       sampleQuestions: questionsWithTimestamp.slice(0, 5).map(q => ({
+ *         timestamp: q.timestamp,
+ *         hour: new Date(q.timestamp).getHours(),
+ *       })),
+ *     };
+ * 
+ *     console.log('[Test Frequency Helpers] Results:', JSON.stringify(results, null, 2));
+ *     return results;
+ *   } catch (error) {
+ *     console.error('[Test Frequency Helpers] Error:', error);
+ *     return {
+ *       error: error instanceof Error ? error.message : 'Unknown error',
+ *       username,
+ *     };
+ *   }
+ * };
+ */
+
+// ============================================================================
+// Genre Analysis Helpers
+// These functions analyze genre preferences and diversity
+// ============================================================================
+
+/**
+ * Analyze genre distribution from questions
+ * Returns array of genres sorted by frequency (most common first)
+ */
+function analyzeGenreDistribution(
+  questions: Array<{ detectedGenre?: string[] }>
+): Array<{ genre: string; count: number; percentage: number }> {
+  if (!questions || questions.length === 0) return [];
+
+  const genreCounts: { [genre: string]: number } = {};
+  let totalGenreOccurrences = 0;
+
+  // Count genre occurrences
+  questions.forEach((q) => {
+    if (q.detectedGenre && Array.isArray(q.detectedGenre) && q.detectedGenre.length > 0) {
+      q.detectedGenre.forEach((genre) => {
+        if (genre && genre.trim()) {
+          genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+          totalGenreOccurrences++;
+        }
+      });
+    }
+  });
+
+  if (totalGenreOccurrences === 0) return [];
+
+  // Convert to array and calculate percentages
+  const distribution = Object.entries(genreCounts)
+    .map(([genre, count]) => ({
+      genre,
+      count,
+      percentage: (count / totalGenreOccurrences) * 100,
+    }))
+    .sort((a, b) => b.count - a.count); // Sort by count descending
+
+  return distribution;
+}
+
+/**
+ * Calculate genre diversity score
+ * Returns a number between 0 and 1, where:
+ * - 0 = all questions in one genre
+ * - 1 = maximum diversity (all genres equally represented)
+ */
+function calculateDiversity(questions: Array<{ detectedGenre?: string[] }>): number {
+  if (!questions || questions.length === 0) return 0;
+
+  const uniqueGenres = new Set<string>();
+  const genreCounts: { [genre: string]: number } = {};
+  let questionsWithGenres = 0;
+
+  // Collect all unique genres and their counts
+  questions.forEach((q) => {
+    if (q.detectedGenre && Array.isArray(q.detectedGenre) && q.detectedGenre.length > 0) {
+      questionsWithGenres++;
+      q.detectedGenre.forEach((genre) => {
+        if (genre && genre.trim()) {
+          uniqueGenres.add(genre);
+          genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+        }
+      });
+    }
+  });
+
+  if (uniqueGenres.size === 0) return 0;
+  if (uniqueGenres.size === 1) return 0; // No diversity
+
+  // Calculate Shannon entropy (diversity measure)
+  const totalOccurrences = Object.values(genreCounts).reduce((sum, count) => sum + count, 0);
+  let entropy = 0;
+
+  Object.values(genreCounts).forEach((count) => {
+    const probability = count / totalOccurrences;
+    if (probability > 0) {
+      entropy -= probability * Math.log2(probability);
+    }
+  });
+
+  // Normalize to 0-1 scale (max entropy is log2(number of genres))
+  const maxEntropy = Math.log2(uniqueGenres.size);
+  const normalizedDiversity = maxEntropy > 0 ? entropy / maxEntropy : 0;
+
+  return Math.round(normalizedDiversity * 100) / 100; // Round to 2 decimal places
+}
+
+/**
+ * Detect recent genre shifts (changing interests)
+ * Compares recent questions (last 30%) with older questions (first 70%)
+ * Returns array of genres that have increased or decreased in frequency
+ */
+function detectRecentGenreShifts(
+  questions: Array<{ detectedGenre?: string[]; timestamp: Date | string | number }>
+): Array<{ genre: string; change: 'increasing' | 'decreasing' | 'stable'; trend: number }> {
+  if (!questions || questions.length < 4) return []; // Need at least 4 questions to detect shifts
+
+  // Sort questions by timestamp (oldest first)
+  const sortedQuestions = [...questions].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  // Split into older (70%) and recent (30%) questions
+  const splitIndex = Math.floor(sortedQuestions.length * 0.7);
+  const olderQuestions = sortedQuestions.slice(0, splitIndex);
+  const recentQuestions = sortedQuestions.slice(splitIndex);
+
+  // Calculate genre frequencies for each period
+  const calculateGenreFrequency = (questionSet: typeof sortedQuestions) => {
+    const genreCounts: { [genre: string]: number } = {};
+    let totalQuestions = 0;
+
+    questionSet.forEach((q) => {
+      if (q.detectedGenre && Array.isArray(q.detectedGenre) && q.detectedGenre.length > 0) {
+        totalQuestions++;
+        q.detectedGenre.forEach((genre) => {
+          if (genre && genre.trim()) {
+            genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+          }
+        });
+      }
+    });
+
+    // Calculate frequencies
+    const frequencies: { [genre: string]: number } = {};
+    Object.entries(genreCounts).forEach(([genre, count]) => {
+      frequencies[genre] = totalQuestions > 0 ? count / totalQuestions : 0;
+    });
+
+    return frequencies;
+  };
+
+  const olderFrequencies = calculateGenreFrequency(olderQuestions);
+  const recentFrequencies = calculateGenreFrequency(recentQuestions);
+
+  // Find all unique genres across both periods
+  const allGenres = new Set([
+    ...Object.keys(olderFrequencies),
+    ...Object.keys(recentFrequencies),
+  ]);
+
+  // Calculate trends
+  const shifts: Array<{ genre: string; change: 'increasing' | 'decreasing' | 'stable'; trend: number }> = [];
+
+  allGenres.forEach((genre) => {
+    const olderFreq = olderFrequencies[genre] || 0;
+    const recentFreq = recentFrequencies[genre] || 0;
+    const trend = recentFreq - olderFreq;
+
+    // Only report significant changes (>10% change)
+    if (Math.abs(trend) > 0.1) {
+      shifts.push({
+        genre,
+        change: trend > 0 ? 'increasing' : 'decreasing',
+        trend: Math.round(trend * 100) / 100, // Round to 2 decimal places
+      });
+    } else if (olderFreq > 0 || recentFreq > 0) {
+      // Include stable genres that exist in either period
+      shifts.push({
+        genre,
+        change: 'stable',
+        trend: Math.round(trend * 100) / 100,
+      });
+    }
+  });
+
+  // Sort by absolute trend value (biggest changes first)
+  return shifts.sort((a, b) => Math.abs(b.trend) - Math.abs(a.trend));
+}
+
+/**
+ * TEST FUNCTION: Test genre analysis helpers
+ * COMMENTED OUT FOR PRODUCTION - Uncomment for testing/debugging
+ * 
+ * export const testGenreHelpers = async (username: string) => {
+ *   try {
+ *     const Question = (await import('../models/Question')).default;
+ *     
+ *     // Get user's questions with genre data
+ *     const questions = await Question.find({ username })
+ *       .sort({ timestamp: -1 })
+ *       .limit(100)
+ *       .select('detectedGenre timestamp')
+ *       .lean();
+ * 
+ *     if (questions.length === 0) {
+ *       console.log('[Test] No questions found for user:', username);
+ *       return {
+ *         error: 'No questions found',
+ *         username,
+ *       };
+ *     }
+ * 
+ *     // Ensure questions have required properties
+ *     const questionsWithData = questions
+ *       .filter((q: any) => q.timestamp)
+ *       .map((q: any) => ({
+ *         detectedGenre: q.detectedGenre || [],
+ *         timestamp: q.timestamp,
+ *       }));
+ * 
+ *     if (questionsWithData.length === 0) {
+ *       return {
+ *         error: 'No questions with valid data found',
+ *         username,
+ *       };
+ *     }
+ * 
+ *     // Test each helper function
+ *     const genreDistribution = analyzeGenreDistribution(questionsWithData);
+ *     const diversity = calculateDiversity(questionsWithData);
+ *     const genreShifts = detectRecentGenreShifts(questionsWithData);
+ * 
+ *     const results = {
+ *       username,
+ *       totalQuestions: questions.length,
+ *       questionsWithGenres: questionsWithData.filter(q => q.detectedGenre && q.detectedGenre.length > 0).length,
+ *       genreAnalysis: {
+ *         distribution: genreDistribution,
+ *         diversityScore: diversity,
+ *         recentShifts: genreShifts,
+ *       },
+ *       sampleQuestions: questionsWithData.slice(0, 5).map(q => ({
+ *         timestamp: q.timestamp,
+ *         genres: q.detectedGenre || [],
+ *       })),
+ *     };
+ * 
+ *     console.log('[Test Genre Helpers] Results:', JSON.stringify(results, null, 2));
+ *     return results;
+ *   } catch (error) {
+ *     console.error('[Test Genre Helpers] Error:', error);
+ *     return {
+ *       error: error instanceof Error ? error.message : 'Unknown error',
+ *       username,
+ *     };
+ *   }
+ * };
+ */
