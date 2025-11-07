@@ -79,6 +79,7 @@ test-genre-helpers.ts
 test-recommendations.ts
 test-pattern-storage.ts
 test-full-flow.ts
+test-personalized-recommendations.ts
 
 
 
