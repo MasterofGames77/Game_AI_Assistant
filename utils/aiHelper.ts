@@ -385,15 +385,39 @@ export const analyzeUserQuestions = (questions: Array<{ question: string, respon
   return Object.keys(genres).sort((a, b) => genres[b] - genres[a]);
 };
 
+/**
+ * Check if a game is released (not in the future)
+ */
+function isGameReleased(game: any): boolean {
+  if (!game.released) {
+    return false; // No release date = likely unreleased
+  }
+  
+  try {
+    const releaseDate = new Date(game.released);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of today
+    
+    // Game is released if release date is today or in the past
+    return releaseDate <= today;
+  } catch (error) {
+    return false; // Invalid date = assume unreleased
+  }
+}
+
 // Fetch game recommendations based on genre
 // Note: RAWG API accepts genre slugs (e.g., "racing", "action", "rpg") or genre IDs
+// Filters out unreleased games
 export const fetchRecommendations = async (genre: string): Promise<string[]> => {
   const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&genres=${encodeURIComponent(genre)}&page_size=20`;
 
   try {
     const response = await axios.get(url);
     if (response.data && response.data.results && response.data.results.length > 0) {
-      return response.data.results.map((game: any) => game.name);
+      // Filter out unreleased games and return only released game names
+      return response.data.results
+        .filter((game: any) => isGameReleased(game))
+        .map((game: any) => game.name);
     } else {
       // Log if no results (for debugging)
       // console.log(`[Recommendations] No games found for genre: ${genre}`);
