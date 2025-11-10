@@ -27,6 +27,8 @@ const useHealthMonitoring = ({
   // Persisted remaining time across full page close/open
   const remainingSecondsOverrideRef = useRef<number | null>(null);
   const lastTickAtRef = useRef<number | null>(null);
+  // Track current enabled state in a ref so cleanup can check current value
+  const isEnabledRef = useRef<boolean>(isEnabled);
 
   // Function to start a new session (only called for truly new sessions)
   const startSession = async () => {
@@ -611,6 +613,11 @@ const useHealthMonitoring = ({
     }
   };
 
+  // Update ref when isEnabled changes
+  useEffect(() => {
+    isEnabledRef.current = isEnabled;
+  }, [isEnabled]);
+
   // Start monitoring when username is available and enabled
   useEffect(() => {
     if (!username || !isEnabled) {
@@ -622,7 +629,28 @@ const useHealthMonitoring = ({
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
       }
-      setHealthStatus((prev) => ({ ...prev, isMonitoring: false }));
+      // Clear timer state when disabled
+      remainingSecondsOverrideRef.current = null;
+      lastTickAtRef.current = null;
+      // Clear localStorage when disabled
+      if (username) {
+        try {
+          const key = `vgw_health_remaining_${username}`;
+          localStorage.removeItem(key);
+        } catch (e) {
+          // Ignore localStorage errors
+        }
+      }
+      // Immediately set isMonitoring to false and clear timer display
+      setHealthStatus({
+        shouldShowBreak: false,
+        timeSinceLastBreak: 0,
+        nextBreakIn: undefined,
+        breakCount: 0,
+        isMonitoring: false,
+        isOnBreak: false,
+        breakStartTime: undefined,
+      });
       return;
     }
 
@@ -687,8 +715,9 @@ const useHealthMonitoring = ({
         timerIntervalRef.current = null;
       }
       // Persist remaining time override on navigation unmount as well
-      try {
-        if (username) {
+      // Only save if monitoring is still enabled (check current ref value, not closure)
+      if (isEnabledRef.current && username) {
+        try {
           const key = `vgw_health_remaining_${username}`;
           let remainingSec = remainingSecondsOverrideRef.current;
 
@@ -745,9 +774,17 @@ const useHealthMonitoring = ({
             localStorage.removeItem(key);
             console.log("Clearing localStorage - no remaining time to save");
           }
+        } catch (e) {
+          console.error("Error saving remaining time to localStorage:", e);
         }
-      } catch (e) {
-        console.error("Error saving remaining time to localStorage:", e);
+      } else if (!isEnabledRef.current && username) {
+        // Clear localStorage when disabled
+        try {
+          const key = `vgw_health_remaining_${username}`;
+          localStorage.removeItem(key);
+        } catch (e) {
+          // Ignore localStorage errors
+        }
       }
       setHealthStatus((prev) => ({ ...prev, isMonitoring: false }));
       // Do not end the session on unmount due to in-app navigation.
