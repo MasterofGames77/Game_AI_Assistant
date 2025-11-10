@@ -6,7 +6,13 @@
  */
 
 import User from '../models/User';
-import { fetchRecommendations, analyzeGameplayPatterns, extractQuestionMetadata } from './aiHelper';
+import { 
+  fetchRecommendations, 
+  analyzeGameplayPatterns, 
+  extractQuestionMetadata,
+  getPersonalizedStrategyTip,
+  TemplateContext
+} from './aiHelper';
 
 /**
  * Map internal genre names (from checkQuestionType) to RAWG API genre slugs
@@ -43,6 +49,315 @@ function mapGenreToRAWGSlug(internalGenre: string): string | null {
   };
 
   return genreMapping[internalGenre] || null;
+}
+
+/**
+ * Map genre name from analysis to template genre key
+ * Converts full genre names (e.g., "Role-Playing Game") to template keys (e.g., "rpg")
+ * Phase 4 Step 1: Template System Integration
+ */
+function mapGenreToTemplateKey(genreName: string): string {
+  if (!genreName) return '';
+  
+  const lowerGenre = genreName.toLowerCase();
+  
+  // First, map internal genre names (from checkQuestionType) to template keys
+  // These are the internal genre identifiers used in the system
+  const internalGenreMap: { [key: string]: string } = {
+    'platformerpro': 'platformer',
+    'platformer pro': 'platformer',
+    'rpgenthusiast': 'rpg',
+    'rpg enthusiast': 'rpg',
+    'actionaficionado': 'action',
+    'action aficionado': 'action',
+    'shooterspecialist': 'shooter',
+    'shooter specialist': 'shooter',
+    'strategyspecialist': 'strategy',
+    'strategy specialist': 'strategy',
+    'adventureaddict': 'adventure',
+    'adventure addict': 'adventure',
+    'puzzlepro': 'puzzle',
+    'puzzle pro': 'puzzle',
+    'fightingfanatic': 'fighting',
+    'fighting fanatic': 'fighting',
+    'racingrenegade': 'racing',
+    'racing renegade': 'racing',
+    'sportschampion': 'sports',
+    'sports champion': 'sports',
+    'survivalspecialist': 'survival',
+    'survival specialist': 'survival',
+    'horrorhero': 'horror',
+    'horror hero': 'horror',
+    'stealthexpert': 'stealth',
+    'stealth expert': 'stealth',
+    'simulationspecialist': 'simulation',
+    'simulation specialist': 'simulation',
+    'sandboxbuilder': 'sandbox',
+    'sandbox builder': 'sandbox',
+    'battleroyale': 'battle-royale',
+    'battle royale': 'battle-royale',
+  };
+  
+  // Check internal genre names first (remove spaces and check)
+  const normalizedInternal = lowerGenre.replace(/\s+/g, '');
+  if (internalGenreMap[normalizedInternal]) {
+    return internalGenreMap[normalizedInternal];
+  }
+  
+  // Direct mappings for full genre names
+  const genreMap: { [key: string]: string } = {
+    'role-playing game': 'rpg',
+    'rpg': 'rpg',
+    'action-role-playing game': 'rpg', // Prioritize RPG for action-rpg
+    'action role-playing game': 'rpg',
+    'first-person shooter': 'shooter',
+    'third-person shooter': 'shooter',
+    'shooter': 'shooter',
+    'fps': 'shooter',
+    'strategy': 'strategy',
+    'real-time strategy': 'strategy',
+    'turn-based strategy': 'strategy',
+    'action': 'action',
+    'action-adventure': 'action',
+    'adventure': 'adventure',
+    'platformer': 'platformer',
+    'puzzle': 'puzzle',
+    'fighting': 'fighting',
+    'racing': 'racing',
+    'sports': 'sports',
+    'survival': 'survival',
+    'survival horror': 'horror',
+    'horror': 'horror',
+    'stealth': 'stealth',
+    'simulation': 'simulation',
+    'roguelike': 'roguelike',
+    'rogue-like': 'roguelike',
+    'sandbox': 'sandbox',
+    'battle royale': 'battle-royale',
+    'battle-royale': 'battle-royale',
+  };
+  
+  // Check for exact match first
+  if (genreMap[lowerGenre]) {
+    return genreMap[lowerGenre];
+  }
+  
+  // Check for partial matches (e.g., "Role-Playing Game" contains "rpg")
+  for (const [key, value] of Object.entries(genreMap)) {
+    if (lowerGenre.includes(key) || key.includes(lowerGenre)) {
+      return value;
+    }
+  }
+  
+  // Check for common genre keywords
+  if (lowerGenre.includes('rpg') || lowerGenre.includes('role-playing')) return 'rpg';
+  if (lowerGenre.includes('shooter') || lowerGenre.includes('fps')) return 'shooter';
+  if (lowerGenre.includes('strategy') || lowerGenre.includes('tactical')) return 'strategy';
+  if (lowerGenre.includes('action')) return 'action';
+  if (lowerGenre.includes('adventure')) return 'adventure';
+  if (lowerGenre.includes('platformer')) return 'platformer';
+  if (lowerGenre.includes('puzzle')) return 'puzzle';
+  if (lowerGenre.includes('fighting')) return 'fighting';
+  if (lowerGenre.includes('racing')) return 'racing';
+  if (lowerGenre.includes('sports')) return 'sports';
+  if (lowerGenre.includes('survival')) return 'survival';
+  if (lowerGenre.includes('horror')) return 'horror';
+  if (lowerGenre.includes('stealth')) return 'stealth';
+  if (lowerGenre.includes('simulation')) return 'simulation';
+  if (lowerGenre.includes('roguelike') || lowerGenre.includes('rogue-like')) return 'roguelike';
+  if (lowerGenre.includes('sandbox')) return 'sandbox';
+  if (lowerGenre.includes('battle-royale') || lowerGenre.includes('battleroyale') || lowerGenre.includes('battle royale')) return 'battle-royale';
+  
+  // Return original genre name (will use fallback in template system)
+  return lowerGenre;
+}
+
+/**
+ * Build template context from user patterns and preferences
+ * Phase 4 Step 1: Template System Integration
+ * Intelligently extracts context values to personalize templates
+ */
+function buildTemplateContext(
+  patterns: Awaited<ReturnType<typeof analyzeGameplayPatterns>>,
+  context: Awaited<ReturnType<typeof extractQuestionContext>>,
+  preferences?: any
+): TemplateContext {
+  const templateContext: TemplateContext = {};
+  const topGenre = patterns.genreAnalysis.topGenres[0]?.genre || '';
+  const difficulty = context.difficultyHint || patterns.difficulty.currentLevel;
+  const playstyleTags = preferences?.playstyleTags || [];
+  const questionCategory = context.questionCategory;
+  
+  // Extract genre-specific context based on top genre
+  const genreKey = mapGenreToTemplateKey(topGenre);
+  
+  // RPG context
+  if (genreKey === 'rpg') {
+    if (difficulty === 'beginner') {
+      // For beginners, suggest balanced stats
+      templateContext.primaryStat = 'strength and vitality';
+    } else if (difficulty === 'intermediate') {
+      if (playstyleTags.includes('strategist')) {
+        templateContext.specificStrategy = 'a specialized build focusing on one primary stat';
+      } else {
+        templateContext.specificStrategy = 'different stat distributions to find your preferred playstyle';
+      }
+    } else if (difficulty === 'advanced') {
+      templateContext.minMaxTips = 'focusing on one primary stat and optimizing gear synergies for maximum efficiency';
+    }
+  }
+  
+  // Shooter context
+  if (genreKey === 'shooter' || genreKey === 'action') {
+    if (difficulty === 'beginner') {
+      templateContext.weaponClass = 'assault rifles or SMGs';
+    } else if (difficulty === 'intermediate') {
+      if (playstyleTags.includes('strategist')) {
+        templateContext.specificLoadout = 'a loadout tailored to specific map types';
+        templateContext.reasoning = 'different maps require different engagement ranges';
+      } else {
+        templateContext.specificLoadout = 'different weapon combinations';
+        templateContext.reasoning = 'experimentation helps you find what works best';
+      }
+    } else if (difficulty === 'advanced') {
+      templateContext.optimalSetup = 'meta weapons and attachments optimized for TTK';
+      templateContext.reasoning = 'they provide the best time-to-kill and competitive advantage';
+    }
+  }
+  
+  // Strategy context
+  if (genreKey === 'strategy') {
+    if (difficulty === 'beginner') {
+      templateContext.resourceTips = 'prioritize resource generation over early aggression';
+    } else if (difficulty === 'intermediate') {
+      // Extract more specific context if available
+      if (questionCategory === 'strategy') {
+        templateContext.unitType = 'counters';
+        templateContext.specificThreat = 'common enemy strategies';
+      } else {
+        templateContext.unitType = 'versatile units';
+        templateContext.specificThreat = 'various threats';
+      }
+    } else if (difficulty === 'advanced') {
+      templateContext.complexStrategy = 'meta compositions with optimal unit combinations';
+    }
+  }
+  
+  // Action context (for non-shooter action games)
+  // Note: Shooter context is handled above, this is for melee/combat action games
+  if (genreKey === 'action') {
+    // Only add action-specific context if shooter context wasn't already set
+    if (!templateContext.weaponClass && !templateContext.specificLoadout && !templateContext.optimalSetup) {
+      if (difficulty === 'beginner') {
+        templateContext.beginnerWeapon = 'sword and shield for easier combat';
+      } else if (difficulty === 'intermediate') {
+        templateContext.weaponCombo = 'light and heavy attack combinations';
+      } else if (difficulty === 'advanced') {
+        templateContext.advancedTechnique = 'perfect dodge timing and parry windows';
+      }
+    }
+  }
+  
+  // Adventure context
+  if (genreKey === 'adventure') {
+    if (difficulty === 'beginner') {
+      templateContext.safeAreas = 'starting areas and tutorial zones';
+    } else if (difficulty === 'intermediate') {
+      templateContext.keyUpgrades = 'health upgrades and movement abilities';
+    } else if (difficulty === 'advanced') {
+      templateContext.efficientPath = 'sequence breaking and route optimization';
+    }
+  }
+  
+  // Platformer context
+  if (genreKey === 'platformer') {
+    if (difficulty === 'beginner') {
+      templateContext.basicTechnique = 'precise jumping and timing';
+    } else if (difficulty === 'intermediate') {
+      templateContext.advancedMove = 'wall jumping and air dashing';
+    } else if (difficulty === 'advanced') {
+      templateContext.speedrunTech = 'wave dashing and frame-perfect inputs';
+    }
+  }
+  
+  // Survival context
+  if (genreKey === 'survival') {
+    if (difficulty === 'beginner') {
+      templateContext.resourcePriority = 'food, water, and shelter';
+    } else if (difficulty === 'intermediate') {
+      templateContext.survivalStrategy = 'establishing a base and securing resources';
+    } else if (difficulty === 'advanced') {
+      templateContext.advancedSurvival = 'optimizing resource gathering and crafting efficiency';
+    }
+  }
+  
+  // Horror context
+  if (genreKey === 'horror') {
+    if (difficulty === 'beginner') {
+      templateContext.conservativeApproach = 'explore carefully and save often';
+    } else if (difficulty === 'intermediate') {
+      templateContext.horrorStrategy = 'managing your resources and knowing when to run';
+    } else if (difficulty === 'advanced') {
+      templateContext.advancedHorror = 'mastering enemy patterns and optimal routing';
+    }
+  }
+  
+  // Stealth context
+  if (genreKey === 'stealth') {
+    if (difficulty === 'beginner') {
+      templateContext.basicStealth = 'staying in shadows and avoiding direct confrontation';
+    } else if (difficulty === 'intermediate') {
+      templateContext.stealthTechnique = 'using distractions and environmental advantages';
+    } else if (difficulty === 'advanced') {
+      templateContext.advancedStealth = 'perfecting timing and route optimization for ghost runs';
+    }
+  }
+  
+  // Simulation context
+  if (genreKey === 'simulation') {
+    if (difficulty === 'beginner') {
+      templateContext.basicManagement = 'learning the core systems and basic controls';
+    } else if (difficulty === 'intermediate') {
+      templateContext.simulationStrategy = 'balancing multiple systems and optimizing workflows';
+    } else if (difficulty === 'advanced') {
+      templateContext.advancedSimulation = 'min-maxing efficiency and mastering complex mechanics';
+    }
+  }
+  
+  // Roguelike context
+  if (genreKey === 'roguelike') {
+    if (difficulty === 'beginner') {
+      templateContext.roguelikeBasics = 'learning enemy patterns and item synergies';
+    } else if (difficulty === 'intermediate') {
+      templateContext.roguelikeStrategy = 'adapting your build to what you find and managing risk';
+    } else if (difficulty === 'advanced') {
+      templateContext.advancedRoguelike = 'mastering optimal routes and build optimization';
+    }
+  }
+  
+  // Sandbox context
+  if (genreKey === 'sandbox') {
+    if (difficulty === 'beginner') {
+      templateContext.basicExploration = 'experimenting with basic tools and mechanics';
+    } else if (difficulty === 'intermediate') {
+      templateContext.sandboxCreativity = 'combining systems in creative ways';
+    } else if (difficulty === 'advanced') {
+      templateContext.advancedSandbox = 'mastering advanced building techniques and optimization';
+    }
+  }
+  
+  // Battle Royale context
+  if (genreKey === 'battle-royale' || genreKey === 'battleroyale') {
+    if (difficulty === 'beginner') {
+      templateContext.safeDrop = 'less populated areas on the map edge';
+    } else if (difficulty === 'intermediate') {
+      templateContext.brStrategy = 'rotating early and positioning for the final circles';
+    } else if (difficulty === 'advanced') {
+      templateContext.advancedBr = 'mastering hot drops and end-game positioning';
+    }
+  }
+  
+  return templateContext;
 }
 
 /**
@@ -99,7 +414,7 @@ export const generatePersonalizedGameRecommendations = async (
         
         if (!rawgGenreSlug) {
           // Skip if no mapping found
-          console.log(`[Recommendations] No RAWG mapping for genre: ${internalGenre}`);
+          // console.log(`[Recommendations] No RAWG mapping for genre: ${internalGenre}`); // Commented for production
           continue;
         }
 
@@ -788,7 +1103,8 @@ async function generateGameRecommendations(
 
 /**
  * Generate personalized loadout suggestions based on genre, difficulty, and playstyle
- * Phase 3 Step 2: Enhanced Strategy Tips - Loadout Suggestions
+ * Phase 4 Step 1: Enhanced with Template System Integration
+ * Uses template system for natural, personalized strategy tips
  */
 function generateLoadoutSuggestions(
   patterns: Awaited<ReturnType<typeof analyzeGameplayPatterns>>,
@@ -798,58 +1114,98 @@ function generateLoadoutSuggestions(
   const suggestions: string[] = [];
   const topGenre = patterns.genreAnalysis.topGenres[0]?.genre || '';
   const difficulty = context.difficultyHint || patterns.difficulty.currentLevel;
-  const playstyleTags = preferences?.playstyleTags || [];
-
-  // RPG loadout suggestions
-  if (topGenre.includes('rpg') || topGenre.includes('RPG')) {
+  
+  // Map genre to template key
+  const genreKey = mapGenreToTemplateKey(topGenre);
+  
+  // Build template context from patterns and preferences
+  const templateContext = buildTemplateContext(patterns, context, preferences);
+  
+  // Generate template-based suggestions for supported genres
+  // Templates are available for: rpg, shooter, strategy, action, adventure, platformer, puzzle, fighting, racing, sports
+  if (genreKey) {
+    const templateTip = getPersonalizedStrategyTip(genreKey, difficulty, templateContext);
+    
+    if (templateTip && !templateTip.includes('[')) { // Only add if no unfilled placeholders
+      // Add appropriate emoji based on genre
+      const emojiMap: { [key: string]: string } = {
+        'rpg': '⚔️',
+        'shooter': '🔫',
+        'strategy': '📊',
+        'action': '⚔️',
+        'adventure': '🗺️',
+        'platformer': '🎮',
+        'puzzle': '🧩',
+        'fighting': '👊',
+        'racing': '🏎️',
+        'sports': '⚽',
+        'survival': '🪓',
+        'horror': '👻',
+        'stealth': '🥷',
+        'simulation': '🏭',
+        'roguelike': '💀',
+        'sandbox': '🧱',
+        'battle-royale': '🎯',
+        'battleroyale': '🎯',
+      };
+      const emoji = emojiMap[genreKey] || '💡';
+      suggestions.push(`${emoji} ${templateTip}`);
+    }
+  }
+  
+  // Add genre-specific additional suggestions that complement templates
+  // These provide extra context beyond what templates can offer
+  
+  // RPG additional suggestions
+  if (genreKey === 'rpg') {
     if (difficulty === 'beginner') {
-      suggestions.push('⚔️ Start with a balanced build: equal focus on offense and defense');
       suggestions.push('🛡️ Prioritize health and defense stats early - survivability is key');
     } else if (difficulty === 'intermediate') {
+      const playstyleTags = preferences?.playstyleTags || [];
       if (playstyleTags.includes('strategist')) {
-        suggestions.push('📊 Focus on a specialized build: choose one primary stat and maximize it');
         suggestions.push('🔮 Consider hybrid builds that combine two complementary playstyles');
-      } else {
-        suggestions.push('⚖️ Experiment with different stat distributions to find your preferred playstyle');
       }
     } else if (difficulty === 'advanced') {
-      suggestions.push('🎯 Min-max your build: focus on one primary stat and optimize gear synergies');
       suggestions.push('⚡ Look for meta builds and optimal stat allocations for your class');
     }
   }
-
-  // Shooter/Action loadout suggestions
-  if (topGenre.includes('shooter') || topGenre.includes('action') || topGenre.includes('Action')) {
+  
+  // Shooter/Action additional suggestions
+  if (genreKey === 'shooter' || genreKey === 'action') {
     if (difficulty === 'beginner') {
-      suggestions.push('🔫 Use versatile weapons: assault rifles or SMGs for balanced gameplay');
       suggestions.push('🛡️ Equip armor that boosts survivability over damage');
     } else if (difficulty === 'intermediate') {
+      const playstyleTags = preferences?.playstyleTags || [];
       if (playstyleTags.includes('strategist')) {
-        suggestions.push('🎯 Build a loadout for specific map types: long-range for open maps, close-range for tight spaces');
         suggestions.push('⚔️ Create weapon combinations that cover different engagement ranges');
-      } else {
-        suggestions.push('🔄 Experiment with different weapon classes to find your comfort zone');
       }
     } else if (difficulty === 'advanced') {
-      suggestions.push('⚡ Optimize for TTK (time-to-kill): use meta weapons and attachments');
       suggestions.push('🎖️ Master weapon recoil patterns and create loadouts that minimize weaknesses');
     }
   }
-
-  // Strategy game loadout suggestions
-  if (topGenre.includes('strategy') || topGenre.includes('Strategy')) {
+  
+  // Strategy additional suggestions
+  if (genreKey === 'strategy') {
     if (difficulty === 'beginner') {
-      suggestions.push('🏰 Focus on economy: prioritize resource generation over early aggression');
       suggestions.push('⚖️ Build a balanced army composition: mix of units for versatility');
     } else if (difficulty === 'intermediate') {
-      suggestions.push('📊 Study unit counters: build compositions that counter common strategies');
       suggestions.push('⚔️ Create specialized builds for specific matchups or scenarios');
     } else if (difficulty === 'advanced') {
-      suggestions.push('🎯 Master meta compositions: learn optimal unit combinations for current patch');
       suggestions.push('⚡ Optimize build orders and resource allocation for maximum efficiency');
     }
   }
-
+  
+  // Fallback: If no template suggestions were generated, use basic genre-based tips
+  if (suggestions.length === 0 && topGenre) {
+    if (difficulty === 'beginner') {
+      suggestions.push('💡 Start with balanced approaches and learn the fundamentals');
+    } else if (difficulty === 'intermediate') {
+      suggestions.push('⚔️ Experiment with different strategies to find what works for you');
+    } else if (difficulty === 'advanced') {
+      suggestions.push('⚡ Focus on optimization and meta strategies for maximum efficiency');
+    }
+  }
+  
   return suggestions;
 }
 
