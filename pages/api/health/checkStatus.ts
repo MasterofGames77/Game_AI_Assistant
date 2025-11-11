@@ -56,7 +56,6 @@ export default async function handler(
         totalSessionTime: 0,
         breakCount: 0,
         healthTipsEnabled: true,
-        ergonomicsReminders: true,
         lastSessionStart: now,
         isOnBreak: false
       };
@@ -73,6 +72,8 @@ export default async function handler(
       user.healthMonitoring.lastBreakReminder = undefined;
       user.healthMonitoring.isOnBreak = false;
       user.healthMonitoring.breakStartTime = undefined;
+      // Reset health tips for new day (24 hour reset)
+      user.healthMonitoring.lastHealthTipTime = undefined;
       await user.save();
     } else if (!lastSessionStart) {
       // Initialize session start time if missing (shouldn't happen with the above fix, but just in case)
@@ -83,13 +84,49 @@ export default async function handler(
     // Check if user needs a break reminder
     const breakStatus = user.shouldShowBreakReminder();
     
-    // Get health tips if user has tips enabled
+    // Get health tips if user has tips enabled (independent of break reminders)
+    // Uses session-based time tracking - timer pauses when page closes/signs out
+    // Timer resets after 24 hours (when session resets)
     let healthTips: string[] = [];
-    if (user.healthMonitoring?.healthTipsEnabled) {
-      healthTips = user.getHealthTips();
+    let shouldShowHealthTips = false;
+    if (user.healthMonitoring?.healthTipsEnabled && lastSessionStart) {
+      const lastHealthTipTime = user.healthMonitoring?.lastHealthTipTime;
+      
+      // Calculate time since last health tip based on session time, not wall-clock time
+      // This ensures the timer pauses when user closes page or signs out
+      let timeSinceLastHealthTip = Infinity;
+      if (lastHealthTipTime) {
+        const lastHealthTipDate = new Date(lastHealthTipTime);
+        // If health tip was shown after session started, calculate from session start
+        if (lastHealthTipDate >= lastSessionStart) {
+          // Health tip was shown during current session - calculate session time since then
+          timeSinceLastHealthTip = Math.floor((now.getTime() - lastHealthTipDate.getTime()) / (1000 * 60));
+        } else {
+          // Health tip was shown before current session started - count from session start
+          timeSinceLastHealthTip = Math.floor((now.getTime() - lastSessionStart.getTime()) / (1000 * 60));
+        }
+      } else {
+        // No health tip shown yet in this session - count from session start
+        timeSinceLastHealthTip = Math.floor((now.getTime() - lastSessionStart.getTime()) / (1000 * 60));
+      }
+      
+      // Show health tips every 30 minutes of active session time
+      // Timer pauses when disabled or when page closes, resumes when re-enabled or page reopens
+      if (timeSinceLastHealthTip >= 30) {
+        // Check if method exists (handles hot-reload caching issues in development)
+        if (typeof user.getHealthTips === 'function') {
+          healthTips = user.getHealthTips();
+          shouldShowHealthTips = true;
+        } else {
+          console.error('getHealthTips method not available on User model');
+          // Fallback: return empty array if method not available
+          healthTips = [];
+        }
+      }
     }
 
-    // Determine if we should show a reminder
+
+    // Determine if we should show a break reminder
     const showReminder = breakStatus.shouldShow && 
       (!user.healthMonitoring?.lastBreakReminder || 
        (new Date().getTime() - user.healthMonitoring.lastBreakReminder.getTime()) > 5 * 60 * 1000);
@@ -100,7 +137,9 @@ export default async function handler(
       nextBreakIn: breakStatus.nextBreakIn,
       breakCount: user.healthMonitoring?.breakCount || 0,
       showReminder,
-      healthTips: showReminder ? healthTips : undefined,
+      healthTips: showReminder ? healthTips : undefined, // Still include in break reminder if shown together
+      shouldShowHealthTips, // Independent health tips flag
+      independentHealthTips: shouldShowHealthTips ? healthTips : undefined, // Independent health tips
       isOnBreak: user.healthMonitoring?.isOnBreak || false,
       breakStartTime: user.healthMonitoring?.breakStartTime,
       lastBreakTime: user.healthMonitoring?.lastBreakTime,

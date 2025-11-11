@@ -19,6 +19,7 @@ import FeedbackStats from "../components/FeedbackStats";
 import useAchievementPolling from "../hooks/useAchievementPolling";
 import useHealthMonitoring from "../hooks/useHealthMonitoring";
 import HealthStatusWidget from "../components/HealthStatusWidget";
+import HealthTipsWidget from "../components/HealthTipsWidget";
 // import { useRouter } from "next/navigation";
 // import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 // import { faPaperclip } from "@fortawesome/free-solid-svg-icons";
@@ -69,8 +70,10 @@ export default function Home() {
   >("form");
 
   // Track break reminder enabled setting
+  // Default to false (disabled) until we load settings from database
+  // This prevents the widget from showing before we know the user's preference
   const [breakReminderEnabled, setBreakReminderEnabled] =
-    useState<boolean>(true);
+    useState<boolean>(false);
 
   // Achievement polling system - replaces Socket.IO for notifications
   const { isPolling, lastChecked } = useAchievementPolling({
@@ -80,12 +83,18 @@ export default function Home() {
   });
 
   // Health monitoring system for break reminders
-  const { healthStatus, recordBreak, endBreak, snoozeReminder } =
-    useHealthMonitoring({
-      username: username,
-      isEnabled: !!username && breakReminderEnabled, // Only monitor when user is logged in AND break reminders are enabled
-      checkInterval: 60000, // Check every minute
-    });
+  const {
+    healthStatus,
+    healthTips,
+    dismissHealthTips,
+    recordBreak,
+    endBreak,
+    snoozeReminder,
+  } = useHealthMonitoring({
+    username: username,
+    isEnabled: !!username && breakReminderEnabled, // Only monitor when user is logged in AND break reminders are enabled
+    checkInterval: 60000, // Check every minute
+  });
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -327,7 +336,7 @@ export default function Home() {
   // Fetch break reminder enabled setting when username changes
   const fetchHealthSettings = useCallback(async () => {
     if (!username) {
-      setBreakReminderEnabled(true); // Default to enabled if no user
+      setBreakReminderEnabled(false); // No user = disabled
       return;
     }
 
@@ -337,8 +346,9 @@ export default function Home() {
       });
 
       if (response.data?.user?.healthMonitoring) {
+        // Use the actual setting from database, default to false if not set
         const breakReminderEnabled =
-          response.data.user.healthMonitoring.breakReminderEnabled ?? true;
+          response.data.user.healthMonitoring.breakReminderEnabled ?? false;
         setBreakReminderEnabled(breakReminderEnabled);
 
         // If break reminders are disabled, clear any stored health timer data
@@ -346,26 +356,21 @@ export default function Home() {
           try {
             const key = `vgw_health_remaining_${username}`;
             localStorage.removeItem(key);
-            console.log(
-              "Break reminders disabled - cleared localStorage health timer"
-            );
+            // console.log(
+            //   "Break reminders disabled - cleared localStorage health timer"
+            // );
           } catch (e) {
             // Ignore localStorage errors
           }
         }
       } else {
-        // Default to enabled if no health monitoring settings found (new user)
-        setBreakReminderEnabled(true);
+        // No health monitoring settings found - default to disabled (safer)
+        setBreakReminderEnabled(false);
       }
     } catch (error) {
       console.error("Error fetching health settings:", error);
-      // On error, try to preserve existing state rather than defaulting
-      // Only default to enabled if we don't have a username (no user logged in)
-      if (!username) {
-        setBreakReminderEnabled(true);
-      }
-      // If username exists but fetch failed, keep current state to avoid
-      // accidentally enabling when user might have it disabled
+      // On error, default to disabled to avoid showing widget when it shouldn't
+      setBreakReminderEnabled(false);
     }
   }, [username]);
 
@@ -388,12 +393,27 @@ export default function Home() {
       }
     };
 
+    // Listen for custom event when health settings are updated
+    const handleHealthSettingsUpdated = () => {
+      if (username) {
+        fetchHealthSettings();
+      }
+    };
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("focus", handleFocus);
+    window.addEventListener(
+      "healthSettingsUpdated",
+      handleHealthSettingsUpdated
+    );
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleFocus);
+      window.removeEventListener(
+        "healthSettingsUpdated",
+        handleHealthSettingsUpdated
+      );
     };
   }, [username, fetchHealthSettings]);
 
@@ -1235,6 +1255,12 @@ export default function Home() {
                     onRecordBreak={recordBreak}
                     onEndBreak={endBreak}
                     onSnoozeReminder={snoozeReminder}
+                  />
+
+                  {/* Health Tips Widget */}
+                  <HealthTipsWidget
+                    tips={healthTips}
+                    onDismiss={dismissHealthTips}
                   />
 
                   <form

@@ -33,7 +33,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         totalSessionTime: 0,
         breakCount: 0,
         healthTipsEnabled: true,
-        ergonomicsReminders: true,
         lastSessionStart: new Date(),
         isOnBreak: false
       };

@@ -1,11 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import connectToMongoDB from '../../../utils/mongodb';
 import User from '../../../models/User';
-import { UpdateHealthSettingsResponse } from '../../../types';
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<UpdateHealthSettingsResponse>
+  res: NextApiResponse<{ success: boolean; error?: string }>
 ) {
   if (req.method !== 'POST') {
     return res.status(405).json({ 
@@ -15,19 +14,12 @@ export default async function handler(
   }
 
   try {
-    const { username, settings } = req.body;
+    const { username } = req.body;
 
     if (!username) {
       return res.status(400).json({ 
         success: false, 
         error: 'Username is required' 
-      });
-    }
-
-    if (!settings) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Settings are required' 
       });
     }
 
@@ -54,32 +46,21 @@ export default async function handler(
       };
     }
 
-    // Update health monitoring settings
-    user.healthMonitoring.breakReminderEnabled = settings.breakReminderEnabled ?? user.healthMonitoring.breakReminderEnabled;
-    user.healthMonitoring.breakIntervalMinutes = settings.breakIntervalMinutes ?? user.healthMonitoring.breakIntervalMinutes;
-    user.healthMonitoring.healthTipsEnabled = settings.healthTipsEnabled ?? user.healthMonitoring.healthTipsEnabled;
-
-    // Validate break interval
-    if (user.healthMonitoring.breakIntervalMinutes < 15 || user.healthMonitoring.breakIntervalMinutes > 120) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Break interval must be between 15 and 120 minutes' 
-      });
-    }
-
-    // Save user
+    // Update last health tip time (only called when tip is actually shown)
+    // This ensures the timer pauses when disabled (timestamp doesn't update)
+    user.healthMonitoring.lastHealthTipTime = new Date();
     await user.save();
 
     return res.status(200).json({ 
-      success: true, 
-      message: 'Health settings updated successfully' 
+      success: true
     });
 
   } catch (error) {
-    console.error('Error updating health settings:', error);
+    console.error('Error marking health tip as shown:', error);
     return res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 
     });
   }
 }
+

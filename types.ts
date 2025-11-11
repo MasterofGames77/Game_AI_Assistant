@@ -308,6 +308,8 @@ export interface HealthStatusResponse {
   breakCount: number;
   showReminder: boolean;
   healthTips?: string[];
+  shouldShowHealthTips?: boolean;
+  independentHealthTips?: string[];
   isOnBreak?: boolean;
   breakStartTime?: Date;
   lastBreakTime?: Date;
@@ -435,7 +437,6 @@ export interface HealthMonitoring {
   breakCount: number;             // Number of breaks taken today
   lastBreakReminder?: Date;       // Last time break reminder was shown
   healthTipsEnabled: boolean;     // Whether to show health tips
-  ergonomicsReminders: boolean;   // Whether to show ergonomics reminders
   isOnBreak?: boolean;           // Whether user is currently on a break
   breakStartTime?: Date;          // When the current break started
 }
@@ -679,4 +680,9 @@ export interface StatsData {
 
 export interface FeedbackStatsProps {
   username: string | null;
+}
+
+export interface HealthTipsWidgetProps {
+  tips: string[];
+  onDismiss: () => void;
 }

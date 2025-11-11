@@ -20,6 +20,47 @@ export interface IUser extends Document {
   subscription?: Subscription;
   usageLimit?: UsageLimit;
   healthMonitoring?: HealthMonitoring;
+  createdAt?: Date; // Mongoose timestamp
+  updatedAt?: Date; // Mongoose timestamp
+  // Methods
+  hasActiveProAccess(): boolean;
+  getSubscriptionStatus(): {
+    type: string;
+    status: string;
+    expiresAt?: Date;
+    daysUntilExpiration?: number;
+    canUpgrade?: boolean;
+    showWarning?: boolean;
+    canCancel?: boolean;
+    canReactivate?: boolean;
+  };
+  canAskQuestion(): {
+    allowed: boolean;
+    reason?: string;
+    questionsRemaining?: number;
+    cooldownUntil?: Date;
+    nextWindowReset?: Date;
+  };
+  recordQuestionUsage(): void;
+  getUsageStatus(): {
+    questionsUsed: number;
+    questionsRemaining: number;
+    questionsLimit: number;
+    windowResetTime?: Date;
+    cooldownUntil?: Date;
+    isInCooldown: boolean;
+    isProUser: boolean;
+  };
+  shouldShowBreakReminder(): {
+    shouldShow: boolean;
+    timeSinceLastBreak: number;
+    timeSinceLastReminder: number;
+    nextBreakIn?: number;
+  };
+  startBreak(): void;
+  endBreak(): void;
+  recordBreak(): void;
+  getHealthTips(): string[];
 }
 
 const UserSchema = new Schema<IUser>({
@@ -160,7 +201,7 @@ const UserSchema = new Schema<IUser>({
     breakCount: { type: Number, default: 0 },
     lastBreakReminder: { type: Date },
     healthTipsEnabled: { type: Boolean, default: true },
-    ergonomicsReminders: { type: Boolean, default: true },
+    lastHealthTipTime: { type: Date },
     isOnBreak: { type: Boolean, default: false },
     breakStartTime: { type: Date }
   }
@@ -521,8 +562,7 @@ UserSchema.methods.startBreak = function(): void {
       breakIntervalMinutes: 45,
       totalSessionTime: 0,
       breakCount: 0,
-      healthTipsEnabled: true,
-      ergonomicsReminders: true
+      healthTipsEnabled: true
     };
   }
   
@@ -565,16 +605,21 @@ UserSchema.methods.recordBreak = function(): void {
 // Method to get health tips
 UserSchema.methods.getHealthTips = function(): string[] {
   const tips = [
-    "💡 Take a 20-second break every 20 minutes to look at something 20 feet away (20-20-20 rule)",
-    "🖱️ Keep your mouse and keyboard at the same level to avoid wrist strain",
-    "🪑 Adjust your chair so your feet are flat on the floor and your back is supported",
-    "👀 Position your monitor about an arm's length away and slightly below eye level",
-    "🤲 Take breaks to stretch your hands, wrists, and fingers",
-    "🚶 Stand up and walk around for a few minutes every hour",
-    "💧 Stay hydrated! Keep a water bottle nearby",
-    "🌱 Consider adding some plants to your gaming setup for better air quality",
-    "💡 Ensure good lighting to reduce eye strain",
-    "🎧 Use headphones at a comfortable volume to protect your hearing"
+    "💡 Try the 20-20-20 rule: every 20 minutes, look at something 20 feet away for 20 seconds to give your eyes a break",
+    "🤲 Don't forget to stretch your hands, wrists, and arms during breaks - your body will thank you later",
+    "🚶 Get up and walk around for a few minutes every hour, even if it's just around your room",
+    "💧 Keep a water bottle nearby and take sips regularly - it's easy to forget to hydrate when you're focused",
+    "🌱 Adding a plant or two to your gaming space can help improve air quality and make it feel more relaxing",
+    "💡 Make sure your room has good lighting - dim screens in dark rooms can really strain your eyes",
+    "🎧 Keep your headphone volume at a comfortable level - your future self will appreciate you protecting your hearing",
+    "🧘 When things get intense, take a moment to breathe deeply - it helps reduce tension and keeps you focused",
+    "👁️ Remember to blink regularly while gaming - it's easy to forget and can lead to dry, tired eyes",
+    "⏰ Set time limits for your gaming sessions and stick to them - balance is key to healthy gaming",
+    "😴 Make sure you're getting enough sleep - gaming late into the night can mess with your sleep schedule",
+    "🍎 Keep healthy snacks nearby instead of reaching for junk food - your body needs good fuel",
+    "🪑 Check your posture every now and then - sit up straight and keep your screen at eye level",
+    "👥 Don't forget to maintain friendships and activities outside of gaming - real-world connections matter too",
+    "🏃 Try to balance gaming with other hobbies and physical activities - variety keeps life interesting"
   ];
   
   // Return 2-3 random tips
@@ -582,6 +627,12 @@ UserSchema.methods.getHealthTips = function(): string[] {
   return shuffled.slice(0, 3);
 };
 
+// Delete model from cache if it exists (handles hot-reload in Next.js)
+if (mongoose.models.User) {
+  delete mongoose.models.User;
+}
+
+// Create the model (with fallback for safety)
 const User = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
 
 export default User;

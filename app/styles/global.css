@@ -485,3 +485,26 @@ input[type="file"]:focus {
 .sidebar {
   -webkit-overflow-scrolling: touch;
 }
+
+/* Override react-hot-toast positioning for health tips */
+.health-tips-toast {
+  position: fixed !important;
+  top: 15% !important;
+  right: 40px !important;
+  transform: none !important;
+  left: auto !important;
+  bottom: auto !important;
+  margin: 0 !important;
+}
+
+/* Override react-hot-toast container positioning for health tips */
+div[class*="react-hot-toast"] .health-tips-toast,
+div[id*="react-hot-toast"] .health-tips-toast {
+  position: fixed !important;
+  top: 15% !important;
+  right: 40px !important;
+  transform: none !important;
+  left: auto !important;
+  bottom: auto !important;
+  margin: 0 !important;
+}

@@ -13,6 +13,7 @@ const useHealthMonitoring = ({
     breakCount: 0,
     isMonitoring: false,
   });
+  const [healthTips, setHealthTips] = useState<string[]>([]);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null); // For real-time countdown
@@ -322,8 +323,9 @@ const useHealthMonitoring = ({
   };
 
   // Function to check health status
+  // Note: This now also checks for health tips even when break reminders are disabled
   const checkHealthStatus = async () => {
-    if (!username || !isEnabled) return;
+    if (!username) return;
 
     try {
       const response = await fetch("/api/health/checkStatus", {
@@ -339,73 +341,85 @@ const useHealthMonitoring = ({
         return;
       }
 
-      // Check again after async operation - isEnabled might have changed
-      if (!isEnabled) return;
-
       const data = await response.json();
 
-      // Store break interval for local calculations
-      breakIntervalMinutesRef.current = data.breakIntervalMinutes || 45;
+      // Only process break reminder logic if break reminders are enabled
+      if (isEnabled) {
+        // Store break interval for local calculations
+        breakIntervalMinutesRef.current = data.breakIntervalMinutes || 45;
 
-      // Update break time references from server data
-      if (data.lastBreakTime && !lastBreakTimeRef.current) {
-        lastBreakTimeRef.current = new Date(data.lastBreakTime);
+        // Update break time references from server data
+        if (data.lastBreakTime && !lastBreakTimeRef.current) {
+          lastBreakTimeRef.current = new Date(data.lastBreakTime);
+        }
+
+        // Calculate session-based time instead of using server time
+        const currentSessionTime = getCurrentSessionTime();
+        const sessionTimeMinutes = Math.floor(currentSessionTime / (1000 * 60));
+
+        // Calculate time since last break (either from session or server data)
+        let timeSinceLastBreak = 0;
+        if (data.isOnBreak) {
+          timeSinceLastBreak = 0;
+        } else if (lastBreakTimeRef.current) {
+          // Use local break time if available
+          const timeSinceBreak =
+            new Date().getTime() - lastBreakTimeRef.current.getTime();
+          timeSinceLastBreak = Math.floor(timeSinceBreak / (1000 * 60));
+        } else if (data.lastBreakTime) {
+          // Fall back to server data
+          const timeSinceBreak =
+            new Date().getTime() - new Date(data.lastBreakTime).getTime();
+          timeSinceLastBreak = Math.floor(timeSinceBreak / (1000 * 60));
+        } else {
+          // Use session time if no break time available
+          timeSinceLastBreak = sessionTimeMinutes;
+        }
+
+        const shouldShowBreak =
+          !data.isOnBreak &&
+          timeSinceLastBreak >= breakIntervalMinutesRef.current;
+
+        // If we have an override remaining time, don't overwrite countdown here
+        if (remainingSecondsOverrideRef.current !== null) {
+          // Keep breakCount / flags in sync though
+          setHealthStatus((prev) => ({
+            ...prev,
+            breakCount: data.breakCount,
+            isMonitoring: isEnabled, // Use current isEnabled state
+            isOnBreak: data.isOnBreak,
+            breakStartTime: data.breakStartTime,
+          }));
+        } else {
+          setHealthStatus({
+            shouldShowBreak: shouldShowBreak,
+            timeSinceLastBreak: timeSinceLastBreak,
+            nextBreakIn: shouldShowBreak
+              ? 0
+              : Math.max(
+                  0,
+                  breakIntervalMinutesRef.current - timeSinceLastBreak
+                ),
+            breakCount: data.breakCount,
+            isMonitoring: isEnabled, // Use current isEnabled state
+            isOnBreak: data.isOnBreak,
+            breakStartTime: data.breakStartTime,
+          });
+        }
+
+        // Show break reminder if needed (only if break reminders are enabled)
+        if (shouldShowBreak && data.showReminder) {
+          showBreakReminder(data.healthTips);
+        }
       }
 
-      // Calculate session-based time instead of using server time
-      const currentSessionTime = getCurrentSessionTime();
-      const sessionTimeMinutes = Math.floor(currentSessionTime / (1000 * 60));
-
-      // Calculate time since last break (either from session or server data)
-      let timeSinceLastBreak = 0;
-      if (data.isOnBreak) {
-        timeSinceLastBreak = 0;
-      } else if (lastBreakTimeRef.current) {
-        // Use local break time if available
-        const timeSinceBreak =
-          new Date().getTime() - lastBreakTimeRef.current.getTime();
-        timeSinceLastBreak = Math.floor(timeSinceBreak / (1000 * 60));
-      } else if (data.lastBreakTime) {
-        // Fall back to server data
-        const timeSinceBreak =
-          new Date().getTime() - new Date(data.lastBreakTime).getTime();
-        timeSinceLastBreak = Math.floor(timeSinceBreak / (1000 * 60));
-      } else {
-        // Use session time if no break time available
-        timeSinceLastBreak = sessionTimeMinutes;
-      }
-
-      const shouldShowBreak =
-        !data.isOnBreak &&
-        timeSinceLastBreak >= breakIntervalMinutesRef.current;
-
-      // If we have an override remaining time, don't overwrite countdown here
-      if (remainingSecondsOverrideRef.current !== null) {
-        // Keep breakCount / flags in sync though
-        setHealthStatus((prev) => ({
-          ...prev,
-          breakCount: data.breakCount,
-          isMonitoring: isEnabled, // Use current isEnabled state
-          isOnBreak: data.isOnBreak,
-          breakStartTime: data.breakStartTime,
-        }));
-      } else {
-        setHealthStatus({
-          shouldShowBreak: shouldShowBreak,
-          timeSinceLastBreak: timeSinceLastBreak,
-          nextBreakIn: shouldShowBreak
-            ? 0
-            : Math.max(0, breakIntervalMinutesRef.current - timeSinceLastBreak),
-          breakCount: data.breakCount,
-          isMonitoring: isEnabled, // Use current isEnabled state
-          isOnBreak: data.isOnBreak,
-          breakStartTime: data.breakStartTime,
-        });
-      }
-
-      // Show break reminder if needed
-      if (shouldShowBreak && data.showReminder && isEnabled) {
-        showBreakReminder(data.healthTips);
+      // Show independent health tips if enabled (works even when break reminders are disabled)
+      if (
+        data.shouldShowHealthTips &&
+        data.independentHealthTips &&
+        data.independentHealthTips.length > 0
+      ) {
+        showHealthTips(data.independentHealthTips);
       }
     } catch (error) {
       console.error("Error checking health status:", error);
@@ -613,14 +627,46 @@ const useHealthMonitoring = ({
     }
   };
 
+  // Function to show health tips independently
+  const showHealthTips = async (tips: string[]) => {
+    if (!username || tips.length === 0) return;
+
+    // Mark health tips as shown
+    try {
+      await fetch("/api/health/markHealthTipShown", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username }),
+      });
+    } catch (error) {
+      console.error("Error marking health tip as shown:", error);
+    }
+
+    // Set health tips state to display in widget
+    setHealthTips(tips);
+
+    // Auto-dismiss after 12 seconds
+    setTimeout(() => {
+      setHealthTips([]);
+    }, 12000);
+  };
+
+  // Function to dismiss health tips
+  const dismissHealthTips = () => {
+    setHealthTips([]);
+  };
+
   // Update ref when isEnabled changes
   useEffect(() => {
     isEnabledRef.current = isEnabled;
   }, [isEnabled]);
 
-  // Start monitoring when username is available and enabled
+  // Start monitoring when username is available
+  // Note: We still check for health tips even when break reminders are disabled
   useEffect(() => {
-    if (!username || !isEnabled) {
+    if (!username) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -678,15 +724,17 @@ const useHealthMonitoring = ({
     // Start monitoring
     setHealthStatus((prev) => ({ ...prev, isMonitoring: true }));
 
-    // Start API polling interval (every minute)
+    // Start API polling interval (every minute) - always runs to check for health tips
     intervalRef.current = setInterval(() => {
       checkHealthStatus();
     }, checkInterval);
 
-    // Start local timer for real-time countdown (every second)
-    timerIntervalRef.current = setInterval(() => {
-      updateTimerLocally();
-    }, 1000);
+    // Start local timer for real-time countdown (every second) - only if break reminders enabled
+    if (isEnabled) {
+      timerIntervalRef.current = setInterval(() => {
+        updateTimerLocally();
+      }, 1000);
+    }
 
     // If we restored a remaining time override, update the timer IMMEDIATELY
     // before checkHealthStatus runs, so the state is correct when checkHealthStatus preserves it
@@ -872,6 +920,8 @@ const useHealthMonitoring = ({
 
   return {
     healthStatus,
+    healthTips,
+    dismissHealthTips,
     recordBreak,
     endBreak,
     snoozeReminder,

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { SubscriptionStatus, HealthMonitoring, AccountData } from "@/types";
+import { HealthMonitoring, AccountData } from "@/types";
 import axios from "axios";
 
 export default function AccountPage() {
@@ -28,7 +28,6 @@ export default function AccountPage() {
     totalSessionTime: 0,
     breakCount: 0,
     healthTipsEnabled: true,
-    ergonomicsReminders: true,
   });
   const [healthSettingsLoading, setHealthSettingsLoading] = useState(false);
   const [healthSettingsError, setHealthSettingsError] = useState("");
@@ -258,6 +257,26 @@ export default function AccountPage() {
               }
             : null
         );
+
+        // Dispatch custom event to notify other tabs/pages that settings changed
+        try {
+          window.dispatchEvent(
+            new CustomEvent("healthSettingsUpdated", {
+              detail: { settings: healthSettings },
+            })
+          );
+          // Also trigger localStorage change event for same-tab sync
+          const event = new CustomEvent("localStorageChange", {
+            detail: {
+              key: "healthSettingsUpdated",
+              newValue: JSON.stringify(healthSettings),
+              oldValue: null,
+            },
+          });
+          window.dispatchEvent(event);
+        } catch (e) {
+          // Ignore event dispatch errors
+        }
 
         // Clear success message after 3 seconds
         setTimeout(() => {
@@ -803,7 +822,8 @@ export default function AccountPage() {
                       <div className="flex justify-between">
                         <span className="text-gray-400">Days Remaining:</span>
                         <span className="text-white font-semibold">
-                          {accountData.subscriptionStatus.daysUntilExpiration} days
+                          {accountData.subscriptionStatus.daysUntilExpiration}{" "}
+                          days
                         </span>
                       </div>
                     )}
@@ -976,7 +996,7 @@ export default function AccountPage() {
                       Health Tips
                     </label>
                     <p className="text-gray-400 text-sm">
-                      Show health and ergonomics tips with reminders
+                      Show health tips every 30 minutes
                     </p>
                   </div>
                   <button
@@ -995,39 +1015,6 @@ export default function AccountPage() {
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                         healthSettings.healthTipsEnabled
-                          ? "translate-x-6"
-                          : "translate-x-1"
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {/* Ergonomics Reminders */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-white font-semibold">
-                      Ergonomics Reminders
-                    </label>
-                    <p className="text-gray-400 text-sm">
-                      Get posture and setup reminders
-                    </p>
-                  </div>
-                  <button
-                    onClick={() =>
-                      handleHealthSettingsChange(
-                        "ergonomicsReminders",
-                        !healthSettings.ergonomicsReminders
-                      )
-                    }
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      healthSettings.ergonomicsReminders
-                        ? "bg-[#00ffff]"
-                        : "bg-gray-600"
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        healthSettings.ergonomicsReminders
                           ? "translate-x-6"
                           : "translate-x-1"
                       }`}

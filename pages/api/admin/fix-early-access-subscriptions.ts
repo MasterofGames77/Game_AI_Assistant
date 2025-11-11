@@ -75,8 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Check if user needs fixing
         const needsFix = !user.subscription || 
                         currentStatus !== 'free_period' || 
-                        !hasEarlyAccess ||
-                        currentStatus === 'expired';
+                        !hasEarlyAccess;
 
         if (!needsFix) {
           results.skipped++;

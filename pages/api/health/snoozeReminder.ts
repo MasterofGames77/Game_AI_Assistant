@@ -43,8 +43,7 @@ export default async function handler(
         breakIntervalMinutes: 45,
         totalSessionTime: 0,
         breakCount: 0,
-        healthTipsEnabled: true,
-        ergonomicsReminders: true
+        healthTipsEnabled: true
       };
     }
 
