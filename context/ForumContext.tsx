@@ -185,6 +185,42 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
     [currentForum]
   );
 
+  const editPost = useCallback(
+    async (forumId: string, postId: string, message: string) => {
+      try {
+        setLoading(true);
+        const response = await axios.put(
+          `/api/editPost?forumId=${forumId}&postId=${postId}`,
+          { 
+            message,
+            username: localStorage.getItem("username"),
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${
+                localStorage.getItem("userId") || "test-user"
+              }`,
+            },
+          }
+        );
+
+        const updatedForum = response.data.forum;
+        setForums((prevForums) =>
+          prevForums.map((f) => (f._id === forumId ? updatedForum : f))
+        );
+        if (currentForum?._id === forumId) {
+          setCurrentForum(updatedForum);
+        }
+      } catch (err: any) {
+        setError(err.response?.data?.error || err.message || "Failed to edit post");
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [currentForum]
+  );
+
   const deletePost = useCallback(
     async (forumId: string, postId: string) => {
       try {
@@ -305,6 +341,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
     createForum,
     deleteForum,
     addPost,
+    editPost,
     deletePost,
     likePost,
     updateForumUsers,
