@@ -13,6 +13,7 @@ export interface IQuestion {
   questionCategory?: string;
   difficultyHint?: string;
   interactionType?: string;
+  imageUrl?: string; // URL of image uploaded with this question
 }
 
 // Define the Question schema
@@ -27,7 +28,8 @@ const QuestionSchema = new mongoose.Schema<IQuestion>({
   detectedGenre: [{ type: String, required: false }],
   questionCategory: { type: String, required: false },
   difficultyHint: { type: String, required: false },
-  interactionType: { type: String, required: false }
+  interactionType: { type: String, required: false },
+  imageUrl: { type: String, required: false } // URL of image uploaded with this question
 }, { collection: 'questions' });
 
 QuestionSchema.index({ username: 1, timestamp: 1 });

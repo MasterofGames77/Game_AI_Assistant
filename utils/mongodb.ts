@@ -11,8 +11,23 @@ dotenv.config({ path: path.resolve(__dirname, '.env.local') });
 
 const MAX_RETRIES = 5; // Set a limit for retries
 let retries = 0;
+let errorListenerAttached = false; // Track if error listener has been attached
 
 const connectToMongoDB = async (): Promise<void> => {
+  // Set max listeners to prevent memory leak warnings
+  // This is safe since we're reusing the same connection across multiple API routes
+  if (mongoose.connection.setMaxListeners) {
+    mongoose.connection.setMaxListeners(20); // Increase from default 10 to 20
+  }
+  
+  // Only attach error listener once, even if module is imported multiple times
+  if (!errorListenerAttached) {
+    mongoose.connection.on('error', (err) => {
+      console.error(`MongoDB connection error after initial connect: ${err}`);
+    });
+    errorListenerAttached = true;
+  }
+  
   if (mongoose.connection.readyState === 0) {
     while (retries < MAX_RETRIES) {
       try {
@@ -33,10 +48,5 @@ const connectToMongoDB = async (): Promise<void> => {
     console.log('Already connected to MongoDB');
   }
 };
-
-// Listen for connection errors after initial connection
-mongoose.connection.on('error', (err) => {
-  console.error(`MongoDB connection error after initial connect: ${err}`);
-});
 
 export default connectToMongoDB;

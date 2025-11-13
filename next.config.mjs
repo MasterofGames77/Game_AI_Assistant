@@ -17,6 +17,38 @@ const nextConfig = {
     MONGODB_URI: process.env.MONGODB_URI,
     GOOGLE_CREDENTIALS: process.env.GOOGLE_CREDENTIALS,
   },
+  images: {
+    // Allow images from cloud storage providers
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'ik.imagekit.io', // ImageKit
+      },
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com', // Cloudinary
+      },
+      {
+        protocol: 'https',
+        hostname: '**.amazonaws.com', // AWS S3
+      },
+    ],
+    // Also allow local images
+    unoptimized: false,
+  },
+  webpack: (config, { isServer }) => {
+    // Make optional image storage dependencies external to prevent build errors
+    // These are dynamically imported only when needed
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push({
+        'cloudinary': 'commonjs cloudinary',
+        'imagekit': 'commonjs imagekit',
+        '@aws-sdk/client-s3': 'commonjs @aws-sdk/client-s3',
+      });
+    }
+    return config;
+  },
 };
 
 export default nextConfig;

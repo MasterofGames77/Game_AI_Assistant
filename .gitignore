@@ -83,6 +83,7 @@ test-personalized-recommendations.ts
 test-template-system.ts
 test-template-integration.ts
 test-tip-comparison.ts
+testGoogleVision.ts
 
 
 
@@ -107,3 +108,12 @@ TIP_ACCURACY_ANALYSIS.md
 
 TIP_QUALITY_IMPROVEMENTS.md
 TIP_QUALITY_FINAL_REPORT.md
+
+README_IMAGE_MODERATION.md
+README_IMAGE_STORAGE.md
+HEROKU_IMAGEKIT_DEPLOYMENT.md
+IMAGEKIT_SETUP_GUIDE.md
+
+public/uploads/*
+
+tmp/*

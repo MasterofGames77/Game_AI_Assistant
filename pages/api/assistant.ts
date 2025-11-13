@@ -3,7 +3,7 @@ import axios from 'axios';
 import connectToMongoDB from '../../utils/mongodb';
 import Question from '../../models/Question';
 import User from '../../models/User';
-import { getChatCompletion, fetchRecommendations, analyzeUserQuestions, getAICache, extractQuestionMetadata, updateQuestionMetadata, analyzeGameplayPatterns } from '../../utils/aiHelper';
+import { getChatCompletion, getChatCompletionWithVision, fetchRecommendations, analyzeUserQuestions, getAICache, extractQuestionMetadata, updateQuestionMetadata, analyzeGameplayPatterns, extractGameTitleFromImageContext, enhanceQuestionWithGameContext } from '../../utils/aiHelper';
 import { storeUserPatterns } from '../../utils/storeUserPatterns';
 import { getClientCredentialsAccessToken, getAccessToken, getTwitchUserData, redirectToTwitch } from '../../utils/twitchAuth';
 // import OpenAI from 'openai';
@@ -16,7 +16,7 @@ import winston from 'winston';
 import { containsOffensiveContent } from '../../utils/contentModeration';
 import { Metrics } from '../../types';
 // import { ImageAnnotatorClient } from '@google-cloud/vision';
-// import fs from 'fs';
+import fs from 'fs';
 
 // Optimized performance monitoring with conditional logging
 const measureLatency = async (operation: string, callback: () => Promise<any>, enableLogging: boolean = false) => {
@@ -269,8 +269,11 @@ const fetchGamesFromIGDB = async (query: string): Promise<string | null> => {
       'Authorization': `Bearer ${accessToken}`
     };
 
+    // Limit query to 255 characters (IGDB API limit)
+    const limitedQuery = query.length > 255 ? query.substring(0, 252) + '...' : query;
+    
     // Sanitize the query to prevent injection
-    const sanitizedQuery = query.replace(/['"\\]/g, '');
+    const sanitizedQuery = limitedQuery.replace(/['"\\]/g, '');
     
     // Modified IGDB query
     const body = `
@@ -354,7 +357,27 @@ const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
 
 // Function to combine game data from multiple sources (RAWG, IGDB, and local CSV)
 const fetchAndCombineGameData = async (question: string, answer: string): Promise<string> => {
-  const gameName = question.replace(/when (was|did) (.*?) (released|come out)/i, "$2").trim();
+  // Extract game name from question - handle both simple and enhanced questions
+  let gameName = question.replace(/when (was|did) (.*?) (released|come out)/i, "$2").trim();
+  
+  // If the question is enhanced (contains image context markers), extract just the game title part
+  // Enhanced questions have format like: "Question\n\n[Context for identification: ...]"
+  if (gameName.includes('\n\n[') || gameName.length > 200) {
+    // Try to extract game title from the enhanced context
+    const gameMatch = gameName.match(/Game:\s*([^\n,]+)/i);
+    if (gameMatch && gameMatch[1]) {
+      gameName = gameMatch[1].trim();
+    } else {
+      // Fallback: extract from the original question part (before the context)
+      const questionPart = gameName.split('\n\n[')[0];
+      gameName = questionPart.replace(/when (was|did) (.*?) (released|come out)/i, "$2").trim();
+    }
+  }
+  
+  // Limit game name to 100 characters (safety limit, IGDB will further limit to 255)
+  if (gameName.length > 100) {
+    gameName = gameName.substring(0, 97) + '...';
+  }
 
   try {
     // Fetch data from RAWG, IGDB, and CSV
@@ -1129,7 +1152,7 @@ class ValidationError extends AssistantError {
 // Main API handler function that processes incoming requests
 const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
   const startTime = performance.now();
-  const { username, question, code } = req.body;
+  const { username, question, code, imageFilePath, imageUrl } = req.body;
   const metrics: Metrics = {};
   const requestMonitor = new RequestMonitor();
   const aiCache = getAICache();
@@ -1204,14 +1227,199 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
 
     let answer: string | null;
 
-    // Add timeout promise
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Request timeout')), 25000);
-    });
+    // Add timeout promises - longer timeout for vision API calls (60s), shorter for text-only (25s)
+    // Use timeout IDs so we can clear them when requests complete
+    let timeoutId: NodeJS.Timeout | null = null;
+    let visionTimeoutId: NodeJS.Timeout | null = null;
+    let timeoutCancelled = false;
+    let visionTimeoutCancelled = false;
+    
+    // Create cancellable timeout promises that won't reject if cancelled
+    const createTimeoutPromise = (ms: number, errorMessage: string): { promise: Promise<never>, cancel: () => void, id: NodeJS.Timeout | null } => {
+      let id: NodeJS.Timeout | null = null;
+      // Use an object to ensure the reference is shared correctly in closures
+      const state = { cancelled: false };
+      let rejectFn: ((error: Error) => void) | null = null;
+      
+      // Create a promise that will be rejected on timeout, but can be cancelled
+      const promise = new Promise<never>((_, reject) => {
+        rejectFn = reject;
+        id = setTimeout(() => {
+          // Double-check cancellation state atomically
+          if (!state.cancelled && rejectFn) {
+            // Mark as about to reject to prevent race conditions
+            const shouldReject = !state.cancelled;
+            if (shouldReject && rejectFn) {
+              try {
+                rejectFn(new Error(errorMessage));
+              } catch (e) {
+                // Ignore errors from rejecting an already-settled promise
+                // This can happen if the promise was already resolved/rejected
+              }
+            }
+          }
+        }, ms);
+      });
+      
+      // CRITICAL: Attach catch handler IMMEDIATELY and SYNCHRONOUSLY to prevent unhandled rejections
+      // This must happen before any await or async operations
+      const catchHandler = (err: any) => {
+        // Silently swallow all rejections - we handle them through the wrapper
+        // This prevents "unhandledRejection" errors
+      };
+      promise.catch(catchHandler);
+      
+      // We use a wrapper that only rejects if not cancelled
+      // This ensures Promise.race works correctly while preventing unhandled rejections
+      const safePromise = new Promise<never>((resolve, reject) => {
+        promise.then(
+          resolve,
+          (err) => {
+            // Only propagate rejection if not cancelled
+            if (!state.cancelled) {
+              reject(err);
+            }
+            // If cancelled, we don't reject - Promise.race will use the other promise
+          }
+        );
+      });
+      
+      // CRITICAL: Also attach catch handler to safePromise to prevent any unhandled rejections
+      // This is a safety net in case the rejection propagates
+      safePromise.catch(() => {
+        // Silently handle - this prevents unhandled rejection warnings
+      });
+      
+      const cancel = () => {
+        // Set cancelled flag in shared state object (must be first to prevent race conditions)
+        state.cancelled = true;
+        // Clear the reject function BEFORE clearing timeout to prevent it from being called
+        rejectFn = null;
+        if (id) {
+          clearTimeout(id);
+          id = null;
+        }
+      };
+      
+      return { promise: safePromise, cancel, id };
+    };
+    
+    const timeoutWrapper = createTimeoutPromise(25000, 'Request timeout');
+    timeoutId = timeoutWrapper.id;
+    const timeoutPromise = timeoutWrapper.promise;
+    
+    const visionTimeoutWrapper = createTimeoutPromise(60000, 'Vision API request timeout');
+    visionTimeoutId = visionTimeoutWrapper.id;
+    const visionTimeoutPromise = visionTimeoutWrapper.promise;
+    
+    // Helper function to clear timeouts
+    const clearTimeouts = () => {
+      timeoutWrapper.cancel();
+      visionTimeoutWrapper.cancel();
+      timeoutCancelled = true;
+      visionTimeoutCancelled = true;
+    };
 
-    // Measure question processing time
+    // If image is provided, analyze it first and enhance the question
+    let imageAnalysisData: any = null;
+    let imageEnhancedQuestion = question;
+    
+    if (imageFilePath || imageUrl) {
+      try {
+        // Directly use Google Vision API for image analysis (more efficient than API call)
+        const { ImageAnnotatorClient } = await import('@google-cloud/vision');
+        const credentials = process.env.GOOGLE_CREDENTIALS 
+          ? JSON.parse(process.env.GOOGLE_CREDENTIALS) 
+          : null;
+        
+        if (credentials) {
+          const client = new ImageAnnotatorClient({ credentials });
+          
+          // Determine image path - download from URL if needed
+          let imagePath: string | null = null;
+          
+          if (imageUrl && imageUrl.startsWith('http')) {
+            // Download cloud image temporarily for analysis
+            const response = await fetch(imageUrl);
+            if (response.ok) {
+              const buffer = await response.arrayBuffer();
+              const tempPath = path.join(process.cwd(), 'tmp', 'analysis', `temp-${Date.now()}.jpg`);
+              const tempDir = path.dirname(tempPath);
+              if (!fs.existsSync(tempDir)) {
+                fs.mkdirSync(tempDir, { recursive: true });
+              }
+              fs.writeFileSync(tempPath, Buffer.from(buffer));
+              imagePath = tempPath;
+            }
+          } else if (imageFilePath) {
+            imagePath = path.join(process.cwd(), 'public', imageFilePath);
+          }
+          
+          if (imagePath && fs.existsSync(imagePath)) {
+            // Get labels and text from image
+            const [labelResult] = await client.labelDetection(imagePath);
+            const [textResult] = await client.textDetection(imagePath);
+            
+            // Get all labels with their confidence scores
+            const allLabels = (labelResult.labelAnnotations || [])
+              .map(l => ({ 
+                description: l?.description || '', 
+                score: l?.score || 0 
+              }))
+              .filter(l => l.description)
+              .sort((a, b) => (b.score || 0) - (a.score || 0)); // Sort by confidence
+            
+            // Use top labels by confidence (up to 20 for detailed analysis)
+            const topLabels = allLabels.slice(0, 20).map(l => l.description);
+            const labels = topLabels.length > 0 ? topLabels : 
+              (labelResult.labelAnnotations?.map(l => l?.description).filter((desc): desc is string => Boolean(desc)) || []) as string[];
+            
+            const detectedText = textResult.textAnnotations?.[0]?.description || '';
+            
+            imageAnalysisData = { labels, detectedText, labelCount: labels.length };
+            
+            // Extract game title from question and/or image context
+            const gameTitle = await extractGameTitleFromImageContext(
+              question,
+              labels.length > 0 ? labels : undefined,
+              detectedText || undefined
+            );
+            
+            console.log('Image analysis:', {
+              topLabels: labels.slice(0, 10),
+              textPreview: detectedText.substring(0, 150),
+              detectedGameTitle: gameTitle,
+              totalLabelsFound: allLabels.length
+            });
+            
+            // Enhance question with game context and image analysis
+            imageEnhancedQuestion = await enhanceQuestionWithGameContext(
+              question,
+              gameTitle,
+              labels,
+              detectedText
+            );
+            
+            // Clean up temp file if it was downloaded
+            if (imagePath.startsWith(path.join(process.cwd(), 'tmp'))) {
+              try {
+                fs.unlinkSync(imagePath);
+              } catch (cleanupError) {
+                console.error('Error cleaning up temp file:', cleanupError);
+              }
+            }
+          }
+        }
+      } catch (imageError: any) {
+        console.error('Error analyzing image:', imageError);
+        // Continue without image analysis if it fails - don't block the question
+      }
+    }
+
+    // Measure question processing time (use enhanced question if image was analyzed)
+    const questionToProcess = imageEnhancedQuestion || question;
     const { result: processedAnswer, latency: processingLatency } = await measureLatency('Question Processing', async () => {
-      if (question.toLowerCase().includes("recommendations")) {
+      if (questionToProcess.toLowerCase().includes("recommendations")) {
         const previousQuestions = await Question.find({ username });
         const genres = analyzeUserQuestions(previousQuestions);
         const cacheKey = `recommendations:${username}:${genres[0] || 'default'}`;
@@ -1221,23 +1429,32 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
           ? `Based on your previous questions, I recommend these games: ${recommendations.join(', ')}.` 
           : "I couldn't find any recommendations based on your preferences.";
 
-      } else if (question.toLowerCase().includes("when was") || question.toLowerCase().includes("when did")) {
+      } else if (questionToProcess.toLowerCase().includes("when was") || questionToProcess.toLowerCase().includes("when did")) {
         // Existing release date logic
-        const cacheKey = `chat:${question.toLowerCase().trim()}`;
-        const baseAnswer = await Promise.race([
-          deduplicateRequest(cacheKey, () => getChatCompletion(question)),
-          timeoutPromise
-        ]) as string;
+        const cacheKey = `chat:${questionToProcess.toLowerCase().trim()}`;
+        try {
+          const raceResult = await Promise.race([
+            deduplicateRequest(cacheKey, () => getChatCompletion(questionToProcess)),
+            timeoutPromise
+          ]);
+          // Cancel timeout IMMEDIATELY after race completes (synchronously)
+          timeoutWrapper.cancel();
+          const baseAnswer = raceResult as string;
 
-        if (baseAnswer) {
-          try {
-            return await fetchAndCombineGameData(question, baseAnswer);
-          } catch (dataError) {
-            console.error('Error fetching additional game data:', dataError);
-            return baseAnswer;
+          if (baseAnswer) {
+            try {
+              return await fetchAndCombineGameData(questionToProcess, baseAnswer);
+            } catch (dataError) {
+              console.error('Error fetching additional game data:', dataError);
+              return baseAnswer;
+            }
           }
+          throw new Error('Failed to generate response for release date question');
+        } catch (error) {
+          // Cancel timeout on error too
+          timeoutWrapper.cancel();
+          throw error;
         }
-        throw new Error('Failed to generate response for release date question');
       } else if (question.toLowerCase().includes("twitch user data")) {
         // Existing Twitch logic
         if (!code) {
@@ -1251,27 +1468,149 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
         const userDataCacheKey = `twitch_user:${accessToken}`;
         const userData = await deduplicateRequest(userDataCacheKey, () => getTwitchUserData(accessToken));
         return `Twitch User Data: ${JSON.stringify(userData)}`;
-      } else if (question.toLowerCase().includes("genre")) {
-        // Existing genre logic
-        const gameTitle = extractGameTitle(question);
-        const genre = getGenreFromMapping(gameTitle);
-        return genre 
-          ? `${gameTitle} is categorized as ${genre}.` 
-          : `I couldn't find genre information for ${gameTitle}.`;
+      } else if (questionToProcess.toLowerCase().includes("genre") && 
+                 !questionToProcess.toLowerCase().includes("level") &&
+                 !questionToProcess.toLowerCase().includes("stage") &&
+                 !questionToProcess.toLowerCase().includes("item")) {
+        // Existing genre logic - only if it's actually a genre question
+        const gameTitle = extractGameTitle(questionToProcess);
+        // Only proceed if we got a valid game title (not empty or just question words)
+        if (gameTitle && gameTitle.length > 2 && !gameTitle.toLowerCase().match(/^(what|which|is|the|name|of|in|this|image|from|a|an)$/i)) {
+          const genre = getGenreFromMapping(gameTitle);
+          return genre 
+            ? `${gameTitle} is categorized as ${genre}.` 
+            : `I couldn't find genre information for ${gameTitle}.`;
+        }
+        // If extractGameTitle failed, fall through to general question handling
       } else {
-        // General questions
-        const cacheKey = `chat:${question.toLowerCase().trim()}`;
-        const baseAnswer = await Promise.race([
-          deduplicateRequest(cacheKey, () => getChatCompletion(question)),
-          timeoutPromise
-        ]) as string;
+        // General questions - use OpenAI Vision API if image is provided (ChatGPT-style analysis)
+        const cacheKey = `chat:${questionToProcess.toLowerCase().trim()}:${imageUrl || imageFilePath || 'no-image'}`;
+        
+        // Create enhanced system message for image-based questions
+        let systemMessage: string | undefined;
+        const isLevelQuestion = questionToProcess.toLowerCase().includes('level') || 
+                               questionToProcess.toLowerCase().includes('stage') ||
+                               questionToProcess.toLowerCase().includes('area') ||
+                               questionToProcess.toLowerCase().includes('chapter');
+        const isItemQuestion = questionToProcess.toLowerCase().includes('item') ||
+                              questionToProcess.toLowerCase().includes('weapon') ||
+                              questionToProcess.toLowerCase().includes('equipment');
+        const isGameQuestion = questionToProcess.toLowerCase().includes('what game') ||
+                              questionToProcess.toLowerCase().includes('which game') ||
+                              questionToProcess.toLowerCase().includes('character') ||
+                              questionToProcess.toLowerCase().includes('what is this from');
+        
+        if (isLevelQuestion || isItemQuestion || isGameQuestion) {
+          systemMessage = `You are an expert video game assistant specializing in identifying games, levels, stages, items, and locations from screenshots. When analyzing images:
+
+CRITICAL INSTRUCTIONS:
+1. Analyze the SPECIFIC visual features in the image (environment, landmarks, architecture, colors, structures, UI elements, character designs)
+2. For level identification: Match the actual visual content to specific levels - if you see a futuristic city with neon lights and a Ferris wheel, identify that specific level (e.g., Eggmanland in Sonic Unleashed)
+3. Pay attention to distinctive landmarks, unique structures, color palettes, and environmental features
+4. Read any text visible in the image (level names, UI elements, etc.)
+5. Cross-reference visual elements with your knowledge of the game's levels
+6. Be precise and base your answer on the actual visual content shown, not general patterns
+7. If you can identify specific visual features (like "neon pink Eggman face Ferris wheel" or "tall green-lit industrial towers"), use those to pinpoint the exact level`;
+        }
+        
+        let baseAnswer: string;
+        
+        // Use OpenAI Vision API if image is available (ChatGPT-style direct image analysis)
+        if (imageUrl || imageFilePath) {
+          try {
+            // Convert local image to base64 if needed, or use URL
+            let imageForVision: string | undefined;
+            
+            if (imageUrl && imageUrl.startsWith('http')) {
+              // Use URL directly (works for cloud storage)
+              imageForVision = imageUrl;
+            } else if (imageFilePath) {
+              // Convert local file to base64
+              const localImagePath = path.join(process.cwd(), 'public', imageFilePath);
+              if (fs.existsSync(localImagePath)) {
+                const imageBuffer = fs.readFileSync(localImagePath);
+                const base64Image = imageBuffer.toString('base64');
+                imageForVision = `data:image/jpeg;base64,${base64Image}`;
+              }
+            }
+            
+            if (imageForVision) {
+              try {
+                const raceResult = await Promise.race([
+                  deduplicateRequest(cacheKey, () => getChatCompletionWithVision(
+                    questionToProcess,
+                    imageForVision?.startsWith('http') ? imageForVision : undefined,
+                    imageForVision?.startsWith('data:') ? imageForVision : undefined,
+                    systemMessage
+                  )),
+                  visionTimeoutPromise // Use longer timeout for vision API calls
+                ]);
+                // Cancel timeout IMMEDIATELY after race completes (synchronously)
+                visionTimeoutWrapper.cancel();
+                baseAnswer = raceResult as string;
+              } catch (error) {
+                // Cancel timeout on error too (synchronously)
+                visionTimeoutWrapper.cancel();
+                throw error;
+              }
+            } else {
+              // Fallback to text-only if image conversion fails
+              try {
+                const raceResult = await Promise.race([
+                  deduplicateRequest(cacheKey, () => getChatCompletion(questionToProcess, systemMessage)),
+                  timeoutPromise
+                ]);
+                // Cancel timeout IMMEDIATELY after race completes (synchronously)
+                timeoutWrapper.cancel();
+                baseAnswer = raceResult as string;
+              } catch (error) {
+                // Cancel timeout on error too (synchronously)
+                timeoutWrapper.cancel();
+                throw error;
+              }
+            }
+          } catch (visionError) {
+            console.error('Error using vision API, falling back to text-only:', visionError);
+            // Clear any remaining timeouts
+            clearTimeouts();
+            // Fallback to text-only API
+            try {
+              // Create a new timeout for the fallback
+              const fallbackTimeout = createTimeoutPromise(25000, 'Request timeout');
+              baseAnswer = await Promise.race([
+                deduplicateRequest(cacheKey, () => getChatCompletion(questionToProcess, systemMessage)),
+                fallbackTimeout.promise
+              ]) as string;
+              // Cancel timeout since request completed successfully
+              fallbackTimeout.cancel();
+            } catch (error) {
+              // Cancel timeout on error too
+              throw error;
+            }
+          }
+        } else {
+          // No image, use text-only API
+          try {
+            const raceResult = await Promise.race([
+              deduplicateRequest(cacheKey, () => getChatCompletion(questionToProcess, systemMessage)),
+              timeoutPromise
+            ]);
+            // Cancel timeout IMMEDIATELY after race completes (synchronously)
+            timeoutWrapper.cancel();
+            baseAnswer = raceResult as string;
+          } catch (error) {
+            // Cancel timeout on error too (synchronously)
+            timeoutWrapper.cancel();
+            throw error;
+          }
+        }
 
         if (!baseAnswer) {
           throw new Error('Failed to generate response');
         }
 
         try {
-          return await fetchAndCombineGameData(question, baseAnswer);
+          return await fetchAndCombineGameData(questionToProcess, baseAnswer);
         } catch (dataError) {
           console.error('Error fetching additional data:', dataError);
           return baseAnswer;
@@ -1292,10 +1631,13 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
         try {
           await session.withTransaction(async () => {
             // Create question with proper username handling
+            // Include imageUrl if provided (use imageUrl from cloud storage, fallback to imageFilePath)
+            const questionImageUrl = imageUrl || (imageFilePath ? `/uploads/question-images/${path.basename(imageFilePath)}` : undefined);
             const questionData = { 
               username: username || 'anonymous', 
               question, 
-              response: answer 
+              response: answer,
+              imageUrl: questionImageUrl // Save image URL with the question
             };
             const questionDoc = await Question.create([questionData], { session });
 

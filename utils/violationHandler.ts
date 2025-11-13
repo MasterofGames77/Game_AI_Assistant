@@ -76,6 +76,24 @@ export const handleContentViolation = async (username: string, offendingWords: s
 };
 
 /**
+ * Handle image content violation (similar to text violations)
+ * @param username - The user's username
+ * @param violationType - Type of image violation (e.g., 'explicit_content', 'violent_content')
+ * @param userEmail - Optional user email for permanent ban handling
+ * @returns Violation result with action and count
+ */
+export const handleImageViolation = async (
+  username: string, 
+  violationType: string,
+  userEmail?: string
+) => {
+  // Use the same violation system as text content
+  // Format violation type as "offending words" for consistency
+  const offendingWords = [`[Image: ${violationType}]`];
+  return await handleContentViolation(username, offendingWords, userEmail);
+};
+
+/**
  * Check if a user is currently banned
  * @param username - The user's username to check
  * @returns Object with ban status information
