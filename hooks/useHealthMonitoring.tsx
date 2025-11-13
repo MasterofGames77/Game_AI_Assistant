@@ -421,6 +421,16 @@ const useHealthMonitoring = ({
       ) {
         showHealthTips(data.independentHealthTips);
       }
+
+      // If break reminders are disabled, ensure isMonitoring is false
+      if (!isEnabled) {
+        setHealthStatus((prev) => {
+          if (prev.isMonitoring) {
+            return { ...prev, isMonitoring: false };
+          }
+          return prev;
+        });
+      }
     } catch (error) {
       console.error("Error checking health status:", error);
     }
@@ -661,7 +671,35 @@ const useHealthMonitoring = ({
   // Update ref when isEnabled changes
   useEffect(() => {
     isEnabledRef.current = isEnabled;
-  }, [isEnabled]);
+
+    // If break reminders are disabled, clear state and localStorage
+    if (!isEnabled && username) {
+      // Clear localStorage
+      try {
+        const key = `vgw_health_remaining_${username}`;
+        localStorage.removeItem(key);
+      } catch (e) {
+        // Ignore localStorage errors
+      }
+
+      // Clear override refs
+      remainingSecondsOverrideRef.current = null;
+      lastTickAtRef.current = null;
+
+      // Clear timer interval if running
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+
+      // Set isMonitoring to false
+      setHealthStatus((prev) => ({
+        ...prev,
+        isMonitoring: false,
+        shouldShowBreak: false,
+      }));
+    }
+  }, [isEnabled, username]);
 
   // Start monitoring when username is available
   // Note: We still check for health tips even when break reminders are disabled
@@ -701,28 +739,41 @@ const useHealthMonitoring = ({
     }
 
     // Restore remaining time override from previous close, if present
-    try {
-      const key = `vgw_health_remaining_${username}`;
-      const stored = localStorage.getItem(key);
-      if (stored) {
-        const remainingSec = Math.max(0, parseInt(stored, 10));
-        if (!Number.isNaN(remainingSec) && remainingSec > 0) {
-          remainingSecondsOverrideRef.current = remainingSec;
-          lastTickAtRef.current = Date.now();
-          console.log(
-            "Restored remaining time from localStorage:",
-            remainingSec,
-            "seconds"
-          );
+    // ONLY restore if break reminders are enabled
+    if (isEnabled) {
+      try {
+        const key = `vgw_health_remaining_${username}`;
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          const remainingSec = Math.max(0, parseInt(stored, 10));
+          if (!Number.isNaN(remainingSec) && remainingSec > 0) {
+            remainingSecondsOverrideRef.current = remainingSec;
+            lastTickAtRef.current = Date.now();
+            console.log(
+              "Restored remaining time from localStorage:",
+              remainingSec,
+              "seconds"
+            );
+          }
         }
-      }
-    } catch (e) {}
+      } catch (e) {}
+    } else {
+      // Clear any stored remaining time if break reminders are disabled
+      try {
+        const key = `vgw_health_remaining_${username}`;
+        localStorage.removeItem(key);
+      } catch (e) {}
+      // Clear the override ref
+      remainingSecondsOverrideRef.current = null;
+      lastTickAtRef.current = null;
+    }
 
     // Start a new session (only informs server; our override governs countdown if present)
     startSession();
 
-    // Start monitoring
-    setHealthStatus((prev) => ({ ...prev, isMonitoring: true }));
+    // Start monitoring - only set isMonitoring to true if break reminders are enabled
+    // Health tips can still work via checkHealthStatus, but the widget won't show
+    setHealthStatus((prev) => ({ ...prev, isMonitoring: isEnabled }));
 
     // Start API polling interval (every minute) - always runs to check for health tips
     intervalRef.current = setInterval(() => {
@@ -738,12 +789,14 @@ const useHealthMonitoring = ({
 
     // If we restored a remaining time override, update the timer IMMEDIATELY
     // before checkHealthStatus runs, so the state is correct when checkHealthStatus preserves it
-    if (remainingSecondsOverrideRef.current !== null) {
+    // ONLY if break reminders are enabled
+    if (isEnabled && remainingSecondsOverrideRef.current !== null) {
       updateTimerLocally();
     }
 
     // Check immediately on first load (but only after we've set the override state if it exists)
     // Delay checkHealthStatus slightly if we have an override to ensure updateTimerLocally runs first
+    // Note: checkHealthStatus still runs even when break reminders are disabled (for health tips)
     if (remainingSecondsOverrideRef.current !== null) {
       // Use setTimeout to ensure updateTimerLocally state update has been applied
       setTimeout(() => {

@@ -7,6 +7,7 @@ import { moderateImage } from '../../utils/imageModeration';
 import { handleImageViolation } from '../../utils/violationHandler';
 import { checkUserBanStatus } from '../../utils/violationHandler';
 import { getImageStorage } from '../../utils/imageStorage';
+import { checkImageUploadRateLimit, recordImageUpload } from '../../utils/imageUploadRateLimit';
 
 // Helper function to safely delete files on Windows (handles EBUSY errors)
 const safeUnlink = async (filePath: string, maxRetries: number = 3, delay: number = 100): Promise<void> => {
@@ -52,18 +53,28 @@ if (!fs.existsSync(tempUploadDir)) {
 
 // Allowed image MIME types
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_DIMENSION = 2048; // Max width or height in pixels
 
 // Validate file type by checking magic numbers (more secure than extension)
 const validateImageFile = async (filePath: string): Promise<boolean> => {
   try {
     const buffer = fs.readFileSync(filePath);
+    
     // Check magic numbers for common image formats
+    // JPEG: FF D8
     const isJPEG = buffer[0] === 0xFF && buffer[1] === 0xD8;
+    
+    // PNG: 89 50 4E 47
     const isPNG = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
-    const isGIF = buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46;
-    const isWEBP = buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50;
+    
+    // GIF: 47 49 46 38 (GIF8)
+    const isGIF = buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38;
+    
+    // WEBP: RIFF header (52 49 46 46) at position 0, then WEBP (57 45 42 50) at position 8
+    const isWEBP = buffer.length >= 12 &&
+      buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 && // RIFF
+      buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50; // WEBP
     
     return isJPEG || isPNG || isGIF || isWEBP;
   } catch (error) {
@@ -106,6 +117,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (!username || typeof username !== 'string') {
       return res.status(400).json({ error: 'Username is required' });
+    }
+
+    // Check rate limiting per user before processing files
+    const rateLimitCheck = await checkImageUploadRateLimit(username);
+    if (!rateLimitCheck.allowed) {
+      // Clean up any uploaded files before returning error
+      if (uploadedFiles && uploadedFiles.length > 0) {
+        for (const file of uploadedFiles) {
+          if (file) {
+            await safeUnlink(file.filepath);
+          }
+        }
+      }
+      return res.status(429).json({
+        error: 'Upload rate limit exceeded',
+        message: rateLimitCheck.reason,
+        resetTime: rateLimitCheck.resetTime,
+        uploadsUsed: rateLimitCheck.uploadsUsed,
+        uploadsLimit: rateLimitCheck.uploadsLimit,
+      });
     }
 
     // Check if user is banned before processing
@@ -288,6 +319,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           error: `Error processing image ${file.originalFilename}: ${error instanceof Error ? error.message : 'Unknown error'}` 
         });
       }
+    }
+
+    // Record successful uploads for rate limiting
+    // Count each image as one upload
+    for (let i = 0; i < processedImages.length; i++) {
+      await recordImageUpload(username);
     }
 
     return res.status(200).json({ 

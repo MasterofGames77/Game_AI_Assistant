@@ -22,9 +22,8 @@ const HealthTipsWidget: React.FC<HealthTipsWidgetProps> = ({
         <div className="flex items-center">
           <span className="text-2xl mr-2">💡</span>
           <div>
-            <p className="text-sm font-bold text-[#00ffff]">Health Tips</p>
-            <p className="text-xs text-gray-300">
-              Quick tips for healthy gaming
+            <p className="text-sm font-bold text-[#00ffff]">
+              Quick Tips for Healthy Gaming
             </p>
           </div>
         </div>

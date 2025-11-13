@@ -710,3 +710,10 @@ export interface ModerationResult {
   safeSearch: SafeSearchResult;
   confidence: 'high' | 'medium' | 'low';
 }
+
+export interface ImageUploadRateLimit {
+  username: string;
+  uploadCount: number;
+  windowStartTime: Date;
+  lastUploadTime: Date;
+}
