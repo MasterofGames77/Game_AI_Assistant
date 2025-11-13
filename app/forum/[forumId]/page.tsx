@@ -6,6 +6,8 @@ import { ForumProvider } from "../../../context/ForumContext";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import PrivateForumUserManagement from "../../../components/PrivateForumUserManagement";
+import toast from "react-hot-toast";
+import Image from "next/image";
 
 export default function ForumPageWrapper({
   params,
@@ -34,6 +36,10 @@ function ForumPage({ params }: { params: { forumId: string } }) {
   const [error, setError] = useState("");
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editMessage, setEditMessage] = useState("");
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [postToDelete, setPostToDelete] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -54,13 +60,73 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     fetchForum();
   }, [params.forumId, setCurrentForum]);
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+
+    // Limit to 5 images
+    if (files.length + selectedImages.length > 5) {
+      setError("Maximum 5 images allowed per post");
+      return;
+    }
+
+    // Validate file types and sizes
+    const validFiles: File[] = [];
+    const previews: string[] = [];
+
+    files.forEach((file) => {
+      // Check file type
+      if (!file.type.startsWith("image/")) {
+        setError(`${file.name} is not a valid image file`);
+        return;
+      }
+
+      // Check file size (10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        setError(`${file.name} exceeds 10MB size limit`);
+        return;
+      }
+
+      validFiles.push(file);
+      previews.push(URL.createObjectURL(file));
+    });
+
+    setSelectedImages([...selectedImages, ...validFiles]);
+    setImagePreviews([...imagePreviews, ...previews]);
+  };
+
+  const removeImage = (index: number) => {
+    // Revoke object URL to free memory
+    URL.revokeObjectURL(imagePreviews[index]);
+
+    setSelectedImages(selectedImages.filter((_, i) => i !== index));
+    setImagePreviews(imagePreviews.filter((_, i) => i !== index));
+  };
+
   const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim()) return;
+    if (!message.trim() && selectedImages.length === 0) {
+      setError("Please enter a message or attach an image");
+      return;
+    }
 
     try {
-      await addPost(params.forumId, message);
+      await addPost(
+        params.forumId,
+        message,
+        selectedImages.length > 0 ? selectedImages : undefined
+      );
       setMessage("");
+      setSelectedImages([]);
+      // Clean up preview URLs
+      imagePreviews.forEach((url) => URL.revokeObjectURL(url));
+      setImagePreviews([]);
+
+      // Reset file input
+      const fileInput = document.getElementById(
+        "image-upload"
+      ) as HTMLInputElement;
+      if (fileInput) fileInput.value = "";
+
       // Fetch updated forum data
       const username = localStorage.getItem("username") || "test-user";
       const response = await axios.get(
@@ -68,7 +134,96 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       );
       setCurrentForum(response.data);
     } catch (err: any) {
-      setError(err.message || "Failed to add post");
+      // Handle image moderation errors with violation tracking
+      if (err.response?.status === 400 || err.response?.status === 403) {
+        const errorData = err.response?.data;
+
+        // Check if this is a content violation (warning/ban)
+        if (errorData?.isContentViolation || errorData?.violationResult) {
+          const violationResult = errorData.violationResult;
+
+          if (violationResult?.action === "banned") {
+            const message =
+              errorData.message ||
+              "Your account has been suspended due to content violations.";
+            setError(message);
+            toast.error(message, {
+              duration: 8000,
+              style: {
+                background: "#fee2e2",
+                color: "#991b1b",
+                border: "1px solid #fca5a5",
+              },
+            });
+          } else if (violationResult?.action === "permanent_ban") {
+            const message =
+              errorData.message ||
+              "Your account has been permanently suspended.";
+            setError(message);
+            toast.error(message, {
+              duration: 8000,
+              style: {
+                background: "#fee2e2",
+                color: "#991b1b",
+                border: "1px solid #fca5a5",
+              },
+            });
+          } else {
+            // Warning - show violation message
+            const message =
+              errorData.message ||
+              `Your image contains inappropriate content. Warning (${
+                violationResult?.count || 1
+              }/3).`;
+            const details =
+              errorData.details ||
+              "The image contains content that violates our community guidelines";
+            setError(message);
+            toast.error(`${message} ${details}`, {
+              duration: 6000,
+              style: {
+                background: "#fee2e2",
+                color: "#991b1b",
+                border: "1px solid #fca5a5",
+              },
+            });
+          }
+        } else if (
+          errorData?.error === "Image contains inappropriate content"
+        ) {
+          // Image rejected but no violation (shouldn't happen, but handle gracefully)
+          const details =
+            errorData.details ||
+            "The image contains content that violates our community guidelines";
+          setError(`Image Rejected: ${details}`);
+          toast.error(
+            `Image Rejected: ${details}. Please choose a different image.`,
+            {
+              duration: 6000,
+              style: {
+                background: "#fee2e2",
+                color: "#991b1b",
+                border: "1px solid #fca5a5",
+              },
+            }
+          );
+        } else {
+          // Other errors
+          const errorMessage =
+            errorData?.error ||
+            errorData?.message ||
+            err.message ||
+            "Failed to add post";
+          setError(errorMessage);
+          toast.error(errorMessage);
+        }
+      } else {
+        // For other errors, show in error state
+        const errorMessage =
+          err.response?.data?.error || err.message || "Failed to add post";
+        setError(errorMessage);
+        toast.error(errorMessage);
+      }
     }
   };
 
@@ -103,11 +258,18 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     setEditMessage("");
   };
 
-  const handleDeletePost = async (postId: string) => {
-    if (!confirm("Are you sure you want to delete this post?")) return;
+  const handleDeletePost = (postId: string) => {
+    setPostToDelete(postId);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeletePost = async () => {
+    if (!postToDelete) return;
 
     try {
-      await deletePost(params.forumId, postId);
+      await deletePost(params.forumId, postToDelete);
+      setShowDeleteConfirm(false);
+      setPostToDelete(null);
       // Fetch updated forum data
       const username = localStorage.getItem("username") || "test-user";
       const response = await axios.get(
@@ -115,8 +277,17 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       );
       setCurrentForum(response.data);
     } catch (err: any) {
-      setError(err.message || "Failed to delete post");
+      setError(
+        err.response?.data?.error || err.message || "Failed to delete post"
+      );
+      setShowDeleteConfirm(false);
+      setPostToDelete(null);
     }
+  };
+
+  const cancelDeletePost = () => {
+    setShowDeleteConfirm(false);
+    setPostToDelete(null);
   };
 
   const handleLikePost = async (postId: string) => {
@@ -147,6 +318,35 @@ function ForumPage({ params }: { params: { forumId: string } }) {
 
   return (
     <div className="max-w-4xl mx-auto p-4">
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-gray-100">
+              Delete Post
+            </h3>
+            <p className="text-gray-700 dark:text-gray-300 mb-6">
+              Are you sure you want to delete this post? This action cannot be
+              undone.
+            </p>
+            <div className="flex space-x-4 justify-end">
+              <button
+                onClick={cancelDeletePost}
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeletePost}
+                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <button
         onClick={() => router.push("/")}
         className="mb-4 px-4 py-2 rounded font-semibold transition
@@ -196,10 +396,81 @@ function ForumPage({ params }: { params: { forumId: string } }) {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="What's new..?"
-            className="w-full p-2 border border-gray-300 rounded"
+            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
             rows={4}
-            required
           />
+
+          {/* Image Upload Section */}
+          <div className="space-y-2">
+            <label
+              htmlFor="image-upload"
+              className="cursor-pointer inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 mr-2"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+              Attach Images (max 5)
+            </label>
+            <input
+              id="image-upload"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+
+            {/* Image Previews */}
+            {imagePreviews.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                {imagePreviews.map((preview, index) => (
+                  <div key={index} className="relative group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={preview}
+                      alt={`Preview ${index + 1}`}
+                      className="w-full h-32 object-cover rounded border border-gray-300 dark:border-gray-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      aria-label="Remove image"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {error && <div className="text-red-500 text-sm">{error}</div>}
+
           <button
             type="submit"
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -257,9 +528,38 @@ function ForumPage({ params }: { params: { forumId: string } }) {
                     </div>
                   </div>
                 ) : (
-                  <p className="whitespace-pre-wrap text-gray-900 dark:text-gray-100">
-                    {post.message}
-                  </p>
+                  <>
+                    <p className="whitespace-pre-wrap text-gray-900 dark:text-gray-100">
+                      {post.message}
+                    </p>
+                    {/* Display attached images */}
+                    {(post.metadata as any).attachments &&
+                      (post.metadata as any).attachments.length > 0 && (
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {(post.metadata as any).attachments.map(
+                            (attachment: any, idx: number) =>
+                              attachment.type === "image" && (
+                                <div key={idx} className="relative">
+                                  <Image
+                                    src={attachment.url}
+                                    alt={attachment.name || `Image ${idx + 1}`}
+                                    width={800}
+                                    height={600}
+                                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer hover:opacity-90 transition-opacity"
+                                    onClick={() =>
+                                      window.open(attachment.url, "_blank")
+                                    }
+                                    unoptimized={attachment.url.startsWith(
+                                      "http"
+                                    )}
+                                    style={{ width: "100%", height: "auto" }}
+                                  />
+                                </div>
+                              )
+                          )}
+                        </div>
+                      )}
+                  </>
                 )}
                 {editingPostId !== post._id && (
                   <div className="mt-2 flex items-center space-x-4">

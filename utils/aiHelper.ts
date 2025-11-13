@@ -92,8 +92,11 @@ export async function fetchFromIGDB(gameTitle: string): Promise<string | null> {
   try {
     const accessToken = await getClientCredentialsAccessToken();
     
+    // Limit game title to 255 characters (IGDB API limit)
+    const limitedTitle = gameTitle.length > 255 ? gameTitle.substring(0, 252) + '...' : gameTitle;
+    
     // Escape special characters and quotes in the game title
-    const sanitizedTitle = gameTitle.replace(/"/g, '\\"');
+    const sanitizedTitle = limitedTitle.replace(/"/g, '\\"');
 
     const response = await axios.post(
       'https://api.igdb.com/v4/games',
@@ -209,6 +212,343 @@ async function fetchSeriesFromRAWG(seriesTitle: string): Promise<any[] | null> {
   }
 }
 
+/**
+ * Extract game title from question text and/or image analysis data
+ * Combines question parsing with image text/labels to find game title
+ * Can identify games from screenshots even when not mentioned in question
+ */
+export async function extractGameTitleFromImageContext(
+  question: string,
+  imageLabels?: string[],
+  imageText?: string
+): Promise<string | undefined> {
+  // First, try to extract from question (most reliable)
+  const questionGameTitle = await extractGameTitleFromQuestion(question);
+  if (questionGameTitle) {
+    return questionGameTitle;
+  }
+
+  // If no game title in question, try to identify from image
+  // Use AI to identify game from visual description
+  if (imageLabels && imageLabels.length > 0 || imageText) {
+    // Build a description of the image for game identification
+    const imageDescription: string[] = [];
+    
+    if (imageLabels && imageLabels.length > 0) {
+      imageDescription.push(`Visual elements detected: ${imageLabels.slice(0, 10).join(', ')}`);
+    }
+    
+    if (imageText) {
+      imageDescription.push(`Text in image: ${imageText.substring(0, 200)}`);
+    }
+    
+    // Create a prompt to identify the game from the image
+    const identificationPrompt = `Based on the following screenshot analysis, identify which video game this screenshot is from. 
+    
+${imageDescription.join('\n')}
+
+Provide only the game title. If you cannot identify it with confidence, respond with "UNKNOWN".`;
+
+    try {
+      // Use OpenAI to identify the game from the image description
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert at identifying video games from screenshots. Analyze visual elements, UI styles, character designs, art styles, and any text to determine the game title. Respond with only the game title, or "UNKNOWN" if uncertain.'
+          },
+          {
+            role: 'user',
+            content: identificationPrompt
+          }
+        ],
+        max_completion_tokens: 100,
+        temperature: 0.3, // Lower temperature for more consistent identification
+      });
+
+      const identifiedGame = completion.choices[0].message.content?.trim();
+      
+      if (identifiedGame && 
+          identifiedGame !== 'UNKNOWN' && 
+          !identifiedGame.toLowerCase().includes('cannot') &&
+          !identifiedGame.toLowerCase().includes('unable')) {
+        
+        // Validate the identified game against IGDB/RAWG
+        const validated = await extractGameTitleFromQuestion(identifiedGame);
+        if (validated) {
+          console.log(`Game identified from image: ${validated} (original: ${identifiedGame})`);
+          return validated;
+        }
+      }
+    } catch (error) {
+      console.error('Error identifying game from image:', error);
+      // Fall through to text-based extraction
+    }
+  }
+
+  // Fallback: Try to extract from image text directly
+  if (imageText) {
+    // Look for game title patterns in image text
+    // Common patterns: "SONIC UNLEASHED", "Level: Eggmanland", etc.
+    const gameTitlePatterns = [
+      /(?:game|title|from|in)\s*:?\s*([A-Z][A-Za-z0-9\s&:'-]+?)(?:\s|$|,|\.)/i,
+      /([A-Z][A-Za-z0-9\s&:'-]{3,30})\s*(?:level|stage|chapter|area|boss)/i,
+    ];
+
+    for (const pattern of gameTitlePatterns) {
+      const match = imageText.match(pattern);
+      if (match && match[1]) {
+        const candidate = match[1].trim();
+        // Skip if it's clearly not a game title
+        if (candidate.length < 3 || 
+            candidate.length > 50 ||
+            candidate.toLowerCase().match(/^(level|stage|chapter|area|boss|item|character|time|score|rings|energy|speed)/i)) {
+          continue;
+        }
+        
+        // Validate against IGDB/RAWG
+        const validated = await extractGameTitleFromQuestion(candidate);
+        if (validated) {
+          return validated;
+        }
+      }
+    }
+    
+    // Also try to find capitalized phrases that might be game titles
+    const capitalizedPhrases = imageText.match(/\b([A-Z][A-Za-z0-9\s&:'-]{2,40})\b/g);
+    if (capitalizedPhrases) {
+      for (const phrase of capitalizedPhrases) {
+        const candidate = phrase.trim();
+        // Skip if it's clearly not a game title
+        if (candidate.length < 3 || 
+            candidate.length > 50 ||
+            candidate.toLowerCase().match(/^(level|stage|chapter|area|boss|item|character|time|score|rings|energy|speed|the|a|an|and|or|but|in|on|at|to|for|of|with|from)/i)) {
+          continue;
+        }
+        
+        // Validate against IGDB/RAWG
+        const validated = await extractGameTitleFromQuestion(candidate);
+        if (validated) {
+          return validated;
+        }
+      }
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Fetch game levels/items from IGDB using game ID
+ * Note: IGDB doesn't have a direct "levels" endpoint, but we can search for game guides/walkthroughs
+ * For now, we'll use the game's name and let the AI correlate with image context
+ */
+export async function fetchGameLevelsFromIGDB(gameTitle: string): Promise<string | null> {
+  try {
+    const accessToken = await getClientCredentialsAccessToken();
+    
+    // Limit game title to 255 characters (IGDB API limit)
+    const limitedTitle = gameTitle.length > 255 ? gameTitle.substring(0, 252) + '...' : gameTitle;
+    
+    // Escape special characters and quotes in the game title
+    const sanitizedTitle = limitedTitle.replace(/"/g, '\\"');
+
+    // Search for the game first to get its ID
+    const gameResponse = await axios.post(
+      'https://api.igdb.com/v4/games',
+      `search "${sanitizedTitle}";
+       fields name,id,summary;
+       limit 1;`,
+      {
+        headers: {
+          'Client-ID': process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID!,
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/json'
+        }
+      }
+    );
+
+    if (gameResponse.data && gameResponse.data.length > 0) {
+      const game = gameResponse.data[0];
+      // Return game info that can help identify levels
+      return `Game: ${game.name}. ${game.summary ? `Summary: ${game.summary.substring(0, 200)}...` : ''}`;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error fetching game levels from IGDB:", error);
+    return null;
+  }
+}
+
+/**
+ * Fetch game information from RAWG including level/item data
+ * RAWG has game details that can help identify levels
+ */
+export async function fetchGameDetailsFromRAWG(gameTitle: string): Promise<string | null> {
+  try {
+    const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&search=${encodeURIComponent(gameTitle)}&search_precise=true`;
+    const response = await axios.get(url);
+
+    if (response.data && response.data.results.length > 0) {
+      const game = response.data.results[0];
+      
+      // Get detailed game info
+      const detailUrl = `https://api.rawg.io/api/games/${game.id}?key=${process.env.RAWG_API_KEY}`;
+      const detailResponse = await axios.get(detailUrl);
+      const gameDetails = detailResponse.data;
+
+      let info = `Game: ${gameDetails.name}`;
+      if (gameDetails.description_raw) {
+        // Include more of the description as it may contain level information
+        info += `\nDescription: ${gameDetails.description_raw.substring(0, 500)}...`;
+      }
+      if (gameDetails.released) {
+        info += `\nReleased: ${gameDetails.released}`;
+      }
+      if (gameDetails.platforms && gameDetails.platforms.length > 0) {
+        info += `\nPlatforms: ${gameDetails.platforms.map((p: any) => p.platform.name).join(', ')}`;
+      }
+      // Include genres and tags which might help identify level themes
+      if (gameDetails.genres && gameDetails.genres.length > 0) {
+        info += `\nGenres: ${gameDetails.genres.map((g: any) => g.name).join(', ')}`;
+      }
+      if (gameDetails.tags && gameDetails.tags.length > 0) {
+        const relevantTags = gameDetails.tags
+          .filter((t: any) => t.language === 'eng')
+          .slice(0, 5)
+          .map((t: any) => t.name);
+        if (relevantTags.length > 0) {
+          info += `\nTags: ${relevantTags.join(', ')}`;
+        }
+      }
+
+      return info;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error fetching game details from RAWG:", error);
+    return null;
+  }
+}
+
+/**
+ * Match image context to specific levels/items using game data and AI
+ * This function enhances the question with game-specific context
+ */
+export async function enhanceQuestionWithGameContext(
+  question: string,
+  gameTitle: string | undefined,
+  imageLabels?: string[],
+  imageText?: string
+): Promise<string> {
+  if (!gameTitle) {
+    // No game title, return original question with image context
+    const imageContext: string[] = [];
+    if (imageLabels && imageLabels.length > 0) {
+      imageContext.push(`Visual elements: ${imageLabels.slice(0, 5).join(', ')}`);
+    }
+    if (imageText) {
+      imageContext.push(`Text in image: ${imageText.substring(0, 200)}${imageText.length > 200 ? '...' : ''}`);
+    }
+    return imageContext.length > 0 
+      ? `${question}\n\n[Image context: ${imageContext.join('. ')}]`
+      : question;
+  }
+
+  // Fetch game data from IGDB and RAWG
+  const [igdbData, rawgData] = await Promise.allSettled([
+    fetchGameLevelsFromIGDB(gameTitle),
+    fetchGameDetailsFromRAWG(gameTitle)
+  ]);
+
+  const igdbInfo = igdbData.status === 'fulfilled' ? igdbData.value : null;
+  const rawgInfo = rawgData.status === 'fulfilled' ? rawgData.value : null;
+
+  // Build enhanced context with specific instructions for level/item identification
+  const contextParts: string[] = [];
+  
+  // Add instruction for level/item identification
+  const isLevelQuestion = question.toLowerCase().includes('level') || 
+                         question.toLowerCase().includes('stage') ||
+                         question.toLowerCase().includes('area') ||
+                         question.toLowerCase().includes('chapter');
+  const isItemQuestion = question.toLowerCase().includes('item') ||
+                        question.toLowerCase().includes('weapon') ||
+                        question.toLowerCase().includes('equipment');
+  const isGameQuestion = question.toLowerCase().includes('what game') ||
+                        question.toLowerCase().includes('which game') ||
+                        question.toLowerCase().includes('what is this from');
+  
+  if (isLevelQuestion) {
+    contextParts.push(`IMPORTANT: The user is asking about a specific level/stage. Use the image analysis and game information below to identify the exact level name shown in the image.`);
+  } else if (isItemQuestion) {
+    contextParts.push(`IMPORTANT: The user is asking about a specific item. Use the image analysis and game information below to identify the exact item shown in the image.`);
+  } else if (isGameQuestion || !question.toLowerCase().includes(gameTitle.toLowerCase())) {
+    contextParts.push(`IMPORTANT: The user wants to identify the game from the screenshot. Use the visual elements, UI styles, character designs, and text to determine the game title.`);
+  }
+  
+  contextParts.push(`Game: ${gameTitle}`);
+  
+  if (imageLabels && imageLabels.length > 0) {
+    // Include more labels for better visual context (up to 15 for detailed analysis)
+    const relevantLabels = imageLabels.slice(0, 15);
+    contextParts.push(`Image visual analysis (detailed): ${relevantLabels.join(', ')}`);
+    // Also provide a summary of key visual elements
+    const keyElements = imageLabels.filter(label => 
+      !label.toLowerCase().includes('game') && 
+      !label.toLowerCase().includes('software') &&
+      !label.toLowerCase().includes('technology')
+    ).slice(0, 10);
+    if (keyElements.length > 0) {
+      contextParts.push(`Key visual elements: ${keyElements.join(', ')}`);
+    }
+  }
+  
+  if (imageText) {
+    const textPreview = imageText.substring(0, 400);
+    contextParts.push(`Text extracted from image: "${textPreview}${imageText.length > 400 ? '...' : ''}"`);
+    // Also extract any potential level names or identifiers from the text
+    const levelNamePatterns = [
+      /(?:level|stage|area|act|chapter)[\s:]+([A-Z][A-Za-z0-9\s&:'-]+)/i,
+      /([A-Z][A-Za-z0-9\s&:'-]{3,30})(?:\s+(?:act|part|chapter|level|stage))/i,
+    ];
+    for (const pattern of levelNamePatterns) {
+      const match = imageText.match(pattern);
+      if (match && match[1]) {
+        const potentialLevelName = match[1].trim();
+        if (potentialLevelName.length > 2 && potentialLevelName.length < 50) {
+          contextParts.push(`Potential level identifier found in text: "${potentialLevelName}"`);
+        }
+      }
+    }
+  }
+
+  if (igdbInfo) {
+    contextParts.push(`Game information (IGDB): ${igdbInfo}`);
+  }
+
+  if (rawgInfo) {
+    contextParts.push(`Game details (RAWG): ${rawgInfo}`);
+  }
+
+  // Add specific instruction for level identification
+  if (isLevelQuestion) {
+    contextParts.push(`CRITICAL: Identify the exact level name by analyzing the specific visual features shown in the image. Do not make generic guesses based on UI elements alone. Focus on:
+- Specific environment details (futuristic city vs desert vs ruins vs ice, etc.)
+- Distinctive landmarks or structures visible in the image
+- Unique color palettes and lighting
+- Architecture style and setting
+- Any text that might indicate the level name
+- Character appearances and their context
+Compare these specific visual details against your knowledge of the game's levels. Be precise and base your answer on the actual visual content, not general patterns.`);
+  }
+
+  return `${question}\n\n[Context for identification: ${contextParts.join('. ')}]`;
+}
+
 // Extract series name from question
 function extractSeriesName(question: string): string | null {
   const seriesPattern = /list all of the games in the (.+?) series/i;
@@ -220,6 +560,67 @@ function extractSeriesName(question: string): string | null {
 function filterGameSeries(games: any[], seriesPrefix: string): any[] {
   return games.filter((game) => game.name.toLowerCase().startsWith(seriesPrefix.toLowerCase()));
 }
+
+/**
+ * Get chat completion with vision support (like ChatGPT)
+ * Can accept images directly for multimodal analysis
+ */
+export const getChatCompletionWithVision = async (
+  question: string,
+  imageUrl?: string,
+  imageBase64?: string,
+  systemMessage?: string
+): Promise<string | null> => {
+  try {
+    const messages: any[] = [
+      {
+        role: 'system',
+        content: systemMessage || 'You are an expert video game assistant specializing in identifying games, levels, stages, items, and locations from screenshots. Analyze images carefully and provide detailed, accurate information.'
+      },
+      {
+        role: 'user',
+        content: []
+      }
+    ];
+
+    // Add image if provided
+    if (imageUrl || imageBase64) {
+      const imageContent: any = {
+        type: 'image_url',
+        image_url: {}
+      };
+
+      if (imageUrl) {
+        imageContent.image_url.url = imageUrl;
+      } else if (imageBase64) {
+        // Format: data:image/jpeg;base64,{base64_string}
+        imageContent.image_url.url = imageBase64.startsWith('data:') 
+          ? imageBase64 
+          : `data:image/jpeg;base64,${imageBase64}`;
+      }
+
+      messages[1].content.push(imageContent);
+    }
+
+    // Add text question
+    messages[1].content.push({
+      type: 'text',
+      text: question
+    });
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: messages as any,
+      max_completion_tokens: 1000,
+      temperature: 0.7,
+    });
+
+    return completion.choices[0].message.content;
+  } catch (error) {
+    console.error('Error in getChatCompletionWithVision:', error);
+    return null;
+  }
+};
 
 // Get chat completion for user questions
 export const getChatCompletion = async (question: string, systemMessage?: string): Promise<string | null> => {
@@ -257,9 +658,18 @@ export const getChatCompletion = async (question: string, systemMessage?: string
       }
     }
 
-    let response = await fetchFromIGDB(question);
+    // Extract game title from question before calling APIs (to avoid sending full enhanced context)
+    const extractedGameTitle = await extractGameTitleFromQuestion(question);
+    const searchQuery = extractedGameTitle || question;
+    
+    // Limit search query to 255 characters (IGDB limit) and extract just the game title part
+    const limitedQuery = searchQuery.length > 255 
+      ? (extractedGameTitle || searchQuery.substring(0, 252) + '...')
+      : searchQuery;
+    
+    let response = await fetchFromIGDB(limitedQuery);
     if (!response) {
-      response = await fetchFromRAWG(question);
+      response = await fetchFromRAWG(limitedQuery);
     }
 
     // If no response from APIs, fall back to OpenAI completion
@@ -273,7 +683,7 @@ export const getChatCompletion = async (question: string, systemMessage?: string
           },
           { role: 'user', content: question }
         ],
-        max_tokens: 800,
+        max_completion_tokens: 800,
       });
 
       response = completion.choices[0].message.content;
@@ -1159,7 +1569,7 @@ function isAPIResultRelevantToQuestion(apiResult: string, question: string, cand
  * Extract game title from question text using IGDB and RAWG APIs for verification
  * This eliminates the need for hardcoded game title lists
  */
-async function extractGameTitleFromQuestion(question: string): Promise<string | undefined> {
+export async function extractGameTitleFromQuestion(question: string): Promise<string | undefined> {
   if (!question || question.length < 3) {
     // console.log('[Game Title] Question too short');
     return undefined;

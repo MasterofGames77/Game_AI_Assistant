@@ -21,6 +21,7 @@ export interface Conversation {
   question: string;
   response: string;
   timestamp: Date;
+  imageUrl?: string; // Optional image URL for questions with screenshots
 }
 
 export interface SideBarProps {
@@ -114,6 +115,11 @@ export interface ForumPost {
     editedBy?: string;
     likes?: number;
     likedBy?: string[];
+    attachments?: Array<{
+      type: 'image' | 'link' | 'file';
+      url: string;
+      name: string;
+    }>;
   };
 }
 
@@ -141,7 +147,7 @@ export interface ForumContextType {
   fetchForums: (page: number, limit: number) => Promise<Forum[]>;
   createForum: (forumData: Partial<Forum>) => Promise<Forum | null>;
   deleteForum: (forumId: string) => Promise<void>;
-  addPost: (forumId: string, message: string) => Promise<void>;
+  addPost: (forumId: string, message: string, imageFiles?: File[]) => Promise<void>;
   editPost: (forumId: string, postId: string, message: string) => Promise<void>;
   deletePost: (forumId: string, postId: string) => Promise<void>;
   likePost: (forumId: string, postId: string) => Promise<void>;
@@ -686,4 +692,21 @@ export interface FeedbackStatsProps {
 export interface HealthTipsWidgetProps {
   tips: string[];
   onDismiss: () => void;
+}
+
+// Image Moderation:
+export interface SafeSearchResult {
+  adult: string;
+  violence: string;
+  racy: string;
+  medical: string;
+  spoof: string;
+}
+
+export interface ModerationResult {
+  isApproved: boolean;
+  isInappropriate: boolean;
+  reasons: string[];
+  safeSearch: SafeSearchResult;
+  confidence: 'high' | 'medium' | 'low';
 }

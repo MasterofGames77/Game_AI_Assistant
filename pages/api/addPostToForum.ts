@@ -70,6 +70,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ error: 'Forum is not active' });
     }
 
+    // Validate attachments if provided
+    const attachments = req.body.attachments || [];
+    if (attachments.length > 5) {
+      return res.status(400).json({ error: 'Maximum 5 images per post allowed' });
+    }
+    
+    // Validate attachment structure
+    for (const attachment of attachments) {
+      if (!attachment.type || !attachment.url) {
+        return res.status(400).json({ error: 'Invalid attachment format. Each attachment must have type and url' });
+      }
+      if (attachment.type !== 'image') {
+        return res.status(400).json({ error: 'Only image attachments are currently supported' });
+      }
+      // Basic URL validation
+      if (!attachment.url.startsWith('/uploads/forum-images/')) {
+        return res.status(400).json({ error: 'Invalid image URL. Images must be uploaded through the upload endpoint.' });
+      }
+    }
+
     // Check for offensive content
     console.log('Checking content moderation for message...');
     const contentCheck = await containsOffensiveContent(message, username);
@@ -120,7 +140,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       createdBy: username,
       likes: [],
       metadata: {
-        edited: false
+        edited: false,
+        attachments: attachments.map((att: any) => ({
+          type: 'image',
+          url: att.url,
+          name: att.name || 'image'
+        }))
       }
     };
 

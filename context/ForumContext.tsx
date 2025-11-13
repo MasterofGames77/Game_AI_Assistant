@@ -111,15 +111,74 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addPost = useCallback(
-    async (forumId: string, message: string) => {
+    async (forumId: string, message: string, imageFiles?: File[]) => {
       try {
         setLoading(true);
+        
+        // Upload images first if provided
+        let attachments: any[] = [];
+        if (imageFiles && imageFiles.length > 0) {
+          const formData = new FormData();
+          imageFiles.forEach((file) => {
+            formData.append('image', file);
+          });
+          // Add username for violation tracking
+          const username = localStorage.getItem("username");
+          if (username) {
+            formData.append('username', username);
+          }
+
+          try {
+            const uploadResponse = await axios.post('/api/uploadForumImage', formData, {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+              },
+            });
+
+            if (uploadResponse.data.success && uploadResponse.data.images) {
+              attachments = uploadResponse.data.images.map((img: any) => ({
+                type: 'image',
+                url: img.url,
+                name: img.name,
+              }));
+            }
+          } catch (uploadError: any) {
+            // Log the error to console for debugging
+            console.error('Image upload error:', {
+              status: uploadError.response?.status,
+              error: uploadError.response?.data?.error,
+              details: uploadError.response?.data?.details,
+              violationResult: uploadError.response?.data?.violationResult,
+              moderationResult: uploadError.response?.data?.moderationResult
+            });
+            
+            // Handle image moderation errors with violation tracking
+            // The error will be thrown and handled in the forum page with a toast notification
+            if (uploadError.response?.status === 400 || uploadError.response?.status === 403) {
+              const errorData = uploadError.response?.data;
+              
+              // Log violation details if present
+              if (errorData?.violationResult) {
+                console.warn('Image violation detected:', {
+                  action: errorData.violationResult.action,
+                  warningCount: errorData.violationResult.count,
+                  details: errorData.details
+                });
+              } else if (errorData?.error === 'Image contains inappropriate content') {
+                console.warn('Image rejected by moderation:', errorData.details);
+              }
+            }
+            throw uploadError;
+          }
+        }
+
         const response = await axios.post(
           "/api/addPostToForum",
           {
             forumId,
             message,
             username: localStorage.getItem("username"),
+            attachments,
           },
           {
             headers: {
@@ -228,6 +287,9 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
         const response = await axios.delete(
           `/api/deletePost?forumId=${forumId}&postId=${postId}`,
           {
+            data: {
+              username: localStorage.getItem("username"),
+            },
             headers: {
               Authorization: `Bearer ${
                 localStorage.getItem("userId") || "test-user"

@@ -8,18 +8,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { forumId, postId } = req.query;
+  const { username } = req.body;
 
   if (!forumId || !postId) {
     return res.status(400).json({ error: 'Missing forumId or postId' });
   }
 
+  if (!username || typeof username !== 'string') {
+    return res.status(400).json({ error: 'Username is required' });
+  }
+
   try {
     await connectToMongoDB();
-    let username = 'test-user';
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      username = authHeader.split(' ')[1] || 'test-user';
-    }
     const forum = await Forum.findOne({ forumId });
     if (!forum) {
       return res.status(404).json({ error: 'Forum not found' });

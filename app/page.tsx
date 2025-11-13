@@ -40,9 +40,11 @@ export default function Home() {
     "chat"
   );
 
-  // Comment out image state variables
-  // const [image, setImage] = useState<File | null>(null);
-  // const [imageUrl, setImageUrl] = useState<string | null>(null);
+  // Image state variables for question/answer system
+  const [image, setImage] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  // Store image URL for the current response (separate from input image)
+  const [responseImageUrl, setResponseImageUrl] = useState<string | null>(null);
 
   //const router = useRouter();
 
@@ -601,6 +603,20 @@ export default function Home() {
     if (selectedConversation) {
       setQuestion(selectedConversation.question);
       setResponse(selectedConversation.response);
+      // Load image URL from conversation if it exists
+      if (selectedConversation.imageUrl) {
+        setResponseImageUrl(selectedConversation.imageUrl);
+      } else {
+        setResponseImageUrl(null);
+      }
+      // Clear input image when loading a conversation
+      setImage(null);
+      setImageUrl(null);
+      // Reset file input
+      const fileInput = document.getElementById(
+        "question-image-upload"
+      ) as HTMLInputElement;
+      if (fileInput) fileInput.value = "";
     }
   }, [selectedConversation]);
 
@@ -629,19 +645,92 @@ export default function Home() {
       //   question,
       //   timestamp: new Date().toISOString(),
       // }); // Commented out for production
-      // let imageFilePath = null;
+      let imageFilePath: string | null = null;
+      let imageUrlForAnalysis: string | null = null;
 
       // Image upload section
-      // if (image) {
-      //   try {
-      //     const formData = new FormData();
-      //     formData.append("image", image);
-      //     const uploadRes = await axios.post("/api/uploadImage", formData);
-      //     imageFilePath = uploadRes.data.filePath;
-      //   } catch (imageError) {
-      //     console.error("Error uploading image:", imageError);
-      //   }
-      // }
+      if (image) {
+        try {
+          const formData = new FormData();
+          formData.append("image", image);
+          // Add username for violation tracking
+          if (username) {
+            formData.append("username", username);
+          }
+
+          const uploadRes = await axios.post("/api/uploadImage", formData, {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          });
+
+          // The new uploadImage API returns both filePath (for local) and url (for cloud)
+          imageFilePath = uploadRes.data.filePath || uploadRes.data.url;
+          imageUrlForAnalysis = uploadRes.data.url || uploadRes.data.filePath;
+        } catch (imageError: any) {
+          console.error("Error uploading image:", imageError);
+
+          // Handle image moderation errors
+          if (
+            imageError.response?.status === 400 ||
+            imageError.response?.status === 403
+          ) {
+            const errorData = imageError.response?.data;
+
+            if (errorData?.isContentViolation || errorData?.violationResult) {
+              const violationResult = errorData.violationResult;
+
+              if (violationResult?.action === "banned") {
+                setError(
+                  errorData.message ||
+                    "Your account has been suspended due to content violations."
+                );
+                setLoading(false);
+                return;
+              }
+
+              if (violationResult?.action === "permanent_ban") {
+                setError(
+                  errorData.message ||
+                    "Your account has been permanently suspended."
+                );
+                setLoading(false);
+                return;
+              }
+
+              // Warning
+              const message =
+                errorData.message ||
+                `Your image contains inappropriate content. Warning (${
+                  violationResult?.count || 1
+                }/3).`;
+              setError(message);
+              setLoading(false);
+              return;
+            } else if (
+              errorData?.error === "Image contains inappropriate content"
+            ) {
+              setError(
+                `Image rejected: ${
+                  errorData.details ||
+                  "The image contains content that violates our community guidelines"
+                }`
+              );
+              setLoading(false);
+              return;
+            }
+          }
+
+          // Other upload errors
+          setError(
+            imageError.response?.data?.error ||
+              imageError.message ||
+              "Failed to upload image"
+          );
+          setLoading(false);
+          return;
+        }
+      }
 
       const res = await axios.post(
         "/api/assistant",
@@ -649,10 +738,11 @@ export default function Home() {
           userId,
           username,
           question,
-          // imageFilePath,
+          imageFilePath: imageFilePath, // For backward compatibility
+          imageUrl: imageUrlForAnalysis, // New: cloud storage URL
         },
         {
-          timeout: 30000,
+          timeout: 65000, // Increased timeout to 65 seconds to accommodate vision API calls (60s + buffer)
           headers: {
             "Content-Type": "application/json",
           },
@@ -671,9 +761,22 @@ export default function Home() {
       }
       fetchConversations();
 
-      // Clear image after successful submission
-      // setImage(null);
-      // setImageUrl(null);
+      // Store image URL for response display (use the uploaded URL, not the blob URL)
+      // The imageUrlForAnalysis is the actual uploaded image URL from cloud storage
+      if (imageUrlForAnalysis) {
+        setResponseImageUrl(imageUrlForAnalysis);
+      } else if (imageUrl) {
+        // Fallback to blob URL if cloud URL not available (shouldn't happen, but just in case)
+        setResponseImageUrl(imageUrl);
+      }
+      // Clear image from input area after submission
+      setImage(null);
+      setImageUrl(null);
+      // Reset file input
+      const fileInput = document.getElementById(
+        "question-image-upload"
+      ) as HTMLInputElement;
+      if (fileInput) fileInput.value = "";
 
       if (res.data && res.data.user) {
         setUsername(res.data.user.username);
@@ -716,12 +819,27 @@ export default function Home() {
   };
 
   // Image handler
-  // const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  //   if (e.target.files && e.target.files[0]) {
-  //     setImage(e.target.files[0]);
-  //     setImageUrl(URL.createObjectURL(e.target.files[0]));
-  //   }
-  // };
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        setError(`${file.name} is not a valid image file`);
+        return;
+      }
+
+      // Validate file size (10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        setError(`${file.name} exceeds 10MB size limit`);
+        return;
+      }
+
+      setImage(file);
+      setImageUrl(URL.createObjectURL(file));
+      setError(""); // Clear any previous errors
+    }
+  };
 
   // function to clear the form
   const handleClear = () => {
@@ -729,7 +847,14 @@ export default function Home() {
     setResponse("");
     setError("");
     setSelectedConversation(null);
-    // setImage(null); // Clear file input if using image
+    setImage(null);
+    setImageUrl(null);
+    setResponseImageUrl(null); // Clear response image too
+    // Reset file input
+    const fileInput = document.getElementById(
+      "question-image-upload"
+    ) as HTMLInputElement;
+    if (fileInput) fileInput.value = "";
   };
 
   // delete conversation from database
@@ -1275,31 +1400,75 @@ export default function Home() {
                       className="w-full p-2 border border-gray-300 rounded mb-4"
                     />
 
-                    {/* Comment out image upload UI section
-                  <div className="mb-4">
-                    <label className="cursor-pointer flex items-center gap-2">
-                      <FontAwesomeIcon icon={faPaperclip} size="lg" />
-                      <span>Attach Screenshot</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageChange}
-                        style={{ display: "none" }}
-                      />
-                    </label>
-                    {imageUrl && (
-                      <div className="mt-2">
-                        <Image
-                          src={imageUrl}
-                          alt="Selected"
-                          width={200}
-                          height={200}
-                          className="rounded"
-                        />
+                    {/* Image upload UI section */}
+                    <div className="mb-4">
+                      <div className="flex flex-col gap-3">
+                        <label className="cursor-pointer inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors w-fit">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-5 w-5 mr-2"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                            />
+                          </svg>
+                          <span>Attach Screenshot</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageChange}
+                            className="hidden"
+                            id="question-image-upload"
+                          />
+                        </label>
+                        {imageUrl && (
+                          <div className="relative inline-block">
+                            <Image
+                              src={imageUrl}
+                              alt="Selected screenshot"
+                              width={200}
+                              height={200}
+                              className="rounded border border-gray-300 dark:border-gray-600"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setImage(null);
+                                setImageUrl(null);
+                                // Reset file input
+                                const fileInput = document.getElementById(
+                                  "question-image-upload"
+                                ) as HTMLInputElement;
+                                if (fileInput) fileInput.value = "";
+                              }}
+                              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-75 hover:opacity-100 transition-opacity"
+                              aria-label="Remove image"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-4 w-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M6 18L18 6M6 6l12 12"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  */}
+                    </div>
 
                     <div className="flex space-x-4">
                       <button
@@ -1445,6 +1614,21 @@ export default function Home() {
                 (response || selectedConversation?.response) && (
                   <div className="mt-8 w-full max-w-3xl">
                     <h2 className="text-2xl font-bold">Response</h2>
+                    {/* Show the image that was analyzed if it exists for this response */}
+                    {responseImageUrl && (
+                      <div className="mt-4 mb-4 relative inline-block">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                          Analyzed screenshot:
+                        </p>
+                        <Image
+                          src={responseImageUrl}
+                          alt="Screenshot that was analyzed"
+                          width={300}
+                          height={300}
+                          className="rounded border border-gray-300 dark:border-gray-600"
+                        />
+                      </div>
+                    )}
                     <div className="bg-gray-100 p-4 rounded response-box">
                       {formatResponse(
                         response || selectedConversation?.response || ""

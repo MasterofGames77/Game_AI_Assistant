@@ -92,13 +92,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const total = await Question.countDocuments({ username });
 
     // Fetch conversations with pagination and lean query
-    // Include metadata fields for Phase 2 verification
+    // Include metadata fields for Phase 2 verification and imageUrl
     const conversations = await Question.find({ username })
       .sort({ timestamp: -1 })
       .skip(skip)
       .limit(pageSize)
       .lean()
-      .select('question response timestamp detectedGame detectedGenre questionCategory difficultyHint interactionType');
+      .select('question response timestamp detectedGame detectedGenre questionCategory difficultyHint interactionType imageUrl');
 
     // Update cache with full dataset
     updateCache(username, conversations);
