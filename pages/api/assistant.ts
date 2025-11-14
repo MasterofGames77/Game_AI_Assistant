@@ -547,7 +547,7 @@ export const checkQuestionType = (question: string): string[] => {
 
   const simulationGames = [
     'sim city', 'the sims', 'animal crossing', 'farming simulator',
-    'microsoft flight simulator', 'bus simulator', 'train simulator',
+    'microsoft flight simulator', 'bus simulator', 'train simulator', 'goat simulator',
     'cities: skylines', 'stardew valley', 'harvest moon', 'story of seasons'
   ];
 

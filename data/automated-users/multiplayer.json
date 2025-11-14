@@ -1,0 +1,63 @@
+{
+  "racing": [
+    "Forza Horizon 5",
+    "Gran Turismo 7",
+    "Mario Kart 8 Deluxe",
+    "Burnout Paradise",
+    "F-Zero GX",
+    "Sonic Racing Crossworlds",
+    "Need for Speed",
+    "Crash Team Racing Nitro-Fueled",
+    "Wipeout Omega Collection",
+    "The Crew Motorfest"
+  ],
+  "battle-royale": [
+    "Fall Guys",
+    "Fortnite",
+    "Apex Legends",
+    "PUBG: Battlegrounds",
+    "Naraka: Bladepoint",
+    "Free Fire",
+    "Vampire: The Masquerade – Bloodhunt",
+    "Population: ONE",
+    "Tetris 99",
+    "Super Animal Royal"
+  ],
+  "fighting": [
+    "Super Smash Bros. Ultimate",
+    "Tekken 8",
+    "Dragon Ball FighterZ",
+    "Guilty Gear Strive",
+    "Ultimate Marvel VS. Capcom 3",
+    "Street Fighter VI",
+    "Soulcalibur II",
+    "Skullgirls 2nd Encore",
+    "Mortal Kombat 1",
+    "The King of Fighters XV"
+  ],
+  "sandbox": [
+    "Minecraft",
+    "Terraria",
+    "Roblox",
+    "No Man's Sky",
+    "Raft",
+    "Valheim",
+    "Universe Sandbox",
+    "Deisim",
+    "Rimworld",
+    "Garry's Mod"
+  ],
+  "fps": [
+    "Overwatch",
+    "Team Fortress 2",
+    "Half-Life 2",
+    "Bioshock Infinite",
+    "Doom Eternal",
+    "Halo Infinite",
+    "Tom Clancy's Rainbow Six Siege",
+    "Destiny 2",
+    "Titanfall 2",
+    "Valorant"
+  ]
+}
+

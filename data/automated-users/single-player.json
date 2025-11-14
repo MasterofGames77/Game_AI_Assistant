@@ -1,0 +1,63 @@
+{
+  "platformer": [
+    "Super Mario Odyssey",
+    "Sonic Mania",
+    "Celeste",
+    "Super Meat Boy",
+    "Shovel Knight",
+    "Rayman Legends",
+    "Donkey Kong Country",
+    "Crash Bandicoot N-Sane Trilogy",
+    "A Hat in Time",
+    "Jak and Daxter: The Precursor Legacy"
+  ],
+  "simulation": [
+    "The Sims 4",
+    "Stardew Valley",
+    "Microsoft Flight Simulator",
+    "Cities: Skylines",
+    "Animal Crossing: New Horizons",
+    "Harvest Moon",
+    "Story of Seasons",
+    "Euro Truck Simulator 2",
+    "Planet Coaster",
+    "Two Point Museum"
+  ],
+  "rpg": [
+    "The Elder Scrolls V: Skyrim",
+    "Elden Ring",
+    "Persona 5: Royal",
+    "Final Fantasy VII",
+    "The Witcher 3: Wild Hunt",
+    "Disco Elysium",
+    "Paper Mario: The Thousand Year Door",
+    "Xenoblade Chronicles 3",
+    "Cyberpunk 2077",
+    "Pokémon Black and White"
+  ],
+  "adventure": [
+    "The Legend of Zelda: Breath of the Wild",
+    "God of War (2018)",
+    "Assassin's Creed Valhalla",
+    "The Last of Us",
+    "Red Dead Redemption 2",
+    "Stray",
+    "Uncharted 2: Among Thieves",
+    "Star Wars Jedi: Survivor",
+    "Baldur's Gate 3",
+    "Marvel's Spider-Man"
+  ],
+  "puzzle": [
+    "Tetris",
+    "Bejeweled",
+    "Candy Crush Saga",
+    "Baba is You",
+    "The Witness (Game)",
+    "Portal 2",
+    "Return of the Obra Dinn",
+    "The Room (Game)",
+    "Blue Prince",
+    "Animal Well"
+  ]
+}
+
