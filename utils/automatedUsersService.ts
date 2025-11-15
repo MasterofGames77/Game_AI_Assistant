@@ -2,7 +2,7 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { generateQuestion, generateForumPost, UserPreferences } from './automatedContentGenerator';
-import { findGameImage, getRandomGameImage } from './automatedImageService';
+import { findGameImage, getRandomGameImage, recordImageUsage } from './automatedImageService';
 import { containsOffensiveContent } from './contentModeration';
 import { GameList, ActivityResult } from '../types';
 
@@ -296,12 +296,15 @@ export async function createForumPost(
       };
     }
     
-    // Find image for the game
+    // Find image for the game (excluding images already used by this user for this game)
     let imagePath: string | null = null;
     let attachments: any[] = [];
     
-    const gameImage = getRandomGameImage(gameTitle);
+    const gameImage = getRandomGameImage(gameTitle, username);
     if (gameImage) {
+      // Image found - record that this user has used this image for this game
+      recordImageUsage(username, gameTitle, gameImage);
+      
       // Image found - need to upload it via the upload endpoint
       // For now, we'll post without image if upload fails
       // (In production, you'd need to handle file upload properly)

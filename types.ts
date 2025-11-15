@@ -747,3 +747,15 @@ export interface ImageMapping {
     };
   };
 }
+
+/**
+ * Load image usage tracking from JSON file
+ */
+export interface ImageUsage {
+  note?: string;
+  usage: {
+    [username: string]: {
+      [gameTitle: string]: string[]; // Array of image paths that have been used
+    };
+  };
+}

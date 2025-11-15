@@ -6,6 +6,128 @@
         "/uploads/automated-images/the-elder-scrolls-v-skyrim.png"
       ],
       "primary": "/uploads/automated-images/the-elder-scrolls-v-skyrim.png"
+    },
+    "Super Mario Odyssey": {
+      "images": [
+        "/uploads/automated-images/super-mario-odyssey-1.png"
+      ],
+      "primary": "/uploads/automated-images/super-mario-odyssey-1.png"
+    },
+    "Sonic Mania": {
+      "images": [
+        "/uploads/automated-images/sonic-mania-1.png"
+      ],
+      "primary": "/uploads/automated-images/sonic-mania-1.png"
+    },
+    "Celeste": {
+      "images": [
+        "/uploads/automated-images/celeste-1.png"
+      ],
+      "primary": "/uploads/automated-images/celeste-1.png"
+    },
+    "Super Meat Boy": {
+      "images": [
+        "/uploads/automated-images/super-meat-boy-1.png"
+      ],
+      "primary": "/uploads/automated-images/super-meat-boy-1.png"
+    },
+    "Shovel Knight": {
+      "images": [
+        "/uploads/automated-images/shovel-knight-1.png"
+      ],
+      "primary": "/uploads/automated-images/shovel-knight-1.png"
+    },
+    "Rayman Legends": {
+      "images": [
+        "/uploads/automated-images/rayman-legends-1.png"
+      ],
+      "primary": "/uploads/automated-images/rayman-legends-1.png"
+    },
+    "Donkey Kong Country": {
+      "images": [
+        "/uploads/automated-images/donkey-kong-country-1.png"
+      ],
+      "primary": "/uploads/automated-images/donkey-kong-country-1.png"
+    },
+    "A Hat in Time": {
+      "images": [
+        "/uploads/automated-images/a-hat-in-time-1.png"
+      ],
+      "primary": "/uploads/automated-images/a-hat-in-time-1.png"
+    },
+    "The Sims 4": {
+      "images": [
+        "/uploads/automated-images/the-sims-4-1.png"
+      ],
+      "primary": "/uploads/automated-images/the-sims-4-1.png"
+    },
+    "Stardew Valley": {
+      "images": [
+        "/uploads/automated-images/stardew-valley-1.png"
+      ],
+      "primary": "/uploads/automated-images/stardew-valley-1.png"
+    },
+    "Microsoft Flight Simulator": {
+      "images": [
+        "/uploads/automated-images/microsoft-flight-simulator-1.png"
+      ],
+      "primary": "/uploads/automated-images/microsoft-flight-simulator-1.png"
+    },
+    "Cities: Skylines": {
+      "images": [
+        "/uploads/automated-images/cities-skylines-1.png"
+      ],
+      "primary": "/uploads/automated-images/cities-skylines-1.png"
+    },
+    "Animal Crossing: New Horizons": {
+      "images": [
+        "/uploads/automated-images/animal-crossing-new-horizons-1.png"
+      ],
+      "primary": "/uploads/automated-images/animal-crossing-new-horizons-1.png"
+    },
+    "Harvest Moon": {
+      "images": [
+        "/uploads/automated-images/harvest-moon-winds-of-anthos-1.png"
+      ],
+      "primary": "/uploads/automated-images/harvest-moon-winds-of-anthos-1.png"
+    },
+    "Story of Seasons": {
+      "images": [
+        "/uploads/automated-images/story-of-seasons-a-wonderful-life-1.png"
+      ],
+      "primary": "/uploads/automated-images/story-of-seasons-a-wonderful-life-1.png"
+    },
+    "Planet Coaster": {
+      "images": [
+        "/uploads/automated-images/planet-coaster-1.png"
+      ],
+      "primary": "/uploads/automated-images/planet-coaster-1.png"
+    },
+    "Two Point Museum": {
+      "images": [
+        "/uploads/automated-images/two-point-museum-1.png"
+      ],
+      "primary": "/uploads/automated-images/two-point-museum-1.png"
+    },
+    "Crash Bandicoot N-Sane Trilogy": {
+      "images": [
+        "/uploads/automated-images/crash-n-sane-trilogy-1.png",
+        "/uploads/automated-images/crash-n-sane-trilogy-2.png",
+        "/uploads/automated-images/crash-n-sane-trilogy-3.png"
+      ],
+      "primary": "/uploads/automated-images/crash-n-sane-trilogy-1.png"
+    },
+    "Jak and Daxter: The Precursor Legacy": {
+      "images": [
+        "/uploads/automated-images/jak-and-daxter-1.png"
+      ],
+      "primary": "/uploads/automated-images/jak-and-daxter-1.png"
+    },
+    "Euro Truck Simulator 2": {
+      "images": [
+        "/uploads/automated-images/euro-truck-simulator2-1.png"
+      ],
+      "primary": "/uploads/automated-images/euro-truck-simulator2-1.png"
     }
   }
 }

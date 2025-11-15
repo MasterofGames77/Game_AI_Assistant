@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { ImageMapping } from '../types';
+import { ImageMapping, ImageUsage } from '../types';
 
 /**
  * Sanitize game title for use in file paths
@@ -113,10 +113,35 @@ export function findGameImage(gameTitle: string): string | null {
     const files = fs.readdirSync(baseDir);
     const sanitizedTitle = sanitizeGameTitle(gameTitle);
     const imageFiles = files.filter(file => {
+      if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(file)) return false;
+      
       const fileBaseName = path.parse(file).name.toLowerCase();
       const expectedBaseName = sanitizedTitle.toLowerCase();
-      return /\.(jpg|jpeg|png|gif|webp)$/i.test(file) && 
-             (fileBaseName === expectedBaseName || fileBaseName.includes(expectedBaseName) || expectedBaseName.includes(fileBaseName));
+      
+      // Remove common suffixes like "-1", "-2", etc. from filename for matching
+      const fileBaseNameClean = fileBaseName.replace(/-\d+$/, '');
+      const expectedBaseNameClean = expectedBaseName.replace(/-\d+$/, '');
+      
+      // Exact match
+      if (fileBaseName === expectedBaseName || fileBaseNameClean === expectedBaseNameClean) {
+        return true;
+      }
+      
+      // Check if file starts with expected name (handles "crash-n-sane-trilogy-1" matching "crash-bandicoot-n-sane-trilogy")
+      // or if expected name starts with file name (handles "jak-and-daxter" matching "jak-and-daxter-the-precursor-legacy")
+      if (fileBaseNameClean.startsWith(expectedBaseNameClean) || expectedBaseNameClean.startsWith(fileBaseNameClean)) {
+        return true;
+      }
+      
+      // Check if key words match (for cases like "euro-truck-simulator2" vs "euro-truck-simulator-2")
+      const fileWords = fileBaseNameClean.split('-').filter(w => w.length > 2);
+      const expectedWords = expectedBaseNameClean.split('-').filter(w => w.length > 2);
+      const matchingWords = fileWords.filter(w => expectedWords.includes(w));
+      if (matchingWords.length >= Math.min(3, Math.max(fileWords.length, expectedWords.length)) * 0.7) {
+        return true;
+      }
+      
+      return false;
     });
     
     if (imageFiles.length > 0) {
@@ -140,27 +165,161 @@ export function findGameImage(gameTitle: string): string | null {
   return null;
 }
 
-/**
- * Get a random image for a game (if multiple images available)
- */
-export function getRandomGameImage(gameTitle: string): string | null {
-  const mapping = loadImageMapping();
+function loadImageUsage(): ImageUsage {
+  const usagePath = path.join(process.cwd(), 'data', 'automated-users', 'image-usage.json');
   
+  try {
+    if (fs.existsSync(usagePath)) {
+      const content = fs.readFileSync(usagePath, 'utf-8');
+      return JSON.parse(content);
+    }
+  } catch (error) {
+    console.error('Error loading image usage:', error);
+  }
+  
+  return { usage: {} };
+}
+
+/**
+ * Save image usage tracking to JSON file
+ */
+function saveImageUsage(usage: ImageUsage): void {
+  const usagePath = path.join(process.cwd(), 'data', 'automated-users', 'image-usage.json');
+  
+  try {
+    fs.writeFileSync(usagePath, JSON.stringify(usage, null, 2), 'utf-8');
+  } catch (error) {
+    console.error('Error saving image usage:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get a random image for a game that hasn't been used by this user before
+ * @param gameTitle - The game title
+ * @param username - The automated user's username (to track usage)
+ * @returns Image path or null if no unused image available
+ */
+export function getRandomGameImage(gameTitle: string, username?: string): string | null {
+  const mapping = loadImageMapping();
+  const usage = loadImageUsage();
+  
+  // Get all available images for this game
+  let availableImages: string[] = [];
+  
+  // First, check mapping for registered images
   if (mapping.games[gameTitle] && mapping.games[gameTitle].images.length > 0) {
-    const images = mapping.games[gameTitle].images.filter(img => {
+    availableImages = mapping.games[gameTitle].images.filter(img => {
       const fullPath = path.join(process.cwd(), 'public', img);
       return fs.existsSync(fullPath);
     });
+  }
+  
+  // Also scan file system for additional images that might not be in mapping
+  // This ensures we find all images even if mapping is incomplete
+  const baseDir = path.join(process.cwd(), 'public', 'uploads', 'automated-images');
+  if (fs.existsSync(baseDir)) {
+    const files = fs.readdirSync(baseDir);
+    const sanitizedTitle = sanitizeGameTitle(gameTitle);
     
-    if (images.length > 0) {
-      // Return random image
-      const randomIndex = Math.floor(Math.random() * images.length);
-      return images[randomIndex];
+    const fileSystemImages = files.filter(file => {
+      if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(file)) return false;
+      
+      const fileBaseName = path.parse(file).name.toLowerCase();
+      const expectedBaseName = sanitizedTitle.toLowerCase();
+      
+      // Remove common suffixes like "-1", "-2", etc. from filename for matching
+      const fileBaseNameClean = fileBaseName.replace(/-\d+$/, '');
+      const expectedBaseNameClean = expectedBaseName.replace(/-\d+$/, '');
+      
+      // Exact match
+      if (fileBaseName === expectedBaseName || fileBaseNameClean === expectedBaseNameClean) {
+        return true;
+      }
+      
+      // Check if file starts with expected name or vice versa
+      if (fileBaseNameClean.startsWith(expectedBaseNameClean) || expectedBaseNameClean.startsWith(fileBaseNameClean)) {
+        return true;
+      }
+      
+      // Check if key words match
+      const fileWords = fileBaseNameClean.split('-').filter(w => w.length > 2);
+      const expectedWords = expectedBaseNameClean.split('-').filter(w => w.length > 2);
+      const matchingWords = fileWords.filter(w => expectedWords.includes(w));
+      if (matchingWords.length >= Math.min(3, Math.max(fileWords.length, expectedWords.length)) * 0.7) {
+        return true;
+      }
+      
+      return false;
+    }).map(file => `/uploads/automated-images/${file}`);
+    
+    // Merge file system images with mapping images, removing duplicates
+    const allImagesSet = new Set([...availableImages, ...fileSystemImages]);
+    availableImages = Array.from(allImagesSet);
+    
+    // Update mapping if we found new images
+    if (fileSystemImages.length > 0 && (!mapping.games[gameTitle] || mapping.games[gameTitle].images.length < fileSystemImages.length)) {
+      if (!mapping.games[gameTitle]) {
+        mapping.games[gameTitle] = { images: [] };
+      }
+      fileSystemImages.forEach(img => {
+        if (!mapping.games[gameTitle].images.includes(img)) {
+          mapping.games[gameTitle].images.push(img);
+        }
+      });
+      if (!mapping.games[gameTitle].primary && fileSystemImages.length > 0) {
+        mapping.games[gameTitle].primary = fileSystemImages[0];
+      }
+      saveImageMapping(mapping);
     }
   }
   
-  // Fallback to findGameImage (which now checks both subdirectory and base directory)
-  return findGameImage(gameTitle);
+  if (availableImages.length === 0) {
+    return null;
+  }
+  
+  // If username provided, filter out images that have been used by this user for this game
+  if (username) {
+    const usedImages = usage.usage[username]?.[gameTitle] || [];
+    const unusedImages = availableImages.filter(img => !usedImages.includes(img));
+    
+    // If all images have been used, return null (don't reuse images)
+    if (unusedImages.length === 0) {
+      return null;
+    }
+    
+    // Return random unused image
+    const randomIndex = Math.floor(Math.random() * unusedImages.length);
+    return unusedImages[randomIndex];
+  }
+  
+  // If no username provided, return random image (for backward compatibility)
+  const randomIndex = Math.floor(Math.random() * availableImages.length);
+  return availableImages[randomIndex];
+}
+
+/**
+ * Record that an image has been used by a user for a specific game
+ * @param username - The automated user's username
+ * @param gameTitle - The game title
+ * @param imagePath - The image path that was used
+ */
+export function recordImageUsage(username: string, gameTitle: string, imagePath: string): void {
+  const usage = loadImageUsage();
+  
+  if (!usage.usage[username]) {
+    usage.usage[username] = {};
+  }
+  
+  if (!usage.usage[username][gameTitle]) {
+    usage.usage[username][gameTitle] = [];
+  }
+  
+  // Add image to used list if not already present
+  if (!usage.usage[username][gameTitle].includes(imagePath)) {
+    usage.usage[username][gameTitle].push(imagePath);
+    saveImageUsage(usage);
+  }
 }
 
 /**

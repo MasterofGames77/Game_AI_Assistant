@@ -1,0 +1,12 @@
+{
+  "note": "Tracks which images have been used by which automated users for which games to prevent image reuse",
+  "usage": {
+    "MysteriousMrEnter": {
+      "Crash Bandicoot N-Sane Trilogy": [
+        "/uploads/automated-images/crash-n-sane-trilogy-1.png",
+        "/uploads/automated-images/crash-n-sane-trilogy-2.png",
+        "/uploads/automated-images/crash-n-sane-trilogy-3.png"
+      ]
+    }
+  }
+}
