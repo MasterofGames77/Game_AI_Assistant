@@ -2,6 +2,7 @@ import { createServer } from "http";
 import { parse, UrlWithParsedQuery } from "url";
 import next, { NextApiRequest, NextApiResponse } from "next";
 import { initSocket } from "./middleware/realtime";
+import { initializeScheduler } from "./utils/automatedUsersScheduler";
 // import fs from "fs";
 // import path from "path";
 
@@ -36,6 +37,9 @@ app.prepare().then(async () => {
 
   // Initialize the Socket.IO server
   initSocket(server);
+
+  // Initialize automated users scheduler
+  initializeScheduler();
 
   // Start the server
   server.listen(port, () => {

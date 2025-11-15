@@ -481,153 +481,164 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       </div>
 
       <div className="space-y-4">
-        {currentForum.posts?.map((post) => (
-          <div
-            key={post._id}
-            className="bg-white dark:bg-gray-900 p-4 rounded-lg shadow hover:shadow-md transition-shadow"
-          >
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <p className="mb-2 text-gray-900 dark:text-gray-200">
-                  Posted by {post.createdBy} on{" "}
-                  {new Date(post.timestamp).toLocaleString()}
-                  {post.metadata.edited && (
-                    <span className="text-blue-500 dark:text-blue-400 text-sm ml-2 italic">
-                      (edited
-                      {post.metadata.editedAt
-                        ? ` on ${new Date(
-                            post.metadata.editedAt
-                          ).toLocaleString()}`
-                        : ""}
-                      )
-                    </span>
-                  )}
-                </p>
-                {editingPostId === post._id ? (
-                  <div className="space-y-2">
-                    <textarea
-                      value={editMessage}
-                      onChange={(e) => setEditMessage(e.target.value)}
-                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                      rows={4}
-                      required
-                    />
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleSaveEdit(post._id)}
-                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={handleCancelEdit}
-                        className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <p className="whitespace-pre-wrap text-gray-900 dark:text-gray-100">
-                      {post.message}
-                    </p>
-                    {/* Display attached images */}
-                    {(post.metadata as any).attachments &&
-                      (post.metadata as any).attachments.length > 0 && (
-                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {(post.metadata as any).attachments.map(
-                            (attachment: any, idx: number) =>
-                              attachment.type === "image" && (
-                                <div key={idx} className="relative">
-                                  <Image
-                                    src={attachment.url}
-                                    alt={attachment.name || `Image ${idx + 1}`}
-                                    width={800}
-                                    height={600}
-                                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer hover:opacity-90 transition-opacity"
-                                    onClick={() =>
-                                      window.open(attachment.url, "_blank")
-                                    }
-                                    unoptimized={attachment.url.startsWith(
-                                      "http"
-                                    )}
-                                    style={{ width: "100%", height: "auto" }}
-                                  />
-                                </div>
-                              )
-                          )}
-                        </div>
-                      )}
-                  </>
-                )}
-                {editingPostId !== post._id && (
-                  <div className="mt-2 flex items-center space-x-4">
-                    <button
-                      onClick={() => handleLikePost(post._id)}
-                      className={`flex items-center space-x-1 ${
-                        post.metadata.likedBy?.includes(
-                          localStorage.getItem("username") || "test-user"
+        {currentForum.posts
+          ?.filter((post) => post && post._id && post.message)
+          .map((post) => (
+            <div
+              key={post._id || `post-${Math.random()}`}
+              className="bg-white dark:bg-gray-900 p-4 rounded-lg shadow hover:shadow-md transition-shadow"
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <p className="mb-2 text-gray-900 dark:text-gray-200">
+                    Posted by {post.createdBy || post.username || "Unknown"} on{" "}
+                    {post.timestamp
+                      ? new Date(post.timestamp).toLocaleString()
+                      : "Unknown date"}
+                    {post.metadata?.edited && (
+                      <span className="text-blue-500 dark:text-blue-400 text-sm ml-2 italic">
+                        (edited
+                        {post.metadata.editedAt
+                          ? ` on ${new Date(
+                              post.metadata.editedAt
+                            ).toLocaleString()}`
+                          : ""}
                         )
-                          ? "text-blue-600"
-                          : "text-gray-400"
-                      } hover:text-blue-700`}
-                    >
-                      {/* Heart icon: filled if liked, outline if not */}
-                      {post.metadata.likedBy?.includes(
-                        localStorage.getItem("username") || "test-user"
-                      ) ? (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5 fill-current"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" />
-                        </svg>
-                      ) : (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z"
-                          />
-                        </svg>
-                      )}
-                      <span>
-                        {post.metadata.likes || 0} Like
-                        {(post.metadata.likes || 0) !== 1 ? "s" : ""}
                       </span>
-                    </button>
-                    {post.createdBy ===
-                      (localStorage.getItem("username") || "test-user") && (
-                      <>
-                        <button
-                          onClick={() => handleEditPost(post._id, post.message)}
-                          className="text-blue-500 hover:text-blue-700"
-                        >
-                          Edit Post
-                        </button>
-                        <button
-                          onClick={() => handleDeletePost(post._id)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          Delete Post
-                        </button>
-                      </>
                     )}
-                  </div>
-                )}
+                  </p>
+                  {editingPostId === post._id ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={editMessage}
+                        onChange={(e) => setEditMessage(e.target.value)}
+                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                        rows={4}
+                        required
+                      />
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleSaveEdit(post._id)}
+                          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={handleCancelEdit}
+                          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="whitespace-pre-wrap text-gray-900 dark:text-gray-100">
+                        {post.message || "No message content"}
+                      </p>
+                      {/* Display attached images */}
+                      {post.metadata?.attachments &&
+                        Array.isArray(post.metadata.attachments) &&
+                        post.metadata.attachments.length > 0 && (
+                          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {post.metadata.attachments.map(
+                              (attachment: any, idx: number) =>
+                                attachment &&
+                                attachment.type === "image" &&
+                                attachment.url && (
+                                  <div key={idx} className="relative">
+                                    <Image
+                                      src={attachment.url}
+                                      alt={
+                                        attachment.name || `Image ${idx + 1}`
+                                      }
+                                      width={800}
+                                      height={600}
+                                      className="w-full rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer hover:opacity-90 transition-opacity"
+                                      onClick={() =>
+                                        window.open(attachment.url, "_blank")
+                                      }
+                                      unoptimized={attachment.url.startsWith(
+                                        "http"
+                                      )}
+                                      style={{ width: "100%", height: "auto" }}
+                                    />
+                                  </div>
+                                )
+                            )}
+                          </div>
+                        )}
+                    </>
+                  )}
+                  {editingPostId !== post._id && (
+                    <div className="mt-2 flex items-center space-x-4">
+                      <button
+                        onClick={() => handleLikePost(post._id)}
+                        className={`flex items-center space-x-1 ${
+                          post.metadata.likedBy?.includes(
+                            localStorage.getItem("username") || "test-user"
+                          )
+                            ? "text-blue-600"
+                            : "text-gray-400"
+                        } hover:text-blue-700`}
+                      >
+                        {/* Heart icon: filled if liked, outline if not */}
+                        {post.metadata.likedBy?.includes(
+                          localStorage.getItem("username") || "test-user"
+                        ) ? (
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-5 w-5 fill-current"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" />
+                          </svg>
+                        ) : (
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-5 w-5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z"
+                            />
+                          </svg>
+                        )}
+                        <span>
+                          {post.metadata.likes || 0} Like
+                          {(post.metadata.likes || 0) !== 1 ? "s" : ""}
+                        </span>
+                      </button>
+                      {post.createdBy ===
+                        (localStorage.getItem("username") || "test-user") && (
+                        <>
+                          <button
+                            onClick={() =>
+                              handleEditPost(post._id, post.message)
+                            }
+                            className="text-blue-500 hover:text-blue-700"
+                          >
+                            Edit Post
+                          </button>
+                          <button
+                            onClick={() => handleDeletePost(post._id)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            Delete Post
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
 
         {currentForum.posts?.length === 0 && (
           <div className="text-center text-gray-500 py-8">

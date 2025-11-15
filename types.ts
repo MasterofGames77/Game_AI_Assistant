@@ -717,3 +717,33 @@ export interface ImageUploadRateLimit {
   windowStartTime: Date;
   lastUploadTime: Date;
 }
+
+
+// Automated Users:
+export interface ScheduledTask {
+  name: string;
+  cronExpression: string;
+  task: () => Promise<void>;
+  isRunning: boolean;
+}
+
+export interface GameList {
+  [genre: string]: string[];
+}
+
+export interface ActivityResult {
+  success: boolean;
+  message: string;
+  details?: any;
+  error?: string;
+}
+
+export interface ImageMapping {
+  note?: string;
+  games: {
+    [gameTitle: string]: {
+      images: string[];
+      primary?: string;
+    };
+  };
+}

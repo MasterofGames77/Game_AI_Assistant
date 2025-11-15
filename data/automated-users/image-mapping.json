@@ -1,5 +1,11 @@
 {
   "note": "This file maps game titles to their image paths in the automated-images directory",
-  "games": {}
+  "games": {
+    "The Elder Scrolls V: Skyrim": {
+      "images": [
+        "/uploads/automated-images/the-elder-scrolls-v-skyrim.png"
+      ],
+      "primary": "/uploads/automated-images/the-elder-scrolls-v-skyrim.png"
+    }
+  }
 }
-

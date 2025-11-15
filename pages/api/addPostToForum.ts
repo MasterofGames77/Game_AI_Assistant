@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import mongoose from 'mongoose';
 import connectToMongoDB from '../../utils/mongodb';
 import Forum from '../../models/Forum';
 import { containsOffensiveContent } from '../../utils/contentModeration';
@@ -132,36 +133,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Create new post
+    // Create new post with proper structure matching the schema
     const newPost = {
+      _id: new mongoose.Types.ObjectId(), // Generate ObjectId for the post
       username,
       message: message.trim(),
       timestamp: new Date(),
       createdBy: username,
-      likes: [],
       metadata: {
         edited: false,
+        editedAt: undefined,
+        editedBy: undefined,
+        likes: 0,
+        likedBy: [],
         attachments: attachments.map((att: any) => ({
           type: 'image',
           url: att.url,
           name: att.name || 'image'
-        }))
+        })),
+        status: 'active'
       }
     };
 
-    // Add post to forum
-    forum.posts.push(newPost);
-    
-    // Update forum metadata
-    forum.metadata.totalPosts += 1;
-    forum.metadata.lastActivityAt = new Date();
+    // Use findOneAndUpdate with $push to add post without validating entire array
+    // This avoids validation errors on existing posts that might be missing fields
+    const updatedForum = await Forum.findOneAndUpdate(
+      { forumId },
+      {
+        $push: { posts: newPost },
+        $set: {
+          'metadata.totalPosts': (forum.metadata.totalPosts || 0) + 1,
+          'metadata.lastActivityAt': new Date()
+        }
+      },
+      {
+        new: true,
+        runValidators: false // Skip validation to avoid issues with existing posts
+      }
+    );
 
-    // Save changes
-    await forum.save();
+    if (!updatedForum) {
+      return res.status(404).json({ error: 'Forum not found after update' });
+    }
 
     return res.status(200).json({ 
       message: 'Post added successfully', 
-      forum
+      forum: updatedForum
     });
   } catch (error: any) {
     console.error('Error adding post:', error);
