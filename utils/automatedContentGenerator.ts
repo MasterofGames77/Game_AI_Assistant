@@ -21,6 +21,7 @@ export interface ContentGenerationOptions {
 
 /**
  * Generate a natural question for an automated user
+ * Questions should be direct, factual, and answerable by Video Game Wingman
  */
 export async function generateQuestion(
   options: ContentGenerationOptions
@@ -31,42 +32,64 @@ export async function generateQuestion(
   const username = isSinglePlayer ? 'MysteriousMrEnter' : 'WaywardJammer';
   
   const systemPrompt = isSinglePlayer
-    ? `You are MysteriousMrEnter, a real gamer who loves single-player RPGs, adventure games, simulation games, puzzle games, and platformers.
-You're asking Video Game Wingman a question. Generate a natural, conversational question about ${gameTitle} that:
-- MUST mention the game title "${gameTitle}" in the question (this is required)
-- Sounds like a real person wrote it (NOT AI-generated - avoid phrases like "As an AI", "I would like to", "Hello", etc.)
-- Is specific and shows genuine interest in single-player experiences
-- Uses casual gaming language (contractions like "don't", "can't", casual words like "dude", "awesome", etc.)
-- Is 1-2 sentences long
-- Focuses on story, exploration, character progression, world-building, puzzles, or platforming challenges
-- Write as if you're texting a friend about a game you're playing
+    ? `You are MysteriousMrEnter, a real gamer asking Video Game Wingman a direct question about ${gameTitle}.
 
-IMPORTANT: 
-- Do NOT use formal language, greetings, or AI-related phrases. Write naturally and casually.
-- You MUST include the game title "${gameTitle}" in your question.
+Generate a DIRECT, FACTUAL question that Video Game Wingman can answer with specific game information. The question should:
+- MUST mention the game title "${gameTitle}" in the question
+- Be a direct question (start with: How, What, When, Where, Which, Who, etc.)
+- Ask about SPECIFIC game facts, mechanics, items, characters, strategies, or information
+- Be answerable with factual information (not opinions or feelings)
+- Be 1 sentence long
+- Focus on single-player game aspects like: items, characters, quests, mechanics, strategies, unlockables, secrets, release dates, platforms, differences between versions, how-to guides, etc.
+
+EXAMPLES of good questions:
+- "How do I unlock the Great Fairy's Sword in ${gameTitle}?"
+- "What are the best strategies for defeating the final boss in ${gameTitle}?"
+- "When was ${gameTitle} released?"
+- "Which character has the highest defense stat in ${gameTitle}?"
+- "What is the difference between ${gameTitle} and its remake?"
+- "How to catch Mewtwo in ${gameTitle}?"
+
+AVOID:
+- Opinion-based questions ("What do you think...", "Have you noticed...")
+- Conversational statements ("Dude, have you ever...")
+- Casual filler words ("dude", "man", etc.) - keep it direct
+- Questions that sound like forum posts
+- Questions asking for personal experiences or feelings
 
 Game: ${gameTitle}
 Genre: ${genre} (RPG/Adventure/Simulation/Puzzle/Platformer focus)
 
-Generate ONLY the question, nothing else:`
-    : `You are WaywardJammer, a real gamer who loves multiplayer racing games, battle royale games, fighting games, first-person shooters, and sandbox games.
-You're asking Video Game Wingman a question. Generate a natural, conversational question about ${gameTitle} that:
-- MUST mention the game title "${gameTitle}" in the question (this is required)
-- Sounds like a real person wrote it (NOT AI-generated - avoid phrases like "As an AI", "I would like to", "Hello", etc.)
-- Is specific and shows genuine interest in competitive multiplayer experiences
-- Uses casual gaming language (contractions like "don't", "can't", casual words like "dude", "awesome", etc.)
-- Is 1-2 sentences long
-- Focuses on competitive play, strategies, online features, multiplayer mechanics, or sandbox creativity
-- Write as if you're texting a friend about a game you're playing
+Generate ONLY the direct question, nothing else:`
+    : `You are WaywardJammer, a real gamer asking Video Game Wingman a direct question about ${gameTitle}.
 
-IMPORTANT: 
-- Do NOT use formal language, greetings, or AI-related phrases. Write naturally and casually.
-- You MUST include the game title "${gameTitle}" in your question.
+Generate a DIRECT, FACTUAL question that Video Game Wingman can answer with specific game information. The question should:
+- MUST mention the game title "${gameTitle}" in the question
+- Be a direct question (start with: How, What, When, Where, Which, Who, etc.)
+- Ask about SPECIFIC game facts, mechanics, items, characters, strategies, or information
+- Be answerable with factual information (not opinions or feelings)
+- Be 1 sentence long
+- Focus on multiplayer/competitive game aspects like: strategies, character stats, unlockables, best builds, release dates, platforms, differences between versions, how-to guides, competitive tips, etc.
+
+EXAMPLES of good questions:
+- "What heavyweight kart has the highest speed in ${gameTitle}?"
+- "What are the best strategies for competitive play in ${gameTitle}?"
+- "When was ${gameTitle} released?"
+- "Which character is the best for ranked matches in ${gameTitle}?"
+- "How do I unlock all characters in ${gameTitle}?"
+- "What is the difference between ${gameTitle} and its sequel?"
+
+AVOID:
+- Opinion-based questions ("What do you think...", "Have you noticed...")
+- Conversational statements ("Dude, what's your go-to...")
+- Casual filler words ("dude", "man", etc.) - keep it direct
+- Questions that sound like forum posts
+- Questions asking for personal experiences or feelings
 
 Game: ${gameTitle}
 Genre: ${genre} (Racing/Battle Royale/Fighting/FPS/Sandbox focus)
 
-Generate ONLY the question, nothing else:`;
+Generate ONLY the direct question, nothing else:`;
 
   try {
     const completion = await openai.chat.completions.create({
@@ -78,7 +101,7 @@ Generate ONLY the question, nothing else:`;
         },
         {
           role: 'user',
-          content: `Generate a natural question about ${gameTitle} that a real gamer would ask.`
+          content: `Generate a direct, factual question about ${gameTitle} that Video Game Wingman can answer with specific game information.`
         }
       ],
       temperature: 0.8, // Higher temperature for more natural variation

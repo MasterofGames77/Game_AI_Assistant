@@ -100,9 +100,9 @@ export async function fetchFromIGDB(gameTitle: string): Promise<string | null> {
 
     const response = await axios.post(
       'https://api.igdb.com/v4/games',
-      // Updated query format with proper escaping and simplified fields
+      // Fetch comprehensive metadata: name, release date, platforms, developers, publishers, genres, rating
       `search "${sanitizedTitle}";
-       fields name,first_release_date,platforms.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher;
+       fields name,first_release_date,platforms.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,genres.name,rating,aggregated_rating;
        limit 1;`,
       {
         headers: {
@@ -116,17 +116,35 @@ export async function fetchFromIGDB(gameTitle: string): Promise<string | null> {
     if (response.data && response.data.length > 0) {
       const game = response.data.find((g: any) => cleanAndMatchTitle(gameTitle, g.name));
       
-      // get developers, publishers, platforms, and release date
+      // Check if game was found before accessing properties
+      if (!game) {
+        return null;
+      }
+      
+      // Get comprehensive metadata: developers, publishers, platforms, release date, genres, rating
       const developers = game.involved_companies?.filter((ic: any) => ic.developer)
-        .map((ic: any) => ic.company.name).join(", ") || "unknown developers";
+        .map((ic: any) => ic.company?.name).filter(Boolean).join(", ") || "unknown developers";
       const publishers = game.involved_companies?.filter((ic: any) => ic.publisher)
-        .map((ic: any) => ic.company.name).join(", ") || "unknown publishers";
-      const platforms = game.platforms?.map((p: any) => p.name).join(", ") || "unknown platforms";
+        .map((ic: any) => ic.company?.name).filter(Boolean).join(", ") || "unknown publishers";
+      const platforms = game.platforms?.map((p: any) => p.name).filter(Boolean).join(", ") || "unknown platforms";
+      const genres = game.genres?.map((g: any) => g.name).filter(Boolean).join(", ") || null;
+      const rating = game.aggregated_rating ? Math.round(game.aggregated_rating) : (game.rating ? Math.round(game.rating) : null);
       const releaseDate = game.first_release_date 
         ? new Date(game.first_release_date * 1000).toLocaleDateString()
         : "unknown release date";
 
-      return `${game.name} was released on ${releaseDate}. It was developed by ${developers} and published by ${publishers} for ${platforms}.`;
+      // Build comprehensive response with all available metadata
+      let gameInfo = `${game.name} was released on ${releaseDate}. It was developed by ${developers} and published by ${publishers} for ${platforms}.`;
+      
+      if (genres) {
+        gameInfo += ` Genres: ${genres}.`;
+      }
+      
+      if (rating) {
+        gameInfo += ` Rating: ${rating}/100.`;
+      }
+
+      return gameInfo;
     }
     return null;
   } catch (error) {
@@ -191,6 +209,145 @@ async function fetchFromRAWG(gameTitle: string): Promise<string | null> {
     return null;
   } catch (error) {
     console.error("Error fetching data from RAWG:", error);
+    return null;
+  }
+}
+
+/**
+ * Fetch version/release information for a game from IGDB and RAWG
+ * Returns information about different platform releases, versions, and updates
+ */
+async function fetchVersionInfo(gameTitle: string): Promise<string | null> {
+  try {
+    const accessToken = await getClientCredentialsAccessToken();
+    const sanitizedTitle = gameTitle.replace(/"/g, '\\"');
+    
+    // Fetch game with release dates for different platforms (these can indicate different versions)
+    // Also fetch summary and storyline for context about the game
+    const response = await axios.post(
+      'https://api.igdb.com/v4/games',
+      `search "${sanitizedTitle}";
+       fields name,summary,storyline,release_dates.date,release_dates.platform.name,release_dates.region,platforms.name,version_parent.name;
+       limit 5;`,
+      {
+        headers: {
+          'Client-ID': process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID!,
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/json'
+        }
+      }
+    );
+
+    if (response.data && response.data.length > 0) {
+      const games = response.data.filter((g: any) => cleanAndMatchTitle(gameTitle, g.name));
+      
+      if (games.length === 0) {
+        return null;
+      }
+
+      const mainGame = games[0];
+      const versionInfo: string[] = [];
+      
+      // Add game summary/storyline for context (helps understand what the game is about)
+      if (mainGame.summary) {
+        versionInfo.push(`Game Summary: ${mainGame.summary.substring(0, 300)}${mainGame.summary.length > 300 ? '...' : ''}`);
+      }
+      
+      // Collect platform-specific release information
+      if (mainGame.release_dates && mainGame.release_dates.length > 0) {
+        const platformReleases = new Map<string, string[]>();
+        
+        for (const release of mainGame.release_dates) {
+          if (release.platform && release.date) {
+            const platformName = release.platform.name || 'Unknown Platform';
+            const releaseDate = new Date(release.date * 1000).toLocaleDateString();
+            const region = release.region ? ` (${release.region})` : '';
+            
+            if (!platformReleases.has(platformName)) {
+              platformReleases.set(platformName, []);
+            }
+            platformReleases.get(platformName)!.push(`${releaseDate}${region}`);
+          }
+        }
+        
+        if (platformReleases.size > 0) {
+          versionInfo.push('Platform Releases:');
+          for (const [platform, dates] of Array.from(platformReleases.entries())) {
+            versionInfo.push(`- ${platform}: ${dates.join(', ')}`);
+          }
+        }
+      }
+      
+      // Check for version parent (indicates this is a version/DLC of another game)
+      if (mainGame.version_parent) {
+        versionInfo.push(`This is a version/DLC of: ${mainGame.version_parent.name}`);
+      }
+      
+      // Check for other versions (games with same version_parent)
+      if (games.length > 1) {
+        versionInfo.push(`Found ${games.length} related entries for this game.`);
+      }
+      
+      // Also try RAWG for additional version info
+      const rawgInfo = await fetchVersionInfoFromRAWG(gameTitle);
+      if (rawgInfo) {
+        versionInfo.push(rawgInfo);
+      }
+      
+      // If we have platform information, add a note about potential differences
+      if (mainGame.platforms && mainGame.platforms.length > 1) {
+        const platformList = mainGame.platforms.map((p: any) => p.name).join(', ');
+        versionInfo.push(`Note: This game is available on multiple platforms (${platformList}). Platform versions may differ in graphics, performance, controls, or features due to hardware capabilities.`);
+      }
+      
+      return versionInfo.length > 0 ? versionInfo.join('\n') : null;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("Error fetching version info from IGDB:", error);
+    return null;
+  }
+}
+
+/**
+ * Fetch version information from RAWG API
+ */
+async function fetchVersionInfoFromRAWG(gameTitle: string): Promise<string | null> {
+  try {
+    const sanitizedTitle = gameTitle.toLowerCase().trim();
+    const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&search=${encodeURIComponent(sanitizedTitle)}`;
+    
+    const response = await axios.get(url);
+
+    if (response.data && response.data.results.length > 0) {
+      // Get all matches (might be different versions/platforms)
+      const matches = response.data.results.filter((g: any) => {
+        const normalizedGameName = g.name.toLowerCase().trim();
+        return normalizedGameName === sanitizedTitle || 
+               normalizedGameName.includes(sanitizedTitle) ||
+               sanitizedTitle.includes(normalizedGameName);
+      });
+
+      if (matches.length > 1) {
+        const versionList = matches.map((g: any) => {
+          const platforms = g.platforms?.map((p: any) => p.platform.name).join(', ') || 'Unknown';
+          const description = g.description_raw ? ` - ${g.description_raw.substring(0, 150)}...` : '';
+          return `- ${g.name} (${platforms}, Released: ${g.released || 'TBA'})${description}`;
+        }).join('\n');
+        
+        return `RAWG found multiple versions:\n${versionList}`;
+      } else if (matches.length === 1) {
+        const game = matches[0];
+        const platforms = game.platforms?.map((p: any) => p.platform.name).join(', ') || 'Unknown';
+        const description = game.description_raw ? `\nDescription: ${game.description_raw.substring(0, 200)}...` : '';
+        return `RAWG: Available on ${platforms} (Released: ${game.released || 'TBA'})${description}`;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("Error fetching version info from RAWG:", error);
     return null;
   }
 }
@@ -658,30 +815,111 @@ export const getChatCompletion = async (question: string, systemMessage?: string
       }
     }
 
-    // Extract game title from question before calling APIs (to avoid sending full enhanced context)
-    const extractedGameTitle = await extractGameTitleFromQuestion(question);
-    const searchQuery = extractedGameTitle || question;
+    // Determine if this is a factual metadata question (can use IGDB/RAWG) or a specific gameplay question (needs OpenAI)
+    const lowerQuestion = question.toLowerCase();
     
-    // Limit search query to 255 characters (IGDB limit) and extract just the game title part
-    const limitedQuery = searchQuery.length > 255 
-      ? (extractedGameTitle || searchQuery.substring(0, 252) + '...')
-      : searchQuery;
+    // Factual metadata questions that IGDB/RAWG can answer:
+    // - Release dates, platforms, developers, publishers, genres, ratings, etc.
+    const isMetadataQuestion = /when (was|is|did)|release date|released|came out|what (platform|system|console|developer|publisher|studio|company|year|genre|genres|rating|score|metacritic)|who (developed|published|made|created)|which (platform|system|console|genre)|is.*available (on|for)|can.*play (on|for)/i.test(lowerQuestion);
     
-    let response = await fetchFromIGDB(limitedQuery);
-    if (!response) {
-      response = await fetchFromRAWG(limitedQuery);
+    // Check for specific gameplay questions (items, mechanics, strategies, etc.)
+    // This includes questions about brands, items, characters, strategies, unlocks, comparisons, etc.
+    // These need OpenAI's knowledge base, not just metadata APIs
+    const isSpecificQuestion = /(what|which|how|where|who|list|name|are|is).*(brand|brands|item|items|weapon|weapons|armor|equipment|character|characters|strategy|strategies|tip|tips|unlock|unlocks|obtain|get|find|catch|defeat|beat|complete|solve|build|class|classes|skill|skills|ability|abilities|mechanic|mechanics|feature|features|difference|differences|compare|comparison|version|versions|edition|editions|best|fastest|strongest|weakest|available|different|types|kinds|ways|methods|approaches|location|locations|boss|bosses|enemy|enemies|quest|quests|mission|missions)/i.test(lowerQuestion) || 
+                               /(difference|differences|compare|comparison|between|versus|vs).*(version|versions|edition|editions|platform|platforms|console|consoles)/i.test(lowerQuestion);
+    
+    let response: string | null = null;
+    
+    // For factual metadata questions, try IGDB/RAWG first (they have accurate metadata)
+    if (isMetadataQuestion && !isSpecificQuestion) {
+      const extractedGameTitle = await extractGameTitleFromQuestion(question);
+      const searchQuery = extractedGameTitle || question;
+      
+      // Limit search query to 255 characters (IGDB limit) and extract just the game title part
+      const limitedQuery = searchQuery.length > 255 
+        ? (extractedGameTitle || searchQuery.substring(0, 252) + '...')
+        : searchQuery;
+      
+      response = await fetchFromIGDB(limitedQuery);
+      if (!response) {
+        response = await fetchFromRAWG(limitedQuery);
+      }
     }
+    
+    // For specific gameplay questions or if IGDB/RAWG didn't return data, use OpenAI
+    // This ensures we get detailed answers for specific questions
+    if (!response || isSpecificQuestion) {
+      // For specific questions, enhance the prompt with game context if available
+      let enhancedQuestion = question;
+      let gameTitleForContext: string | undefined;
+      
+      if (isSpecificQuestion) {
+        const extractedGameTitle = await extractGameTitleFromQuestion(question);
+        gameTitleForContext = extractedGameTitle;
+        
+        // Check if this is a version comparison question
+        const isVersionQuestion = /(version|versions|edition|editions|difference|differences|compare|comparison|between).*(version|versions|edition|editions|platform|platforms)/i.test(lowerQuestion);
+        
+        if (extractedGameTitle) {
+          // For version questions, fetch detailed version information
+          if (isVersionQuestion) {
+            const versionInfo = await fetchVersionInfo(extractedGameTitle);
+            const gameContext = await fetchFromIGDB(extractedGameTitle) || await fetchFromRAWG(extractedGameTitle);
+            
+            if (versionInfo || gameContext) {
+              let contextParts = [];
+              if (gameContext) contextParts.push(`Game Context: ${gameContext}`);
+              if (versionInfo) contextParts.push(`Version/Release Information:\n${versionInfo}`);
+              
+              enhancedQuestion = `Question: ${question}\n\nGame: ${extractedGameTitle}\n${contextParts.join('\n\n')}\n\nPlease provide a detailed answer about the differences between versions/editions/platforms of ${extractedGameTitle}. 
 
-    // If no response from APIs, fall back to OpenAI completion
-    if (!response) {
+IMPORTANT INSTRUCTIONS:
+- Use the platform and release information provided above to identify which platforms/versions exist
+- For each platform/version mentioned, explain specific differences in:
+  * Gameplay mechanics (controls, features, mechanics)
+  * Graphics and performance (visual quality, frame rate, resolution)
+  * Content (exclusive features, DLC, updates)
+  * Hardware requirements and capabilities
+- Be specific and factual - base your answer on the platform information provided
+- If the version information shows different platforms, explain how hardware differences affect gameplay mechanics
+- Avoid generic statements - use the actual platform names and release dates from the information above`;
+            } else {
+              enhancedQuestion = `Question: ${question}\n\nGame: ${extractedGameTitle}\n\nPlease provide a detailed answer about the differences between versions/editions/platforms of ${extractedGameTitle}. If you don't have specific information about version differences, clearly state that rather than providing generic information.`;
+            }
+          } else {
+            // For non-version questions, use standard game context
+            const gameContext = await fetchFromIGDB(extractedGameTitle) || await fetchFromRAWG(extractedGameTitle);
+            if (gameContext) {
+              // Add game context to help the AI provide accurate answers
+              enhancedQuestion = `Question: ${question}\n\nGame: ${extractedGameTitle}\nGame Context: ${gameContext}\n\nPlease provide a detailed, accurate answer to the question about ${extractedGameTitle}. Focus on the specific game mentioned and be factual.`;
+            } else {
+              // Even without API context, emphasize the game title
+              enhancedQuestion = `Question: ${question}\n\nGame: ${extractedGameTitle}\n\nPlease provide a detailed answer about ${extractedGameTitle}. Be specific and factual. If you don't have specific information about this game or its versions, clearly state that rather than providing generic information.`;
+            }
+          }
+        }
+      }
+      
+      // Enhanced system message for better answer quality
+      const enhancedSystemMessage = systemMessage || `You are Video Game Wingman, an expert AI assistant specializing in video games. 
+
+CRITICAL INSTRUCTIONS:
+- Always identify and use the CORRECT game title from the question (e.g., if the question mentions "Deisim", answer about Deisim, not a different game)
+- Provide accurate, detailed answers about game mechanics, items, characters, strategies, versions, and gameplay
+- Be specific and factual - cite specific features, mechanics, or details when possible
+- For version comparison questions, clearly explain the differences between versions
+- If you don't have specific information about a game or its versions, clearly state: "I don't have specific information about [game title] or its different versions" rather than guessing or providing generic information
+- Never confuse game titles or provide information about the wrong game
+${gameTitleForContext ? `- The game being asked about is: ${gameTitleForContext}` : ''}`;
+      
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
           { 
             role: 'system', 
-            content: systemMessage || 'You are an AI assistant specializing in video games. You can provide detailed analytics and insights into gameplay, helping players track their progress and identify areas for improvement.' 
+            content: enhancedSystemMessage
           },
-          { role: 'user', content: question }
+          { role: 'user', content: enhancedQuestion }
         ],
         max_completion_tokens: 800,
       });
@@ -1231,11 +1469,12 @@ function extractGameTitleCandidates(question: string): string[] {
     candidates.push(quotedMatch[1].trim());
   }
 
-  // Strategy 2: "in [Game Title]", "for [Game Title]" patterns
+  // Strategy 2: "in [Game Title]", "for [Game Title]", "of [Game Title]" patterns
   // Updated to handle special characters (é, ü, ö, ō, etc.) and roman numerals (X, Y, III, etc.)
   // Improved to stop at common verbs and question words to avoid capturing too much
   // Character class includes: À-ÿ (Latin-1), Ā-ž (Latin Extended-A), and common Unicode letters
-  const inGamePattern = /\b(?:in|for|from|on)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&-]+?)(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)|$|[?.!])/gi;
+  // Added "of" to catch patterns like "versions of Deisim", "differences between versions of [Game]"
+  const inGamePattern = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&-]+?)(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)|$|[?.!])/gi;
   let match: RegExpExecArray | null;
   while ((match = inGamePattern.exec(question)) !== null) {
     if (match[1]) {
@@ -1253,19 +1492,42 @@ function extractGameTitleCandidates(question: string): string[] {
       if (candidate.length >= 3 && !/^(what|which|where|when|why|how|who)$/i.test(candidate)) {
         // Check for non-game indicators (phrases that indicate this isn't a game title)
         const lowerCandidate = candidate.toLowerCase();
-        if (!lowerCandidate.includes('kart has') && 
-            !lowerCandidate.includes('is the') &&
-            !lowerCandidate.includes('best way') &&
-            !lowerCandidate.includes('battle and catch') &&
-            !lowerCandidate.includes('has the') &&
-            !lowerCandidate.includes('has highest') &&
-            !lowerCandidate.includes('has best') &&
-            !lowerCandidate.includes('has the lowest') &&
-            !lowerCandidate.includes('has the worst') &&
-            !lowerCandidate.includes('CTGP') &&
-            !lowerCandidate.includes('has the slowest') &&
-            !lowerCandidate.includes('has the easiest') &&
-            !lowerCandidate.includes('has the hardest')) {
+        // Filter out common non-game phrases
+        const nonGamePhrases = [
+          'kart has', 'is the', 'best way', 'battle and catch', 'has the', 'has highest',
+          'has best', 'has the lowest', 'has the worst', 'CTGP', 'has the slowest',
+          'has the easiest', 'has the hardest', 'gameplay mechanics', 'mechanics',
+          'gameplay', 'different versions', 'versions', 'key differences', 'differences',
+          'between', 'version', 'edition', 'editions'
+        ];
+        
+        const isNonGamePhrase = nonGamePhrases.some(phrase => lowerCandidate.includes(phrase));
+        
+        // Also check if it's a very generic phrase (all lowercase common words)
+        const isGenericPhrase = /^(the|a|an|this|that|these|those|some|any|all|each|every)\s+/i.test(candidate) &&
+                                candidate.split(/\s+/).length <= 3;
+        
+        if (!isNonGamePhrase && !isGenericPhrase) {
+          candidates.push(candidate);
+        }
+      }
+    }
+  }
+
+  // Strategy 2.5: "versions of [Game]", "differences between...of [Game]" patterns
+  // This catches cases like "differences between versions of Deisim"
+  const ofGamePattern = /\b(?:versions?|editions?|differences?|between|comparison|compare)\s+(?:between\s+)?(?:the\s+)?(?:different\s+)?(?:versions?|editions?)\s+of\s+([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&-]+?)(?:\s*$|[?.!])/gi;
+  while ((match = ofGamePattern.exec(question)) !== null) {
+    if (match[1]) {
+      let candidate = match[1].trim();
+      // Clean up trailing words
+      candidate = candidate.replace(/\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)$/i, '');
+      if (candidate.length >= 3 && candidate.length <= 50) {
+        const lowerCandidate = candidate.toLowerCase();
+        // Filter out non-game phrases
+        if (!lowerCandidate.includes('gameplay mechanics') && 
+            !lowerCandidate.includes('mechanics') &&
+            !lowerCandidate.includes('gameplay')) {
           candidates.push(candidate);
         }
       }
@@ -1275,19 +1537,33 @@ function extractGameTitleCandidates(question: string): string[] {
   // Strategy 3: Proper noun patterns (capitalized words, including special chars)
   // Also matches patterns like "Pokémon X and Y", "Final Fantasy VII", "God of War Ragnarök"
   // Character class includes: À-ÿ (Latin-1), Ā-ž (Latin Extended-A) for characters like ö, ō
+  // Prioritize proper nouns that appear later in the question (game titles often come after question setup)
   const properNounPattern = /\b([A-ZÀ-ÿĀ-ž][a-zÀ-ÿĀ-ž]+(?:\s+(?:[A-ZÀ-ÿĀ-ž][a-zÀ-ÿĀ-ž]+|[IVXLCDM]+|\band\b)){1,4})\b/g;
+  const properNounMatches: Array<{ candidate: string; index: number }> = [];
   while ((match = properNounPattern.exec(question)) !== null) {
     if (match[1]) {
       let candidate = match[1].trim();
       // Skip if it's at the start of a sentence (likely not a game)
       const candidateIndex = question.indexOf(candidate);
-      if (candidateIndex > 0 && candidate.length >= 5) {
-        // Filter out common question starters
-        if (!/^(How|What|Where|When|Why|Which|Who)\s+/.test(candidate)) {
-          candidates.push(candidate);
+      if (candidateIndex > 0 && candidate.length >= 3) {
+        // Filter out common question starters and non-game phrases
+        const lowerCandidate = candidate.toLowerCase();
+        if (!/^(How|What|Where|When|Why|Which|Who)\s+/.test(candidate) &&
+            !lowerCandidate.includes('gameplay mechanics') &&
+            !lowerCandidate.includes('mechanics') &&
+            !lowerCandidate.includes('gameplay') &&
+            !lowerCandidate.includes('versions') &&
+            !lowerCandidate.includes('differences')) {
+          properNounMatches.push({ candidate, index: candidateIndex });
         }
       }
     }
+  }
+  
+  // Sort by position (later in question = more likely to be game title) and add to candidates
+  properNounMatches.sort((a, b) => b.index - a.index);
+  for (const match of properNounMatches) {
+    candidates.push(match.candidate);
   }
 
   // Strategy 4: Extract from "What [item] in [game]?" patterns (with special char support)
@@ -1577,12 +1853,20 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
 
   try {
     // Extract potential game title candidates
-    const candidates = extractGameTitleCandidates(question);
+    let candidates = extractGameTitleCandidates(question);
     
     if (candidates.length === 0) {
       // console.log('[Game Title] No candidates extracted from question');
       return undefined;
     }
+
+    // Sort candidates by position in question (later = more likely to be game title)
+    // This helps prioritize "Deisim" over "Gameplay Mechanics" in questions like
+    // "What are the key differences in gameplay mechanics between the different versions of Deisim?"
+    candidates = candidates.map(candidate => ({
+      candidate,
+      position: question.toLowerCase().indexOf(candidate.toLowerCase())
+    })).sort((a, b) => b.position - a.position).map(item => item.candidate);
 
     // console.log(`[Game Title] Extracted ${candidates.length} candidate(s):`, candidates);
 
@@ -1896,19 +2180,30 @@ function detectInteractionType(question: string): string | undefined {
   const lowerQuestion = question.toLowerCase();
   const questionLength = question.length;
 
-  // Fast tip - short, direct questions
-  if (questionLength < 50 && /^(what|where|when|how|who|which|is|can|does|do)\s+/i.test(question)) {
-    return 'fast_tip';
+  // Quick fact - simple factual questions about release dates, platforms, developers, publishers
+  // These are informational queries that get quick factual responses
+  if (/when (was|is)|released|release date|what (platform|system|console|developer|publisher|studio|company|year)|who (developed|published|made|created)/i.test(lowerQuestion)) {
+    return 'quick_fact';
   }
 
-  // Detailed guide - longer questions with multiple requests or detailed context
-  if (questionLength > 100 || /guide|walkthrough|explain|detailed|step by step|comprehensive/i.test(lowerQuestion)) {
-    return 'detailed_guide';
+  // Strategy/tips - questions about strategies, best practices, tips, how-to questions
+  // Check this before detailed_guide to catch simple "how to" questions
+  if (/strategy|strategies|best (way|method|approach|build|character|class|weapon|item)|tip|tips|how (do|can|should|to) (i|you)/i.test(lowerQuestion)) {
+    // If it's a long question with "how to", it might be a detailed guide
+    if (questionLength > 80 && /how to/i.test(lowerQuestion)) {
+      return 'detailed_guide';
+    }
+    return 'strategy_tip';
   }
 
   // Item lookup - specific item/equipment questions
-  if (/what (is|does|are)|item|weapon|armor|equipment|gear/i.test(lowerQuestion)) {
+  if (/what (is|does|are)|item|weapon|armor|equipment|gear|unlock|obtain|get|find/i.test(lowerQuestion)) {
     return 'item_lookup';
+  }
+
+  // Detailed guide - longer questions with multiple requests or detailed context
+  if (questionLength > 100 || /guide|walkthrough|explain|detailed|step by step|comprehensive|tutorial/i.test(lowerQuestion)) {
+    return 'detailed_guide';
   }
 
   // Comparison - questions asking to compare options
@@ -1916,16 +2211,22 @@ function detectInteractionType(question: string): string | undefined {
     return 'comparison';
   }
 
-  // Quick answer - very short questions
+  // Quick answer - very short questions (< 30 chars)
   if (questionLength < 30) {
     return 'quick_answer';
   }
 
-  // Default to detailed_guide for longer questions
+  // Fast tip - short, direct questions (30-60 chars)
+  if (questionLength < 60 && /^(what|where|when|how|who|which|is|can|does|do)\s+/i.test(question)) {
+    return 'fast_tip';
+  }
+
+  // Default to detailed_guide for longer questions (> 60 chars)
   if (questionLength > 60) {
     return 'detailed_guide';
   }
 
+  // Fallback to fast_tip for medium-length questions
   return 'fast_tip';
 }
 
@@ -3376,17 +3677,219 @@ export const testTemplateSystem = (): {
       difficulty: 'advanced',
       context: { speedrunTech: 'wave dashing and wall jumping' },
     },
+    {
+      genre: 'platformer',
+      difficulty: 'beginner',
+      context: { basicMovement: 'jumping and running mechanics' },
+    },
     // Test with missing context (should show placeholders or handle gracefully)
     {
       genre: 'puzzle',
       difficulty: 'beginner',
       context: {}, // No context provided
     },
+    {
+      genre: 'puzzle',
+      difficulty: 'intermediate',
+      context: { puzzleType: 'logic puzzles and pattern recognition' },
+    },
+    // Simulation (MysteriousMrEnter genre)
+    {
+      genre: 'simulation',
+      difficulty: 'beginner',
+      context: { resourceManagement: 'managing time and resources efficiently' },
+    },
+    {
+      genre: 'simulation',
+      difficulty: 'intermediate',
+      context: { optimizationTips: 'balancing production chains and efficiency' },
+    },
+    {
+      genre: 'simulation',
+      difficulty: 'advanced',
+      context: { advancedMechanics: 'complex economic systems and automation' },
+    },
+    // Racing (WaywardJammer genre)
+    {
+      genre: 'racing',
+      difficulty: 'beginner',
+      context: { basicDriving: 'braking and cornering techniques' },
+    },
+    {
+      genre: 'racing',
+      difficulty: 'intermediate',
+      context: { racingLine: 'optimal racing line and drafting strategies' },
+    },
+    {
+      genre: 'racing',
+      difficulty: 'advanced',
+      context: { advancedTech: 'drift mechanics and boost management' },
+    },
+    // Battle Royale (WaywardJammer genre)
+    {
+      genre: 'battle-royale',
+      difficulty: 'beginner',
+      context: { survivalTips: 'landing zones and early game looting' },
+    },
+    {
+      genre: 'battle-royale',
+      difficulty: 'intermediate',
+      context: { positioning: 'zone positioning and engagement timing' },
+    },
+    {
+      genre: 'battle-royale',
+      difficulty: 'advanced',
+      context: { endgameStrategy: 'final circle positioning and inventory management' },
+    },
+    // Fighting (WaywardJammer genre)
+    {
+      genre: 'fighting',
+      difficulty: 'beginner',
+      context: { basicCombos: 'simple combo strings and blocking' },
+    },
+    {
+      genre: 'fighting',
+      difficulty: 'intermediate',
+      context: { frameData: 'frame advantage and combo optimization' },
+    },
+    {
+      genre: 'fighting',
+      difficulty: 'advanced',
+      context: { advancedTech: 'option selects and mix-up strategies' },
+    },
+    // Sandbox (WaywardJammer genre)
+    {
+      genre: 'sandbox',
+      difficulty: 'beginner',
+      context: { buildingBasics: 'basic construction and resource gathering' },
+    },
+    {
+      genre: 'sandbox',
+      difficulty: 'intermediate',
+      context: { automation: 'redstone circuits and automation systems' },
+    },
+    {
+      genre: 'sandbox',
+      difficulty: 'advanced',
+      context: { complexBuilds: 'advanced building techniques and modding' },
+    },
+    // First-Person Shooter (WaywardJammer genre - more specific than generic shooter)
+    {
+      genre: 'fps',
+      difficulty: 'beginner',
+      context: { aimBasics: 'crosshair placement and recoil control' },
+    },
+    {
+      genre: 'fps',
+      difficulty: 'intermediate',
+      context: { movementTech: 'strafe jumping and map control' },
+    },
+    {
+      genre: 'fps',
+      difficulty: 'advanced',
+      context: { competitivePlay: 'team coordination and utility usage' },
+    },
+    // Additional common genres
+    {
+      genre: 'sports',
+      difficulty: 'beginner',
+      context: { basicControls: 'passing and shooting mechanics' },
+    },
+    {
+      genre: 'sports',
+      difficulty: 'intermediate',
+      context: { strategy: 'formation tactics and player positioning' },
+    },
+    {
+      genre: 'horror',
+      difficulty: 'beginner',
+      context: { survivalTips: 'resource conservation and stealth mechanics' },
+    },
+    {
+      genre: 'horror',
+      difficulty: 'intermediate',
+      context: { puzzleSolving: 'environmental puzzles and item usage' },
+    },
+    {
+      genre: 'survival',
+      difficulty: 'beginner',
+      context: { resourceGathering: 'food, water, and shelter basics' },
+    },
+    {
+      genre: 'survival',
+      difficulty: 'intermediate',
+      context: { crafting: 'advanced crafting recipes and base building' },
+    },
+    {
+      genre: 'mmo',
+      difficulty: 'beginner',
+      context: { classSelection: 'choosing the right class for your playstyle' },
+    },
+    {
+      genre: 'mmo',
+      difficulty: 'intermediate',
+      context: { endgameContent: 'raids, dungeons, and gear progression' },
+    },
+    {
+      genre: 'indie',
+      difficulty: 'beginner',
+      context: { uniqueMechanics: 'understanding the game\'s unique systems' },
+    },
+    {
+      genre: 'casual',
+      difficulty: 'beginner',
+      context: { accessibility: 'easy-to-learn mechanics and progression' },
+    },
+    {
+      genre: 'stealth',
+      difficulty: 'intermediate',
+      context: { stealthMechanics: 'hiding, distraction, and silent takedowns' },
+    },
+    {
+      genre: 'stealth',
+      difficulty: 'advanced',
+      context: { ghostRuns: 'no-kill, no-detection playthrough strategies' },
+    },
+    {
+      genre: 'rhythm',
+      difficulty: 'beginner',
+      context: { timing: 'beat matching and rhythm patterns' },
+    },
+    {
+      genre: 'rhythm',
+      difficulty: 'advanced',
+      context: { perfectScores: 'mastering complex patterns and timing windows' },
+    },
+    {
+      genre: 'tower-defense',
+      difficulty: 'beginner',
+      context: { placement: 'optimal tower placement and upgrade priorities' },
+    },
+    {
+      genre: 'tower-defense',
+      difficulty: 'intermediate',
+      context: { waveManagement: 'resource management and enemy type counters' },
+    },
     // Test genre variant matching
     {
       genre: 'action-rpg',
       difficulty: 'beginner',
       context: { primaryStat: 'agility' },
+    },
+    {
+      genre: 'action-adventure',
+      difficulty: 'intermediate',
+      context: { exploration: 'finding secrets and optional content' },
+    },
+    {
+      genre: 'real-time-strategy',
+      difficulty: 'intermediate',
+      context: { buildOrder: 'optimal unit production and tech progression' },
+    },
+    {
+      genre: 'turn-based-strategy',
+      difficulty: 'beginner',
+      context: { positioning: 'unit placement and tactical movement' },
     },
     // Test with unknown genre
     {

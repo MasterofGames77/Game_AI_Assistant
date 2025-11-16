@@ -186,6 +186,7 @@ const OFFENSIVE_WORDS = [
   'Aileen Cannon',
   'Tommy Tuberville',
   'Brandon Carr',
+  'Elaine Pelino',
   'Dr. Oz',
   'Mehmet Oz',
   'Julie Fedorchak',

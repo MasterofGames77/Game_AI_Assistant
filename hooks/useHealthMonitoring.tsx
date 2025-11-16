@@ -234,7 +234,8 @@ const useHealthMonitoring = ({
 
   // Function to update timer locally (real-time countdown)
   const updateTimerLocally = () => {
-    if (!username || !isEnabled) {
+    // Use ref to get current isEnabled value to avoid closure issues
+    if (!username || !isEnabledRef.current) {
       // Ensure isMonitoring is false when disabled
       setHealthStatus((prev) => {
         if (prev.isMonitoring) {
@@ -381,10 +382,22 @@ const useHealthMonitoring = ({
           timeSinceLastBreak >= breakIntervalMinutesRef.current;
 
         // If we have an override remaining time, don't overwrite countdown here
+        // But we should still update nextBreakIn from the override to keep it in sync
         if (remainingSecondsOverrideRef.current !== null) {
-          // Keep breakCount / flags in sync though
+          // Calculate nextBreakIn from the override to ensure it's current
+          const nextBreakIn = Math.ceil(
+            remainingSecondsOverrideRef.current / 60
+          );
+          const shouldShowBreak = nextBreakIn === 0;
+
+          // Keep breakCount / flags in sync, and update nextBreakIn from override
           setHealthStatus((prev) => ({
             ...prev,
+            shouldShowBreak,
+            nextBreakIn,
+            timeSinceLastBreak: shouldShowBreak
+              ? breakIntervalMinutesRef.current
+              : breakIntervalMinutesRef.current - nextBreakIn,
             breakCount: data.breakCount,
             isMonitoring: isEnabled, // Use current isEnabled state
             isOnBreak: data.isOnBreak,
@@ -782,17 +795,25 @@ const useHealthMonitoring = ({
 
     // Start local timer for real-time countdown (every second) - only if break reminders enabled
     if (isEnabled) {
+      // Clear any existing interval first to avoid duplicates
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
       timerIntervalRef.current = setInterval(() => {
         updateTimerLocally();
       }, 1000);
+      // Update immediately on start
+      updateTimerLocally();
+    } else {
+      // Clear timer interval if disabled
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
     }
 
-    // If we restored a remaining time override, update the timer IMMEDIATELY
-    // before checkHealthStatus runs, so the state is correct when checkHealthStatus preserves it
-    // ONLY if break reminders are enabled
-    if (isEnabled && remainingSecondsOverrideRef.current !== null) {
-      updateTimerLocally();
-    }
+    // Note: updateTimerLocally() is already called immediately after starting the interval above
+    // so we don't need to call it again here
 
     // Check immediately on first load (but only after we've set the override state if it exists)
     // Delay checkHealthStatus slightly if we have an override to ensure updateTimerLocally runs first

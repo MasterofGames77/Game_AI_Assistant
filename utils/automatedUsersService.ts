@@ -209,31 +209,79 @@ async function createForumForGame(
 }
 
 /**
+ * Find a suitable forum for posting
+ * Prioritizes forums created by the user, then forums for games in their preferred genres
+ */
+function findSuitableForum(
+  forums: any[],
+  username: string,
+  preferredGameTitle?: string,
+  preferredGenre?: string
+): any | null {
+  if (forums.length === 0) {
+    return null;
+  }
+
+  // Priority 1: Forums created by this user for the preferred game
+  if (preferredGameTitle) {
+    const userCreatedForumForGame = forums.find((f: any) => 
+      f.createdBy === username &&
+      (f.gameTitle?.toLowerCase() === preferredGameTitle.toLowerCase() ||
+       f.title?.toLowerCase().includes(preferredGameTitle.toLowerCase()))
+    );
+    if (userCreatedForumForGame) {
+      return userCreatedForumForGame;
+    }
+  }
+
+  // Priority 2: Any forum for the preferred game (created by anyone)
+  if (preferredGameTitle) {
+    const forumForGame = forums.find((f: any) => 
+      f.gameTitle?.toLowerCase() === preferredGameTitle.toLowerCase() ||
+      f.title?.toLowerCase().includes(preferredGameTitle.toLowerCase())
+    );
+    if (forumForGame) {
+      return forumForGame;
+    }
+  }
+
+  // Priority 3: Forums created by this user (any game in their preferred genres)
+  const userCreatedForums = forums.filter((f: any) => f.createdBy === username);
+  if (userCreatedForums.length > 0) {
+    // Return a random forum created by the user to add variety
+    return userCreatedForums[Math.floor(Math.random() * userCreatedForums.length)];
+  }
+
+  // Priority 4: Any active forum (to encourage participation in existing discussions)
+  // Filter to only include forums that are active and have some activity
+  const activeForums = forums.filter((f: any) => 
+    f.metadata?.status === 'active' && 
+    (f.metadata?.totalPosts > 0 || f.posts?.length > 0)
+  );
+  if (activeForums.length > 0) {
+    // Return a random active forum
+    return activeForums[Math.floor(Math.random() * activeForums.length)];
+  }
+
+  // Priority 5: Any forum at all
+  return forums[Math.floor(Math.random() * forums.length)];
+}
+
+/**
  * Create a forum post
+ * Can post to existing forums (including ones created by the user) or create new forums
  */
 export async function createForumPost(
   username: string,
   userPreferences: UserPreferences
 ): Promise<ActivityResult> {
   try {
-    // Select a random game first
-    const gameSelection = selectRandomGame(userPreferences);
-    if (!gameSelection) {
-      return {
-        success: false,
-        message: 'No games available for user preferences',
-        error: 'No games found'
-      };
-    }
-    
-    const { gameTitle, genre } = gameSelection;
-    
-    // Get list of active forums
+    // Get list of active forums first
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
     let forumsResponse;
     try {
       forumsResponse = await axios.get(
-        `${baseUrl}/api/getAllForums?username=${username}`,
+        `${baseUrl}/api/getAllForums?username=${username}&limit=100`, // Get more forums to have better selection
         {
           headers: {
             'username': username
@@ -247,18 +295,37 @@ export async function createForumPost(
     
     const forums = forumsResponse.data.forums || [];
     
-    // Try to find a forum for this specific game
-    let targetForum = forums.find((f: any) => 
-      f.gameTitle?.toLowerCase() === gameTitle.toLowerCase() ||
-      f.title?.toLowerCase().includes(gameTitle.toLowerCase())
-    );
+    // Select a random game from user's preferences
+    const gameSelection = selectRandomGame(userPreferences);
+    if (!gameSelection) {
+      return {
+        success: false,
+        message: 'No games available for user preferences',
+        error: 'No games found'
+      };
+    }
+    
+    const { gameTitle, genre } = gameSelection;
+    
+    // Try to find a suitable existing forum
+    let targetForum = findSuitableForum(forums, username, gameTitle, genre);
     
     let forumId: string;
     let forumTitle: string;
+    let actualGameTitle: string;
+    let actualGenre: string;
     
-    // If no forum exists for this game, create one
-    if (!targetForum) {
-      console.log(`No forum found for ${gameTitle}, creating new forum...`);
+    if (targetForum) {
+      // Use existing forum
+      forumId = targetForum.forumId || targetForum._id;
+      forumTitle = targetForum.title || targetForum.gameTitle || 'General Discussion';
+      // Use the game title from the forum if available, otherwise use the selected game
+      actualGameTitle = targetForum.gameTitle || gameTitle;
+      actualGenre = genre; // Keep the genre from selection for content generation
+      console.log(`Posting to existing forum: ${forumTitle} (created by: ${targetForum.createdBy || 'unknown'})`);
+    } else {
+      // No suitable forum found, create a new one
+      console.log(`No suitable forum found for ${gameTitle}, creating new forum...`);
       const newForum = await createForumForGame(username, gameTitle, genre);
       
       if (!newForum) {
@@ -271,16 +338,15 @@ export async function createForumPost(
       
       forumId = newForum.forumId;
       forumTitle = newForum.forumTitle;
-    } else {
-      // Use existing forum
-      forumId = targetForum.forumId || targetForum._id;
-      forumTitle = targetForum.title || targetForum.gameTitle || 'General Discussion';
+      actualGameTitle = gameTitle;
+      actualGenre = genre;
+      console.log(`Created new forum: ${forumTitle}`);
     }
     
-    // Generate natural forum post
+    // Generate natural forum post using the actual game title from the forum
     const postContent = await generateForumPost({
-      gameTitle,
-      genre,
+      gameTitle: actualGameTitle,
+      genre: actualGenre,
       userPreferences,
       forumTopic: forumTitle
     });
@@ -300,10 +366,10 @@ export async function createForumPost(
     let imagePath: string | null = null;
     let attachments: any[] = [];
     
-    const gameImage = getRandomGameImage(gameTitle, username);
+    const gameImage = getRandomGameImage(actualGameTitle, username);
     if (gameImage) {
       // Image found - record that this user has used this image for this game
-      recordImageUsage(username, gameTitle, gameImage);
+      recordImageUsage(username, actualGameTitle, gameImage);
       
       // Image found - need to upload it via the upload endpoint
       // For now, we'll post without image if upload fails
@@ -337,11 +403,12 @@ export async function createForumPost(
       details: {
         forumId,
         forumTitle,
-        gameTitle,
-        genre,
+        gameTitle: actualGameTitle,
+        genre: actualGenre,
         postContent,
         imageUsed: imagePath !== null,
-        postId: postResponse.data.post?._id
+        postId: postResponse.data.post?._id,
+        postedToExistingForum: targetForum !== null
       }
     };
   } catch (error) {
