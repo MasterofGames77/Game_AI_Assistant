@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
-import { HealthMonitoringProps, HealthStatus } from "../types";
+import { HealthMonitoringProps, HealthStatus, StoredTimerData } from "../types";
+
+// ADD THESE LINES HERE (after imports):
+// Storage key helper
+const getStorageKey = (username: string) => `vgw_health_timer_${username}`;
 
 const useHealthMonitoring = ({
   username,
@@ -30,30 +34,119 @@ const useHealthMonitoring = ({
   const lastTickAtRef = useRef<number | null>(null);
   // Track current enabled state in a ref so cleanup can check current value
   const isEnabledRef = useRef<boolean>(isEnabled);
+  // Track if timer was restored from localStorage
+  const timerRestoredRef = useRef<boolean>(false);
+  // Track if we're currently initializing to prevent double calls
+  const isInitializingRef = useRef<boolean>(false);
+  // Track if startSession has been called to prevent double calls
+  const startSessionCalledRef = useRef<boolean>(false);
+  // Track if restore has completed to prevent other code from running before restore
+  const restoreCompletedRef = useRef<boolean>(false);
+  // Track if component is initialized to prevent saving default state before restore
+  const isInitializedRef = useRef<boolean>(false);
+
+  // ADD THESE THREE FUNCTIONS HERE (before startSession):
+
+  // Save timer state to localStorage
+  const saveTimerState = () => {
+    if (!username || !isEnabledRef.current) return;
+
+    try {
+      const remainingSec = remainingSecondsOverrideRef.current;
+      const sessionStart = sessionStartTimeRef.current?.getTime();
+
+      if (remainingSec !== null && remainingSec > 0 && sessionStart) {
+        const data: StoredTimerData = {
+          remainingSeconds: remainingSec,
+          timestamp: Date.now(),
+          sessionStartTime: sessionStart,
+          breakIntervalMinutes: breakIntervalMinutesRef.current,
+        };
+
+        localStorage.setItem(getStorageKey(username), JSON.stringify(data));
+        console.log("Timer state saved:", {
+          remainingMinutes: Math.floor(remainingSec / 60),
+          sessionStart: new Date(sessionStart).toISOString(),
+        });
+      }
+    } catch (e) {
+      console.error("Error saving timer state:", e);
+    }
+  };
+
+  // Restore timer state from localStorage
+  const restoreTimerState = (): boolean => {
+    if (!username || !isEnabledRef.current) return false;
+
+    try {
+      const stored = localStorage.getItem(getStorageKey(username));
+      if (!stored) return false;
+
+      const data: StoredTimerData = JSON.parse(stored);
+      const now = Date.now();
+      const elapsedHours = (now - data.timestamp) / (1000 * 60 * 60);
+
+      // Validate: must be within 24 hours
+      if (elapsedHours >= 24) {
+        console.log("Stored timer expired (>24 hours), clearing...");
+        localStorage.removeItem(getStorageKey(username));
+        return false;
+      }
+
+      // Restore state
+      remainingSecondsOverrideRef.current = data.remainingSeconds;
+      lastTickAtRef.current = now;
+      breakIntervalMinutesRef.current = data.breakIntervalMinutes;
+      sessionStartTimeRef.current = new Date(data.sessionStartTime);
+      timerRestoredRef.current = true;
+
+      console.log("Timer state restored:", {
+        remainingMinutes: Math.floor(data.remainingSeconds / 60),
+        elapsedHours: elapsedHours.toFixed(2),
+        sessionStart: new Date(data.sessionStartTime).toISOString(),
+      });
+
+      return true;
+    } catch (e) {
+      console.error("Error restoring timer state:", e);
+      return false;
+    }
+  };
+
+  // Clear timer state from localStorage
+  const clearTimerState = () => {
+    if (!username) return;
+    try {
+      localStorage.removeItem(getStorageKey(username));
+      console.log("Timer state cleared");
+    } catch (e) {
+      console.error("Error clearing timer state:", e);
+    }
+  };
 
   // Function to start a new session (only called for truly new sessions)
   const startSession = async () => {
     if (!username) return;
 
-    const now = new Date();
-
-    // If we already have a remaining seconds override from localStorage, preserve it
-    // Don't recalculate based on lastBreakTime if we have a saved countdown
-    if (remainingSecondsOverrideRef.current !== null) {
-      console.log(
-        "Resuming session with saved remaining time:",
-        remainingSecondsOverrideRef.current,
-        "seconds - skipping startSession API call"
-      );
-      // Just ensure we have basic session refs set
-      if (!sessionStartTimeRef.current) {
-        sessionStartTimeRef.current = now;
-      }
-      if (!lastActiveTimeRef.current) {
-        lastActiveTimeRef.current = now;
-      }
-      return; // Don't call API - we're resuming, not starting fresh
+    // Prevent double calls - if already called or initializing, skip
+    if (startSessionCalledRef.current || isInitializingRef.current) {
+      return;
     }
+
+    // Mark as called to prevent double execution
+    startSessionCalledRef.current = true;
+
+    // If timer was restored, skip server call
+    if (timerRestoredRef.current) {
+      console.log("Skipping startSession - timer restored from localStorage");
+      // Reset flag after a delay to allow for retries if needed
+      setTimeout(() => {
+        startSessionCalledRef.current = false;
+      }, 1000);
+      return;
+    }
+
+    const now = new Date();
 
     try {
       // Check if there's an existing session to resume
@@ -160,7 +253,9 @@ const useHealthMonitoring = ({
     const sessionDuration = now.getTime() - lastActiveTimeRef.current.getTime();
     accumulatedSessionTimeRef.current += sessionDuration;
     sessionPausedTimeRef.current = now;
-    lastActiveTimeRef.current = null; // Mark as paused
+    lastActiveTimeRef.current = null;
+
+    saveTimerState();
   };
 
   // Function to resume session (when page becomes visible)
@@ -261,14 +356,19 @@ const useHealthMonitoring = ({
             remainingSecondsOverrideRef.current - deltaSec
           );
           lastTickAtRef.current = nowMs;
+
+          // Save periodically (every 10 seconds)
+          if (deltaSec % 10 === 0) {
+            saveTimerState();
+          }
         }
       } else {
         // Not visible, don't change remaining seconds
         lastTickAtRef.current = nowMs;
       }
 
-      const nextBreakIn = Math.ceil(remainingSecondsOverrideRef.current / 60);
-      const shouldShowBreak = nextBreakIn === 0;
+      const nextBreakIn = Math.floor(remainingSecondsOverrideRef.current / 60);
+      const shouldShowBreak = remainingSecondsOverrideRef.current <= 0;
 
       setHealthStatus((prev) => ({
         ...prev,
@@ -349,9 +449,40 @@ const useHealthMonitoring = ({
         // Store break interval for local calculations
         breakIntervalMinutesRef.current = data.breakIntervalMinutes || 45;
 
-        // Update break time references from server data
-        if (data.lastBreakTime && !lastBreakTimeRef.current) {
+        // Only update break time references if we don't have a restored timer
+        if (
+          !timerRestoredRef.current &&
+          data.lastBreakTime &&
+          !lastBreakTimeRef.current
+        ) {
           lastBreakTimeRef.current = new Date(data.lastBreakTime);
+        }
+
+        // If we have a restored override, keep using it
+        if (remainingSecondsOverrideRef.current !== null) {
+          const nextBreakIn = Math.floor(
+            remainingSecondsOverrideRef.current / 60
+          );
+          const shouldShowBreak = remainingSecondsOverrideRef.current <= 0;
+
+          setHealthStatus((prev) => ({
+            ...prev,
+            shouldShowBreak,
+            nextBreakIn,
+            timeSinceLastBreak: shouldShowBreak
+              ? breakIntervalMinutesRef.current
+              : breakIntervalMinutesRef.current - nextBreakIn,
+            breakCount: data.breakCount,
+            isMonitoring: isEnabled,
+            isOnBreak: data.isOnBreak,
+            breakStartTime: data.breakStartTime,
+          }));
+
+          if (shouldShowBreak && data.showReminder) {
+            showBreakReminder(data.healthTips);
+          }
+
+          return; // Important: exit early
         }
 
         // Calculate session-based time instead of using server time
@@ -385,10 +516,10 @@ const useHealthMonitoring = ({
         // But we should still update nextBreakIn from the override to keep it in sync
         if (remainingSecondsOverrideRef.current !== null) {
           // Calculate nextBreakIn from the override to ensure it's current
-          const nextBreakIn = Math.ceil(
+          const nextBreakIn = Math.floor(
             remainingSecondsOverrideRef.current / 60
           );
-          const shouldShowBreak = nextBreakIn === 0;
+          const shouldShowBreak = remainingSecondsOverrideRef.current <= 0;
 
           // Keep breakCount / flags in sync, and update nextBreakIn from override
           setHealthStatus((prev) => ({
@@ -558,6 +689,28 @@ const useHealthMonitoring = ({
         lastBreakTimeRef.current = new Date();
         // Clear any persisted remaining time since a new break started
         remainingSecondsOverrideRef.current = null;
+
+        clearTimerState();
+        timerRestoredRef.current = false;
+
+        // Clear from server
+        try {
+          if (username) {
+            await fetch("/api/health/saveTimerState", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                username,
+                remainingSeconds: 0,
+                breakIntervalMinutes: breakIntervalMinutesRef.current,
+              }),
+            });
+          }
+        } catch (e) {
+          console.error("Error clearing timer state on server:", e);
+        }
+
+        // Clear from localStorage
         try {
           if (username)
             localStorage.removeItem(`vgw_health_remaining_${username}`);
@@ -603,6 +756,25 @@ const useHealthMonitoring = ({
         lastBreakTimeRef.current = new Date();
         // Clear persisted remaining time; countdown restarts after break
         remainingSecondsOverrideRef.current = null;
+
+        // Clear from server
+        try {
+          if (username) {
+            await fetch("/api/health/saveTimerState", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                username,
+                remainingSeconds: 0,
+                breakIntervalMinutes: breakIntervalMinutesRef.current,
+              }),
+            });
+          }
+        } catch (e) {
+          console.error("Error clearing timer state on server:", e);
+        }
+
+        // Clear from localStorage
         try {
           if (username)
             localStorage.removeItem(`vgw_health_remaining_${username}`);
@@ -751,25 +923,161 @@ const useHealthMonitoring = ({
       return;
     }
 
-    // Restore remaining time override from previous close, if present
+    // Restore remaining time override from server (cross-browser persistence)
+    // Fallback to localStorage if server doesn't have it
     // ONLY restore if break reminders are enabled
     if (isEnabled) {
-      try {
-        const key = `vgw_health_remaining_${username}`;
-        const stored = localStorage.getItem(key);
-        if (stored) {
-          const remainingSec = Math.max(0, parseInt(stored, 10));
-          if (!Number.isNaN(remainingSec) && remainingSec > 0) {
-            remainingSecondsOverrideRef.current = remainingSec;
-            lastTickAtRef.current = Date.now();
-            console.log(
-              "Restored remaining time from localStorage:",
-              remainingSec,
-              "seconds"
-            );
+      // First, try to restore from server (for cross-browser sync)
+      const restoreFromServer = async () => {
+        try {
+          const response = await fetch("/api/health/getTimerState", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.timerState) {
+              const timerData = data.timerState;
+              const now = Date.now();
+              const timeSinceSave = now - timerData.savedAt;
+              const twentyFourHours = 24 * 60 * 60 * 1000;
+
+              // Check if 24 hours have passed since save
+              if (timeSinceSave < twentyFourHours) {
+                // Check if break interval changed
+                const currentBreakInterval = breakIntervalMinutesRef.current;
+                let remainingSec = timerData.remainingSeconds;
+
+                if (
+                  timerData.breakIntervalMinutes &&
+                  timerData.breakIntervalMinutes !== currentBreakInterval
+                ) {
+                  // Adjust proportionally
+                  const ratio =
+                    currentBreakInterval / timerData.breakIntervalMinutes;
+                  remainingSec = Math.max(0, Math.round(remainingSec * ratio));
+                }
+
+                if (remainingSec > 0) {
+                  remainingSecondsOverrideRef.current = remainingSec;
+                  lastTickAtRef.current = now;
+                  console.log(
+                    "Restored timer from server:",
+                    remainingSec,
+                    "seconds (",
+                    Math.floor(remainingSec / 60),
+                    "minutes)"
+                  );
+
+                  // Update state immediately
+                  const nextBreakIn = Math.floor(remainingSec / 60);
+                  const shouldShowBreak = remainingSec <= 0;
+                  setHealthStatus({
+                    shouldShowBreak,
+                    nextBreakIn: Math.max(0, nextBreakIn),
+                    timeSinceLastBreak: shouldShowBreak
+                      ? breakIntervalMinutesRef.current
+                      : Math.max(
+                          0,
+                          breakIntervalMinutesRef.current - nextBreakIn
+                        ),
+                    breakCount: healthStatus.breakCount,
+                    isMonitoring: isEnabled,
+                  });
+
+                  // Mark as initialized
+                  isInitializedRef.current = true;
+                  restoreCompletedRef.current = true;
+                  return true; // Successfully restored from server
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error restoring timer from server:", error);
+        }
+        return false; // Server restore failed
+      };
+
+      // Try server first, then fallback to localStorage
+      restoreFromServer().then((serverRestored) => {
+        if (!serverRestored) {
+          // Fallback to localStorage
+          try {
+            const key = `vgw_health_remaining_${username}`;
+            const stored = localStorage.getItem(key);
+            if (stored) {
+              let timerData: {
+                remainingSeconds: number;
+                savedAt: number;
+                breakIntervalMinutes?: number;
+              } | null = null;
+
+              try {
+                timerData = JSON.parse(stored);
+              } catch (e) {
+                // Old format - backward compatibility
+                const remainingSec = Math.max(0, parseInt(stored, 10));
+                if (!Number.isNaN(remainingSec) && remainingSec > 0) {
+                  timerData = {
+                    remainingSeconds: remainingSec,
+                    savedAt: Date.now(),
+                    breakIntervalMinutes: breakIntervalMinutesRef.current,
+                  };
+                }
+              }
+
+              if (timerData && timerData.remainingSeconds > 0) {
+                const now = Date.now();
+                const timeSinceSave = now - timerData.savedAt;
+                const twentyFourHours = 24 * 60 * 60 * 1000;
+
+                if (timeSinceSave < twentyFourHours) {
+                  remainingSecondsOverrideRef.current =
+                    timerData.remainingSeconds;
+                  lastTickAtRef.current = now;
+                  console.log(
+                    "Restored timer from localStorage:",
+                    timerData.remainingSeconds,
+                    "seconds"
+                  );
+
+                  // Update state
+                  const nextBreakIn = Math.floor(
+                    timerData.remainingSeconds / 60
+                  );
+                  const shouldShowBreak = timerData.remainingSeconds <= 0;
+                  setHealthStatus({
+                    shouldShowBreak,
+                    nextBreakIn: Math.max(0, nextBreakIn),
+                    timeSinceLastBreak: shouldShowBreak
+                      ? breakIntervalMinutesRef.current
+                      : Math.max(
+                          0,
+                          breakIntervalMinutesRef.current - nextBreakIn
+                        ),
+                    breakCount: healthStatus.breakCount,
+                    isMonitoring: isEnabled,
+                  });
+                }
+              }
+            }
+          } catch (e) {
+            console.error("Error restoring from localStorage:", e);
           }
         }
-      } catch (e) {}
+        // Mark as initialized after restore attempt (server or localStorage)
+        isInitializedRef.current = true;
+        restoreCompletedRef.current = true;
+
+        // Call checkHealthStatus after restore completes to sync with server
+        // Delay slightly to ensure state updates have been applied
+        setTimeout(() => {
+          checkHealthStatus();
+        }, 200);
+      });
     } else {
       // Clear any stored remaining time if break reminders are disabled
       try {
@@ -782,7 +1090,17 @@ const useHealthMonitoring = ({
     }
 
     // Start a new session (only informs server; our override governs countdown if present)
-    startSession();
+    // Only call startSession if we haven't called it yet (to prevent double calls)
+    if (!startSessionCalledRef.current && !isInitializingRef.current) {
+      isInitializingRef.current = true;
+      startSession().finally(() => {
+        // Reset flags after a short delay to allow for async operations
+        setTimeout(() => {
+          isInitializingRef.current = false;
+          // Don't reset startSessionCalledRef here - it should stay true for this mount
+        }, 500);
+      });
+    }
 
     // Start monitoring - only set isMonitoring to true if break reminders are enabled
     // Health tips can still work via checkHealthStatus, but the widget won't show
@@ -815,16 +1133,23 @@ const useHealthMonitoring = ({
     // Note: updateTimerLocally() is already called immediately after starting the interval above
     // so we don't need to call it again here
 
-    // Check immediately on first load (but only after we've set the override state if it exists)
-    // Delay checkHealthStatus slightly if we have an override to ensure updateTimerLocally runs first
-    // Note: checkHealthStatus still runs even when break reminders are disabled (for health tips)
-    if (remainingSecondsOverrideRef.current !== null) {
-      // Use setTimeout to ensure updateTimerLocally state update has been applied
-      setTimeout(() => {
-        checkHealthStatus();
-      }, 0);
-    } else {
+    // Check immediately on first load (but only after restore has completed)
+    // The restore logic will call checkHealthStatus after it completes
+    // If restore hasn't completed yet (isEnabled is false or restore is async),
+    // we still need to call it for health tips, but delay it to avoid showing default 45
+    if (!isEnabled) {
+      // Break reminders disabled, safe to call immediately (only for health tips)
       checkHealthStatus();
+    } else {
+      // Break reminders enabled - wait for restore to complete
+      // The restore promise will call checkHealthStatus after it completes
+      // But as a fallback, call it after a delay if restore hasn't completed
+      setTimeout(() => {
+        // Only call if restore still hasn't completed (fallback for edge cases)
+        if (!restoreCompletedRef.current) {
+          checkHealthStatus();
+        }
+      }, 1000);
     }
 
     return () => {
@@ -836,9 +1161,13 @@ const useHealthMonitoring = ({
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
       }
+      // Reset startSession flag on unmount so it can be called again on next mount
+      startSessionCalledRef.current = false;
+      isInitializingRef.current = false;
       // Persist remaining time override on navigation unmount as well
-      // Only save if monitoring is still enabled (check current ref value, not closure)
-      if (isEnabledRef.current && username) {
+      // Only save if monitoring is still enabled AND component is initialized
+      // This prevents saving default state before restore completes
+      if (isEnabledRef.current && username && isInitializedRef.current) {
         try {
           const key = `vgw_health_remaining_${username}`;
           let remainingSec = remainingSecondsOverrideRef.current;
@@ -883,18 +1212,59 @@ const useHealthMonitoring = ({
 
           // Only save if we have a valid remaining time > 0
           if (remainingSec !== null && remainingSec > 0) {
-            localStorage.setItem(key, String(remainingSec));
+            // Save to server (for cross-browser persistence)
+            const saveToServer = async () => {
+              try {
+                await fetch("/api/health/saveTimerState", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    username,
+                    remainingSeconds: remainingSec,
+                    breakIntervalMinutes: breakIntervalMinutesRef.current,
+                  }),
+                });
+                console.log("Saved timer state to server (cleanup)");
+              } catch (error) {
+                console.error("Error saving timer state to server:", error);
+              }
+            };
+            saveToServer();
+
+            // Also save to localStorage as backup/cache
+            const timerData = {
+              remainingSeconds: remainingSec,
+              savedAt: Date.now(),
+              breakIntervalMinutes: breakIntervalMinutesRef.current,
+            };
+            localStorage.setItem(key, JSON.stringify(timerData));
             console.log(
-              "Saving remaining time to localStorage:",
+              "Saving remaining time:",
               remainingSec,
               "seconds (",
               Math.floor(remainingSec / 60),
-              "minutes)"
+              "minutes) - saved to server and localStorage"
             );
           } else {
-            // Clear localStorage if no remaining time
+            // Clear both server and localStorage if no remaining time
+            const clearFromServer = async () => {
+              try {
+                await fetch("/api/health/saveTimerState", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    username,
+                    remainingSeconds: 0,
+                    breakIntervalMinutes: breakIntervalMinutesRef.current,
+                  }),
+                });
+              } catch (error) {
+                console.error("Error clearing timer state on server:", error);
+              }
+            };
+            clearFromServer();
             localStorage.removeItem(key);
-            console.log("Clearing localStorage - no remaining time to save");
+            console.log("Clearing timer state - no remaining time to save");
           }
         } catch (e) {
           console.error("Error saving remaining time to localStorage:", e);
@@ -934,8 +1304,9 @@ const useHealthMonitoring = ({
       // Page is being unloaded - pause session but don't end it
       pauseSession();
       // Persist the current remaining time so we resume from exactly where it was
+      // Only save if component is initialized (prevents saving during initial mount)
       try {
-        if (username) {
+        if (username && isEnabledRef.current && isInitializedRef.current) {
           // Prefer override value if present; otherwise compute from current state
           let remainingSec = remainingSecondsOverrideRef.current;
           if (remainingSec === null) {
@@ -944,10 +1315,38 @@ const useHealthMonitoring = ({
               Math.max(0, breakIntervalMinutesRef.current);
             remainingSec = Math.max(0, Math.round(next * 60));
           }
-          localStorage.setItem(
-            `vgw_health_remaining_${username}`,
-            String(remainingSec)
-          );
+          // Only save if we have a valid remaining time > 0
+          if (remainingSec > 0) {
+            // Save to server (for cross-browser persistence)
+            const saveToServer = async () => {
+              try {
+                await fetch("/api/health/saveTimerState", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    username,
+                    remainingSeconds: remainingSec,
+                    breakIntervalMinutes: breakIntervalMinutesRef.current,
+                  }),
+                });
+                console.log("Saved timer state to server (beforeunload)");
+              } catch (error) {
+                console.error("Error saving timer state to server:", error);
+              }
+            };
+            saveToServer();
+
+            // Also save to localStorage as backup/cache
+            const timerData = {
+              remainingSeconds: remainingSec,
+              savedAt: Date.now(),
+              breakIntervalMinutes: breakIntervalMinutesRef.current,
+            };
+            localStorage.setItem(
+              `vgw_health_remaining_${username}`,
+              JSON.stringify(timerData)
+            );
+          }
         }
       } catch (e) {}
     };

@@ -16,7 +16,6 @@ import mongoose from 'mongoose';
 import winston from 'winston';
 import { containsOffensiveContent } from '../../utils/contentModeration';
 import { Metrics } from '../../types';
-// import { ImageAnnotatorClient } from '@google-cloud/vision';
 import fs from 'fs';
 
 // Optimized performance monitoring with conditional logging

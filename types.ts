@@ -435,6 +435,12 @@ export interface UsageLimit {
 }
 
 // Health monitoring interface
+export interface TimerState {
+  remainingSeconds: number;
+  savedAt: Date;
+  breakIntervalMinutes: number;
+}
+
 export interface HealthMonitoring {
   breakReminderEnabled: boolean;   // Whether break reminders are enabled
   breakIntervalMinutes: number;    // Break interval in minutes (default: 45)
@@ -446,6 +452,7 @@ export interface HealthMonitoring {
   healthTipsEnabled: boolean;     // Whether to show health tips
   isOnBreak?: boolean;           // Whether user is currently on a break
   breakStartTime?: Date;          // When the current break started
+  timerState?: TimerState;        // Server-side timer state for cross-browser persistence
 }
 
 export interface UpdateHealthSettingsResponse {
@@ -777,4 +784,18 @@ export interface RecommendationsDisplayProps {
     };
   };
   onDismiss?: () => void;
+}
+
+// Interface for stored timer data
+export interface StoredTimerData {
+  remainingSeconds: number;
+  timestamp: number;
+  sessionStartTime: number;
+  breakIntervalMinutes: number;
+}
+
+export interface SaveTimerStateRequest {
+  username: string;
+  remainingSeconds: number;
+  breakIntervalMinutes: number;
 }

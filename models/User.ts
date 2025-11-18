@@ -203,7 +203,13 @@ const UserSchema = new Schema<IUser>({
     healthTipsEnabled: { type: Boolean, default: true },
     lastHealthTipTime: { type: Date },
     isOnBreak: { type: Boolean, default: false },
-    breakStartTime: { type: Date }
+    breakStartTime: { type: Date },
+    // Server-side timer state for cross-browser persistence
+    timerState: {
+      remainingSeconds: { type: Number },
+      savedAt: { type: Date },
+      breakIntervalMinutes: { type: Number }
+    }
   }
 }, { collection: 'users' });
 
