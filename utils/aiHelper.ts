@@ -1295,7 +1295,7 @@ async function searchGameInIGDB(candidateTitle: string): Promise<string | null> 
       });
       
       if (exactMatch && !isBundleOrDLC(exactMatch.name)) {
-        return exactMatch.name;
+        return cleanGameTitle(exactMatch.name);
       }
       
       // If exact match is a bundle, try to find base game
@@ -1311,7 +1311,7 @@ async function searchGameInIGDB(candidateTitle: string): Promise<string | null> 
                  !isBundleOrDLC(g.name);
         });
         if (baseGameMatch) {
-          return baseGameMatch.name;
+          return cleanGameTitle(baseGameMatch.name);
         }
       }
       
@@ -1326,7 +1326,7 @@ async function searchGameInIGDB(candidateTitle: string): Promise<string | null> 
         const matchingWords = candidateWords.filter(word => resultWords.includes(word));
         
         if (matchingWords.length >= 1 || candidateTitle.length <= 15) {
-          return firstResult.name;
+          return cleanGameTitle(firstResult.name);
         }
       }
       
@@ -1339,17 +1339,17 @@ async function searchGameInIGDB(candidateTitle: string): Promise<string | null> 
         const baseGameMatch = response.data.find((g: any) => {
           const gameName = g.name.toLowerCase();
           const baseLower = baseGame.toLowerCase();
-          return (gameName === baseLower || gameName.includes(baseLower)) && 
+          return (gameName === baseLower || gameName.includes(baseLower)) &&
                  !isBundleOrDLC(g.name);
         });
         if (baseGameMatch) {
-          return baseGameMatch.name;
+          return cleanGameTitle(baseGameMatch.name);
         }
         // If no base game found, return cleaned version
-        return baseGame;
+        return cleanGameTitle(baseGame);
       }
       
-      return firstResult.name;
+      return cleanGameTitle(firstResult.name);
     }
     return null;
   } catch (error) {
@@ -1382,7 +1382,7 @@ async function searchGameInRAWG(candidateTitle: string): Promise<string | null> 
       });
       
       if (nonBundleMatches.length > 0) {
-        return nonBundleMatches[0].name;
+        return cleanGameTitle(nonBundleMatches[0].name);
       }
       
       // If only bundle matches found, try to extract base game
@@ -1407,10 +1407,10 @@ async function searchGameInRAWG(candidateTitle: string): Promise<string | null> 
                  !isBundleOrDLC(g.name);
         });
         if (baseGameMatch) {
-          return baseGameMatch.name;
+          return cleanGameTitle(baseGameMatch.name);
         }
         // If no base game found, return cleaned version
-        return baseGame;
+        return cleanGameTitle(baseGame);
       }
       
       // Fallback: prefer first non-bundle result
@@ -1423,7 +1423,7 @@ async function searchGameInRAWG(candidateTitle: string): Promise<string | null> 
         const matchingWords = candidateWords.filter(word => resultWords.includes(word));
         
         if (matchingWords.length >= 1 || candidateTitle.length <= 15) {
-          return firstResult.name;
+          return cleanGameTitle(firstResult.name);
         }
       }
       
@@ -1439,12 +1439,12 @@ async function searchGameInRAWG(candidateTitle: string): Promise<string | null> 
                  !isBundleOrDLC(g.name);
         });
         if (baseGameMatch) {
-          return baseGameMatch.name;
+          return cleanGameTitle(baseGameMatch.name);
         }
-        return baseGame;
+        return cleanGameTitle(baseGame);
       }
       
-      return firstResult.name;
+      return cleanGameTitle(firstResult.name);
     }
     return null;
   } catch (error) {
@@ -1752,13 +1752,52 @@ function isValidAPIResult(apiResult: string, originalCandidate: string): boolean
 }
 
 /**
+ * Clean game title by removing engine names and other unwanted prefixes
+ * Removes: "Unreal Engine", "Unity", "Source Engine", etc.
+ */
+function cleanGameTitle(title: string): string {
+  if (!title) return title;
+  
+  // Engine names and prefixes to remove (case-insensitive)
+  const enginePrefixes = [
+    'unreal engine',
+    'unity',
+    'source engine',
+    'cryengine',
+    'frostbite',
+    'id tech',
+    'unreal',
+    'game engine',
+  ];
+  
+  let cleaned = title.trim();
+  
+  // Remove engine prefixes from the beginning
+  for (const engine of enginePrefixes) {
+    const regex = new RegExp(`^${engine}\\s+`, 'i');
+    cleaned = cleaned.replace(regex, '');
+  }
+  
+  // Also check if engine name appears in the middle and remove it
+  for (const engine of enginePrefixes) {
+    const regex = new RegExp(`\\s+${engine}\\s+`, 'i');
+    cleaned = cleaned.replace(regex, ' ');
+  }
+  
+  return cleaned.trim();
+}
+
+/**
  * Normalize game titles that should start with "The"
  * Ensures titles like "Legend of Zelda" become "The Legend of Zelda"
  */
 function normalizeGameTitle(title: string): string {
   if (!title) return title;
   
-  const lower = title.toLowerCase().trim();
+  // First clean the title to remove engine names
+  let cleaned = cleanGameTitle(title);
+  
+  const lower = cleaned.toLowerCase().trim();
   
   // Games that should always start with "The"
   const gamesRequiringThe = [
@@ -1774,11 +1813,11 @@ function normalizeGameTitle(title: string): string {
   for (const gamePattern of gamesRequiringThe) {
     if (lower.startsWith(gamePattern) && !lower.startsWith('the ' + gamePattern)) {
       // Add "The" at the beginning
-      return 'The ' + title.trim();
+      return 'The ' + cleaned.trim();
     }
   }
   
-  return title;
+  return cleaned;
 }
 
 /**
@@ -2068,8 +2107,8 @@ function detectQuestionCategory(question: string): string | undefined {
     return 'boss_fight';
   }
 
-  // Level/walkthrough patterns
-  if (/(walkthrough|guide|how to get|how to reach|how do i get|location|where is|find|locate)/i.test(lowerQuestion)) {
+  // Level/walkthrough patterns (including temple, dungeon, area, clear)
+  if (/(walkthrough|guide|how to get|how to reach|how do i get|location|where is|find|locate|how to clear|how to complete|temple|dungeon|area|level)/i.test(lowerQuestion)) {
     return 'level_walkthrough';
   }
 
@@ -2240,14 +2279,18 @@ export const extractQuestionMetadata = async (
   checkQuestionTypeFn?: (question: string) => string[]
 ): Promise<QuestionMetadata> => {
   try {
-    // console.log('[Metadata Extraction] Starting metadata extraction for question:', question.substring(0, 100));
+    console.log('[Metadata Extraction] Starting metadata extraction for question:', question.substring(0, 100));
     const metadata: QuestionMetadata = {};
 
     // Extract game title using IGDB/RAWG APIs (async)
+    console.log('[Metadata Extraction] Calling extractGameTitleFromQuestion...');
     const detectedGame = await extractGameTitleFromQuestion(question);
+    console.log('[Metadata Extraction] extractGameTitleFromQuestion returned:', detectedGame);
     if (detectedGame) {
       metadata.detectedGame = detectedGame;
-      // console.log('[Metadata Extraction] Detected game:', detectedGame);
+      console.log('[Metadata Extraction] Detected game:', detectedGame);
+    } else {
+      console.log('[Metadata Extraction] No game detected from question');
     }
 
     // Extract genres using the existing checkQuestionType function if provided
@@ -2261,10 +2304,14 @@ export const extractQuestionMetadata = async (
     }
 
     // Detect question category
+    console.log('[Metadata Extraction] Calling detectQuestionCategory...');
     const category = detectQuestionCategory(question);
+    console.log('[Metadata Extraction] detectQuestionCategory returned:', category);
     if (category) {
       metadata.questionCategory = category;
-      // console.log('[Metadata Extraction] Question category:', category);
+      console.log('[Metadata Extraction] Question category:', category);
+    } else {
+      console.log('[Metadata Extraction] No question category detected');
     }
 
     // Estimate difficulty

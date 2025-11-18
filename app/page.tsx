@@ -20,6 +20,7 @@ import useAchievementPolling from "../hooks/useAchievementPolling";
 import useHealthMonitoring from "../hooks/useHealthMonitoring";
 import HealthStatusWidget from "../components/HealthStatusWidget";
 import HealthTipsWidget from "../components/HealthTipsWidget";
+import RecommendationsDisplay from "../components/RecommendationsDisplay";
 // import { useRouter } from "next/navigation";
 // import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 // import { faPaperclip } from "@fortawesome/free-solid-svg-icons";
@@ -35,6 +36,11 @@ export default function Home() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [metrics, setMetrics] = useState<any>({});
   const [usageStatus, setUsageStatus] = useState<any>(null);
+  const [recommendations, setRecommendations] = useState<any>(null);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [recommendationsMessage, setRecommendationsMessage] = useState<
+    string | null
+  >(null);
 
   const [activeView, setActiveView] = useState<"chat" | "forum" | "feedback">(
     "chat"
@@ -612,6 +618,10 @@ export default function Home() {
       // Clear input image when loading a conversation
       setImage(null);
       setImageUrl(null);
+      // Clear recommendations when loading a conversation (they're specific to each question)
+      setRecommendations(null);
+      setRecommendationsLoading(false);
+      setRecommendationsMessage(null);
       // Reset file input
       const fileInput = document.getElementById(
         "question-image-upload"
@@ -637,6 +647,10 @@ export default function Home() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    // Clear previous recommendations when asking a new question
+    setRecommendations(null);
+    setRecommendationsLoading(false);
+    setRecommendationsMessage(null);
     const startTime = performance.now();
 
     try {
@@ -760,6 +774,8 @@ export default function Home() {
         setMetrics(res.data.metrics);
       }
       fetchConversations();
+
+      // Recommendations are now fetched on-demand via button click
 
       // Store image URL for response display (use the uploaded URL, not the blob URL)
       // The imageUrlForAnalysis is the actual uploaded image URL from cloud storage
@@ -1664,6 +1680,125 @@ export default function Home() {
                         </details>
                       </div>
                     )}
+
+                    {/* Phase 3 Step 3: Display Recommendations */}
+                    {recommendationsMessage && (
+                      <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <span className="text-yellow-600 dark:text-yellow-400 text-lg">
+                            ℹ️
+                          </span>
+                          <div className="flex-1">
+                            <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
+                              Recommendations Not Available
+                            </p>
+                            <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                              {recommendationsMessage}
+                            </p>
+                            <button
+                              onClick={() => setRecommendationsMessage(null)}
+                              className="mt-2 text-xs text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {recommendations && username && (
+                      <RecommendationsDisplay
+                        username={username}
+                        recommendations={recommendations}
+                        onDismiss={() => {
+                          // console.log("[Recommendations] Dismissed by user");
+                          setRecommendations(null);
+                          setRecommendationsMessage(null);
+                        }}
+                      />
+                    )}
+                    {/* Get Recommendations Button - appears after response */}
+                    {username &&
+                      response &&
+                      !recommendations &&
+                      !recommendationsMessage &&
+                      activeView === "chat" && (
+                        <div className="mt-6 flex items-center justify-center">
+                          <button
+                            onClick={async () => {
+                              try {
+                                setRecommendationsLoading(true);
+                                setRecommendationsMessage(null);
+                                const recRes = await axios.get(
+                                  `/api/recommendations?username=${encodeURIComponent(
+                                    username
+                                  )}&question=${encodeURIComponent(question)}`
+                                );
+                                // console.log(
+                                //   "[Recommendations] Fetch response:",
+                                //   recRes.data
+                                // );
+
+                                if (
+                                  recRes.data.success &&
+                                  recRes.data.recommendations
+                                ) {
+                                  const recs = recRes.data.recommendations;
+                                  const hasContent =
+                                    recs.strategyTips?.tips?.length > 0 ||
+                                    recs.learningPath?.suggestions?.length >
+                                      0 ||
+                                    recs.learningPath?.nextSteps?.length > 0 ||
+                                    recs.personalizedTips?.tips?.length > 0;
+
+                                  if (hasContent) {
+                                    setRecommendations(recs);
+                                    setRecommendationsMessage(null);
+                                  } else {
+                                    // Show user-friendly message
+                                    const reason =
+                                      recRes.data.progressiveDisclosure
+                                        ?.reason ||
+                                      "Not enough activity yet. Keep asking questions to get personalized recommendations!";
+                                    setRecommendationsMessage(reason);
+                                    setRecommendations(null);
+                                  }
+                                } else {
+                                  // Show message if recommendations aren't available
+                                  const reason =
+                                    recRes.data.progressiveDisclosure?.reason ||
+                                    "Recommendations not available at this time.";
+                                  setRecommendationsMessage(reason);
+                                }
+                              } catch (error: any) {
+                                console.error(
+                                  "[Recommendations] Fetch error:",
+                                  error
+                                );
+                                setRecommendationsMessage(
+                                  `Error: ${
+                                    error.response?.data?.error ||
+                                    error.message ||
+                                    "Failed to load recommendations"
+                                  }`
+                                );
+                              } finally {
+                                setRecommendationsLoading(false);
+                              }
+                            }}
+                            disabled={recommendationsLoading}
+                            className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                          >
+                            {recommendationsLoading ? (
+                              <>
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                Loading personalized recommendations...
+                              </>
+                            ) : (
+                              <>💡 Get Personalized Recommendations</>
+                            )}
+                          </button>
+                        </div>
+                      )}
 
                     {/* Move buttons below the response */}
                     <div className="mt-4 footer-buttons">

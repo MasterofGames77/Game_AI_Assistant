@@ -759,3 +759,22 @@ export interface ImageUsage {
     };
   };
 }
+
+export interface RecommendationsDisplayProps {
+  username: string;
+  recommendations: {
+    strategyTips: {
+      tips: string[];
+      category: string;
+    };
+    learningPath: {
+      suggestions: string[];
+      nextSteps: string[];
+    };
+    personalizedTips: {
+      tips: string[];
+      basedOn: string;
+    };
+  };
+  onDismiss?: () => void;
+}

@@ -5,6 +5,7 @@ import Question from '../../models/Question';
 import User from '../../models/User';
 import { getChatCompletion, getChatCompletionWithVision, fetchRecommendations, analyzeUserQuestions, getAICache, extractQuestionMetadata, updateQuestionMetadata, analyzeGameplayPatterns, extractGameTitleFromImageContext, enhanceQuestionWithGameContext } from '../../utils/aiHelper';
 import { storeUserPatterns } from '../../utils/storeUserPatterns';
+import { generatePersonalizedRecommendations } from '../../utils/generateRecommendations';
 import { getClientCredentialsAccessToken, getAccessToken, getTwitchUserData, redirectToTwitch } from '../../utils/twitchAuth';
 // import OpenAI from 'openai';
 import path from 'path';
@@ -1834,11 +1835,34 @@ CRITICAL INSTRUCTIONS:
         }
       });
     }
+
+    // Phase 3 Step 3: Generate Personalized Recommendations
+    // Generate recommendations in background after response is sent
+    // Recommendations respect progressive disclosure and are stored for later retrieval
+    // This doesn't block the user's response
+    if (username) {
+      setImmediate(async () => {
+        try {
+          // Generate recommendations with current question as context
+          // Don't force show - respect progressive disclosure
+          await generatePersonalizedRecommendations(username, question, false);
+          
+          // Note: updateRecommendationHistory is called inside generatePersonalizedRecommendations
+          // if recommendations are actually shown (progressive disclosure passed)
+        } catch (error) {
+          // Log error but don't throw - this is a background operation
+          console.error('[Recommendations] Error generating recommendations:', error);
+        }
+      });
+    }
     
     // Return just the base answer
+    // Recommendations are generated in background and can be fetched separately
     return res.status(200).json({ 
       answer: answer,
-      metrics
+      metrics,
+      // Include a flag to indicate recommendations may be available
+      recommendationsAvailable: !!username
     });
     
   } catch (error) {
