@@ -1480,6 +1480,83 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
         });
         
         return personalizedRecommendation || "Based on your gaming history, I'd recommend exploring games similar to what you've enjoyed before. What genres interest you most?";
+      } else if (lowerQuestion.includes("daily gaming tip") || lowerQuestion.includes("daily tip") || lowerQuestion.includes("give me a tip")) {
+        // Handle personalized daily gaming tip based on user history
+        const Forum = (await import('../../models/Forum')).default;
+        
+        // Fetch user's question history
+        const previousQuestionsRaw = await Question.find({ username })
+          .sort({ timestamp: -1 })
+          .limit(30)
+          .select('question detectedGame detectedGenre timestamp')
+          .lean() as unknown as Array<{
+            question: string;
+            detectedGame?: string;
+            detectedGenre?: string[];
+            timestamp: Date;
+          }>;
+        
+        // Fetch user's forum activity (forums they created or posted in)
+        const userForums = await Forum.find({
+          $or: [
+            { createdBy: username },
+            { 'posts.username': username }
+          ]
+        })
+          .select('gameTitle posts')
+          .lean() as unknown as Array<{
+            gameTitle: string;
+            posts: Array<{ username: string; message: string }>;
+          }>;
+        
+        // Extract games from questions
+        const gamesFromQuestions = previousQuestionsRaw
+          .filter(q => q.detectedGame)
+          .map(q => q.detectedGame!)
+          .filter((game, index, self) => self.indexOf(game) === index)
+          .slice(0, 5);
+        
+        // Extract games from forums
+        const gamesFromForums = userForums
+          .map(f => f.gameTitle)
+          .filter((game, index, self) => self.indexOf(game) === index)
+          .slice(0, 5);
+        
+        // Combine and deduplicate
+        const allGames = Array.from(new Set([...gamesFromQuestions, ...gamesFromForums])).slice(0, 5);
+        
+        // Get genres from questions
+        const questionsForAnalysis = previousQuestionsRaw.map(q => ({
+          question: q.question,
+          response: '' // Not needed for genre analysis
+        }));
+        const genres = analyzeUserQuestions(questionsForAnalysis);
+        const topGenres = genres.slice(0, 2);
+        
+        // Build personalized tip context
+        let tipContext = `Generate a helpful, practical daily gaming tip. `;
+        
+        if (allGames.length > 0) {
+          tipContext += `The user has been asking about or discussing these games: ${allGames.join(', ')}. `;
+        }
+        
+        if (topGenres.length > 0) {
+          tipContext += `They seem to enjoy ${topGenres.join(' and ')} games. `;
+        }
+        
+        if (allGames.length === 0 && topGenres.length === 0) {
+          tipContext += `The user is new or hasn't asked about specific games yet. `;
+        }
+        
+        tipContext += `Provide a useful, actionable gaming tip that would be relevant to their interests. Make it specific and practical, not generic. Keep it to 2-3 sentences.`;
+        
+        // Generate personalized tip
+        const cacheKey = `daily-tip:${username}:${allGames[0] || topGenres[0] || 'default'}`;
+        const personalizedTip = await deduplicateRequest(cacheKey, async () => {
+          return await getChatCompletion(tipContext);
+        });
+        
+        return personalizedTip || "Here's a daily gaming tip: Take regular breaks every 45-60 minutes to keep your mind sharp and avoid fatigue. Your performance actually improves when you give yourself time to rest!";
       } else if (questionToProcess.toLowerCase().includes("recommendations")) {
         const previousQuestions = await Question.find({ username });
         const genres = analyzeUserQuestions(previousQuestions);
