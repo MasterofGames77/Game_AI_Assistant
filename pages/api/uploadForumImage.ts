@@ -53,32 +53,61 @@ if (!fs.existsSync(tempUploadDir)) {
 
 // Allowed image MIME types
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 7 * 1024 * 1024; // 7MB
 const MAX_DIMENSION = 2048; // Max width or height in pixels
 
 // Validate file type by checking magic numbers (more secure than extension)
-const validateImageFile = async (filePath: string): Promise<boolean> => {
+const validateImageFile = async (filePath: string, filename?: string | null): Promise<boolean> => {
   try {
     const buffer = fs.readFileSync(filePath);
+    
+    // Ensure buffer is large enough to check magic numbers
+    if (buffer.length < 4) {
+      console.warn(`File ${filename || filePath} is too small to validate (${buffer.length} bytes)`);
+      return false;
+    }
     
     // Check magic numbers for common image formats
     // JPEG: FF D8
     const isJPEG = buffer[0] === 0xFF && buffer[1] === 0xD8;
     
-    // PNG: 89 50 4E 47
-    const isPNG = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+    // PNG: 89 50 4E 47 (PNG signature)
+    // Some PNG files might have extra bytes, so check first 8 bytes for PNG signature
+    const isPNG = buffer.length >= 8 &&
+      buffer[0] === 0x89 && 
+      buffer[1] === 0x50 && 
+      buffer[2] === 0x4E && 
+      buffer[3] === 0x47 &&
+      buffer[4] === 0x0D && 
+      buffer[5] === 0x0A && 
+      buffer[6] === 0x1A && 
+      buffer[7] === 0x0A;
     
-    // GIF: 47 49 46 38 (GIF8)
-    const isGIF = buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38;
+    // Also check for PNG without the full signature (just the first 4 bytes)
+    const isPNGShort = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+    
+    // GIF: 47 49 46 38 (GIF8) or 47 49 46 39 (GIF9)
+    const isGIF = (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) ||
+                  (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x39);
     
     // WEBP: RIFF header (52 49 46 46) at position 0, then WEBP (57 45 42 50) at position 8
     const isWEBP = buffer.length >= 12 &&
       buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 && // RIFF
       buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50; // WEBP
     
-    return isJPEG || isPNG || isGIF || isWEBP;
+    const isValid = isJPEG || isPNG || isPNGShort || isGIF || isWEBP;
+    
+    if (!isValid && filename) {
+      // Log the first few bytes for debugging
+      const hexPreview = Array.from(buffer.slice(0, 8))
+        .map(b => '0x' + b.toString(16).padStart(2, '0').toUpperCase())
+        .join(' ');
+      console.warn(`File ${filename} failed validation. First 8 bytes: ${hexPreview}`);
+    }
+    
+    return isValid;
   } catch (error) {
-    console.error('Error validating image file:', error);
+    console.error(`Error validating image file ${filename || filePath}:`, error);
     return false;
   }
 };
@@ -182,18 +211,54 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Validate file is actually an image using magic numbers
-      const isValidImage = await validateImageFile(file.filepath);
+      const isValidImage = await validateImageFile(file.filepath, file.originalFilename);
       if (!isValidImage) {
         // Clean up invalid file (with retry for Windows file locks)
         await safeUnlink(file.filepath);
+        // Log more details for debugging
+        console.error(`Image validation failed for ${file.originalFilename}:`, {
+          mimetype: file.mimetype,
+          size: file.size,
+          filepath: file.filepath
+        });
         return res.status(400).json({ 
-          error: `File ${file.originalFilename} is not a valid image file` 
+          error: `File ${file.originalFilename} is not a valid image file`,
+          message: `The file "${file.originalFilename}" could not be validated as a valid image. Please ensure it's a JPEG, PNG, GIF, or WEBP file.`,
+          details: `MIME type detected: ${file.mimetype || 'unknown'}, File size: ${file.size} bytes`
         });
       }
 
       try {
         // Process image with sharp: resize if too large, optimize
-        const image = sharp(file.filepath);
+        // First verify Sharp can read the file (catches corrupted PNGs)
+        let image: sharp.Sharp;
+        try {
+          image = sharp(file.filepath);
+          // Try to get metadata to verify the file is readable
+          const metadata = await image.metadata();
+          
+          // Check if metadata is valid
+          if (!metadata || (!metadata.width && !metadata.height)) {
+            throw new Error('Unable to read image metadata - file may be corrupted');
+          }
+        } catch (sharpError: any) {
+          const filename = file.originalFilename || 'unknown';
+          console.error(`Sharp processing error for ${filename}:`, {
+            error: sharpError.message,
+            code: sharpError.code,
+            mimetype: file.mimetype,
+            stack: sharpError.stack
+          });
+          await safeUnlink(file.filepath);
+          return res.status(400).json({
+            error: `File ${filename} could not be processed`,
+            message: `The image file "${filename}" appears to be corrupted or in an unsupported format. Please try converting it to a standard PNG or JPEG format.`,
+            details: sharpError.message
+          });
+        }
+        
+        // Re-initialize sharp instance for processing
+        image = sharp(file.filepath);
         const metadata = await image.metadata();
 
         // Resize if image is too large
@@ -312,11 +377,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           type: uploadResult.type || file.mimetype || 'image/jpeg'
         });
       } catch (error) {
-        console.error('Error processing image:', error);
+        const filename = file.originalFilename || 'unknown';
+        console.error(`Error processing image ${filename}:`, {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined,
+          mimetype: file.mimetype,
+          size: file.size
+        });
         // Clean up on error (with retry for Windows file locks)
         await safeUnlink(file.filepath);
         return res.status(500).json({ 
-          error: `Error processing image ${file.originalFilename}: ${error instanceof Error ? error.message : 'Unknown error'}` 
+          error: `Error processing image ${filename}`,
+          message: `Failed to process the image file "${filename}". ${error instanceof Error ? error.message : 'Unknown error'}`,
+          details: error instanceof Error ? error.message : 'Unknown error'
         });
       }
     }
