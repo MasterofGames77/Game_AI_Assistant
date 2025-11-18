@@ -1419,7 +1419,68 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     // Measure question processing time (use enhanced question if image was analyzed)
     const questionToProcess = imageEnhancedQuestion || question;
     const { result: processedAnswer, latency: processingLatency } = await measureLatency('Question Processing', async () => {
-      if (questionToProcess.toLowerCase().includes("recommendations")) {
+      // Handle "What should I play?" with personalized recommendations based on user history
+      const lowerQuestion = questionToProcess.toLowerCase();
+      if (lowerQuestion.includes("what should i play") || lowerQuestion.includes("what game should i play") || lowerQuestion.includes("recommend me a game")) {
+        // Fetch user's question history
+        const previousQuestionsRaw = await Question.find({ username })
+          .sort({ timestamp: -1 })
+          .limit(50)
+          .select('question response detectedGame detectedGenre timestamp')
+          .lean() as unknown as Array<{
+            question: string;
+            response: string;
+            detectedGame?: string;
+            detectedGenre?: string[];
+            timestamp: Date;
+          }>;
+        
+        if (previousQuestionsRaw.length === 0) {
+          // No history - give a general recommendation
+          const cacheKey = `recommendations:new-user:default`;
+          const recommendations = await deduplicateRequest(cacheKey, () => fetchRecommendations('Action-Adventure'));
+          return recommendations.length > 0 
+            ? `Since you're new here, here are some great games to get started: ${recommendations.slice(0, 3).join(', ')}. Feel free to ask me about any game you're interested in!` 
+            : "I'd love to help you find a game! What types of games do you enjoy? Action, RPG, strategy, or something else?";
+        }
+        
+        // Extract games and genres from user's history
+        const gamesAskedAbout = previousQuestionsRaw
+          .filter(q => q.detectedGame)
+          .map(q => q.detectedGame!)
+          .filter((game, index, self) => self.indexOf(game) === index) // Remove duplicates
+          .slice(0, 10); // Top 10 unique games
+        
+        // Map to expected format for analyzeUserQuestions
+        const questionsForAnalysis = previousQuestionsRaw.map(q => ({
+          question: q.question,
+          response: q.response
+        }));
+        
+        const genres = analyzeUserQuestions(questionsForAnalysis);
+        const topGenres = genres.slice(0, 3); // Top 3 genres
+        
+        // Build context for AI recommendation
+        let contextMessage = `Based on your gaming history, I can see you've asked about ${previousQuestionsRaw.length} games. `;
+        
+        if (gamesAskedAbout.length > 0) {
+          contextMessage += `You've shown interest in games like: ${gamesAskedAbout.slice(0, 5).join(', ')}. `;
+        }
+        
+        if (topGenres.length > 0) {
+          contextMessage += `Your favorite genres seem to be: ${topGenres.join(', ')}. `;
+        }
+        
+        contextMessage += `Based on this, what game would you recommend I play next? Please suggest 2-3 specific games with brief reasons why they'd be a good fit for me.`;
+        
+        // Use AI to generate personalized recommendation
+        const cacheKey = `personalized-recommendation:${username}:${topGenres[0] || 'default'}`;
+        const personalizedRecommendation = await deduplicateRequest(cacheKey, async () => {
+          return await getChatCompletion(contextMessage);
+        });
+        
+        return personalizedRecommendation || "Based on your gaming history, I'd recommend exploring games similar to what you've enjoyed before. What genres interest you most?";
+      } else if (questionToProcess.toLowerCase().includes("recommendations")) {
         const previousQuestions = await Question.find({ username });
         const genres = analyzeUserQuestions(previousQuestions);
         const cacheKey = `recommendations:${username}:${genres[0] || 'default'}`;
@@ -1644,6 +1705,8 @@ CRITICAL INSTRUCTIONS:
             // Record question usage for free users
             if (user) {
               user.recordQuestionUsage();
+              // Update daily streak
+              user.updateStreak();
               await user.save({ session });
             }
 

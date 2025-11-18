@@ -72,6 +72,10 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
 }) => {
   const [hasProAccess, setHasProAccess] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
+  const [streak, setStreak] = useState<{
+    currentStreak: number;
+    longestStreak: number;
+  } | null>(null);
 
   // Function to update username and check Pro access
   const updateUserData = useCallback(async () => {
@@ -97,9 +101,26 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
       } catch (error) {
         console.error("Error checking Pro access:", error);
       }
+
+      // Fetch streak data
+      try {
+        const streakResponse = await fetch(
+          `/api/streak?username=${encodeURIComponent(storedUsername)}`
+        );
+        if (streakResponse.ok) {
+          const streakData = await streakResponse.json();
+          setStreak({
+            currentStreak: streakData.currentStreak || 0,
+            longestStreak: streakData.longestStreak || 0,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching streak:", error);
+      }
     } else {
       // Clear state if no username
       setHasProAccess(false);
+      setStreak(null);
     }
   }, []);
 
@@ -210,6 +231,21 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
           username={username || undefined}
         />
       </div>
+
+      {/* Daily Streak Counter */}
+      {username && streak && streak.currentStreak > 0 && (
+        <div className="mb-4 p-3 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg text-white text-center">
+          <div className="text-2xl font-bold">🔥 {streak.currentStreak}</div>
+          <div className="text-xs opacity-90">
+            Day{streak.currentStreak !== 1 ? "s" : ""} Streak
+          </div>
+          {streak.longestStreak > streak.currentStreak && (
+            <div className="text-xs opacity-75 mt-1">
+              Best: {streak.longestStreak} days
+            </div>
+          )}
+        </div>
+      )}
 
       {/* View Switching Buttons */}
       <div className="grid grid-cols-2 gap-1 mb-6">

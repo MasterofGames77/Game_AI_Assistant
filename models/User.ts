@@ -20,6 +20,11 @@ export interface IUser extends Document {
   subscription?: Subscription;
   usageLimit?: UsageLimit;
   healthMonitoring?: HealthMonitoring;
+  streak?: {
+    lastActivityDate?: Date;
+    currentStreak?: number;
+    longestStreak?: number;
+  };
   createdAt?: Date; // Mongoose timestamp
   updatedAt?: Date; // Mongoose timestamp
   // Methods
@@ -61,6 +66,7 @@ export interface IUser extends Document {
   endBreak(): void;
   recordBreak(): void;
   getHealthTips(): string[];
+  updateStreak(): void;
 }
 
 const UserSchema = new Schema<IUser>({
@@ -210,6 +216,12 @@ const UserSchema = new Schema<IUser>({
       savedAt: { type: Date },
       breakIntervalMinutes: { type: Number }
     }
+  },
+  // Daily streak tracking
+  streak: {
+    lastActivityDate: { type: Date },
+    currentStreak: { type: Number, default: 0 },
+    longestStreak: { type: Number, default: 0 }
   }
 }, { collection: 'users' });
 
@@ -631,6 +643,52 @@ UserSchema.methods.getHealthTips = function(): string[] {
   // Return 2-3 random tips
   const shuffled = tips.sort(() => 0.5 - Math.random());
   return shuffled.slice(0, 3);
+};
+
+// Method to update daily streak
+UserSchema.methods.updateStreak = function(): void {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  // Initialize streak if it doesn't exist
+  if (!this.streak) {
+    this.streak = {
+      lastActivityDate: today,
+      currentStreak: 1,
+      longestStreak: 1
+    };
+    return;
+  }
+  
+  const lastActivity = this.streak.lastActivityDate 
+    ? new Date(this.streak.lastActivityDate)
+    : null;
+  
+  if (!lastActivity) {
+    // First time tracking - start streak at 1
+    this.streak.lastActivityDate = today;
+    this.streak.currentStreak = 1;
+    this.streak.longestStreak = Math.max(this.streak.longestStreak || 0, 1);
+    return;
+  }
+  
+  const lastActivityDate = new Date(lastActivity.getFullYear(), lastActivity.getMonth(), lastActivity.getDate());
+  const daysDifference = Math.floor((today.getTime() - lastActivityDate.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (daysDifference === 0) {
+    // Same day - no change to streak
+    return;
+  } else if (daysDifference === 1) {
+    // Consecutive day - increment streak
+    this.streak.currentStreak = (this.streak.currentStreak || 0) + 1;
+    this.streak.longestStreak = Math.max(this.streak.longestStreak || 0, this.streak.currentStreak);
+  } else {
+    // Streak broken - reset to 1
+    this.streak.currentStreak = 1;
+  }
+  
+  // Update last activity date
+  this.streak.lastActivityDate = today;
 };
 
 // Delete model from cache if it exists (handles hot-reload in Next.js)
