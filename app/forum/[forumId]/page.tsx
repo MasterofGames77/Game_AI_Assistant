@@ -38,6 +38,11 @@ function ForumPage({ params }: { params: { forumId: string } }) {
   const [editMessage, setEditMessage] = useState("");
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [editSelectedImages, setEditSelectedImages] = useState<File[]>([]);
+  const [editImagePreviews, setEditImagePreviews] = useState<string[]>([]);
+  const [editExistingAttachments, setEditExistingAttachments] = useState<any[]>(
+    []
+  );
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [postToDelete, setPostToDelete] = useState<string | null>(null);
   const router = useRouter();
@@ -208,14 +213,35 @@ function ForumPage({ params }: { params: { forumId: string } }) {
             }
           );
         } else {
-          // Other errors
-          const errorMessage =
-            errorData?.error ||
-            errorData?.message ||
-            err.message ||
-            "Failed to add post";
-          setError(errorMessage);
-          toast.error(errorMessage);
+          // Check if this is an image upload error
+          if ((err as any).isUploadError) {
+            const errorMessage =
+              errorData?.message ||
+              errorData?.error ||
+              err.message ||
+              "Failed to upload image to forum";
+            console.error("Image upload failed:", errorMessage, errorData);
+            toast.error(
+              "Unable to upload image. Please try again or post without an image.",
+              {
+                duration: 5000,
+                style: {
+                  background: "#fef3c7",
+                  color: "#92400e",
+                  border: "1px solid #fcd34d",
+                },
+              }
+            );
+          } else {
+            // Other errors
+            const errorMessage =
+              errorData?.error ||
+              errorData?.message ||
+              err.message ||
+              "Failed to add post";
+            setError(errorMessage);
+            toast.error(errorMessage);
+          }
         }
       } else {
         // For other errors, show in error state
@@ -227,21 +253,53 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     }
   };
 
-  const handleEditPost = (postId: string, currentMessage: string) => {
+  const handleEditPost = (
+    postId: string,
+    currentMessage: string,
+    existingAttachments?: any[]
+  ) => {
     setEditingPostId(postId);
     setEditMessage(currentMessage);
+    // Load existing attachments
+    setEditExistingAttachments(existingAttachments || []);
+    setEditSelectedImages([]);
+    setEditImagePreviews([]);
   };
 
   const handleSaveEdit = async (postId: string) => {
-    if (!editMessage.trim()) {
-      setError("Message cannot be empty");
+    // Allow empty message if there are attachments (existing or new)
+    const hasMessage = editMessage.trim().length > 0;
+    const hasExistingAttachments = editExistingAttachments.length > 0;
+    const hasNewImages = editSelectedImages.length > 0;
+
+    if (!hasMessage && !hasExistingAttachments && !hasNewImages) {
+      setError("Please enter a message or attach an image");
       return;
     }
 
     try {
-      await editPost(params.forumId, postId, editMessage);
+      // Combine existing attachments with new images
+      await editPost(
+        params.forumId,
+        postId,
+        editMessage.trim() || "", // Allow empty message for image-only posts
+        editSelectedImages.length > 0 ? editSelectedImages : undefined,
+        editExistingAttachments
+      );
       setEditingPostId(null);
       setEditMessage("");
+      setEditSelectedImages([]);
+      // Clean up preview URLs
+      editImagePreviews.forEach((url) => URL.revokeObjectURL(url));
+      setEditImagePreviews([]);
+      setEditExistingAttachments([]);
+
+      // Reset file input
+      const fileInput = document.getElementById(
+        "edit-image-upload"
+      ) as HTMLInputElement;
+      if (fileInput) fileInput.value = "";
+
       // Fetch updated forum data
       const username = localStorage.getItem("username") || "test-user";
       const response = await axios.get(
@@ -249,13 +307,151 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       );
       setCurrentForum(response.data);
     } catch (err: any) {
-      setError(err.message || "Failed to edit post");
+      // Handle image moderation errors
+      if (err.response?.status === 400 || err.response?.status === 403) {
+        const errorData = err.response?.data;
+        if (errorData?.isContentViolation || errorData?.violationResult) {
+          const violationResult = errorData.violationResult;
+          if (
+            violationResult?.action === "banned" ||
+            violationResult?.action === "permanent_ban"
+          ) {
+            setError(errorData.message || "Your account has been suspended.");
+          } else {
+            setError(
+              errorData.message || "Image contains inappropriate content."
+            );
+          }
+        } else {
+          // Check if this is an image upload error
+          if ((err as any).isUploadError) {
+            const errorMessage =
+              errorData?.message ||
+              errorData?.error ||
+              err.message ||
+              "Failed to upload image";
+            console.error(
+              "Image upload failed (edit):",
+              errorMessage,
+              errorData
+            );
+            toast.error(
+              "Unable to upload image. Your message will be saved, but the image could not be added.",
+              {
+                duration: 5000,
+                style: {
+                  background: "#fef3c7",
+                  color: "#92400e",
+                  border: "1px solid #fcd34d",
+                },
+              }
+            );
+            // Don't set error state for upload errors - allow post to be saved without image
+          } else {
+            setError(
+              errorData?.error ||
+                errorData?.message ||
+                err.message ||
+                "Failed to edit post"
+            );
+            toast.error(
+              errorData?.error ||
+                errorData?.message ||
+                err.message ||
+                "Failed to edit post"
+            );
+          }
+        }
+      } else {
+        // Check if this is an image upload error
+        if ((err as any).isUploadError) {
+          console.error("Image upload failed (edit):", err.message);
+          toast.error(
+            "Unable to upload image. Your message will be saved, but the image could not be added.",
+            {
+              duration: 5000,
+              style: {
+                background: "#fef3c7",
+                color: "#92400e",
+                border: "1px solid #fcd34d",
+              },
+            }
+          );
+        } else {
+          setError(err.message || "Failed to edit post");
+          toast.error(err.message || "Failed to edit post");
+        }
+      }
     }
   };
 
   const handleCancelEdit = () => {
     setEditingPostId(null);
     setEditMessage("");
+    setEditSelectedImages([]);
+    // Clean up preview URLs
+    editImagePreviews.forEach((url) => URL.revokeObjectURL(url));
+    setEditImagePreviews([]);
+    setEditExistingAttachments([]);
+
+    // Reset file input
+    const fileInput = document.getElementById(
+      "edit-image-upload"
+    ) as HTMLInputElement;
+    if (fileInput) fileInput.value = "";
+  };
+
+  const handleEditImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+
+    // Limit to 5 images total (existing + new)
+    if (
+      files.length +
+        editSelectedImages.length +
+        editExistingAttachments.length >
+      5
+    ) {
+      setError("Maximum 5 images allowed per post");
+      return;
+    }
+
+    // Validate file types and sizes
+    const validFiles: File[] = [];
+    const previews: string[] = [];
+
+    files.forEach((file) => {
+      // Check file type
+      if (!file.type.startsWith("image/")) {
+        setError(`${file.name} is not a valid image file`);
+        return;
+      }
+
+      // Check file size (10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        setError(`${file.name} exceeds 10MB size limit`);
+        return;
+      }
+
+      validFiles.push(file);
+      previews.push(URL.createObjectURL(file));
+    });
+
+    setEditSelectedImages([...editSelectedImages, ...validFiles]);
+    setEditImagePreviews([...editImagePreviews, ...previews]);
+  };
+
+  const removeEditImage = (index: number, isNew: boolean) => {
+    if (isNew) {
+      // Remove new image
+      URL.revokeObjectURL(editImagePreviews[index]);
+      setEditSelectedImages(editSelectedImages.filter((_, i) => i !== index));
+      setEditImagePreviews(editImagePreviews.filter((_, i) => i !== index));
+    } else {
+      // Remove existing attachment
+      setEditExistingAttachments(
+        editExistingAttachments.filter((_, i) => i !== index)
+      );
+    }
   };
 
   const handleDeletePost = (postId: string) => {
@@ -512,10 +708,130 @@ function ForumPage({ params }: { params: { forumId: string } }) {
                       <textarea
                         value={editMessage}
                         onChange={(e) => setEditMessage(e.target.value)}
+                        placeholder="What's new..?"
                         className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                         rows={4}
-                        required
                       />
+
+                      {/* Image Upload Section for Editing */}
+                      <div className="space-y-2">
+                        <label
+                          htmlFor="edit-image-upload"
+                          className="cursor-pointer inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-5 w-5 mr-2"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            />
+                          </svg>
+                          Add Images (max 5 total)
+                        </label>
+                        <input
+                          id="edit-image-upload"
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleEditImageSelect}
+                          className="hidden"
+                        />
+
+                        {/* Existing Attachments */}
+                        {editExistingAttachments.length > 0 && (
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                            {editExistingAttachments.map(
+                              (attachment, index) => (
+                                <div
+                                  key={`existing-${index}`}
+                                  className="relative group"
+                                >
+                                  <Image
+                                    src={attachment.url}
+                                    alt={
+                                      attachment.name || `Image ${index + 1}`
+                                    }
+                                    width={200}
+                                    height={200}
+                                    className="w-full h-32 object-cover rounded border border-gray-300 dark:border-gray-600"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      removeEditImage(index, false)
+                                    }
+                                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    aria-label="Remove image"
+                                  >
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      className="h-4 w-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M6 18L18 6M6 6l12 12"
+                                      />
+                                    </svg>
+                                  </button>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        )}
+
+                        {/* New Image Previews */}
+                        {editImagePreviews.length > 0 && (
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                            {editImagePreviews.map((preview, index) => (
+                              <div
+                                key={`new-${index}`}
+                                className="relative group"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={preview}
+                                  alt={`Preview ${index + 1}`}
+                                  className="w-full h-32 object-cover rounded border border-gray-300 dark:border-gray-600"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removeEditImage(index, true)}
+                                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  aria-label="Remove image"
+                                >
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-4 w-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M6 18L18 6M6 6l12 12"
+                                    />
+                                  </svg>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
                       <div className="flex space-x-2">
                         <button
                           onClick={() => handleSaveEdit(post._id)}
@@ -533,9 +849,12 @@ function ForumPage({ params }: { params: { forumId: string } }) {
                     </div>
                   ) : (
                     <>
-                      <p className="whitespace-pre-wrap text-gray-900 dark:text-gray-100">
-                        {post.message || "No message content"}
-                      </p>
+                      {/* Only show message if it exists (allow image-only posts) */}
+                      {post.message && post.message.trim().length > 0 && (
+                        <p className="whitespace-pre-wrap text-gray-900 dark:text-gray-100 mb-4">
+                          {post.message}
+                        </p>
+                      )}
                       {/* Display attached images */}
                       {post.metadata?.attachments &&
                         Array.isArray(post.metadata.attachments) &&
@@ -619,7 +938,11 @@ function ForumPage({ params }: { params: { forumId: string } }) {
                         <>
                           <button
                             onClick={() =>
-                              handleEditPost(post._id, post.message)
+                              handleEditPost(
+                                post._id,
+                                post.message,
+                                post.metadata?.attachments || []
+                              )
                             }
                             className="text-blue-500 hover:text-blue-700"
                           >

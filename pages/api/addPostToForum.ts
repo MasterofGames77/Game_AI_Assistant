@@ -13,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     await connectToMongoDB();
-    const { forumId, message, username } = req.body;
+    const { forumId, message, username, attachments } = req.body;
 
     // Log the request for debugging (especially for 400 errors)
     console.log('addPostToForum request:', {
@@ -21,14 +21,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       username,
       messageLength: message?.length,
       hasMessage: !!message,
+      hasAttachments: attachments && Array.isArray(attachments) && attachments.length > 0,
       timestamp: new Date().toISOString()
     });
 
     // Validate required fields with detailed error messages
+    // Allow empty message if attachments are provided (like social media posts)
     const missingFields: string[] = [];
     if (!forumId) missingFields.push('forumId');
-    if (!message) missingFields.push('message');
     if (!username) missingFields.push('username');
+    
+    // Check if message or attachments are provided
+    const hasMessage = message && typeof message === 'string' && message.trim().length > 0;
+    const hasAttachments = attachments && Array.isArray(attachments) && attachments.length > 0;
+    
+    if (!hasMessage && !hasAttachments) {
+      return res.status(400).json({ 
+        error: 'Message is required and cannot be empty, or you must provide at least one image' 
+      });
+    }
     
     if (missingFields.length > 0) {
       console.warn('Missing required fields:', { missingFields, username, forumId });
@@ -72,13 +83,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Validate attachments if provided
-    const attachments = req.body.attachments || [];
-    if (attachments.length > 5) {
+    const postAttachments = attachments || [];
+    if (postAttachments.length > 5) {
       return res.status(400).json({ error: 'Maximum 5 images per post allowed' });
     }
     
     // Validate attachment structure
-    for (const attachment of attachments) {
+    for (const attachment of postAttachments) {
       if (!attachment.type || !attachment.url) {
         return res.status(400).json({ error: 'Invalid attachment format. Each attachment must have type and url' });
       }
@@ -146,10 +157,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Create new post with proper structure matching the schema
+    // Use message if provided, otherwise use empty string (images-only post)
     const newPost = {
       _id: new mongoose.Types.ObjectId(), // Generate ObjectId for the post
       username,
-      message: message.trim(),
+      message: hasMessage ? message.trim() : '', // Allow empty message for image-only posts
       timestamp: new Date(),
       createdBy: username,
       metadata: {
@@ -158,7 +170,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         editedBy: undefined,
         likes: 0,
         likedBy: [],
-        attachments: attachments.map((att: any) => ({
+        attachments: postAttachments.map((att: any) => ({
           type: 'image',
           url: att.url,
           name: att.name || 'image'

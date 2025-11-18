@@ -148,7 +148,7 @@ export interface ForumContextType {
   createForum: (forumData: Partial<Forum>) => Promise<Forum | null>;
   deleteForum: (forumId: string) => Promise<void>;
   addPost: (forumId: string, message: string, imageFiles?: File[]) => Promise<void>;
-  editPost: (forumId: string, postId: string, message: string) => Promise<void>;
+  editPost: (forumId: string, postId: string, message: string, imageFiles?: File[], existingAttachments?: any[]) => Promise<void>;
   deletePost: (forumId: string, postId: string) => Promise<void>;
   likePost: (forumId: string, postId: string) => Promise<void>;
   updateForumUsers: (forumId: string, allowedUsers: string[]) => Promise<boolean>;

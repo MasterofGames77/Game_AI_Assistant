@@ -114,61 +114,82 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
     async (forumId: string, message: string, imageFiles?: File[]) => {
       try {
         setLoading(true);
-        
+
         // Upload images first if provided
         let attachments: any[] = [];
         if (imageFiles && imageFiles.length > 0) {
           const formData = new FormData();
           imageFiles.forEach((file) => {
-            formData.append('image', file);
+            formData.append("image", file);
           });
           // Add username for violation tracking
           const username = localStorage.getItem("username");
           if (username) {
-            formData.append('username', username);
+            formData.append("username", username);
           }
 
           try {
-            const uploadResponse = await axios.post('/api/uploadForumImage', formData, {
-              headers: {
-                'Content-Type': 'multipart/form-data',
-              },
-            });
+            const uploadResponse = await axios.post(
+              "/api/uploadForumImage",
+              formData,
+              {
+                headers: {
+                  "Content-Type": "multipart/form-data",
+                },
+              }
+            );
 
             if (uploadResponse.data.success && uploadResponse.data.images) {
               attachments = uploadResponse.data.images.map((img: any) => ({
-                type: 'image',
+                type: "image",
                 url: img.url,
                 name: img.name,
               }));
             }
           } catch (uploadError: any) {
-            // Log the error to console for debugging
-            console.error('Image upload error:', {
+            // Log detailed error to console for debugging
+            console.error("Image upload error:", {
               status: uploadError.response?.status,
               error: uploadError.response?.data?.error,
+              message: uploadError.response?.data?.message,
               details: uploadError.response?.data?.details,
               violationResult: uploadError.response?.data?.violationResult,
-              moderationResult: uploadError.response?.data?.moderationResult
+              moderationResult: uploadError.response?.data?.moderationResult,
+              fullError: uploadError,
             });
-            
+
             // Handle image moderation errors with violation tracking
-            // The error will be thrown and handled in the forum page with a toast notification
-            if (uploadError.response?.status === 400 || uploadError.response?.status === 403) {
+            if (
+              uploadError.response?.status === 400 ||
+              uploadError.response?.status === 403
+            ) {
               const errorData = uploadError.response?.data;
-              
+
               // Log violation details if present
               if (errorData?.violationResult) {
-                console.warn('Image violation detected:', {
+                console.warn("Image violation detected:", {
                   action: errorData.violationResult.action,
                   warningCount: errorData.violationResult.count,
-                  details: errorData.details
+                  details: errorData.details,
                 });
-              } else if (errorData?.error === 'Image contains inappropriate content') {
-                console.warn('Image rejected by moderation:', errorData.details);
+              } else if (
+                errorData?.error === "Image contains inappropriate content"
+              ) {
+                console.warn(
+                  "Image rejected by moderation:",
+                  errorData.details
+                );
               }
             }
-            throw uploadError;
+            // Re-throw with a user-friendly error message attached
+            const userFriendlyError = new Error(
+              uploadError.response?.data?.message ||
+                uploadError.response?.data?.error ||
+                "Failed to upload image. Please try again."
+            );
+            (userFriendlyError as any).response = uploadError.response;
+            (userFriendlyError as any).isUploadError = true;
+            throw userFriendlyError;
           }
         }
 
@@ -245,14 +266,104 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
   );
 
   const editPost = useCallback(
-    async (forumId: string, postId: string, message: string) => {
+    async (
+      forumId: string,
+      postId: string,
+      message: string,
+      imageFiles?: File[],
+      existingAttachments?: any[]
+    ) => {
       try {
         setLoading(true);
+
+        // Upload new images first if provided
+        let attachments: any[] = existingAttachments || [];
+        if (imageFiles && imageFiles.length > 0) {
+          const formData = new FormData();
+          imageFiles.forEach((file) => {
+            formData.append("image", file);
+          });
+          // Add username for violation tracking
+          const username = localStorage.getItem("username");
+          if (username) {
+            formData.append("username", username);
+          }
+
+          try {
+            const uploadResponse = await axios.post(
+              "/api/uploadForumImage",
+              formData,
+              {
+                headers: {
+                  "Content-Type": "multipart/form-data",
+                },
+              }
+            );
+
+            if (uploadResponse.data.success && uploadResponse.data.images) {
+              const newAttachments = uploadResponse.data.images.map(
+                (img: any) => ({
+                  type: "image",
+                  url: img.url,
+                  name: img.name,
+                })
+              );
+              // Combine existing attachments with new ones
+              attachments = [...attachments, ...newAttachments];
+            }
+          } catch (uploadError: any) {
+            // Log detailed error to console for debugging
+            console.error("Image upload error (edit post):", {
+              status: uploadError.response?.status,
+              error: uploadError.response?.data?.error,
+              message: uploadError.response?.data?.message,
+              details: uploadError.response?.data?.details,
+              violationResult: uploadError.response?.data?.violationResult,
+              moderationResult: uploadError.response?.data?.moderationResult,
+              fullError: uploadError,
+            });
+
+            // Handle image moderation errors with violation tracking
+            if (
+              uploadError.response?.status === 400 ||
+              uploadError.response?.status === 403
+            ) {
+              const errorData = uploadError.response?.data;
+
+              // Log violation details if present
+              if (errorData?.violationResult) {
+                console.warn("Image violation detected:", {
+                  action: errorData.violationResult.action,
+                  warningCount: errorData.violationResult.count,
+                  details: errorData.details,
+                });
+              } else if (
+                errorData?.error === "Image contains inappropriate content"
+              ) {
+                console.warn(
+                  "Image rejected by moderation:",
+                  errorData.details
+                );
+              }
+            }
+            // Re-throw with a user-friendly error message attached
+            const userFriendlyError = new Error(
+              uploadError.response?.data?.message ||
+                uploadError.response?.data?.error ||
+                "Failed to upload image. Please try again."
+            );
+            (userFriendlyError as any).response = uploadError.response;
+            (userFriendlyError as any).isUploadError = true;
+            throw userFriendlyError;
+          }
+        }
+
         const response = await axios.put(
           `/api/editPost?forumId=${forumId}&postId=${postId}`,
-          { 
+          {
             message,
             username: localStorage.getItem("username"),
+            attachments: attachments.length > 0 ? attachments : undefined,
           },
           {
             headers: {
@@ -271,7 +382,9 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
           setCurrentForum(updatedForum);
         }
       } catch (err: any) {
-        setError(err.response?.data?.error || err.message || "Failed to edit post");
+        setError(
+          err.response?.data?.error || err.message || "Failed to edit post"
+        );
         throw err;
       } finally {
         setLoading(false);
