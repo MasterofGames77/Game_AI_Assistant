@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { ImageMapping, ImageUsage } from '../types';
+import { getImageStorage } from './imageStorage';
 
 /**
  * Sanitize game title for use in file paths
@@ -195,12 +196,77 @@ function saveImageUsage(usage: ImageUsage): void {
 }
 
 /**
+ * Check if an image path is a cloud URL (starts with http:// or https://)
+ */
+function isCloudUrl(imagePath: string): boolean {
+  return imagePath.startsWith('http://') || imagePath.startsWith('https://');
+}
+
+/**
+ * Upload a local image file to cloud storage (if configured)
+ * @param localImagePath - Local file path (e.g., /uploads/automated-images/game.png)
+ * @returns Cloud URL if uploaded, or local path if using local storage
+ */
+async function uploadImageToCloud(localImagePath: string): Promise<string> {
+  const imageStorage = getImageStorage();
+  
+  // Check if we're using local storage by checking if the upload directory exists
+  // and if the storage instance is LocalImageStorage
+  // We can detect this by checking environment variables for cloud storage
+  const hasCloudStorage = 
+    (process.env.IMAGEKIT_PUBLIC_KEY && process.env.IMAGEKIT_PRIVATE_KEY && process.env.IMAGEKIT_URL_ENDPOINT) ||
+    (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) ||
+    (process.env.AWS_S3_BUCKET_NAME && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
+  
+  // If no cloud storage configured, return local path
+  if (!hasCloudStorage) {
+    return localImagePath;
+  }
+  
+  // Check if image is already a cloud URL
+  if (isCloudUrl(localImagePath)) {
+    return localImagePath;
+  }
+  
+  // Get full file path
+  const fullPath = path.join(process.cwd(), 'public', localImagePath);
+  
+  // Check if file exists
+  if (!fs.existsSync(fullPath)) {
+    console.warn(`Image file not found: ${fullPath}`);
+    return localImagePath; // Return original path if file doesn't exist
+  }
+  
+  try {
+    // Extract filename from path
+    const filename = path.basename(localImagePath);
+    const sanitizedGameTitle = path.dirname(localImagePath).split('/').pop() || 'automated-images';
+    const folder = `automated-images/${sanitizedGameTitle}`;
+    
+    // Upload to cloud storage
+    const result = await imageStorage.uploadImage(fullPath, filename, folder);
+    
+    console.log(`Uploaded automated image to cloud: ${result.url}`);
+    return result.url;
+  } catch (error) {
+    console.error(`Error uploading image to cloud storage: ${error}`);
+    // Fall back to local path if upload fails
+    return localImagePath;
+  }
+}
+
+/**
  * Get a random image for a game that hasn't been used by this user before
  * @param gameTitle - The game title
  * @param username - The automated user's username (to track usage)
- * @returns Image path or null if no unused image available
+ * @param uploadToCloud - Whether to upload to cloud storage if not already uploaded (default: true)
+ * @returns Image URL (local path or cloud URL) or null if no unused image available
  */
-export function getRandomGameImage(gameTitle: string, username?: string): string | null {
+export async function getRandomGameImage(
+  gameTitle: string, 
+  username?: string,
+  uploadToCloud: boolean = true
+): Promise<string | null> {
   const mapping = loadImageMapping();
   const usage = loadImageUsage();
   
@@ -210,6 +276,11 @@ export function getRandomGameImage(gameTitle: string, username?: string): string
   // First, check mapping for registered images
   if (mapping.games[gameTitle] && mapping.games[gameTitle].images.length > 0) {
     availableImages = mapping.games[gameTitle].images.filter(img => {
+      // If it's already a cloud URL, include it
+      if (isCloudUrl(img)) {
+        return true;
+      }
+      // Otherwise, check if local file exists
       const fullPath = path.join(process.cwd(), 'public', img);
       return fs.existsSync(fullPath);
     });
@@ -277,8 +348,10 @@ export function getRandomGameImage(gameTitle: string, username?: string): string
   if (availableImages.length === 0) {
     return null;
   }
-  
+
   // If username provided, filter out images that have been used by this user for this game
+  let selectedImage: string | null = null;
+  
   if (username) {
     const usedImages = usage.usage[username]?.[gameTitle] || [];
     const unusedImages = availableImages.filter(img => !usedImages.includes(img));
@@ -290,12 +363,43 @@ export function getRandomGameImage(gameTitle: string, username?: string): string
     
     // Return random unused image
     const randomIndex = Math.floor(Math.random() * unusedImages.length);
-    return unusedImages[randomIndex];
+    selectedImage = unusedImages[randomIndex];
+  } else {
+    // If no username provided, return random image (for backward compatibility)
+    const randomIndex = Math.floor(Math.random() * availableImages.length);
+    selectedImage = availableImages[randomIndex];
   }
   
-  // If no username provided, return random image (for backward compatibility)
-  const randomIndex = Math.floor(Math.random() * availableImages.length);
-  return availableImages[randomIndex];
+  // If image is not already a cloud URL and we should upload to cloud, upload it
+  if (selectedImage && uploadToCloud && !isCloudUrl(selectedImage)) {
+    try {
+      const cloudUrl = await uploadImageToCloud(selectedImage);
+      
+      // Update mapping with cloud URL if it changed
+      if (cloudUrl !== selectedImage && isCloudUrl(cloudUrl)) {
+        const gameMapping = mapping.games[gameTitle];
+        if (gameMapping) {
+          // Replace local path with cloud URL in mapping
+          const index = gameMapping.images.indexOf(selectedImage);
+          if (index !== -1) {
+            gameMapping.images[index] = cloudUrl;
+          }
+          if (gameMapping.primary === selectedImage) {
+            gameMapping.primary = cloudUrl;
+          }
+          saveImageMapping(mapping);
+        }
+      }
+      
+      return cloudUrl;
+    } catch (error) {
+      console.error(`Error uploading image to cloud: ${error}`);
+      // Fall back to local path if upload fails
+      return selectedImage;
+    }
+  }
+  
+  return selectedImage;
 }
 
 /**

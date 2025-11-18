@@ -86,8 +86,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'Only image attachments are currently supported' });
       }
       // Basic URL validation
-      if (!attachment.url.startsWith('/uploads/forum-images/')) {
-        return res.status(400).json({ error: 'Invalid image URL. Images must be uploaded through the upload endpoint.' });
+      // Allow:
+      // - Local forum images: /uploads/forum-images/
+      // - Local automated images: /uploads/automated-images/
+      // - Cloud URLs: http:// or https://
+      const isValidUrl = 
+        attachment.url.startsWith('/uploads/forum-images/') ||
+        attachment.url.startsWith('/uploads/automated-images/') ||
+        attachment.url.startsWith('http://') ||
+        attachment.url.startsWith('https://');
+      
+      if (!isValidUrl) {
+        return res.status(400).json({ 
+          error: 'Invalid image URL. Images must be uploaded through the upload endpoint or be a valid cloud URL.' 
+        });
       }
     }
 

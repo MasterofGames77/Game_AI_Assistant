@@ -363,22 +363,37 @@ export async function createForumPost(
     }
     
     // Find image for the game (excluding images already used by this user for this game)
-    let imagePath: string | null = null;
+    // This will automatically upload to cloud storage if configured
+    let imageUrl: string | null = null;
     let attachments: any[] = [];
     
-    const gameImage = getRandomGameImage(actualGameTitle, username);
+    const gameImage = await getRandomGameImage(actualGameTitle, username, true);
     if (gameImage) {
       // Image found - record that this user has used this image for this game
+      // Record the URL (could be local path or cloud URL)
       recordImageUsage(username, actualGameTitle, gameImage);
       
-      // Image found - need to upload it via the upload endpoint
-      // For now, we'll post without image if upload fails
-      // (In production, you'd need to handle file upload properly)
-      imagePath = gameImage;
+      // If it's a cloud URL, we can use it directly
+      // If it's a local path, it will be served from /public
+      imageUrl = gameImage;
       
-      // Note: Image upload requires actual file, not just path
-      // This would need to be handled differently in production
-      // For now, we'll post without image attachment
+      // Add image to attachments if it's a cloud URL or if we're in production
+      // For local development, the image will be served from /public automatically
+      if (gameImage.startsWith('http://') || gameImage.startsWith('https://')) {
+        // Cloud URL - add as attachment
+        attachments.push({
+          type: 'image',
+          url: gameImage,
+          name: path.basename(gameImage)
+        });
+      } else {
+        // Local path - will be served from /public, but we can still add it
+        attachments.push({
+          type: 'image',
+          url: gameImage,
+          name: path.basename(gameImage)
+        });
+      }
     }
     
     // Post to forum
@@ -388,7 +403,7 @@ export async function createForumPost(
         forumId,
         message: postContent,
         username,
-        attachments: attachments // Empty for now, can be added later
+        attachments: attachments // Now includes image if available
       },
       {
         headers: {
@@ -406,7 +421,8 @@ export async function createForumPost(
         gameTitle: actualGameTitle,
         genre: actualGenre,
         postContent,
-        imageUsed: imagePath !== null,
+        imageUsed: imageUrl !== null,
+        imageUrl: imageUrl,
         postId: postResponse.data.post?._id,
         postedToExistingForum: targetForum !== null
       }

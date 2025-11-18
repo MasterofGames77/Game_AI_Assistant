@@ -91,7 +91,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         const image = findGameImage(gameTitle);
-        const randomImage = getRandomGameImage(gameTitle);
+        const randomImage = await getRandomGameImage(gameTitle);
         const hasImage = hasGameImage(gameTitle);
 
         return res.status(200).json({
