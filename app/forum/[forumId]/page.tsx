@@ -151,26 +151,32 @@ function ForumPage({ params }: { params: { forumId: string } }) {
             const message =
               errorData.message ||
               "Your account has been suspended due to content violations.";
-            setError(message);
+            // Don't set error state - only show toast popup
             toast.error(message, {
               duration: 8000,
               style: {
                 background: "#fee2e2",
                 color: "#991b1b",
                 border: "1px solid #fca5a5",
+                padding: "16px",
+                borderRadius: "8px",
+                fontSize: "14px",
               },
             });
           } else if (violationResult?.action === "permanent_ban") {
             const message =
               errorData.message ||
               "Your account has been permanently suspended.";
-            setError(message);
+            // Don't set error state - only show toast popup
             toast.error(message, {
               duration: 8000,
               style: {
                 background: "#fee2e2",
                 color: "#991b1b",
                 border: "1px solid #fca5a5",
+                padding: "16px",
+                borderRadius: "8px",
+                fontSize: "14px",
               },
             });
           } else {
@@ -183,13 +189,16 @@ function ForumPage({ params }: { params: { forumId: string } }) {
             const details =
               errorData.details ||
               "The image contains content that violates our community guidelines";
-            setError(message);
-            toast.error(`${message} ${details}`, {
+            // Don't set error state - only show toast popup
+            toast.error(message, {
               duration: 6000,
               style: {
                 background: "#fee2e2",
                 color: "#991b1b",
                 border: "1px solid #fca5a5",
+                padding: "16px",
+                borderRadius: "8px",
+                fontSize: "14px",
               },
             });
           }
@@ -200,7 +209,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
           const details =
             errorData.details ||
             "The image contains content that violates our community guidelines";
-          setError(`Image Rejected: ${details}`);
+          // Don't set error state - only show toast popup
           toast.error(
             `Image Rejected: ${details}. Please choose a different image.`,
             {
@@ -209,6 +218,9 @@ function ForumPage({ params }: { params: { forumId: string } }) {
                 background: "#fee2e2",
                 color: "#991b1b",
                 border: "1px solid #fca5a5",
+                padding: "16px",
+                borderRadius: "8px",
+                fontSize: "14px",
               },
             }
           );
@@ -316,10 +328,33 @@ function ForumPage({ params }: { params: { forumId: string } }) {
             violationResult?.action === "banned" ||
             violationResult?.action === "permanent_ban"
           ) {
-            setError(errorData.message || "Your account has been suspended.");
+            // Don't set error state - only show toast popup
+            toast.error(errorData.message || "Your account has been suspended.", {
+              duration: 8000,
+              style: {
+                background: "#fee2e2",
+                color: "#991b1b",
+                border: "1px solid #fca5a5",
+                padding: "16px",
+                borderRadius: "8px",
+                fontSize: "14px",
+              },
+            });
           } else {
-            setError(
-              errorData.message || "Image contains inappropriate content."
+            // Don't set error state - only show toast popup
+            toast.error(
+              errorData.message || "Image contains inappropriate content.",
+              {
+                duration: 6000,
+                style: {
+                  background: "#fee2e2",
+                  color: "#991b1b",
+                  border: "1px solid #fca5a5",
+                  padding: "16px",
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                },
+              }
             );
           }
         } else {
@@ -348,18 +383,23 @@ function ForumPage({ params }: { params: { forumId: string } }) {
             );
             // Don't set error state for upload errors - allow post to be saved without image
           } else {
-            setError(
+            // Don't set error state - only show toast popup
+            const errorMessage =
               errorData?.error ||
-                errorData?.message ||
-                err.message ||
-                "Failed to edit post"
-            );
-            toast.error(
-              errorData?.error ||
-                errorData?.message ||
-                err.message ||
-                "Failed to edit post"
-            );
+              errorData?.message ||
+              err.message ||
+              "Failed to edit post";
+            toast.error(errorMessage, {
+              duration: 5000,
+              style: {
+                background: "#fee2e2",
+                color: "#991b1b",
+                border: "1px solid #fca5a5",
+                padding: "16px",
+                borderRadius: "8px",
+                fontSize: "14px",
+              },
+            });
           }
         }
       } else {

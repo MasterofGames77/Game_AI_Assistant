@@ -145,7 +145,22 @@ export async function moderateImage(imagePath: string): Promise<ModerationResult
     // Get credentials
     const credentials = getGoogleCredentials();
     if (!credentials) {
-      throw new Error('Google Cloud Vision credentials not configured');
+      // If credentials are not configured, allow the image (don't block)
+      // This prevents false positives when the API is not set up
+      console.warn('Google Cloud Vision credentials not configured - allowing image without moderation');
+      return {
+        isApproved: true,
+        isInappropriate: false,
+        reasons: [],
+        safeSearch: {
+          adult: 'UNKNOWN',
+          violence: 'UNKNOWN',
+          racy: 'UNKNOWN',
+          medical: 'UNKNOWN',
+          spoof: 'UNKNOWN'
+        },
+        confidence: 'low'
+      };
     }
 
     // Create Vision API client
@@ -158,11 +173,13 @@ export async function moderateImage(imagePath: string): Promise<ModerationResult
     const safeSearchAnnotation = safeSearchResult.safeSearchAnnotation;
 
     if (!safeSearchAnnotation) {
-      // If SafeSearch fails, we'll be conservative and reject
+      // If SafeSearch fails, allow the image (don't block)
+      // This prevents false positives when the API returns no results
+      console.warn('SafeSearch annotation not available - allowing image without moderation');
       return {
-        isApproved: false,
-        isInappropriate: true,
-        reasons: ['Unable to analyze image content'],
+        isApproved: true,
+        isInappropriate: false,
+        reasons: [],
         safeSearch: {
           adult: 'UNKNOWN',
           violence: 'UNKNOWN',
@@ -197,11 +214,14 @@ export async function moderateImage(imagePath: string): Promise<ModerationResult
   } catch (error: any) {
     console.error('Error moderating image:', error);
     
-    // On error, be conservative and reject the image
+    // On error, allow the image (don't block)
+    // This prevents false positives when the API fails
+    // Log the error for debugging but don't block legitimate uploads
+    console.warn(`Image moderation error - allowing image: ${error.message}`);
     return {
-      isApproved: false,
-      isInappropriate: true,
-      reasons: [`Error analyzing image: ${error.message}`],
+      isApproved: true,
+      isInappropriate: false,
+      reasons: [],
       safeSearch: {
         adult: 'UNKNOWN',
         violence: 'UNKNOWN',
