@@ -85,9 +85,20 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
   } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [actualTotalConversations, setActualTotalConversations] = useState<
+    number | null
+  >(null);
 
   // Calculate if there are more conversations to load
-  const hasMore = conversationCount > conversations.length;
+  // Prioritize actualTotalConversations (fetched from API), then conversationCount prop, then check array length
+  const totalToUse =
+    actualTotalConversations !== null
+      ? actualTotalConversations
+      : conversationCount > 0
+      ? conversationCount
+      : null;
+
+  const hasMore = totalToUse !== null && totalToUse > conversations.length;
 
   // Function to update username and check Pro access
   const updateUserData = useCallback(async () => {
@@ -142,9 +153,28 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
             totalQuestions: statsData.totalQuestions || 0,
             currentStreak: statsData.currentStreak || 0,
           });
+          // Also set the actual total for Load More button
+          setActualTotalConversations(statsData.totalQuestions || 0);
         }
       } catch (error) {
         console.error("Error fetching stats:", error);
+      }
+
+      // Also fetch conversation count directly to ensure Load More button shows correctly
+      try {
+        const convResponse = await fetch(
+          `/api/getConversation?username=${encodeURIComponent(
+            storedUsername
+          )}&page=1&pageSize=20`
+        );
+        if (convResponse.ok) {
+          const convData = await convResponse.json();
+          if (convData.pagination && convData.pagination.total !== undefined) {
+            setActualTotalConversations(convData.pagination.total);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching conversation count:", error);
       }
     } else {
       // Clear state if no username
@@ -216,6 +246,34 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
       clearTimeout(debounceTimer);
     };
   }, [updateUserData]);
+
+  // Refresh stats when conversations change (e.g., after a new question)
+  useEffect(() => {
+    if (username) {
+      // Add a small delay to ensure database has been updated
+      const refreshStats = async () => {
+        // Wait a bit for database write to complete
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        try {
+          const statsResponse = await fetch(
+            `/api/stats?username=${encodeURIComponent(username)}`
+          );
+          if (statsResponse.ok) {
+            const statsData = await statsResponse.json();
+            setStats({
+              questionsToday: statsData.questionsToday || 0,
+              totalQuestions: statsData.totalQuestions || 0,
+              currentStreak: statsData.currentStreak || 0,
+            });
+            setActualTotalConversations(statsData.totalQuestions || 0);
+          }
+        } catch (error) {
+          console.error("Error refreshing stats:", error);
+        }
+      };
+      refreshStats();
+    }
+  }, [username, conversations.length]);
 
   // Memoize the shorten function
   const shortenQuestion = (question: string): string => {
@@ -399,7 +457,7 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
         })}
 
         {/* Load More Button */}
-        {conversationCount > conversations.length && (
+        {hasMore && (
           <div className="mt-4 mb-2">
             <button
               onClick={async () => {
@@ -432,7 +490,8 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
               {loadingMore
                 ? "Loading..."
                 : `Load More (${
-                    conversationCount - conversations.length
+                    (actualTotalConversations || conversationCount) -
+                    conversations.length
                   } remaining)`}
             </button>
           </div>
