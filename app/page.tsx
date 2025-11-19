@@ -1336,7 +1336,17 @@ export default function Home() {
             setActiveView={setActiveView}
             conversationCount={conversationCount}
             onLoadMore={(newConversations) => {
-              setConversations((prev) => [...prev, ...newConversations]);
+              setConversations((prev) => {
+                // Create a Set of existing conversation IDs (using question + timestamp as unique key)
+                const existingKeys = new Set(
+                  prev.map((conv) => `${conv.question}-${conv.timestamp}`)
+                );
+                // Filter out duplicates from new conversations
+                const uniqueNew = newConversations.filter(
+                  (conv) => !existingKeys.has(`${conv.question}-${conv.timestamp}`)
+                );
+                return [...prev, ...uniqueNew];
+              });
             }}
             className={sidebarOpen ? "sidebar open" : "sidebar"}
           />

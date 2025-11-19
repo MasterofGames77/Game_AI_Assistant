@@ -69,39 +69,55 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Parse query parameters
     const { page, pageSize, skip } = parseQueryParams(req.query);
 
-    // Check cache first
-    const cachedData = getCachedData(username);
-    if (cachedData) {
-      logger.info('Cache hit for conversations', { username });
-      return res.status(200).json({
-        conversations: cachedData.slice(skip, skip + pageSize),
-        pagination: {
-          total: cachedData.length,
-          page,
-          pageSize,
-          totalPages: Math.ceil(cachedData.length / pageSize)
-        }
-      });
-    }
-
     // Connect to MongoDB
-    logger.info('Fetching conversations from database', { username });
     await connectToMongoDB();
 
     // Get total count for pagination
     const total = await Question.countDocuments({ username });
 
-    // Fetch conversations with pagination and lean query
-    // Include metadata fields for Phase 2 verification and imageUrl
-    const conversations = await Question.find({ username })
-      .sort({ timestamp: -1 })
-      .skip(skip)
-      .limit(pageSize)
-      .lean()
-      .select('question response timestamp detectedGame detectedGenre questionCategory difficultyHint interactionType imageUrl');
+    // For page 1, check cache first
+    if (page === 1) {
+      const cachedData = getCachedData(username);
+      if (cachedData) {
+        logger.info('Cache hit for conversations', { username });
+        return res.status(200).json({
+          conversations: cachedData.slice(0, pageSize),
+          pagination: {
+            total: cachedData.length,
+            page,
+            pageSize,
+            totalPages: Math.ceil(cachedData.length / pageSize)
+          }
+        });
+      }
+    }
 
-    // Update cache with full dataset
-    updateCache(username, conversations);
+    // For page 1: fetch all conversations and cache them
+    // For page 2+: fetch only the requested page (bypass cache)
+    let conversations;
+    if (page === 1) {
+      // Fetch all conversations for caching
+      logger.info('Fetching all conversations from database for cache', { username });
+      conversations = await Question.find({ username })
+        .sort({ timestamp: -1 })
+        .lean()
+        .select('question response timestamp detectedGame detectedGenre questionCategory difficultyHint interactionType imageUrl');
+      
+      // Update cache with full dataset
+      updateCache(username, conversations);
+      
+      // Return only the first page
+      conversations = conversations.slice(0, pageSize);
+    } else {
+      // For subsequent pages, fetch directly from database (bypass cache)
+      logger.info('Fetching conversations from database', { username, page });
+      conversations = await Question.find({ username })
+        .sort({ timestamp: -1 })
+        .skip(skip)
+        .limit(pageSize)
+        .lean()
+        .select('question response timestamp detectedGame detectedGenre questionCategory difficultyHint interactionType imageUrl');
+    }
 
     // Log success
     logger.info('Conversations fetched successfully', {
