@@ -680,11 +680,7 @@ export default function Home() {
             formData.append("username", username);
           }
 
-          const uploadRes = await axios.post("/api/uploadImage", formData, {
-            headers: {
-              "Content-Type": "multipart/form-data",
-            },
-          });
+          const uploadRes = await axios.post("/api/uploadImage", formData);
 
           // The new uploadImage API returns both filePath (for local) and url (for cloud)
           imageFilePath = uploadRes.data.filePath || uploadRes.data.url;

@@ -131,12 +131,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
           try {
             const uploadResponse = await axios.post(
               "/api/uploadForumImage",
-              formData,
-              {
-                headers: {
-                  "Content-Type": "multipart/form-data",
-                },
-              }
+              formData
             );
 
             if (uploadResponse.data.success && uploadResponse.data.images) {
@@ -292,12 +287,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
           try {
             const uploadResponse = await axios.post(
               "/api/uploadForumImage",
-              formData,
-              {
-                headers: {
-                  "Content-Type": "multipart/form-data",
-                },
-              }
+              formData
             );
 
             if (uploadResponse.data.success && uploadResponse.data.images) {
