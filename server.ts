@@ -3,8 +3,8 @@ import { parse, UrlWithParsedQuery } from "url";
 import next, { NextApiRequest, NextApiResponse } from "next";
 import { initSocket } from "./middleware/realtime";
 import { initializeScheduler } from "./utils/automatedUsersScheduler";
-// import fs from "fs";
-// import path from "path";
+import fs from "fs";
+import path from "path";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = process.env.PORT || 3000;
@@ -12,19 +12,19 @@ const app = next({ dev });
 const handle = app.getRequestHandler();
 
 // Function to set up Google Vision credentials
-// const setupGoogleCredentials = () => {
-//   const credentialsPath = path.join("/tmp", "service-account-key.json");
-//   const credentials = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-//   if (credentials) {
-//     // Write the JSON credentials to a file in the temporary directory
-//     fs.writeFileSync(credentialsPath, credentials);
-//     // Set the GOOGLE_APPLICATION_CREDENTIALS environment variable to point to the file
-//     process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
-//     console.log("Google Vision API credentials set up successfully.");
-//   } else {
-//     console.error("GOOGLE_APPLICATION_CREDENTIALS_JSON is not set.");
-//   }
-// };
+const setupGoogleCredentials = () => {
+  const credentialsPath = path.join("/tmp", "service-account-key.json");
+  const credentials = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+  if (credentials) {
+    // Write the JSON credentials to a file in the temporary directory
+    fs.writeFileSync(credentialsPath, credentials);
+    // Set the GOOGLE_APPLICATION_CREDENTIALS environment variable to point to the file
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
+    console.log("Google Vision API credentials set up successfully.");
+  } else {
+    console.error("GOOGLE_APPLICATION_CREDENTIALS_JSON is not set.");
+  }
+};
 
 app.prepare().then(async () => {
   const server = createServer((req, res) => {
@@ -39,7 +39,14 @@ app.prepare().then(async () => {
   initSocket(server);
 
   // Initialize automated users scheduler
+  console.log('Initializing automated users scheduler...');
+  // console.log(`AUTOMATED_USERS_ENABLED: ${process.env.AUTOMATED_USERS_ENABLED}`);
+  // console.log(`AUTOMATED_USERS_MYSTERIOUS_QUESTION: ${process.env.AUTOMATED_USERS_MYSTERIOUS_QUESTION}`);
+  // console.log(`AUTOMATED_USERS_MYSTERIOUS_POST: ${process.env.AUTOMATED_USERS_MYSTERIOUS_POST}`);
+  // console.log(`AUTOMATED_USERS_WAYWARD_QUESTION: ${process.env.AUTOMATED_USERS_WAYWARD_QUESTION}`);
+  // console.log(`AUTOMATED_USERS_WAYWARD_POST: ${process.env.AUTOMATED_USERS_WAYWARD_POST}`);
   initializeScheduler();
+  setupGoogleCredentials();
 
   // Start the server
   server.listen(port, () => {

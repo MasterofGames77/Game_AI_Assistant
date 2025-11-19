@@ -800,3 +800,13 @@ export interface SaveTimerStateRequest {
   remainingSeconds: number;
   breakIntervalMinutes: number;
 }
+
+export interface CronTask {
+  name: string;
+  cronExpression: string;
+  task: () => Promise<void>;
+  isRunning: boolean;
+  cronTask?: any; // The actual node-cron task object
+  lastRun?: Date;
+  nextRun?: Date;
+}
