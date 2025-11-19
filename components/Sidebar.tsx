@@ -69,6 +69,8 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
   activeView,
   setActiveView,
   className,
+  conversationCount,
+  onLoadMore,
 }) => {
   const [hasProAccess, setHasProAccess] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
@@ -76,6 +78,16 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
     currentStreak: number;
     longestStreak: number;
   } | null>(null);
+  const [stats, setStats] = useState<{
+    questionsToday: number;
+    totalQuestions: number;
+    currentStreak: number;
+  } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Calculate if there are more conversations to load
+  const hasMore = conversationCount > conversations.length;
 
   // Function to update username and check Pro access
   const updateUserData = useCallback(async () => {
@@ -117,10 +129,28 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
       } catch (error) {
         console.error("Error fetching streak:", error);
       }
+
+      // Fetch stats data
+      try {
+        const statsResponse = await fetch(
+          `/api/stats?username=${encodeURIComponent(storedUsername)}`
+        );
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json();
+          setStats({
+            questionsToday: statsData.questionsToday || 0,
+            totalQuestions: statsData.totalQuestions || 0,
+            currentStreak: statsData.currentStreak || 0,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching stats:", error);
+      }
     } else {
       // Clear state if no username
       setHasProAccess(false);
       setStreak(null);
+      setStats(null);
     }
   }, []);
 
@@ -232,7 +262,30 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
         />
       </div>
 
-      {/* Daily Streak Counter */}
+      {/* Quick Stats Widget */}
+      {username && stats && (
+        <div className="mb-4 p-3 bg-gray-800 rounded-lg border border-gray-700">
+          <div className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wide">
+            Your Stats
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-300">Questions Today</span>
+              <span className="text-sm font-bold text-white">
+                {stats.questionsToday}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-300">Total Questions</span>
+              <span className="text-sm font-bold text-white">
+                {stats.totalQuestions}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Daily Streak Counter (keep for visual emphasis if streak > 0) */}
       {username && streak && streak.currentStreak > 0 && (
         <div className="mb-4 p-3 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg text-white text-center">
           <div className="text-2xl font-bold">🔥 {streak.currentStreak}</div>
@@ -344,6 +397,46 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
             </div>
           );
         })}
+
+        {/* Load More Button */}
+        {conversationCount > conversations.length && (
+          <div className="mt-4 mb-2">
+            <button
+              onClick={async () => {
+                if (loadingMore || !username) return;
+                setLoadingMore(true);
+                try {
+                  const nextPage = currentPage + 1;
+                  const response = await fetch(
+                    `/api/getConversation?username=${encodeURIComponent(
+                      username
+                    )}&page=${nextPage}&pageSize=20`
+                  );
+                  if (response.ok) {
+                    const data = await response.json();
+                    // Update parent component's conversations via callback
+                    if (onLoadMore) {
+                      onLoadMore(data.conversations);
+                    }
+                    setCurrentPage(nextPage);
+                  }
+                } catch (error) {
+                  console.error("Error loading more conversations:", error);
+                } finally {
+                  setLoadingMore(false);
+                }
+              }}
+              disabled={loadingMore}
+              className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loadingMore
+                ? "Loading..."
+                : `Load More (${
+                    conversationCount - conversations.length
+                  } remaining)`}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

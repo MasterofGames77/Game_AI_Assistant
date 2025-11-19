@@ -34,6 +34,7 @@ export default function Home() {
   const [selectedConversation, setSelectedConversation] =
     useState<Conversation | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [totalConversations, setTotalConversations] = useState<number>(0);
   const [metrics, setMetrics] = useState<any>({});
   const [usageStatus, setUsageStatus] = useState<any>(null);
   const [recommendations, setRecommendations] = useState<any>(null);
@@ -114,6 +115,13 @@ export default function Home() {
       `/api/getConversation?username=${storedUsername}`
     );
     setConversations(res.data.conversations);
+    // Use the actual total from pagination, not just the returned array length
+    if (res.data.pagination && res.data.pagination.total !== undefined) {
+      setTotalConversations(res.data.pagination.total);
+    } else {
+      // Fallback to array length if pagination info not available
+      setTotalConversations(res.data.conversations.length);
+    }
   }, []);
 
   useEffect(() => {
@@ -640,7 +648,7 @@ export default function Home() {
   }, [username, isPolling]);
 
   // Display conversation and forum count in the UI
-  const conversationCount = conversations.length;
+  const conversationCount = totalConversations || conversations.length;
 
   // function to handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1326,7 +1334,10 @@ export default function Home() {
             onNavigateToAccount={handleNavigateToAccount}
             activeView={activeView}
             setActiveView={setActiveView}
-            conversationCount={conversations.length}
+            conversationCount={conversationCount}
+            onLoadMore={(newConversations) => {
+              setConversations((prev) => [...prev, ...newConversations]);
+            }}
             className={sidebarOpen ? "sidebar open" : "sidebar"}
           />
           <div className="main-content flex-1">
@@ -1342,9 +1353,13 @@ export default function Home() {
 
               {/* Display conversation count in the UI */}
               {conversationCount > 0 && (
-                <p className="text-sm text-gray-600 mt-2">
-                  You have {conversationCount} saved conversation
-                  {conversationCount !== 1 ? "s" : ""}
+                <p className="text-sm text-white font-medium mt-2 bg-gray-800 px-3 py-2 rounded-lg border border-gray-700">
+                  {conversationCount} total conversation{conversationCount !== 1 ? "s" : ""}
+                  {conversations.length < conversationCount && (
+                    <span className="text-gray-400 text-xs block mt-1">
+                      ({conversations.length} shown, {conversationCount - conversations.length} more available)
+                    </span>
+                  )}
                 </p>
               )}
 

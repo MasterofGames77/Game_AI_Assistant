@@ -34,6 +34,7 @@ export interface SideBarProps {
   activeView: "chat" | "forum" | "feedback";
   setActiveView: (view: "chat" | "forum" | "feedback") => void;
   conversationCount: number;
+  onLoadMore?: (newConversations: Conversation[]) => void;
 }
 
 export interface ProStatusProps {
