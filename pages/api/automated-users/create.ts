@@ -111,8 +111,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Check if users already exist
     const existingMysterious = await User.findOne({ username: 'MysteriousMrEnter' });
     const existingWayward = await User.findOne({ username: 'WaywardJammer' });
+    const existingHipster = await User.findOne({ username: 'InterdimensionalHipster' });
 
-    if (existingMysterious && existingWayward) {
+    if (existingMysterious && existingWayward && existingHipster) {
       return res.status(200).json({
         message: 'Automated users already exist',
         users: {
@@ -127,6 +128,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             username: existingWayward.username,
             email: existingWayward.email,
             hasProAccess: existingWayward.hasProAccess
+          },
+          interdimensionalHipster: {
+            userId: existingHipster.userId,
+            username: existingHipster.username,
+            email: existingHipster.email,
+            hasProAccess: existingHipster.hasProAccess
           }
         }
       });
@@ -170,6 +177,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         username: existingWayward.username,
         email: existingWayward.email,
         hasProAccess: existingWayward.hasProAccess,
+        message: 'User already exists'
+      };
+    }
+
+    // Create InterdimensionalHipster if doesn't exist
+    if (!existingHipster) {
+      createdUsers.interdimensionalHipster = await createAutomatedUser(
+        'InterdimensionalHipster',
+        'interdimensional-hipster@wingman.internal',
+        {
+          genres: ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer', 'Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox'],
+          focus: 'single-player' // Default focus, but can respond to both types
+        }
+      );
+    } else {
+      createdUsers.interdimensionalHipster = {
+        userId: existingHipster.userId,
+        username: existingHipster.username,
+        email: existingHipster.email,
+        hasProAccess: existingHipster.hasProAccess,
         message: 'User already exists'
       };
     }
