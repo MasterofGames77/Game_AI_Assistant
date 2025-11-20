@@ -40,11 +40,16 @@ app.prepare().then(async () => {
 
   // Initialize automated users scheduler
   console.log('Initializing automated users scheduler...');
-  // console.log(`AUTOMATED_USERS_ENABLED: ${process.env.AUTOMATED_USERS_ENABLED}`);
-  // console.log(`AUTOMATED_USERS_MYSTERIOUS_QUESTION: ${process.env.AUTOMATED_USERS_MYSTERIOUS_QUESTION}`);
-  // console.log(`AUTOMATED_USERS_MYSTERIOUS_POST: ${process.env.AUTOMATED_USERS_MYSTERIOUS_POST}`);
-  // console.log(`AUTOMATED_USERS_WAYWARD_QUESTION: ${process.env.AUTOMATED_USERS_WAYWARD_QUESTION}`);
-  // console.log(`AUTOMATED_USERS_WAYWARD_POST: ${process.env.AUTOMATED_USERS_WAYWARD_POST}`);
+  console.log(`AUTOMATED_USERS_ENABLED: ${process.env.AUTOMATED_USERS_ENABLED}`);
+  console.log(`Server starting at: ${new Date().toISOString()}`);
+  console.log(`Node version: ${process.version}`);
+  console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
+  
+  // Add a simple test to verify the event loop is running
+  setInterval(() => {
+    console.log(`[SERVER KEEPALIVE] Server is alive at ${new Date().toISOString()}`);
+  }, 60000); // Every minute
+  
   initializeScheduler();
   setupGoogleCredentials();
 

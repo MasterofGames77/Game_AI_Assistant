@@ -1,9 +1,23 @@
-import cron from 'node-cron';
 import { askQuestion, createForumPost, getUserPreferences } from './automatedUsersService';
 import { CronTask } from '../types';
+// @ts-ignore - node-schedule types may not be perfect with ES modules
+import { scheduleJob } from 'node-schedule';
+
+// Helper to convert cron expression to node-schedule format
+// node-schedule uses: second minute hour day month dayOfWeek
+// Standard cron uses: minute hour day month dayOfWeek
+function convertCronExpression(cronExpr: string): string {
+  const parts = cronExpr.split(/\s+/);
+  if (parts.length === 5) {
+    // Add '0' for seconds at the beginning
+    return `0 ${parts.join(' ')}`;
+  }
+  return cronExpr;
+}
 
 class AutomatedUsersScheduler {
   private tasks: CronTask[] = [];
+  private cronTasks: any[] = []; // Store all node-schedule job objects to prevent garbage collection
   public isEnabled: boolean; // Made public so getScheduler can check it
 
   constructor() {
@@ -39,16 +53,26 @@ class AutomatedUsersScheduler {
 
     console.log('Initializing automated users scheduler...');
     console.log(`Scheduler enabled: ${this.isEnabled}`);
-
+    
+    // Check if we're in test mode (use shorter intervals for testing)
+    const isTestMode = process.env.AUTOMATED_USERS_TEST_MODE === 'true';
+    if (isTestMode) {
+      console.log('⚠️  TEST MODE ENABLED: Using shorter cron intervals for testing');
+      console.log('   Set AUTOMATED_USERS_TEST_MODE=false to use production schedules');
+    }
+    
     // MysteriousMrEnter: Question at 10:20 AM EST (15:20 UTC)
     // Note: EST is UTC-5, but we need to handle EDT (UTC-4) during daylight saving
     // For simplicity, using UTC times. Adjust for DST if needed.
+    // In test mode: runs every 2 minutes
     this.addTask({
       name: 'MysteriousMrEnter-Question',
-      cronExpression: this.cleanCronExpression(
-        process.env.AUTOMATED_USERS_MYSTERIOUS_QUESTION,
-        '20 15 * * *'
-      ), // 10:20 AM EST
+      cronExpression: isTestMode 
+        ? '*/2 * * * *' // Every 2 minutes in test mode
+        : this.cleanCronExpression(
+            process.env.AUTOMATED_USERS_MYSTERIOUS_QUESTION,
+            '20 15 * * *'
+          ), // 10:20 AM EST
       isRunning: false,
       task: async () => {
         await this.executeQuestion('MysteriousMrEnter');
@@ -56,12 +80,15 @@ class AutomatedUsersScheduler {
     });
 
     // MysteriousMrEnter: Forum Post at 1:30 PM EST (18:30 UTC)
+    // In test mode: runs every 3 minutes
     this.addTask({
       name: 'MysteriousMrEnter-ForumPost',
-      cronExpression: this.cleanCronExpression(
-        process.env.AUTOMATED_USERS_MYSTERIOUS_POST,
-        '30 18 * * *'
-      ), // 1:30 PM EST
+      cronExpression: isTestMode
+        ? '*/3 * * * *' // Every 3 minutes in test mode
+        : this.cleanCronExpression(
+            process.env.AUTOMATED_USERS_MYSTERIOUS_POST,
+            '30 18 * * *'
+          ), // 1:30 PM EST
       isRunning: false,
       task: async () => {
         await this.executeForumPost('MysteriousMrEnter');
@@ -69,12 +96,15 @@ class AutomatedUsersScheduler {
     });
 
     // WaywardJammer: Question at 11:10 AM EST (16:10 UTC)
+    // In test mode: runs every 4 minutes
     this.addTask({
       name: 'WaywardJammer-Question',
-      cronExpression: this.cleanCronExpression(
-        process.env.AUTOMATED_USERS_WAYWARD_QUESTION,
-        '10 16 * * *'
-      ), // 11:10 AM EST
+      cronExpression: isTestMode
+        ? '*/4 * * * *' // Every 4 minutes in test mode
+        : this.cleanCronExpression(
+            process.env.AUTOMATED_USERS_WAYWARD_QUESTION,
+            '10 16 * * *'
+          ), // 11:10 AM EST
       isRunning: false,
       task: async () => {
         await this.executeQuestion('WaywardJammer');
@@ -82,24 +112,47 @@ class AutomatedUsersScheduler {
     });
 
     // WaywardJammer: Forum Post at 3:45 PM EST (20:45 UTC)
+    // In test mode: runs every 5 minutes
     this.addTask({
       name: 'WaywardJammer-ForumPost',
-      cronExpression: this.cleanCronExpression(
-        process.env.AUTOMATED_USERS_WAYWARD_POST,
-        '45 20 * * *'
-      ), // 3:45 PM EST
+      cronExpression: isTestMode
+        ? '*/5 * * * *' // Every 5 minutes in test mode
+        : this.cleanCronExpression(
+            process.env.AUTOMATED_USERS_WAYWARD_POST,
+            '45 20 * * *'
+          ), // 3:45 PM EST
       isRunning: false,
       task: async () => {
         await this.executeForumPost('WaywardJammer');
       }
     });
 
+    console.log('✅ Using node-schedule (simpler and more reliable)');
+    
+    // Add a heartbeat task (runs every 5 minutes) - reduced logging
+    const heartbeatTask = scheduleJob('*/5 * * * *', () => {
+      // Only log heartbeat occasionally to reduce noise (every 30 minutes = 6 heartbeats)
+      const now = new Date();
+      const minutes = now.getMinutes();
+      if (minutes % 30 === 0) {
+        console.log(`[SCHEDULER HEARTBEAT] Scheduler is alive at ${now.toISOString()}`);
+      }
+    });
+    if (heartbeatTask) {
+      this.cronTasks.push(heartbeatTask);
+      console.log('✅ Heartbeat task scheduled (runs every 5 minutes, logs every 30 minutes)');
+    }
+
     // Start all tasks
     let scheduledCount = 0;
     this.tasks.forEach(task => {
       try {
-        // node-cron will throw an error if the expression is invalid
-        const scheduledTask = cron.schedule(task.cronExpression, async () => {
+        // Use node-schedule for reliable scheduling
+        const cronSchedule = convertCronExpression(task.cronExpression);
+        const scheduledTask = scheduleJob(cronSchedule, async () => {
+          const triggerTime = new Date();
+          console.log(`[CRON TRIGGER] Task ${task.name} triggered by cron at ${triggerTime.toISOString()}`);
+          
           if (task.isRunning) {
             console.log(`Task ${task.name} is already running, skipping...`);
             return;
@@ -114,16 +167,18 @@ class AutomatedUsersScheduler {
             console.log(`Completed scheduled task: ${task.name}`);
           } catch (error) {
             console.error(`Error in scheduled task ${task.name}:`, error);
+            if (error instanceof Error) {
+              console.error(`Error stack: ${error.stack}`);
+            }
           } finally {
             task.isRunning = false;
           }
-        }, {
-          timezone: 'UTC' // Cron uses UTC, times are already converted
         });
 
         if (scheduledTask) {
           // Store the cron task object so we can verify it's running
           task.cronTask = scheduledTask;
+          this.cronTasks.push(scheduledTask); // Store in array to prevent garbage collection
           scheduledCount++;
           
           // Calculate next run time
@@ -131,11 +186,12 @@ class AutomatedUsersScheduler {
           task.nextRun = nextRun || undefined;
           
           console.log(`✅ Scheduled task: ${task.name} with cron: ${task.cronExpression}`);
+          console.log(`   Task object type: ${typeof scheduledTask}, stored in memory`);
           if (task.nextRun) {
             console.log(`   Next run: ${task.nextRun.toISOString()}`);
           }
         } else {
-          console.error(`❌ Failed to schedule task: ${task.name}`);
+          console.error(`❌ Failed to schedule task: ${task.name} - cron.schedule returned null/undefined`);
         }
       } catch (error) {
         console.error(`❌ Error scheduling task ${task.name}:`, error);
@@ -258,8 +314,22 @@ class AutomatedUsersScheduler {
       nextRun?: string;
       lastRun?: string;
       isScheduled?: boolean;
+      taskType: 'question' | 'forumPost';
+      description: string;
     }>;
   } {
+    const getTaskType = (name: string): 'question' | 'forumPost' => {
+      return name.includes('Question') ? 'question' : 'forumPost';
+    };
+
+    const getDescription = (name: string): string => {
+      if (name.includes('Question')) {
+        return 'Asks Video Game Wingman a question about a game';
+      } else {
+        return 'Creates a forum post in an existing or new forum';
+      }
+    };
+
     return {
       enabled: this.isEnabled,
       tasks: this.tasks.map(task => ({
@@ -268,7 +338,9 @@ class AutomatedUsersScheduler {
         isRunning: task.isRunning,
         nextRun: task.nextRun ? task.nextRun.toISOString() : undefined,
         lastRun: task.lastRun ? task.lastRun.toISOString() : undefined,
-        isScheduled: !!task.cronTask
+        isScheduled: !!task.cronTask,
+        taskType: getTaskType(task.name),
+        description: getDescription(task.name)
       }))
     };
   }

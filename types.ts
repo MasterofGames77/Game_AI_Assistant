@@ -806,7 +806,7 @@ export interface CronTask {
   cronExpression: string;
   task: () => Promise<void>;
   isRunning: boolean;
-  cronTask?: any; // The actual node-cron task object
+  cronTask?: any; // The actual node-schedule job object
   lastRun?: Date;
   nextRun?: Date;
 }

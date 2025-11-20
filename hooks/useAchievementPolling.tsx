@@ -5,7 +5,7 @@ import { UseAchievementPollingProps, AchievementData } from "../types";
 const useAchievementPolling = ({
   username,
   isEnabled,
-  pollingInterval = 90000,
+  pollingInterval = 120000, // 2 minutes
 }: UseAchievementPollingProps) => {
   const [isPolling, setIsPolling] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(() => {

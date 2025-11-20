@@ -119,15 +119,21 @@
     },
     "Jak and Daxter: The Precursor Legacy": {
       "images": [
-        "/uploads/automated-images/jak-and-daxter-1.png"
+        "https://ik.imagekit.io/q37npn1m5/automated-images/automated-images/jak-and-daxter-1_S8LKDmpF0.png"
       ],
-      "primary": "/uploads/automated-images/jak-and-daxter-1.png"
+      "primary": "https://ik.imagekit.io/q37npn1m5/automated-images/automated-images/jak-and-daxter-1_S8LKDmpF0.png"
     },
     "Euro Truck Simulator 2": {
       "images": [
         "/uploads/automated-images/euro-truck-simulator2-1.png"
       ],
       "primary": "/uploads/automated-images/euro-truck-simulator2-1.png"
+    },
+    "Apex Legends": {
+      "images": [
+        "https://ik.imagekit.io/q37npn1m5/automated-images/automated-images/apex-legends-1_PRnmeeT6X.png"
+      ],
+      "primary": "https://ik.imagekit.io/q37npn1m5/automated-images/automated-images/apex-legends-1_PRnmeeT6X.png"
     }
   }
 }

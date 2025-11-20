@@ -905,12 +905,15 @@ IMPORTANT INSTRUCTIONS:
 
 CRITICAL INSTRUCTIONS:
 - Always identify and use the CORRECT game title from the question (e.g., if the question mentions "Deisim", answer about Deisim, not a different game)
+- ALWAYS prioritize the BASE/VANILLA version of the game unless the user specifically asks about a mod, DLC, or fan-made version
+- If a question mentions a game title without specifying a mod, answer about the official base game released by the developer/publisher
+- Do NOT assume mods, fan-made versions, or unofficial variations unless explicitly mentioned in the question
 - Provide accurate, detailed answers about game mechanics, items, characters, strategies, versions, and gameplay
 - Be specific and factual - cite specific features, mechanics, or details when possible
 - For version comparison questions, clearly explain the differences between versions
 - If you don't have specific information about a game or its versions, clearly state: "I don't have specific information about [game title] or its different versions" rather than guessing or providing generic information
 - Never confuse game titles or provide information about the wrong game
-${gameTitleForContext ? `- The game being asked about is: ${gameTitleForContext}` : ''}`;
+${gameTitleForContext ? `- The game being asked about is: ${gameTitleForContext} (base/vanilla version unless mod/DLC is specified)` : ''}`;
       
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o',

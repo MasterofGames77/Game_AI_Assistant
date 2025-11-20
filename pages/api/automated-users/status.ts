@@ -12,7 +12,11 @@ import { getScheduler } from '../../../utils/automatedUsersScheduler';
  *   tasks: Array<{
  *     name: string,
  *     cronExpression: string,
- *     isRunning: boolean
+ *     isRunning: boolean,
+ *     nextRun?: string,
+ *     lastRun?: string,
+ *     isScheduled?: boolean,
+ *     taskType: 'question' | 'forumPost'
  *   }>
  * }
  */

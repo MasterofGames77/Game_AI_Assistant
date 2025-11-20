@@ -36,6 +36,7 @@ export async function generateQuestion(
 
 Generate a DIRECT, FACTUAL question that Video Game Wingman can answer with specific game information. The question should:
 - MUST mention the game title "${gameTitle}" in the question
+- Ask about the BASE/VANILLA version of the game (the official release, not mods or fan-made versions)
 - Be a direct question (start with: How, What, When, Where, Which, Who, etc.)
 - Ask about SPECIFIC game facts, mechanics, items, characters, strategies, or information
 - Be answerable with factual information (not opinions or feelings)
@@ -65,6 +66,7 @@ Generate ONLY the direct question, nothing else:`
 
 Generate a DIRECT, FACTUAL question that Video Game Wingman can answer with specific game information. The question should:
 - MUST mention the game title "${gameTitle}" in the question
+- Ask about the BASE/VANILLA version of the game (the official release, not mods or fan-made versions)
 - Be a direct question (start with: How, What, When, Where, Which, Who, etc.)
 - Ask about SPECIFIC game facts, mechanics, items, characters, strategies, or information
 - Be answerable with factual information (not opinions or feelings)
