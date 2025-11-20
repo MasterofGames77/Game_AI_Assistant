@@ -1,4 +1,4 @@
-import { askQuestion, createForumPost, getUserPreferences } from './automatedUsersService';
+import { askQuestion, createForumPost, respondToForumPost, getUserPreferences } from './automatedUsersService';
 import { CronTask } from '../types';
 // @ts-ignore - node-schedule types may not be perfect with ES modules
 import { scheduleJob } from 'node-schedule';
@@ -126,6 +126,72 @@ class AutomatedUsersScheduler {
         await this.executeForumPost('WaywardJammer');
       }
     });
+
+    // InterdimensionalHipster: Respond to posts at 2:00 PM EST (19:00 UTC)
+    // In test mode: runs every 6 minutes
+    this.addTask({
+      name: 'InterdimensionalHipster-Reply',
+      cronExpression: isTestMode
+        ? '*/6 * * * *' // Every 6 minutes in test mode
+        : this.cleanCronExpression(
+            process.env.AUTOMATED_USERS_HIPSTER_REPLY,
+            '0 19 * * *'
+          ), // 2:00 PM EST
+      isRunning: false,
+      task: async () => {
+        await this.executePostReply('InterdimensionalHipster');
+      }
+    });
+
+    // InterdimensionalHipster: Second reply at 4:30 PM EST (21:30 UTC)
+    // In test mode: runs every 7 minutes
+    this.addTask({
+      name: 'InterdimensionalHipster-Reply2',
+      cronExpression: isTestMode
+        ? '*/7 * * * *' // Every 7 minutes in test mode
+        : this.cleanCronExpression(
+            process.env.AUTOMATED_USERS_HIPSTER_REPLY2 || process.env.AUTOMATED_USERS_HIPSTER_REPLY,
+            '30 21 * * *'
+          ), // 4:30 PM EST
+      isRunning: false,
+      task: async () => {
+        await this.executePostReply('InterdimensionalHipster');
+      }
+    });
+
+    // InterdimensionalHipster: Create original forum post at 12:00 PM EST (17:00 UTC)
+    // In test mode: runs every 8 minutes
+    this.addTask({
+      name: 'InterdimensionalHipster-ForumPost',
+      cronExpression: isTestMode
+        ? '*/8 * * * *' // Every 8 minutes in test mode
+        : this.cleanCronExpression(
+            process.env.AUTOMATED_USERS_HIPSTER_POST_1 || process.env.AUTOMATED_USERS_HIPSTER_POST,
+            '0 17 * * *'
+          ), // 12:00 PM EST
+      isRunning: false,
+      task: async () => {
+        await this.executeForumPost('InterdimensionalHipster');
+      }
+    });
+
+    // InterdimensionalHipster: Second original forum post (optional)
+    // Only added if AUTOMATED_USERS_HIPSTER_POST_2 is set
+    if (process.env.AUTOMATED_USERS_HIPSTER_POST_2) {
+      this.addTask({
+        name: 'InterdimensionalHipster-ForumPost2',
+        cronExpression: isTestMode
+          ? '*/9 * * * *' // Every 9 minutes in test mode
+          : this.cleanCronExpression(
+              process.env.AUTOMATED_USERS_HIPSTER_POST_2,
+              '0 14 * * *' // 10:00 AM EST default
+            ),
+        isRunning: false,
+        task: async () => {
+          await this.executeForumPost('InterdimensionalHipster');
+        }
+      });
+    }
 
     console.log('✅ Using node-schedule (simpler and more reliable)');
     
@@ -303,6 +369,31 @@ class AutomatedUsersScheduler {
   }
 
   /**
+   * Execute post reply activity for a user
+   */
+  private async executePostReply(username: string): Promise<void> {
+    try {
+      const preferences = await getUserPreferences(username);
+      if (!preferences) {
+        console.error(`No preferences found for user: ${username}`);
+        return;
+      }
+
+      console.log(`Executing post reply activity for ${username}...`);
+      const result = await respondToForumPost(username, preferences);
+
+      if (result.success) {
+        console.log(`✅ ${username} replied to forum post successfully:`, result.details?.replyContent?.substring(0, 50) + '...');
+        console.log(`   Replied to: ${result.details?.repliedToAuthor} in forum: ${result.details?.forumTitle}`);
+      } else {
+        console.error(`❌ ${username} failed to reply to forum post:`, result.error);
+      }
+    } catch (error) {
+      console.error(`Error executing post reply for ${username}:`, error);
+    }
+  }
+
+  /**
    * Get status of all scheduled tasks
    */
   public getStatus(): {
@@ -314,17 +405,25 @@ class AutomatedUsersScheduler {
       nextRun?: string;
       lastRun?: string;
       isScheduled?: boolean;
-      taskType: 'question' | 'forumPost';
+      taskType: 'question' | 'forumPost' | 'postReply';
       description: string;
     }>;
   } {
-    const getTaskType = (name: string): 'question' | 'forumPost' => {
-      return name.includes('Question') ? 'question' : 'forumPost';
+    const getTaskType = (name: string): 'question' | 'forumPost' | 'postReply' => {
+      if (name.includes('Question')) {
+        return 'question';
+      } else if (name.includes('Reply')) {
+        return 'postReply';
+      } else {
+        return 'forumPost';
+      }
     };
 
     const getDescription = (name: string): string => {
       if (name.includes('Question')) {
         return 'Asks Video Game Wingman a question about a game';
+      } else if (name.includes('Reply')) {
+        return 'Responds to forum posts from other users';
       } else {
         return 'Creates a forum post in an existing or new forum';
       }

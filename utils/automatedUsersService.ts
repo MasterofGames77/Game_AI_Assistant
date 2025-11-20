@@ -1,15 +1,58 @@
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
-import { generateQuestion, generateForumPost, UserPreferences } from './automatedContentGenerator';
+import { generateQuestion, generateForumPost, generatePostReply, UserPreferences } from './automatedContentGenerator';
 import { findGameImage, getRandomGameImage, recordImageUsage } from './automatedImageService';
 import { containsOffensiveContent } from './contentModeration';
 import { GameList, ActivityResult } from '../types';
 
 /**
  * Load game list for a user based on their preferences
+ * InterdimensionalHipster can access both single-player and multiplayer games
  */
 function loadGameList(userPreferences: UserPreferences): { games: string[]; genres: string[] } {
+  // Check if this is InterdimensionalHipster (has both single-player and multiplayer genres)
+  const isInterdimensionalHipster = userPreferences.genres.length > 5 && 
+    userPreferences.genres.some(g => ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer'].includes(g)) &&
+    userPreferences.genres.some(g => ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox'].includes(g));
+  
+  if (isInterdimensionalHipster) {
+    // Load both single-player and multiplayer games
+    try {
+      const singlePlayerPath = path.join(process.cwd(), 'data', 'automated-users', 'single-player.json');
+      const multiplayerPath = path.join(process.cwd(), 'data', 'automated-users', 'multiplayer.json');
+      
+      const singlePlayerContent = fs.readFileSync(singlePlayerPath, 'utf-8');
+      const multiplayerContent = fs.readFileSync(multiplayerPath, 'utf-8');
+      
+      const singlePlayerList: GameList = JSON.parse(singlePlayerContent);
+      const multiplayerList: GameList = JSON.parse(multiplayerContent);
+      
+      const allGames: string[] = [];
+      const genres: string[] = [];
+      
+      // Add single-player games
+      for (const [genre, games] of Object.entries(singlePlayerList)) {
+        genres.push(genre);
+        allGames.push(...games);
+      }
+      
+      // Add multiplayer games
+      for (const [genre, games] of Object.entries(multiplayerList)) {
+        if (!genres.includes(genre)) {
+          genres.push(genre);
+        }
+        allGames.push(...games);
+      }
+      
+      return { games: allGames, genres };
+    } catch (error) {
+      console.error('Error loading game lists for InterdimensionalHipster:', error);
+      return { games: [], genres: [] };
+    }
+  }
+  
+  // For other users, use the standard logic
   const isSinglePlayer = userPreferences.focus === 'single-player';
   const gameListFile = isSinglePlayer ? 'single-player.json' : 'multiplayer.json';
   const gameListPath = path.join(process.cwd(), 'data', 'automated-users', gameListFile);
@@ -47,24 +90,60 @@ function selectRandomGame(userPreferences: UserPreferences): { gameTitle: string
   const randomGame = games[Math.floor(Math.random() * games.length)];
   
   // Find which genre this game belongs to
-  const gameListPath = path.join(
-    process.cwd(),
-    'data',
-    'automated-users',
-    userPreferences.focus === 'single-player' ? 'single-player.json' : 'multiplayer.json'
-  );
+  // Check if this is InterdimensionalHipster (has both single-player and multiplayer genres)
+  const isInterdimensionalHipster = userPreferences.genres.length > 5 && 
+    userPreferences.genres.some(g => ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer'].includes(g)) &&
+    userPreferences.genres.some(g => ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox'].includes(g));
   
-  try {
-    const content = fs.readFileSync(gameListPath, 'utf-8');
-    const gameList: GameList = JSON.parse(content);
-    
-    for (const [genre, genreGames] of Object.entries(gameList)) {
-      if (genreGames.includes(randomGame)) {
-        return { gameTitle: randomGame, genre };
+  if (isInterdimensionalHipster) {
+    // Check both game lists
+    try {
+      const singlePlayerPath = path.join(process.cwd(), 'data', 'automated-users', 'single-player.json');
+      const multiplayerPath = path.join(process.cwd(), 'data', 'automated-users', 'multiplayer.json');
+      
+      const singlePlayerContent = fs.readFileSync(singlePlayerPath, 'utf-8');
+      const multiplayerContent = fs.readFileSync(multiplayerPath, 'utf-8');
+      
+      const singlePlayerList: GameList = JSON.parse(singlePlayerContent);
+      const multiplayerList: GameList = JSON.parse(multiplayerContent);
+      
+      // Check single-player games first
+      for (const [genre, genreGames] of Object.entries(singlePlayerList)) {
+        if (genreGames.includes(randomGame)) {
+          return { gameTitle: randomGame, genre };
+        }
       }
+      
+      // Check multiplayer games
+      for (const [genre, genreGames] of Object.entries(multiplayerList)) {
+        if (genreGames.includes(randomGame)) {
+          return { gameTitle: randomGame, genre };
+        }
+      }
+    } catch (error) {
+      console.error('Error finding game genre for InterdimensionalHipster:', error);
     }
-  } catch (error) {
-    console.error('Error finding game genre:', error);
+  } else {
+    // For other users, use the standard logic
+    const gameListPath = path.join(
+      process.cwd(),
+      'data',
+      'automated-users',
+      userPreferences.focus === 'single-player' ? 'single-player.json' : 'multiplayer.json'
+    );
+    
+    try {
+      const content = fs.readFileSync(gameListPath, 'utf-8');
+      const gameList: GameList = JSON.parse(content);
+      
+      for (const [genre, genreGames] of Object.entries(gameList)) {
+        if (genreGames.includes(randomGame)) {
+          return { gameTitle: randomGame, genre };
+        }
+      }
+    } catch (error) {
+      console.error('Error finding game genre:', error);
+    }
   }
   
   // Fallback: return game with first genre
@@ -321,8 +400,11 @@ export async function createForumPost(
       forumTitle = targetForum.title || targetForum.gameTitle || 'General Discussion';
       // Use the game title from the forum if available, otherwise use the selected game
       actualGameTitle = targetForum.gameTitle || gameTitle;
-      actualGenre = genre; // Keep the genre from selection for content generation
+      // IMPORTANT: Determine genre from the actual game title in the forum, not the randomly selected game
+      // This ensures we use the correct genre for the game that's actually being discussed
+      actualGenre = determineGenreFromGame(actualGameTitle);
       console.log(`Posting to existing forum: ${forumTitle} (created by: ${targetForum.createdBy || 'unknown'})`);
+      console.log(`Using game title: ${actualGameTitle}, genre: ${actualGenre}`);
     } else {
       // No suitable forum found, create a new one
       console.log(`No suitable forum found for ${gameTitle}, creating new forum...`);
@@ -482,6 +564,359 @@ export async function likePost(
 }
 
 /**
+ * Find a post to respond to in forums
+ * Prioritizes posts from other automated users (MysteriousMrEnter, WaywardJammer) and other users (including real users)
+ * Excludes posts from the responding user
+ */
+function findPostToRespondTo(
+  forums: any[],
+  respondingUsername: string
+): { forum: any; post: any; gameTitle: string; genre: string } | null {
+  // Priority users to respond to (automated users)
+  const priorityUsers = ['MysteriousMrEnter', 'WaywardJammer'];
+  // Automated users list (to identify but not exclude real users)
+  const automatedUsers = ['MysteriousMrEnter', 'WaywardJammer', 'InterdimensionalHipster'];
+  
+  // Filter forums that have posts
+  const forumsWithPosts = forums.filter((f: any) => 
+    f.posts && Array.isArray(f.posts) && f.posts.length > 0 &&
+    f.metadata?.status === 'active'
+  );
+  
+  if (forumsWithPosts.length === 0) {
+    return null;
+  }
+  
+  // Priority 1: Find posts from priority users (MysteriousMrEnter, WaywardJammer)
+  // that haven't been responded to by the responding user
+  for (const forum of forumsWithPosts) {
+    const posts = forum.posts || [];
+    
+    // Find posts from priority users that the responding user hasn't replied to
+    for (const post of posts) {
+      if (
+        priorityUsers.includes(post.username) &&
+        post.username !== respondingUsername &&
+        post.metadata?.status === 'active'
+      ) {
+        // Check if responding user has already replied in this forum
+        const hasReplied = posts.some((p: any) => 
+          p.username === respondingUsername && 
+          p.timestamp > post.timestamp
+        );
+        
+        if (!hasReplied) {
+          // Try to determine genre from forum or game title
+          const genre = determineGenreFromGame(forum.gameTitle || forum.title);
+          return {
+            forum,
+            post,
+            gameTitle: forum.gameTitle || 'Unknown Game',
+            genre
+          };
+        }
+      }
+    }
+  }
+  
+  // Priority 2: Find any recent posts from other users (including real users, not just automated)
+  // Sort forums by last activity
+  const sortedForums = [...forumsWithPosts].sort((a: any, b: any) => {
+    const aTime = new Date(a.metadata?.lastActivityAt || 0).getTime();
+    const bTime = new Date(b.metadata?.lastActivityAt || 0).getTime();
+    return bTime - aTime;
+  });
+  
+  for (const forum of sortedForums) {
+    const posts = forum.posts || [];
+    
+    // Get recent posts from other users (including real users)
+    // Filter out posts from the responding user and inactive posts
+    const recentPosts = posts
+      .filter((p: any) => 
+        p.username !== respondingUsername &&
+        p.metadata?.status === 'active' &&
+        p.message && p.message.trim().length > 0 // Ensure post has content
+      )
+      .sort((a: any, b: any) => {
+        const aTime = new Date(a.timestamp || 0).getTime();
+        const bTime = new Date(b.timestamp || 0).getTime();
+        return bTime - aTime;
+      })
+      .slice(0, 20); // Check more posts to find good candidates
+    
+    if (recentPosts.length > 0) {
+      // Prefer posts from real users (not automated users) if available
+      const realUserPosts = recentPosts.filter((p: any) => !automatedUsers.includes(p.username));
+      const postsToConsider = realUserPosts.length > 0 ? realUserPosts : recentPosts;
+      
+      // Pick a random post from the candidates
+      const selectedPost = postsToConsider[Math.floor(Math.random() * postsToConsider.length)];
+      
+      // Check if responding user has already replied to this specific post
+      // Use a 12-hour window instead of 24 to allow more frequent engagement
+      const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+      const postTime = new Date(selectedPost.timestamp);
+      
+      // Allow responding to posts from the last 7 days (not just 12 hours)
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      
+      if (postTime > sevenDaysAgo) {
+        // Check if we've replied recently to this specific post (within 12 hours)
+        const hasRepliedRecently = posts.some((p: any) => 
+          p.username === respondingUsername && 
+          new Date(p.timestamp) > postTime &&
+          new Date(p.timestamp) > twelveHoursAgo
+        );
+        
+        if (!hasRepliedRecently) {
+          const genre = determineGenreFromGame(forum.gameTitle || forum.title);
+          return {
+            forum,
+            post: selectedPost,
+            gameTitle: forum.gameTitle || 'Unknown Game',
+            genre
+          };
+        }
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Determine genre from game title by checking game lists
+ * Prioritizes single-player games first, then multiplayer games
+ */
+function determineGenreFromGame(gameTitle: string): string {
+  if (!gameTitle || gameTitle.trim().length === 0) {
+    return 'adventure'; // Default fallback
+  }
+  
+  try {
+    // Normalize game title for comparison (case-insensitive, trim whitespace)
+    const normalizedTitle = gameTitle.trim().toLowerCase();
+    
+    // Check single-player games FIRST (most games are single-player)
+    const singlePlayerPath = path.join(process.cwd(), 'data', 'automated-users', 'single-player.json');
+    const singlePlayerContent = fs.readFileSync(singlePlayerPath, 'utf-8');
+    const singlePlayerGames: GameList = JSON.parse(singlePlayerContent);
+    
+    for (const [genre, games] of Object.entries(singlePlayerGames)) {
+      // Check for exact match first
+      if (games.some(g => g.trim().toLowerCase() === normalizedTitle)) {
+        console.log(`Genre determined: ${genre} for game: ${gameTitle}`);
+        return genre;
+      }
+      // Also check if game title contains the game name or vice versa (for partial matches)
+      if (games.some(g => {
+        const normalizedGame = g.trim().toLowerCase();
+        return normalizedTitle.includes(normalizedGame) || normalizedGame.includes(normalizedTitle);
+      })) {
+        console.log(`Genre determined (partial match): ${genre} for game: ${gameTitle}`);
+        return genre;
+      }
+    }
+    
+    // Check multiplayer games SECOND (only if not found in single-player)
+    const multiplayerPath = path.join(process.cwd(), 'data', 'automated-users', 'multiplayer.json');
+    const multiplayerContent = fs.readFileSync(multiplayerPath, 'utf-8');
+    const multiplayerGames: GameList = JSON.parse(multiplayerContent);
+    
+    for (const [genre, games] of Object.entries(multiplayerGames)) {
+      // Check for exact match first
+      if (games.some(g => g.trim().toLowerCase() === normalizedTitle)) {
+        console.log(`Genre determined: ${genre} for game: ${gameTitle}`);
+        return genre;
+      }
+      // Also check if game title contains the game name or vice versa (for partial matches)
+      if (games.some(g => {
+        const normalizedGame = g.trim().toLowerCase();
+        return normalizedTitle.includes(normalizedGame) || normalizedGame.includes(normalizedTitle);
+      })) {
+        console.log(`Genre determined (partial match): ${genre} for game: ${gameTitle}`);
+        return genre;
+      }
+    }
+  } catch (error) {
+    console.error('Error determining genre from game:', error);
+  }
+  
+  // Default to 'rpg' for unknown games (most common genre in our lists)
+  console.warn(`Could not determine genre for game: ${gameTitle}, defaulting to 'rpg'`);
+  return 'rpg';
+}
+
+/**
+ * Respond to a forum post
+ * Finds a suitable post from other users and generates a relevant reply
+ */
+export async function respondToForumPost(
+  username: string,
+  userPreferences: UserPreferences
+): Promise<ActivityResult> {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    
+    // Get list of active forums
+    let forumsResponse;
+    try {
+      forumsResponse = await axios.get(
+        `${baseUrl}/api/getAllForums?username=${username}&limit=100`,
+        {
+          headers: {
+            'username': username
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Error fetching forums:', error);
+      return {
+        success: false,
+        message: 'Failed to fetch forums',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+    
+    const forums = forumsResponse.data.forums || [];
+    
+    // Filter to only forums with posts
+    const forumsWithPosts = forums.filter((f: any) => 
+      f.metadata?.totalPosts > 0 || (f.posts && Array.isArray(f.posts) && f.posts.length > 0)
+    );
+    
+    if (forumsWithPosts.length === 0) {
+      return {
+        success: false,
+        message: 'No forums with posts found',
+        error: 'No posts available'
+      };
+    }
+    
+    // Fetch full forum details with posts for a few forums
+    // Limit to first 10 forums to avoid too many API calls
+    const forumsToCheck = forumsWithPosts.slice(0, 10);
+    const forumsWithFullPosts: any[] = [];
+    
+    for (const forum of forumsToCheck) {
+      try {
+        const forumId = forum.forumId || forum._id;
+        const forumDetailResponse = await axios.get(
+          `${baseUrl}/api/getForumTopic?forumId=${forumId}&username=${username}&incrementView=false`,
+          {
+            headers: {
+              'username': username
+            }
+          }
+        );
+        
+        if (forumDetailResponse.data.forum && forumDetailResponse.data.forum.posts) {
+          forumsWithFullPosts.push(forumDetailResponse.data.forum);
+        }
+      } catch (error) {
+        console.error(`Error fetching forum details for ${forum.forumId}:`, error);
+        // Continue to next forum if this one fails
+      }
+    }
+    
+    // If we don't have posts from API calls, try using posts from getAllForums response
+    if (forumsWithFullPosts.length === 0) {
+      // Use forums that might have posts in the response
+      for (const forum of forumsWithPosts) {
+        if (forum.posts && Array.isArray(forum.posts) && forum.posts.length > 0) {
+          forumsWithFullPosts.push(forum);
+        }
+      }
+    }
+    
+    if (forumsWithFullPosts.length === 0) {
+      return {
+        success: false,
+        message: 'No forums with posts found',
+        error: 'No posts available'
+      };
+    }
+    
+    // Find a post to respond to
+    const postToRespondTo = findPostToRespondTo(forumsWithFullPosts, username);
+    
+    if (!postToRespondTo) {
+      return {
+        success: false,
+        message: 'No suitable posts found to respond to',
+        error: 'No posts available'
+      };
+    }
+    
+    const { forum, post, gameTitle, genre } = postToRespondTo;
+    const forumId = forum.forumId || forum._id;
+    const forumTitle = forum.title || forum.gameTitle || 'General Discussion';
+    const originalPostAuthor = post.username;
+    const originalPostContent = post.message;
+    
+    console.log(`Responding to post by ${originalPostAuthor} in forum: ${forumTitle} (${gameTitle})`);
+    
+    // Generate relevant reply
+    const replyContent = await generatePostReply({
+      gameTitle,
+      genre,
+      originalPost: originalPostContent,
+      originalPostAuthor,
+      forumTopic: forumTitle
+    });
+    
+    // Check content moderation
+    const contentCheck = await containsOffensiveContent(replyContent, username);
+    if (contentCheck.isOffensive) {
+      return {
+        success: false,
+        message: 'Generated reply failed content moderation',
+        error: 'Content moderation failed',
+        details: { offendingWords: contentCheck.offendingWords }
+      };
+    }
+    
+    // Post reply to forum
+    const postResponse = await axios.post(
+      `${baseUrl}/api/addPostToForum`,
+      {
+        forumId,
+        message: replyContent,
+        username
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    return {
+      success: true,
+      message: 'Forum post reply created successfully',
+      details: {
+        forumId,
+        forumTitle,
+        gameTitle,
+        genre,
+        replyContent,
+        repliedToPostId: post._id,
+        repliedToAuthor: originalPostAuthor,
+        postId: postResponse.data.post?._id
+      }
+    };
+  } catch (error) {
+    console.error('Error responding to forum post:', error);
+    return {
+      success: false,
+      message: 'Failed to respond to forum post',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}
+
+/**
  * Get user preferences from database
  */
 export async function getUserPreferences(username: string): Promise<UserPreferences | null> {
@@ -497,6 +932,12 @@ export async function getUserPreferences(username: string): Promise<UserPreferen
       return {
         genres: ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox'],
         focus: 'multiplayer'
+      };
+    } else if (username === 'InterdimensionalHipster') {
+      // InterdimensionalHipster can talk about both single-player and multiplayer games
+      return {
+        genres: ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer', 'Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox'],
+        focus: 'single-player' // Default focus, but can respond to both types
       };
     }
     

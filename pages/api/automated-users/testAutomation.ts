@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import { generateQuestion, generateForumPost, UserPreferences } from '../../../utils/automatedContentGenerator';
 import { findGameImage, getRandomGameImage, hasGameImage, getAllGamesWithImages } from '../../../utils/automatedImageService';
-import { askQuestion, createForumPost, getUserPreferences } from '../../../utils/automatedUsersService';
+import { askQuestion, createForumPost, respondToForumPost, getUserPreferences } from '../../../utils/automatedUsersService';
 import { getScheduler } from '../../../utils/automatedUsersScheduler';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -254,9 +254,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
 
+      case 'reply-to-post': {
+        // Test replying to a forum post
+        if (!username) {
+          return res.status(400).json({ 
+            error: 'Missing required field: username' 
+          });
+        }
+
+        const preferences = await getUserPreferences(username);
+        if (!preferences) {
+          return res.status(400).json({ 
+            error: `No preferences found for user: ${username}` 
+          });
+        }
+
+        const result = await respondToForumPost(username, preferences);
+
+        return res.status(result.success ? 200 : 500).json({
+          success: result.success,
+          testType: 'reply-to-post',
+          result
+        });
+      }
+
       default:
         return res.status(400).json({ 
-          error: 'Invalid testType. Valid types: generate-question, generate-post, find-image, ask-question, create-post, create-forum, scheduler-status, trigger-task',
+          error: 'Invalid testType. Valid types: generate-question, generate-post, find-image, ask-question, create-post, create-forum, reply-to-post, scheduler-status, trigger-task',
           availableTests: [
             'generate-question - Test question generation (requires: username, gameTitle, genre)',
             'generate-post - Test forum post generation (requires: username, gameTitle, genre, optional: forumTopic)',
@@ -264,6 +288,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             'ask-question - Test full question flow (requires: username)',
             'create-post - Test full forum post flow (requires: username)',
             'create-forum - Test forum creation (requires: username, gameTitle)',
+            'reply-to-post - Test replying to a forum post (requires: username)',
             'scheduler-status - Get scheduler status',
             'trigger-task - Manually trigger a task (requires: taskName)'
           ]

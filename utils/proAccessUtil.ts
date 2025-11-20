@@ -24,6 +24,10 @@ export const checkProAccess = async (identifier: string, userId?: string): Promi
   // Always grant Pro access for LegendaryRenegade (Master account)
   if (identifier === "LegendaryRenegade") return true;
   
+  // Always grant Pro access for automated users
+  const automatedUsers = ["MysteriousMrEnter", "WaywardJammer", "InterdimensionalHipster"];
+  if (automatedUsers.includes(identifier)) return true;
+  
   try {
     await connectToWingmanDB();
     const splashDB = await connectToSplashDB();

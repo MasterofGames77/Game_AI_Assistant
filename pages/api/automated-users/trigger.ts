@@ -24,7 +24,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'MysteriousMrEnter-Question',
         'MysteriousMrEnter-ForumPost',
         'WaywardJammer-Question',
-        'WaywardJammer-ForumPost'
+        'WaywardJammer-ForumPost',
+        'InterdimensionalHipster-Reply',
+        'InterdimensionalHipster-Reply2',
+        'InterdimensionalHipster-ForumPost'
       ]
     });
   }

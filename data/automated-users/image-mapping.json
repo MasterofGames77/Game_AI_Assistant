@@ -21,9 +21,9 @@
     },
     "Celeste": {
       "images": [
-        "/uploads/automated-images/celeste-1.png"
+        "https://ik.imagekit.io/q37npn1m5/automated-images/automated-images/celeste-1_fLokUYLGK.png"
       ],
-      "primary": "/uploads/automated-images/celeste-1.png"
+      "primary": "https://ik.imagekit.io/q37npn1m5/automated-images/automated-images/celeste-1_fLokUYLGK.png"
     },
     "Super Meat Boy": {
       "images": [
@@ -134,6 +134,12 @@
         "https://ik.imagekit.io/q37npn1m5/automated-images/automated-images/apex-legends-1_PRnmeeT6X.png"
       ],
       "primary": "https://ik.imagekit.io/q37npn1m5/automated-images/automated-images/apex-legends-1_PRnmeeT6X.png"
+    },
+    "Xenoblade Chronicles 3": {
+      "images": [
+        "https://ik.imagekit.io/q37npn1m5/automated-images/automated-images/xenoblade-chronicles3-1_e8bsUDiDmX.png"
+      ],
+      "primary": "https://ik.imagekit.io/q37npn1m5/automated-images/automated-images/xenoblade-chronicles3-1_e8bsUDiDmX.png"
     }
   }
 }

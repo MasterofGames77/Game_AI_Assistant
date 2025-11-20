@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { askQuestion, createForumPost, getUserPreferences } from '../../../utils/automatedUsersService';
+import { askQuestion, createForumPost, respondToForumPost, getUserPreferences } from '../../../utils/automatedUsersService';
 import { getScheduler } from '../../../utils/automatedUsersScheduler';
 
 /**
@@ -9,8 +9,8 @@ import { getScheduler } from '../../../utils/automatedUsersScheduler';
  * 
  * Request body:
  * {
- *   activityType: 'ask-question' | 'create-post' | 'trigger-task',
- *   username?: string,  // Required for ask-question and create-post
+ *   activityType: 'ask-question' | 'create-post' | 'reply-to-post' | 'trigger-task',
+ *   username?: string,  // Required for ask-question, create-post, and reply-to-post
  *   taskName?: string    // Required for trigger-task
  * }
  * 
@@ -35,6 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       availableActivities: [
         'ask-question - Ask a question as an automated user (requires: username)',
         'create-post - Create a forum post as an automated user (requires: username)',
+        'reply-to-post - Reply to a forum post as an automated user (requires: username)',
         'trigger-task - Manually trigger a scheduled task (requires: taskName)'
       ]
     });
@@ -92,6 +93,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
 
+      case 'reply-to-post': {
+        if (!username) {
+          return res.status(400).json({
+            success: false,
+            error: 'Missing required field: username for reply-to-post activity'
+          });
+        }
+
+        const preferences = await getUserPreferences(username);
+        if (!preferences) {
+          return res.status(400).json({
+            success: false,
+            error: `No preferences found for user: ${username}`
+          });
+        }
+
+        const result = await respondToForumPost(username, preferences);
+
+        return res.status(result.success ? 200 : 500).json({
+          success: result.success,
+          activityType: 'reply-to-post',
+          result
+        });
+      }
+
       case 'trigger-task': {
         if (!taskName) {
           return res.status(400).json({
@@ -129,6 +155,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           availableActivities: [
             'ask-question - Ask a question as an automated user (requires: username)',
             'create-post - Create a forum post as an automated user (requires: username)',
+            'reply-to-post - Reply to a forum post as an automated user (requires: username)',
             'trigger-task - Manually trigger a scheduled task (requires: taskName)'
           ]
         });
