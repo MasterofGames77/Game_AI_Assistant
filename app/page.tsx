@@ -108,13 +108,61 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // function to get conversations
-  const fetchConversations = useCallback(async () => {
+  const fetchConversations = useCallback(async (forceRefresh = false) => {
     const storedUsername = localStorage.getItem("username");
     if (!storedUsername) return;
+    
+    // Add timestamp to bypass cache when forcing refresh (cache is already cleared server-side)
+    const cacheBuster = forceRefresh ? `&_t=${Date.now()}` : '';
+    
     const res = await axios.get(
-      `/api/getConversation?username=${storedUsername}`
+      `/api/getConversation?username=${storedUsername}&page=1&pageSize=20${cacheBuster}`
     );
-    setConversations(res.data.conversations);
+    
+    // Merge fetched conversations with existing ones to preserve optimistic updates
+    setConversations((prev) => {
+      const fetched = res.data.conversations;
+      
+      // If forcing refresh (after new question), replace all but keep optimistic updates
+      if (forceRefresh) {
+        // Find any temporary (optimistic) conversations in prev that aren't in fetched
+        const tempConversations = prev.filter(conv => conv._id?.startsWith('temp-'));
+        
+        // Start with fetched conversations (page 1 from server)
+        const merged = [...fetched];
+        
+        // Add optimistic conversations that aren't in fetched results yet
+        tempConversations.forEach(tempConv => {
+          const existsInFetched = fetched.some(
+            (fetchedConv: Conversation) => 
+              fetchedConv.question === tempConv.question &&
+              Math.abs(
+                new Date(fetchedConv.timestamp).getTime() - 
+                new Date(tempConv.timestamp).getTime()
+              ) < 10000 // Within 10 seconds
+          );
+          
+          // If temp conversation not in fetched results yet, keep it
+          if (!existsInFetched) {
+            merged.push(tempConv);
+          }
+        });
+        
+        // Sort by timestamp (most recent first)
+        merged.sort((a, b) => 
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+        
+        // Return merged conversations (page 1 from server + any optimistic updates)
+        // The reset logic in Sidebar checks non-temp conversations, so it will correctly
+        // detect that we're back to page 1 (20 non-temp conversations)
+        return merged;
+      }
+      
+      // Normal fetch - just replace
+      return fetched;
+    });
+    
     // Use the actual total from pagination, not just the returned array length
     if (res.data.pagination && res.data.pagination.total !== undefined) {
       setTotalConversations(res.data.pagination.total);
@@ -777,7 +825,36 @@ export default function Home() {
       if (res.data.metrics) {
         setMetrics(res.data.metrics);
       }
-      fetchConversations();
+      
+      // Optimistically add the new question to conversations immediately when response is received
+      // This ensures the question appears in the sidebar right away
+      const newConversation: Conversation = {
+        _id: `temp-${Date.now()}`, // Temporary ID until we fetch from server
+        username: username || 'anonymous',
+        question: question,
+        response: res.data.answer,
+        timestamp: new Date(),
+        imageUrl: imageUrlForAnalysis || undefined,
+      };
+      
+      // Add to conversations list immediately (optimistic update) - happens synchronously
+      setConversations((prev) => {
+        // Check if conversation already exists to avoid duplicates
+        const exists = prev.some(
+          (conv) => conv.question === question && 
+          Math.abs(new Date(conv.timestamp).getTime() - new Date().getTime()) < 5000
+        );
+        if (exists) return prev;
+        // Add new conversation at the beginning (most recent first)
+        // This will cause the sidebar to update immediately
+        return [newConversation, ...prev];
+      });
+      
+      // Force refresh conversations to sync with server (after a delay to allow DB write)
+      // The merge logic in fetchConversations will preserve the optimistic update if needed
+      setTimeout(() => {
+        fetchConversations(true);
+      }, 800); // Increased delay slightly to ensure DB write completes
 
       // Recommendations are now fetched on-demand via button click
 

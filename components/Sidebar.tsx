@@ -247,6 +247,19 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
     };
   }, [updateUserData]);
 
+  // Reset currentPage when conversations are refreshed from parent (e.g., after new question)
+  // This happens when conversations are reset to page 1
+  useEffect(() => {
+    // Count non-temporary conversations (excluding optimistic updates with temp- IDs)
+    const nonTempConversations = conversations.filter(conv => !conv._id?.startsWith('temp-'));
+    
+    // If we have 20 or fewer non-temp conversations, we're on page 1
+    // Reset currentPage to ensure Load More works correctly
+    if (nonTempConversations.length <= 20 && currentPage > 1) {
+      setCurrentPage(1);
+    }
+  }, [conversations, currentPage]);
+
   // Refresh stats when conversations change (e.g., after a new question)
   useEffect(() => {
     if (username) {

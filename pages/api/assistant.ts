@@ -17,6 +17,7 @@ import winston from 'winston';
 import { containsOffensiveContent } from '../../utils/contentModeration';
 import { Metrics } from '../../types';
 import fs from 'fs';
+import { clearUserCache } from './getConversation';
 
 // Optimized performance monitoring with conditional logging
 const measureLatency = async (operation: string, callback: () => Promise<any>, enableLogging: boolean = false) => {
@@ -395,34 +396,12 @@ const fetchAndCombineGameData = async (question: string, answer: string): Promis
         ? csvData.value.find((game: any) => game.title.toLowerCase() === gameName.toLowerCase())
         : null;
 
-    const isMainResponseShort = answer.length < 100;
-    const hasRelevantData = rawgResponse || igdbResponse || csvGameInfo;
-
-    if (isMainResponseShort && hasRelevantData) {
-      let finalResponse = "Game Information:\n";
-
-      // Add CSV data if available
-      if (csvGameInfo) {
-        finalResponse += `\nLocal Database: ${formatGameInfo(csvGameInfo)}`;
-      }
-
-      // Add RAWG data if available
-      if (rawgResponse && !rawgResponse.includes("Failed")) {
-        finalResponse += `\nFrom RAWG: ${rawgResponse}`;
-      }
-
-      // Add IGDB data if available
-      if (igdbResponse && !igdbResponse.includes("Failed")) {
-        finalResponse += `\nFrom IGDB: ${igdbResponse}`;
-      }
-
-      return `${answer}\n\nAdditional Information:\n${finalResponse}`;
-    }
-
-    return answer; // Return original answer if no additional data is available
+    // Removed additional information section - just return the answer
+    // The answer from OpenAI/IGDB/RAWG should be complete and sufficient
+    return answer;
   } catch (error) {
     console.error("Error combining game data:", error);
-    return `${answer}\n\nAdditional Information:\nFailed to fetch additional data due to an error.`;
+    return answer; // Return original answer even on error
   }
 };
 
@@ -1899,6 +1878,11 @@ CRITICAL INSTRUCTIONS:
       }
     });
     metrics.databaseMetrics = dbMetrics;
+
+    // Clear conversation cache for this user to ensure fresh data on next fetch
+    if (username) {
+      clearUserCache(username);
+    }
 
     // Extract question ID for metadata analysis (runs asynchronously after response)
     // questionDoc is an array returned from Question.create

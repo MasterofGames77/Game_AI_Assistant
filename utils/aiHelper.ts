@@ -87,6 +87,39 @@ function cleanAndMatchTitle(queryTitle: string, recordTitle: string): boolean {
   return cleanQuery === cleanRecord; // Simple exact match
 }
 
+// Validate that a game result matches distinctive words from the query title
+function validateGameMatch(queryTitle: string, resultTitle: string): boolean {
+  const queryLower = queryTitle.toLowerCase();
+  const resultLower = resultTitle.toLowerCase();
+  
+  // Extract distinctive words from query (numbers, remake, HD, etc.)
+  const distinctiveWords = queryLower
+    .split(/\s+/)
+    .filter(w => {
+      if (/^\d+$/.test(w) || /^(ii|iii|iv|v|vi|vii|viii|ix|x)$/i.test(w)) return true;
+      if (/remake|remaster|reimagined/i.test(w)) return true;
+      if (/world|part|sequel/i.test(w)) return true;
+      if (/^hd$|^4k$|definitive|edition|deluxe|ultimate|complete|collection/i.test(w)) return true;
+      return false;
+    })
+    .map(w => w.replace(/[^a-z0-9]/g, ''));
+  
+  // If query has distinctive words, they MUST be in the result
+  if (distinctiveWords.length > 0) {
+    const allDistinctivePresent = distinctiveWords.every(dw => {
+      if (dw.length > 0) {
+        const wordPattern = new RegExp(`\\b${dw}\\b`, 'i');
+        return wordPattern.test(resultLower);
+      }
+      return true;
+    });
+    return allDistinctivePresent;
+  }
+  
+  // If no distinctive words, do basic matching
+  return true;
+}
+
 // Example IGDB Fetch Function with Improved Filtering
 export async function fetchFromIGDB(gameTitle: string): Promise<string | null> {
   try {
@@ -101,9 +134,10 @@ export async function fetchFromIGDB(gameTitle: string): Promise<string | null> {
     const response = await axios.post(
       'https://api.igdb.com/v4/games',
       // Fetch comprehensive metadata: name, release date, platforms, developers, publishers, genres, rating
+      // Increase limit to search through multiple results to find the correct match
       `search "${sanitizedTitle}";
        fields name,first_release_date,platforms.name,involved_companies.company.name,involved_companies.developer,involved_companies.publisher,genres.name,rating,aggregated_rating;
-       limit 1;`,
+       limit 10;`,
       {
         headers: {
           'Client-ID': process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID!,
@@ -114,7 +148,24 @@ export async function fetchFromIGDB(gameTitle: string): Promise<string | null> {
     );
 
     if (response.data && response.data.length > 0) {
-      const game = response.data.find((g: any) => cleanAndMatchTitle(gameTitle, g.name));
+      // First, try exact match
+      let game = response.data.find((g: any) => cleanAndMatchTitle(gameTitle, g.name));
+      
+      // If exact match found, validate it has distinctive words
+      if (game && !validateGameMatch(gameTitle, game.name)) {
+        game = undefined; // Reject if distinctive words don't match
+      }
+      
+      // If no exact match or exact match failed validation, try to find a match with distinctive words
+      if (!game) {
+        game = response.data.find((g: any) => {
+          // Check if result contains the query title (or vice versa) and has distinctive words
+          const gameNameLower = g.name.toLowerCase();
+          const queryLower = gameTitle.toLowerCase();
+          const hasBasicMatch = gameNameLower.includes(queryLower) || queryLower.includes(gameNameLower);
+          return hasBasicMatch && validateGameMatch(gameTitle, g.name);
+        });
+      }
       
       // Check if game was found before accessing properties
       if (!game) {
@@ -829,6 +880,7 @@ export const getChatCompletion = async (question: string, systemMessage?: string
                                /(difference|differences|compare|comparison|between|versus|vs).*(version|versions|edition|editions|platform|platforms|console|consoles)/i.test(lowerQuestion);
     
     let response: string | null = null;
+    let apiResultQuality: 'good' | 'questionable' | 'none' = 'none';
     
     // For factual metadata questions, try IGDB/RAWG first (they have accurate metadata)
     if (isMetadataQuestion && !isSpecificQuestion) {
@@ -840,20 +892,236 @@ export const getChatCompletion = async (question: string, systemMessage?: string
         ? (extractedGameTitle || searchQuery.substring(0, 252) + '...')
         : searchQuery;
       
+      // Try IGDB first
       response = await fetchFromIGDB(limitedQuery);
-      if (!response) {
-        response = await fetchFromRAWG(limitedQuery);
+      if (response) {
+        // Validate that the result matches the extracted game title
+        const questionLower = question.toLowerCase();
+        const responseLower = response.toLowerCase();
+        const extractedTitleLower = (extractedGameTitle || '').toLowerCase();
+        
+        // Extract key words from the game title (excluding common words)
+        const extractKeyWords = (title: string): string[] => {
+          const commonWords = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by']);
+          return title
+            .toLowerCase()
+            .split(/\s+/)
+            .filter(w => w.length > 2 && !commonWords.has(w))
+            .map(w => w.replace(/[^a-z0-9]/g, ''));
+        };
+        
+        const titleKeyWords = extractKeyWords(extractedTitleLower || questionLower);
+        const responseKeyWords = extractKeyWords(responseLower);
+        
+        // Check if response contains key words from the game title
+        const matchingWords = titleKeyWords.filter(word => 
+          responseKeyWords.some(rw => rw.includes(word) || word.includes(rw))
+        );
+        
+        // Check if response starts with or prominently contains the game name
+        // The response format from fetchFromIGDB is: "[Game Name] was released on..."
+        const responseStartsWithTitle = responseLower.startsWith(extractedTitleLower) || 
+                                       responseLower.includes(` ${extractedTitleLower} `) ||
+                                       responseLower.includes(` ${extractedTitleLower} was`);
+        
+        // Require at least 2 matching key words (or 1 if title is short)
+        // OR response starts with the game title (strong indicator)
+        const minMatches = titleKeyWords.length <= 3 ? 1 : 2;
+        const hasTitleMatch = responseStartsWithTitle || matchingWords.length >= minMatches;
+        
+        // Check if question or extracted title mentions remake/remaster/sequel/version but response doesn't match
+        const hasRemake = /remake|remaster|reimagined/i.test(questionLower) || /remake|remaster|reimagined/i.test(extractedTitleLower);
+        const hasSequel = /\b(2|ii|3|iii|4|iv|world\s*2|world\s*ii)\b/i.test(questionLower) || /\b(2|ii|3|iii|4|iv|world\s*2|world\s*ii)\b/i.test(extractedTitleLower);
+        const hasVersion = /\b(hd|4k|definitive|edition|deluxe|ultimate|complete|collection)\b/i.test(questionLower) || /\b(hd|4k|definitive|edition|deluxe|ultimate|complete|collection)\b/i.test(extractedTitleLower);
+        const responseHasRemake = /remake|remaster|reimagined/i.test(responseLower);
+        const responseHasSequel = /\b(2|ii|3|iii|4|iv|world\s*2|world\s*ii)\b/i.test(responseLower);
+        const responseHasVersion = /\b(hd|4k|definitive|edition|deluxe|ultimate|complete|collection)\b/i.test(responseLower);
+        
+        // Check for conflicting game titles - if response mentions a different game that shares some words
+        // but is clearly different (e.g., "Resident Evil Archives" vs "Resident Evil 4 Remake")
+        // Extract distinctive words from the title (numbers, remake/remaster, version indicators, specific identifiers)
+        const distinctiveWords = extractedTitleLower
+          .split(/\s+/)
+          .filter(w => /^\d+$/.test(w) || /remake|remaster|reimagined|world|part|ii|iii|iv|v|^hd$|^4k$|definitive|edition|deluxe|ultimate|complete|collection/i.test(w))
+          .map(w => w.replace(/[^a-z0-9]/g, ''));
+        
+        // Check if response is missing distinctive words that should be present
+        const missingDistinctive = distinctiveWords.some(dw => {
+          if (dw.length > 0) {
+            // Check if this distinctive word appears in the response
+            const wordPattern = new RegExp(`\\b${dw}\\b`, 'i');
+            return !wordPattern.test(responseLower);
+          }
+          return false;
+        });
+        
+        // Also check if response contains words that contradict the title
+        // (e.g., if title has "4" but response has "Archives" without "4")
+        const hasConflict = missingDistinctive && distinctiveWords.length > 0;
+        
+        // Mark as questionable if:
+        // 1. Response doesn't match the game title key words
+        // 2. Question mentions remake/sequel/version but response doesn't
+        // 3. Response contains conflicting game titles
+        if (!hasTitleMatch || (hasRemake && !responseHasRemake) || (hasSequel && !responseHasSequel) || (hasVersion && !responseHasVersion) || hasConflict) {
+          apiResultQuality = 'questionable';
+        } else {
+          apiResultQuality = 'good';
+        }
+      }
+      
+      // Try RAWG if IGDB failed or returned questionable result
+      if (!response || apiResultQuality === 'questionable') {
+        const rawgResponse = await fetchFromRAWG(limitedQuery);
+        if (rawgResponse && !rawgResponse.includes("Failed") && !rawgResponse.includes("No games found")) {
+          // Validate RAWG result with the same logic as IGDB
+          const questionLower = question.toLowerCase();
+          const rawgLower = rawgResponse.toLowerCase();
+          const extractedTitleLower = (extractedGameTitle || '').toLowerCase();
+          
+          // Extract key words from the game title
+          const extractKeyWords = (title: string): string[] => {
+            const commonWords = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by']);
+            return title
+              .toLowerCase()
+              .split(/\s+/)
+              .filter(w => w.length > 2 && !commonWords.has(w))
+              .map(w => w.replace(/[^a-z0-9]/g, ''));
+          };
+          
+          const titleKeyWords = extractKeyWords(extractedTitleLower || questionLower);
+          const rawgKeyWords = extractKeyWords(rawgLower);
+          
+          // Check if response contains key words from the game title
+          const matchingWords = titleKeyWords.filter(word => 
+            rawgKeyWords.some(rw => rw.includes(word) || word.includes(rw))
+          );
+          
+          // Check if response starts with or prominently contains the game name
+          const rawgStartsWithTitle = rawgLower.startsWith(extractedTitleLower) || 
+                                     rawgLower.includes(` ${extractedTitleLower} `) ||
+                                     rawgLower.includes(`(${extractedTitleLower}`);
+          
+          const minMatches = titleKeyWords.length <= 3 ? 1 : 2;
+          const hasTitleMatch = rawgStartsWithTitle || matchingWords.length >= minMatches;
+          
+          const hasRemake = /remake|remaster|reimagined/i.test(questionLower) || /remake|remaster|reimagined/i.test(extractedTitleLower);
+          const hasSequel = /\b(2|ii|3|iii|4|iv|world\s*2|world\s*ii)\b/i.test(questionLower) || /\b(2|ii|3|iii|4|iv|world\s*2|world\s*ii)\b/i.test(extractedTitleLower);
+          const hasVersion = /\b(hd|4k|definitive|edition|deluxe|ultimate|complete|collection)\b/i.test(questionLower) || /\b(hd|4k|definitive|edition|deluxe|ultimate|complete|collection)\b/i.test(extractedTitleLower);
+          const rawgHasRemake = /remake|remaster|reimagined/i.test(rawgLower);
+          const rawgHasSequel = /\b(2|ii|3|iii|4|iv|world\s*2|world\s*ii)\b/i.test(rawgLower);
+          const rawgHasVersion = /\b(hd|4k|definitive|edition|deluxe|ultimate|complete|collection)\b/i.test(rawgLower);
+          
+          // Check for conflicting game titles using the same logic as IGDB
+          const distinctiveWords = extractedTitleLower
+            .split(/\s+/)
+            .filter(w => /^\d+$/.test(w) || /remake|remaster|reimagined|world|part|ii|iii|iv|v|^hd$|^4k$|definitive|edition|deluxe|ultimate|complete|collection/i.test(w))
+            .map(w => w.replace(/[^a-z0-9]/g, ''));
+          
+          const missingDistinctive = distinctiveWords.some(dw => {
+            if (dw.length > 0) {
+              const wordPattern = new RegExp(`\\b${dw}\\b`, 'i');
+              return !wordPattern.test(rawgLower);
+            }
+            return false;
+          });
+          
+          const hasConflict = missingDistinctive && distinctiveWords.length > 0;
+          
+          if (hasTitleMatch && !((hasRemake && !rawgHasRemake) || (hasSequel && !rawgHasSequel) || (hasVersion && !rawgHasVersion)) && !hasConflict) {
+            response = rawgResponse;
+            apiResultQuality = 'good';
+          } else {
+            apiResultQuality = 'questionable';
+          }
+        }
       }
     }
     
-    // For specific gameplay questions or if IGDB/RAWG didn't return data, use OpenAI
-    // This ensures we get detailed answers for specific questions
-    if (!response || isSpecificQuestion) {
-      // For specific questions, enhance the prompt with game context if available
+    // For specific gameplay questions, or if IGDB/RAWG didn't return good data, use OpenAI
+    // Also use OpenAI for factual questions if API results are questionable or missing
+    // This ensures we get accurate, up-to-date answers
+    if (!response || isSpecificQuestion || apiResultQuality === 'questionable') {
+      // For specific questions or metadata questions with questionable API results, enhance the prompt
       let enhancedQuestion = question;
       let gameTitleForContext: string | undefined;
       
-      if (isSpecificQuestion) {
+      // For metadata questions with questionable/missing API results, use OpenAI with enhanced prompt
+      if (isMetadataQuestion && !isSpecificQuestion && (apiResultQuality === 'questionable' || !response)) {
+        const extractedGameTitle = await extractGameTitleFromQuestion(question);
+        gameTitleForContext = extractedGameTitle;
+        
+        if (extractedGameTitle) {
+          // Check if the game title contains remake/remaster/sequel/version indicators
+          const titleLower = extractedGameTitle.toLowerCase();
+          const hasRemake = /remake|remaster|reimagined/i.test(titleLower);
+          const hasSequel = /\b(2|ii|3|iii|4|iv|5|v|world\s*2|world\s*ii|sequel|part\s*2|part\s*ii)\b/i.test(titleLower);
+          const hasVersion = /\b(hd|4k|definitive|edition|deluxe|ultimate|complete|collection)\b/i.test(titleLower);
+          
+          // Build a dynamic prompt that emphasizes accuracy and correct game identification
+          // Make it VERY explicit and repetitive to prevent confusion
+          let instructions = `⚠️ CRITICAL: The user is asking about "${extractedGameTitle}" ⚠️
+
+YOU MUST ANSWER ABOUT THIS EXACT GAME: "${extractedGameTitle}"
+
+DO NOT confuse "${extractedGameTitle}" with:
+- Other games in the same series
+- Earlier or later versions
+- Remakes, remasters, or ports of different games
+- Games with similar names
+
+IMPORTANT INSTRUCTIONS:
+1. The game you MUST answer about is: "${extractedGameTitle}"
+2. Answer ONLY about "${extractedGameTitle}" - nothing else
+3. If you see any information about a different game, IGNORE IT and answer only about "${extractedGameTitle}"`;
+          
+          if (hasRemake) {
+            instructions += `\n4. The title "${extractedGameTitle}" contains "Remake/Remaster/Reimagined" - you MUST answer about THIS specific remake/remaster, NOT the original game
+5. Do NOT provide information about the original game - only about "${extractedGameTitle}"`;
+          }
+          
+          if (hasSequel) {
+            instructions += `\n4. The title "${extractedGameTitle}" contains a sequel indicator - you MUST answer about THIS specific sequel, NOT earlier games
+5. Do NOT provide information about earlier games in the series - only about "${extractedGameTitle}"`;
+          }
+          
+          if (hasVersion) {
+            instructions += `\n4. The title "${extractedGameTitle}" contains a version indicator (HD, 4K, Definitive Edition, etc.) - you MUST answer about THIS specific version, NOT other versions
+5. Do NOT provide information about other versions of the game - only about "${extractedGameTitle}"`;
+          }
+          
+          if (hasRemake || hasSequel || hasVersion) {
+            instructions += `\n6. If you find information about multiple games, ONLY use information that specifically matches "${extractedGameTitle}"
+7. Reject any information that is about a different game, even if it's in the same series
+8. If the title contains "HD", the answer MUST be about the HD version, NOT the original or other versions`;
+          }
+          
+          instructions += `\n8. Provide accurate release dates, platforms, developers, and publishers for "${extractedGameTitle}" ONLY
+9. If you're not certain about information for "${extractedGameTitle}", clearly state that rather than guessing or providing information about a different game
+10. Be precise - the game title is "${extractedGameTitle}" - use this exact title in your response
+11. IGNORE any information you might have about similar-sounding games - only use information that is specifically about "${extractedGameTitle}"
+12. If you find yourself thinking about a different game, STOP and refocus on "${extractedGameTitle}" ONLY
+
+REMEMBER: Answer ONLY about "${extractedGameTitle}". Do not confuse it with any other game. The user's question is specifically about "${extractedGameTitle}".`;
+          
+          enhancedQuestion = `User's Question: ${question}
+
+${instructions}
+
+⚠️ FINAL REMINDER: The user is asking about "${extractedGameTitle}". Answer ONLY about this game. Do not mention or provide information about any other game, even if it has a similar name.
+
+RESPONSE FORMAT:
+- Start your response by confirming you're answering about "${extractedGameTitle}"
+- Then provide the factual information requested
+- Do NOT say "I understand your question is about [different game]" - the question is about "${extractedGameTitle}"
+
+Now please provide a detailed, accurate answer about "${extractedGameTitle}" based on the user's question above.`;
+        } else {
+          enhancedQuestion = `Question: ${question}
+
+Please provide accurate, factual information. Make sure to identify the correct game title from the question and answer about that specific game. If the question mentions a remake, remaster, or sequel, make sure your answer is about that specific version.`;
+        }
+      } else if (isSpecificQuestion) {
         const extractedGameTitle = await extractGameTitleFromQuestion(question);
         gameTitleForContext = extractedGameTitle;
         
@@ -903,17 +1171,19 @@ IMPORTANT INSTRUCTIONS:
       // Enhanced system message for better answer quality
       const enhancedSystemMessage = systemMessage || `You are Video Game Wingman, an expert AI assistant specializing in video games. 
 
-CRITICAL INSTRUCTIONS:
-- Always identify and use the CORRECT game title from the question (e.g., if the question mentions "Deisim", answer about Deisim, not a different game)
-- ALWAYS prioritize the BASE/VANILLA version of the game unless the user specifically asks about a mod, DLC, or fan-made version
-- If a question mentions a game title without specifying a mod, answer about the official base game released by the developer/publisher
-- Do NOT assume mods, fan-made versions, or unofficial variations unless explicitly mentioned in the question
-- Provide accurate, detailed answers about game mechanics, items, characters, strategies, versions, and gameplay
+CRITICAL INSTRUCTIONS - READ CAREFULLY:
+- ALWAYS identify and use the EXACT game title from the question - do NOT substitute it with a different game
+- If the question specifies a game title (especially in the user's message), you MUST answer about THAT exact game, nothing else
+- If the question mentions "Remake", "Remaster", or a specific sequel number (like "2", "World 2", "II", "4"), answer about THAT specific version ONLY
+- NEVER confuse similar game titles - if asked about "Resident Evil 4 Remake", do NOT answer about "Resident Evil Archives" or any other Resident Evil game
+- If you see conflicting information or are unsure, use the EXACT game title from the user's question
+- ALWAYS prioritize the game title as specified in the question over any other information you might have
+- For factual metadata questions (release dates, platforms, developers), provide precise, up-to-date information for the EXACT game asked about
 - Be specific and factual - cite specific features, mechanics, or details when possible
-- For version comparison questions, clearly explain the differences between versions
-- If you don't have specific information about a game or its versions, clearly state: "I don't have specific information about [game title] or its different versions" rather than guessing or providing generic information
-- Never confuse game titles or provide information about the wrong game
-${gameTitleForContext ? `- The game being asked about is: ${gameTitleForContext} (base/vanilla version unless mod/DLC is specified)` : ''}`;
+- If you don't have specific information about the exact game asked about, clearly state that rather than providing information about a different game
+- NEVER provide information about a different game, even if it's in the same series or has a similar name
+- Pay special attention to remakes, remasters, and sequels - make sure you're answering about the EXACT version specified
+${gameTitleForContext ? `\n⚠️ IMPORTANT: The user is asking about "${gameTitleForContext}" - you MUST answer about this exact game, not any other game with a similar name ⚠️` : ''}`;
       
       const completion = await openai.chat.completions.create({
         model: 'gpt-4o',
@@ -1289,70 +1559,80 @@ async function searchGameInIGDB(candidateTitle: string): Promise<string | null> 
     if (response.data && response.data.length > 0) {
       const lowerCandidate = candidateTitle.toLowerCase();
       
-      // First, try to find exact or close match
+      // Extract distinctive words from candidate (numbers, remake, HD, version indicators, etc.)
+      const candidateDistinctiveWords = lowerCandidate
+        .split(/\s+/)
+        .filter(w => {
+          if (/^\d+$/.test(w) || /^(ii|iii|iv|v|vi|vii|viii|ix|x)$/i.test(w)) return true;
+          if (/remake|remaster|reimagined/i.test(w)) return true;
+          if (/world|part|sequel/i.test(w)) return true;
+          if (/^hd$|^4k$|definitive|edition|deluxe|ultimate|complete|collection/i.test(w)) return true;
+          return false;
+        })
+        .map(w => w.replace(/[^a-z0-9]/g, ''));
+      
+      // First, try to find exact match (highest priority)
       const exactMatch = response.data.find((g: any) => {
         const gameName = g.name.toLowerCase();
-        return gameName === lowerCandidate || 
-               gameName.includes(lowerCandidate) ||
-               lowerCandidate.includes(gameName);
+        return gameName === lowerCandidate;
       });
       
       if (exactMatch && !isBundleOrDLC(exactMatch.name)) {
         return cleanGameTitle(exactMatch.name);
       }
       
-      // If exact match is a bundle, try to find base game
-      if (exactMatch && isBundleOrDLC(exactMatch.name)) {
-        const baseGame = extractBaseGameFromBundle(exactMatch.name);
-        // Search for the base game in results
-        const baseGameMatch = response.data.find((g: any) => {
-          const gameName = g.name.toLowerCase();
-          const baseLower = baseGame.toLowerCase();
-          return (gameName === baseLower || 
-                  gameName.includes(baseLower) ||
-                  baseLower.includes(gameName)) && 
-                 !isBundleOrDLC(g.name);
-        });
-        if (baseGameMatch) {
-          return cleanGameTitle(baseGameMatch.name);
-        }
-      }
-      
-      // Prefer non-bundle results
-      const nonBundleResults = response.data.filter((g: any) => !isBundleOrDLC(g.name));
-      if (nonBundleResults.length > 0) {
-        // Check if there's significant overlap in words
-        const firstResult = nonBundleResults[0];
-        const firstResultLower = firstResult.name.toLowerCase();
-        const candidateWords = lowerCandidate.split(/\s+/).filter((w: string) => w.length > 2);
-        const resultWords = firstResultLower.split(/\s+/).filter((w: string) => w.length > 2);
-        const matchingWords = candidateWords.filter(word => resultWords.includes(word));
+      // If candidate has distinctive words, require them in the match
+      // This prevents "Resident Evil 4 Remake" from matching "Resident Evil Archives"
+      const matchesWithDistinctive = response.data.filter((g: any) => {
+        const gameName = g.name.toLowerCase();
+        const hasBasicMatch = gameName.includes(lowerCandidate) || lowerCandidate.includes(gameName);
         
-        if (matchingWords.length >= 1 || candidateTitle.length <= 15) {
-          return cleanGameTitle(firstResult.name);
+        if (!hasBasicMatch) return false;
+        
+        // If candidate has distinctive words, they MUST be in the result
+        if (candidateDistinctiveWords.length > 0) {
+          const allDistinctivePresent = candidateDistinctiveWords.every(dw => {
+            if (dw.length > 0) {
+              const wordPattern = new RegExp(`\\b${dw}\\b`, 'i');
+              return wordPattern.test(gameName);
+            }
+            return true;
+          });
+          return allDistinctivePresent;
         }
+        
+        return true;
+      });
+      
+      // Prefer non-bundle matches with distinctive words
+      const nonBundleMatch = matchesWithDistinctive.find((g: any) => !isBundleOrDLC(g.name));
+      if (nonBundleMatch) {
+        return cleanGameTitle(nonBundleMatch.name);
       }
       
-      // Fallback to first result if no non-bundle found
-      const firstResult = response.data[0];
-      // If it's a bundle, try to extract base game
-      if (isBundleOrDLC(firstResult.name)) {
-        const baseGame = extractBaseGameFromBundle(firstResult.name);
-        // Try to find base game in results
-        const baseGameMatch = response.data.find((g: any) => {
-          const gameName = g.name.toLowerCase();
-          const baseLower = baseGame.toLowerCase();
-          return (gameName === baseLower || gameName.includes(baseLower)) &&
-                 !isBundleOrDLC(g.name);
-        });
-        if (baseGameMatch) {
-          return cleanGameTitle(baseGameMatch.name);
-        }
-        // If no base game found, return cleaned version
-        return cleanGameTitle(baseGame);
+      // Fallback to first match with distinctive words (even if bundle)
+      if (matchesWithDistinctive.length > 0) {
+        return cleanGameTitle(matchesWithDistinctive[0].name);
       }
       
-      return cleanGameTitle(firstResult.name);
+      // If no matches with distinctive words and candidate has distinctive words, return null
+      // This prevents matching wrong games when distinctive words are missing
+      if (candidateDistinctiveWords.length > 0) {
+        return null; // Don't return a match if distinctive words are missing
+      }
+      
+      // Only do basic matching if candidate has no distinctive words (generic titles)
+      const basicMatch = response.data.find((g: any) => {
+        const gameName = g.name.toLowerCase();
+        return gameName === lowerCandidate;
+      });
+      
+      if (basicMatch && !isBundleOrDLC(basicMatch.name)) {
+        return cleanGameTitle(basicMatch.name);
+      }
+      
+      // If still no match, return null rather than returning wrong game
+      return null;
     }
     return null;
   } catch (error) {
@@ -1375,79 +1655,80 @@ async function searchGameInRAWG(candidateTitle: string): Promise<string | null> 
     if (response.data && response.data.results.length > 0) {
       const lowerCandidate = sanitizedTitle;
       
-      // First, try to find exact or close match (prefer non-bundles)
+      // Extract distinctive words from candidate (numbers, remake, HD, version indicators, etc.)
+      const candidateDistinctiveWords = lowerCandidate
+        .split(/\s+/)
+        .filter(w => {
+          if (/^\d+$/.test(w) || /^(ii|iii|iv|v|vi|vii|viii|ix|x)$/i.test(w)) return true;
+          if (/remake|remaster|reimagined/i.test(w)) return true;
+          if (/world|part|sequel/i.test(w)) return true;
+          if (/^hd$|^4k$|definitive|edition|deluxe|ultimate|complete|collection/i.test(w)) return true;
+          return false;
+        })
+        .map(w => w.replace(/[^a-z0-9]/g, ''));
+      
+      // First, try to find exact match (highest priority)
+      const exactMatch = response.data.results.find((g: any) => {
+        const normalizedGameName = g.name.toLowerCase().trim();
+        return normalizedGameName === lowerCandidate;
+      });
+      
+      if (exactMatch && !isBundleOrDLC(exactMatch.name)) {
+        return cleanGameTitle(exactMatch.name);
+      }
+      
+      // If candidate has distinctive words, require them in the match
+      const matchesWithDistinctive = response.data.results.filter((g: any) => {
+        const normalizedGameName = g.name.toLowerCase().trim();
+        const hasBasicMatch = normalizedGameName === lowerCandidate || 
+                             normalizedGameName.includes(lowerCandidate) ||
+                             lowerCandidate.includes(normalizedGameName);
+        
+        if (!hasBasicMatch) return false;
+        
+        // If candidate has distinctive words, they MUST be in the result
+        if (candidateDistinctiveWords.length > 0) {
+          const allDistinctivePresent = candidateDistinctiveWords.every(dw => {
+            if (dw.length > 0) {
+              const wordPattern = new RegExp(`\\b${dw}\\b`, 'i');
+              return wordPattern.test(normalizedGameName);
+            }
+            return true;
+          });
+          return allDistinctivePresent;
+        }
+        
+        return true;
+      });
+      
+      // Prefer non-bundle matches with distinctive words
+      const nonBundleMatch = matchesWithDistinctive.find((g: any) => !isBundleOrDLC(g.name));
+      if (nonBundleMatch) {
+        return cleanGameTitle(nonBundleMatch.name);
+      }
+      
+      // Fallback to first match with distinctive words (even if bundle)
+      if (matchesWithDistinctive.length > 0) {
+        return cleanGameTitle(matchesWithDistinctive[0].name);
+      }
+      
+      // If no matches with distinctive words and candidate has distinctive words, return null
+      if (candidateDistinctiveWords.length > 0) {
+        return null; // Don't return a match if distinctive words are missing
+      }
+      
+      // Only do basic matching if candidate has no distinctive words (generic titles)
       const nonBundleMatches = response.data.results.filter((g: any) => {
         const normalizedGameName = g.name.toLowerCase().trim();
-        const isMatch = normalizedGameName === lowerCandidate || 
-               normalizedGameName.includes(lowerCandidate) ||
-               lowerCandidate.includes(normalizedGameName);
-        return isMatch && !isBundleOrDLC(g.name);
+        return normalizedGameName === lowerCandidate && !isBundleOrDLC(g.name);
       });
       
       if (nonBundleMatches.length > 0) {
         return cleanGameTitle(nonBundleMatches[0].name);
       }
       
-      // If only bundle matches found, try to extract base game
-      const bundleMatches = response.data.results.filter((g: any) => {
-        const normalizedGameName = g.name.toLowerCase().trim();
-        return (normalizedGameName === lowerCandidate || 
-               normalizedGameName.includes(lowerCandidate) ||
-               lowerCandidate.includes(normalizedGameName)) &&
-               isBundleOrDLC(g.name);
-      });
-      
-      if (bundleMatches.length > 0) {
-        const bundleTitle = bundleMatches[0].name;
-        const baseGame = extractBaseGameFromBundle(bundleTitle);
-        // Search for base game in results
-        const baseGameMatch = response.data.results.find((g: any) => {
-          const normalizedGameName = g.name.toLowerCase().trim();
-          const baseLower = baseGame.toLowerCase();
-          return (normalizedGameName === baseLower || 
-                  normalizedGameName.includes(baseLower) ||
-                  baseLower.includes(normalizedGameName)) &&
-                 !isBundleOrDLC(g.name);
-        });
-        if (baseGameMatch) {
-          return cleanGameTitle(baseGameMatch.name);
-        }
-        // If no base game found, return cleaned version
-        return cleanGameTitle(baseGame);
-      }
-      
-      // Fallback: prefer first non-bundle result
-      const nonBundleResults = response.data.results.filter((g: any) => !isBundleOrDLC(g.name));
-      if (nonBundleResults.length > 0) {
-        const firstResult = nonBundleResults[0];
-        const firstResultLower = firstResult.name.toLowerCase();
-        const candidateWords = lowerCandidate.split(/\s+/).filter((w: string) => w.length > 2);
-        const resultWords = firstResultLower.split(/\s+/).filter((w: string) => w.length > 2);
-        const matchingWords = candidateWords.filter(word => resultWords.includes(word));
-        
-        if (matchingWords.length >= 1 || candidateTitle.length <= 15) {
-          return cleanGameTitle(firstResult.name);
-        }
-      }
-      
-      // Last resort: return first result (even if bundle)
-      const firstResult = response.data.results[0];
-      if (isBundleOrDLC(firstResult.name)) {
-        const baseGame = extractBaseGameFromBundle(firstResult.name);
-        // Try to find base game
-        const baseGameMatch = response.data.results.find((g: any) => {
-          const normalizedGameName = g.name.toLowerCase().trim();
-          const baseLower = baseGame.toLowerCase();
-          return (normalizedGameName === baseLower || normalizedGameName.includes(baseLower)) &&
-                 !isBundleOrDLC(g.name);
-        });
-        if (baseGameMatch) {
-          return cleanGameTitle(baseGameMatch.name);
-        }
-        return cleanGameTitle(baseGame);
-      }
-      
-      return cleanGameTitle(firstResult.name);
+      // If no match found, return null rather than returning wrong game
+      return null;
     }
     return null;
   } catch (error) {
@@ -1471,13 +1752,27 @@ function extractGameTitleCandidates(question: string): string[] {
   if (quotedMatch && quotedMatch[1].trim().length >= 3) {
     candidates.push(quotedMatch[1].trim());
   }
+  
+  // Strategy 1.5: "When was [Game Title] released?" pattern
+  // This captures the full game title including numbers and remake indicators
+  const whenWasPattern = /when\s+(?:was|is|did)\s+([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&-]+?)\s+(?:released|come\s+out|launched)/i;
+  const whenWasMatch = question.match(whenWasPattern);
+  if (whenWasMatch && whenWasMatch[1]) {
+    let candidate = whenWasMatch[1].trim();
+    // Remove leading "the" if present
+    candidate = candidate.replace(/^the\s+/i, '');
+    if (candidate.length >= 3) {
+      candidates.push(candidate);
+    }
+  }
 
   // Strategy 2: "in [Game Title]", "for [Game Title]", "of [Game Title]" patterns
   // Updated to handle special characters (é, ü, ö, ō, etc.) and roman numerals (X, Y, III, etc.)
   // Improved to stop at common verbs and question words to avoid capturing too much
   // Character class includes: À-ÿ (Latin-1), Ā-ž (Latin Extended-A), and common Unicode letters
   // Added "of" to catch patterns like "versions of Deisim", "differences between versions of [Game]"
-  const inGamePattern = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&-]+?)(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)|$|[?.!])/gi;
+  // IMPORTANT: Preserve remake/remaster/sequel indicators and version indicators (Remake, Remaster, HD, 2, World 2, II, etc.)
+  const inGamePattern = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&-(]+?(?:\s+(?:Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|2|II|3|III|4|IV|World\s*2|World\s*II))?)(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)|$|[?.!])/gi;
   let match: RegExpExecArray | null;
   while ((match = inGamePattern.exec(question)) !== null) {
     if (match[1]) {
@@ -1537,11 +1832,11 @@ function extractGameTitleCandidates(question: string): string[] {
     }
   }
 
-  // Strategy 3: Proper noun patterns (capitalized words, including special chars)
-  // Also matches patterns like "Pokémon X and Y", "Final Fantasy VII", "God of War Ragnarök"
+  // Strategy 3: Proper noun patterns (capitalized words, including special chars, numbers, and remake indicators)
+  // Also matches patterns like "Pokémon X and Y", "Final Fantasy VII", "God of War Ragnarök", "Resident Evil 4 Remake"
   // Character class includes: À-ÿ (Latin-1), Ā-ž (Latin Extended-A) for characters like ö, ō
-  // Prioritize proper nouns that appear later in the question (game titles often come after question setup)
-  const properNounPattern = /\b([A-ZÀ-ÿĀ-ž][a-zÀ-ÿĀ-ž]+(?:\s+(?:[A-ZÀ-ÿĀ-ž][a-zÀ-ÿĀ-ž]+|[IVXLCDM]+|\band\b)){1,4})\b/g;
+  // IMPORTANT: Include numbers, remake/remaster indicators, and version indicators (HD, 4K, etc.) in the pattern
+  const properNounPattern = /\b([A-ZÀ-ÿĀ-ž][a-zÀ-ÿĀ-ž]+(?:\s+(?:[A-ZÀ-ÿĀ-ž][a-zÀ-ÿĀ-ž]+|[IVXLCDM]+|\d+|Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|\band\b)){1,6})\b/g;
   const properNounMatches: Array<{ candidate: string; index: number }> = [];
   while ((match = properNounPattern.exec(question)) !== null) {
     if (match[1]) {
@@ -1826,6 +2121,7 @@ function normalizeGameTitle(title: string): string {
 /**
  * Check if an API result is relevant to the question text
  * Ensures the result shares significant words with the question or candidate
+ * STRICT VERSION: Requires distinctive words (numbers, remake, sequel indicators) to match
  */
 function isAPIResultRelevantToQuestion(apiResult: string, question: string, candidate: string): boolean {
   if (!apiResult || !question) return true; // If we can't validate, allow it
@@ -1833,6 +2129,48 @@ function isAPIResultRelevantToQuestion(apiResult: string, question: string, cand
   const lowerResult = apiResult.toLowerCase();
   const lowerQuestion = question.toLowerCase();
   const lowerCandidate = candidate.toLowerCase();
+  
+  // Extract distinctive words from candidate (numbers, remake/remaster, HD, version indicators, sequel indicators)
+  // These MUST be present in the result for it to be considered relevant
+  const distinctiveWords = lowerCandidate
+    .split(/\s+/)
+    .filter(w => {
+      // Numbers (like "4", "2", "III")
+      if (/^\d+$/.test(w) || /^(ii|iii|iv|v|vi|vii|viii|ix|x)$/i.test(w)) return true;
+      // Remake/remaster indicators
+      if (/remake|remaster|reimagined/i.test(w)) return true;
+      // Sequel indicators
+      if (/world|part|sequel/i.test(w)) return true;
+      // Version indicators (HD, 4K, Definitive Edition, etc.)
+      if (/^hd$|^4k$|definitive|edition|deluxe|ultimate|complete|collection/i.test(w)) return true;
+      return false;
+    })
+    .map(w => w.replace(/[^a-z0-9]/g, ''));
+  
+  // If candidate has distinctive words, they MUST appear in the result
+  if (distinctiveWords.length > 0) {
+    const missingDistinctive = distinctiveWords.some(dw => {
+      if (dw.length > 0) {
+        // Check if this distinctive word appears in the result
+        const wordPattern = new RegExp(`\\b${dw}\\b`, 'i');
+        return !wordPattern.test(lowerResult);
+      }
+      return false;
+    });
+    
+    if (missingDistinctive) {
+      // Distinctive word is missing - this is NOT a match
+      return false;
+    }
+  }
+  
+  // Check for conflicting words - if candidate has "4" and "remake", result shouldn't have "archives" without "4"
+  // This catches cases like "Resident Evil 4 Remake" vs "Resident Evil Archives"
+  if (lowerCandidate.includes('4') && lowerCandidate.includes('remake')) {
+    if (lowerResult.includes('archives') && !lowerResult.includes('4')) {
+      return false; // "Archives" without "4" is a different game
+    }
+  }
   
   // Extract meaningful words from each (filter out common words)
   const commonWords = new Set([
@@ -1923,6 +2261,46 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
       try {
         const igdbMatch = await searchGameInIGDB(candidate);
         if (igdbMatch) {
+          // STRICT VALIDATION: Check if distinctive words from candidate are in the result
+          const candidateLower = candidate.toLowerCase();
+          const resultLower = igdbMatch.toLowerCase();
+          
+          // Extract distinctive words (numbers, remake/remaster, HD, version indicators, sequel indicators)
+          const distinctiveWords = candidateLower
+            .split(/\s+/)
+            .filter(w => {
+              if (/^\d+$/.test(w) || /^(ii|iii|iv|v|vi|vii|viii|ix|x)$/i.test(w)) return true;
+              if (/remake|remaster|reimagined/i.test(w)) return true;
+              if (/world|part|sequel/i.test(w)) return true;
+              if (/^hd$|^4k$|definitive|edition|deluxe|ultimate|complete|collection/i.test(w)) return true;
+              return false;
+            })
+            .map(w => w.replace(/[^a-z0-9]/g, ''));
+          
+          // If candidate has distinctive words, they MUST be in the result
+          if (distinctiveWords.length > 0) {
+            const missingDistinctive = distinctiveWords.some(dw => {
+              if (dw.length > 0) {
+                const wordPattern = new RegExp(`\\b${dw}\\b`, 'i');
+                return !wordPattern.test(resultLower);
+              }
+              return false;
+            });
+            
+            if (missingDistinctive) {
+              // console.log(`[Game Title] Rejecting IGDB result - missing distinctive words: "${igdbMatch}" vs candidate "${candidate}"`);
+              continue; // Try next candidate
+            }
+          }
+          
+          // Check for conflicting patterns (e.g., "Archives" when candidate has "4 Remake")
+          if (candidateLower.includes('4') && candidateLower.includes('remake')) {
+            if (resultLower.includes('archives') && !resultLower.includes('4')) {
+              // console.log(`[Game Title] Rejecting IGDB result - conflicting pattern: "${igdbMatch}"`);
+              continue;
+            }
+          }
+          
           // Validate that the API result doesn't contain unexpected words
           if (!isValidAPIResult(igdbMatch, candidate)) {
             // console.log(`[Game Title] Rejecting IGDB result with unexpected words: "${igdbMatch}"`);
@@ -1987,6 +2365,46 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
       try {
         const rawgMatch = await searchGameInRAWG(candidate);
         if (rawgMatch) {
+          // STRICT VALIDATION: Check if distinctive words from candidate are in the result
+          const candidateLower = candidate.toLowerCase();
+          const resultLower = rawgMatch.toLowerCase();
+          
+          // Extract distinctive words (numbers, remake/remaster, HD, version indicators, sequel indicators)
+          const distinctiveWords = candidateLower
+            .split(/\s+/)
+            .filter(w => {
+              if (/^\d+$/.test(w) || /^(ii|iii|iv|v|vi|vii|viii|ix|x)$/i.test(w)) return true;
+              if (/remake|remaster|reimagined/i.test(w)) return true;
+              if (/world|part|sequel/i.test(w)) return true;
+              if (/^hd$|^4k$|definitive|edition|deluxe|ultimate|complete|collection/i.test(w)) return true;
+              return false;
+            })
+            .map(w => w.replace(/[^a-z0-9]/g, ''));
+          
+          // If candidate has distinctive words, they MUST be in the result
+          if (distinctiveWords.length > 0) {
+            const missingDistinctive = distinctiveWords.some(dw => {
+              if (dw.length > 0) {
+                const wordPattern = new RegExp(`\\b${dw}\\b`, 'i');
+                return !wordPattern.test(resultLower);
+              }
+              return false;
+            });
+            
+            if (missingDistinctive) {
+              // console.log(`[Game Title] Rejecting RAWG result - missing distinctive words: "${rawgMatch}" vs candidate "${candidate}"`);
+              continue; // Try next candidate
+            }
+          }
+          
+          // Check for conflicting patterns
+          if (candidateLower.includes('4') && candidateLower.includes('remake')) {
+            if (resultLower.includes('archives') && !resultLower.includes('4')) {
+              // console.log(`[Game Title] Rejecting RAWG result - conflicting pattern: "${rawgMatch}"`);
+              continue;
+            }
+          }
+          
           // Validate that the API result doesn't contain unexpected words
           if (!isValidAPIResult(rawgMatch, candidate)) {
             // console.log(`[Game Title] Rejecting RAWG result with unexpected words: "${rawgMatch}"`);
