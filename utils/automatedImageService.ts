@@ -14,6 +14,49 @@ function sanitizeGameTitle(gameTitle: string): string {
 }
 
 /**
+ * Extract game title from image filename/path
+ * Returns the sanitized game title that the image represents
+ */
+function extractGameTitleFromImage(imagePath: string): string {
+  // Extract filename from path (handles both local paths and cloud URLs)
+  let filename: string;
+  if (imagePath.includes('/')) {
+    filename = path.basename(imagePath);
+  } else {
+    filename = imagePath;
+  }
+  
+  // Remove file extension
+  const nameWithoutExt = path.parse(filename).name.toLowerCase();
+  
+  // Remove common suffixes like "-1", "-2", etc. and cloud storage suffixes
+  // Also remove ImageKit suffixes like "_wmtk-nvDt"
+  const cleaned = nameWithoutExt
+    .replace(/-\d+$/, '') // Remove trailing numbers like "-1", "-2"
+    .replace(/_[a-z0-9]+$/i, '') // Remove ImageKit-style suffixes like "_wmtk-nvDt"
+    .trim();
+  
+  return cleaned;
+}
+
+/**
+ * Verify that an image actually belongs to a specific game title
+ * Uses strict matching to ensure images aren't incorrectly matched to similar game titles
+ */
+function verifyImageBelongsToGame(imagePath: string, gameTitle: string): boolean {
+  const imageGameTitle = extractGameTitleFromImage(imagePath);
+  const expectedGameTitle = sanitizeGameTitle(gameTitle);
+  
+  // Remove number suffixes from both for comparison
+  const imageTitleClean = imageGameTitle.replace(/-\d+$/, '');
+  const expectedTitleClean = expectedGameTitle.replace(/-\d+$/, '');
+  
+  // Must match exactly (not just start with or have keywords in common)
+  // This prevents "super-mario-odyssey" from matching "super-mario-64"
+  return imageTitleClean === expectedTitleClean;
+}
+
+/**
  * Load image mapping from JSON file
  */
 function loadImageMapping(): ImageMapping {
@@ -61,19 +104,35 @@ export function findGameImage(gameTitle: string): string | null {
   const mapping = loadImageMapping();
   
   // Check if game exists in mapping
+  // IMPORTANT: Verify that each image actually belongs to this game
   if (mapping.games[gameTitle] && mapping.games[gameTitle].images.length > 0) {
     const images = mapping.games[gameTitle].images;
     
-    // Use primary image if available, otherwise pick random
+    // Use primary image if available and verified, otherwise pick random
     if (mapping.games[gameTitle].primary) {
-      const primaryPath = path.join(process.cwd(), 'public', mapping.games[gameTitle].primary!);
-      if (fs.existsSync(primaryPath)) {
-        return mapping.games[gameTitle].primary!;
+      const primaryImage = mapping.games[gameTitle].primary!;
+      // Verify the primary image belongs to this game
+      if (verifyImageBelongsToGame(primaryImage, gameTitle)) {
+        if (isCloudUrl(primaryImage)) {
+          return primaryImage;
+        }
+        const primaryPath = path.join(process.cwd(), 'public', primaryImage);
+        if (fs.existsSync(primaryPath)) {
+          return primaryImage;
+        }
       }
     }
     
-    // Try to find any existing image
+    // Try to find any existing verified image
     for (const imagePath of images) {
+      // Verify the image actually belongs to this game
+      if (!verifyImageBelongsToGame(imagePath, gameTitle)) {
+        continue;
+      }
+      
+      if (isCloudUrl(imagePath)) {
+        return imagePath;
+      }
       const fullPath = path.join(process.cwd(), 'public', imagePath);
       if (fs.existsSync(fullPath)) {
         return imagePath;
@@ -90,21 +149,24 @@ export function findGameImage(gameTitle: string): string | null {
     );
     
     if (imageFiles.length > 0) {
-      // Return first image found
+      // Return first image found (images in game-specific directories should belong to that game)
       const sanitizedTitle = sanitizeGameTitle(gameTitle);
       const imagePath = `/uploads/automated-images/${sanitizedTitle}/${imageFiles[0]}`;
       
-      // Update mapping for future use
-      if (!mapping.games[gameTitle]) {
-        mapping.games[gameTitle] = { images: [] };
+      // Verify the image belongs to this game (safety check)
+      if (verifyImageBelongsToGame(imagePath, gameTitle)) {
+        // Update mapping for future use
+        if (!mapping.games[gameTitle]) {
+          mapping.games[gameTitle] = { images: [] };
+        }
+        if (!mapping.games[gameTitle].images.includes(imagePath)) {
+          mapping.games[gameTitle].images.push(imagePath);
+          mapping.games[gameTitle].primary = imagePath;
+          saveImageMapping(mapping);
+        }
+        
+        return imagePath;
       }
-      if (!mapping.games[gameTitle].images.includes(imagePath)) {
-        mapping.games[gameTitle].images.push(imagePath);
-        mapping.games[gameTitle].primary = imagePath;
-        saveImageMapping(mapping);
-      }
-      
-      return imagePath;
     }
   }
   
@@ -116,50 +178,30 @@ export function findGameImage(gameTitle: string): string | null {
     const imageFiles = files.filter(file => {
       if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(file)) return false;
       
-      const fileBaseName = path.parse(file).name.toLowerCase();
-      const expectedBaseName = sanitizedTitle.toLowerCase();
-      
-      // Remove common suffixes like "-1", "-2", etc. from filename for matching
-      const fileBaseNameClean = fileBaseName.replace(/-\d+$/, '');
-      const expectedBaseNameClean = expectedBaseName.replace(/-\d+$/, '');
-      
-      // Exact match
-      if (fileBaseName === expectedBaseName || fileBaseNameClean === expectedBaseNameClean) {
-        return true;
-      }
-      
-      // Check if file starts with expected name (handles "crash-n-sane-trilogy-1" matching "crash-bandicoot-n-sane-trilogy")
-      // or if expected name starts with file name (handles "jak-and-daxter" matching "jak-and-daxter-the-precursor-legacy")
-      if (fileBaseNameClean.startsWith(expectedBaseNameClean) || expectedBaseNameClean.startsWith(fileBaseNameClean)) {
-        return true;
-      }
-      
-      // Check if key words match (for cases like "euro-truck-simulator2" vs "euro-truck-simulator-2")
-      const fileWords = fileBaseNameClean.split('-').filter(w => w.length > 2);
-      const expectedWords = expectedBaseNameClean.split('-').filter(w => w.length > 2);
-      const matchingWords = fileWords.filter(w => expectedWords.includes(w));
-      if (matchingWords.length >= Math.min(3, Math.max(fileWords.length, expectedWords.length)) * 0.7) {
-        return true;
-      }
-      
-      return false;
+      // Use strict verification instead of loose matching
+      // This prevents "super-mario-odyssey" from matching "super-mario-64"
+      const imagePath = `/uploads/automated-images/${file}`;
+      return verifyImageBelongsToGame(imagePath, gameTitle);
     });
     
     if (imageFiles.length > 0) {
-      // Return first matching image
+      // Return first matching verified image
       const imagePath = `/uploads/automated-images/${imageFiles[0]}`;
       
-      // Update mapping for future use
-      if (!mapping.games[gameTitle]) {
-        mapping.games[gameTitle] = { images: [] };
+      // Verify again before adding to mapping (double-check)
+      if (verifyImageBelongsToGame(imagePath, gameTitle)) {
+        // Update mapping for future use
+        if (!mapping.games[gameTitle]) {
+          mapping.games[gameTitle] = { images: [] };
+        }
+        if (!mapping.games[gameTitle].images.includes(imagePath)) {
+          mapping.games[gameTitle].images.push(imagePath);
+          mapping.games[gameTitle].primary = imagePath;
+          saveImageMapping(mapping);
+        }
+        
+        return imagePath;
       }
-      if (!mapping.games[gameTitle].images.includes(imagePath)) {
-        mapping.games[gameTitle].images.push(imagePath);
-        mapping.games[gameTitle].primary = imagePath;
-        saveImageMapping(mapping);
-      }
-      
-      return imagePath;
     }
   }
   
@@ -256,7 +298,7 @@ async function uploadImageToCloud(localImagePath: string): Promise<string> {
 }
 
 /**
- * Get a random image for a game that hasn't been used by this user before
+ * Get a random image for a game that hasn't been used by ANY automated user before
  * @param gameTitle - The game title
  * @param username - The automated user's username (to track usage)
  * @param uploadToCloud - Whether to upload to cloud storage if not already uploaded (default: true)
@@ -274,9 +316,16 @@ export async function getRandomGameImage(
   let availableImages: string[] = [];
   
   // First, check mapping for registered images
+  // IMPORTANT: Verify that each image actually belongs to this game
   if (mapping.games[gameTitle] && mapping.games[gameTitle].images.length > 0) {
     availableImages = mapping.games[gameTitle].images.filter(img => {
-      // If it's already a cloud URL, include it
+      // First verify the image actually belongs to this game
+      if (!verifyImageBelongsToGame(img, gameTitle)) {
+        console.warn(`Image ${img} in mapping for "${gameTitle}" does not actually belong to this game. Skipping.`);
+        return false;
+      }
+      
+      // If it's already a cloud URL, include it (after verification)
       if (isCloudUrl(img)) {
         return true;
       }
@@ -296,52 +345,38 @@ export async function getRandomGameImage(
     const fileSystemImages = files.filter(file => {
       if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(file)) return false;
       
-      const fileBaseName = path.parse(file).name.toLowerCase();
-      const expectedBaseName = sanitizedTitle.toLowerCase();
+      const imagePath = `/uploads/automated-images/${file}`;
       
-      // Remove common suffixes like "-1", "-2", etc. from filename for matching
-      const fileBaseNameClean = fileBaseName.replace(/-\d+$/, '');
-      const expectedBaseNameClean = expectedBaseName.replace(/-\d+$/, '');
-      
-      // Exact match
-      if (fileBaseName === expectedBaseName || fileBaseNameClean === expectedBaseNameClean) {
-        return true;
-      }
-      
-      // Check if file starts with expected name or vice versa
-      if (fileBaseNameClean.startsWith(expectedBaseNameClean) || expectedBaseNameClean.startsWith(fileBaseNameClean)) {
-        return true;
-      }
-      
-      // Check if key words match
-      const fileWords = fileBaseNameClean.split('-').filter(w => w.length > 2);
-      const expectedWords = expectedBaseNameClean.split('-').filter(w => w.length > 2);
-      const matchingWords = fileWords.filter(w => expectedWords.includes(w));
-      if (matchingWords.length >= Math.min(3, Math.max(fileWords.length, expectedWords.length)) * 0.7) {
-        return true;
-      }
-      
-      return false;
+      // Use strict verification to ensure the image actually belongs to this game
+      // This prevents "super-mario-odyssey" from matching "super-mario-64"
+      return verifyImageBelongsToGame(imagePath, gameTitle);
     }).map(file => `/uploads/automated-images/${file}`);
     
     // Merge file system images with mapping images, removing duplicates
     const allImagesSet = new Set([...availableImages, ...fileSystemImages]);
     availableImages = Array.from(allImagesSet);
     
-    // Update mapping if we found new images
-    if (fileSystemImages.length > 0 && (!mapping.games[gameTitle] || mapping.games[gameTitle].images.length < fileSystemImages.length)) {
+    // Update mapping if we found new verified images
+    // Only add images that have been verified to belong to this game
+    if (fileSystemImages.length > 0) {
       if (!mapping.games[gameTitle]) {
         mapping.games[gameTitle] = { images: [] };
       }
+      let mappingUpdated = false;
       fileSystemImages.forEach(img => {
-        if (!mapping.games[gameTitle].images.includes(img)) {
+        // Double-check verification before adding to mapping
+        if (verifyImageBelongsToGame(img, gameTitle) && !mapping.games[gameTitle].images.includes(img)) {
           mapping.games[gameTitle].images.push(img);
+          mappingUpdated = true;
         }
       });
       if (!mapping.games[gameTitle].primary && fileSystemImages.length > 0) {
         mapping.games[gameTitle].primary = fileSystemImages[0];
+        mappingUpdated = true;
       }
-      saveImageMapping(mapping);
+      if (mappingUpdated) {
+        saveImageMapping(mapping);
+      }
     }
   }
   
@@ -349,26 +384,28 @@ export async function getRandomGameImage(
     return null;
   }
 
-  // If username provided, filter out images that have been used by this user for this game
-  let selectedImage: string | null = null;
+  // List of all automated users
+  const automatedUsers = ['MysteriousMrEnter', 'WaywardJammer', 'InterdimensionalHipster'];
   
-  if (username) {
-    const usedImages = usage.usage[username]?.[gameTitle] || [];
-    const unusedImages = availableImages.filter(img => !usedImages.includes(img));
-    
-    // If all images have been used, return null (don't reuse images)
-    if (unusedImages.length === 0) {
-      return null;
-    }
-    
-    // Return random unused image
-    const randomIndex = Math.floor(Math.random() * unusedImages.length);
-    selectedImage = unusedImages[randomIndex];
-  } else {
-    // If no username provided, return random image (for backward compatibility)
-    const randomIndex = Math.floor(Math.random() * availableImages.length);
-    selectedImage = availableImages[randomIndex];
+  // Collect all images that have been used by ANY automated user for this game
+  const allUsedImages = new Set<string>();
+  for (const user of automatedUsers) {
+    const userUsedImages = usage.usage[user]?.[gameTitle] || [];
+    userUsedImages.forEach(img => allUsedImages.add(img));
   }
+  
+  // Filter out images that have been used by any automated user
+  const unusedImages = availableImages.filter(img => !allUsedImages.has(img));
+  
+  // If all images have been used, return null (don't reuse images)
+  if (unusedImages.length === 0) {
+    console.log(`All images for ${gameTitle} have been used by automated users. No unused images available.`);
+    return null;
+  }
+  
+  // Return random unused image
+  const randomIndex = Math.floor(Math.random() * unusedImages.length);
+  const selectedImage = unusedImages[randomIndex];
   
   // If image is not already a cloud URL and we should upload to cloud, upload it
   if (selectedImage && uploadToCloud && !isCloudUrl(selectedImage)) {

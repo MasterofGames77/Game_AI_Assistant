@@ -51,8 +51,11 @@ class AutomatedUsersScheduler {
       return;
     }
 
+    const initTime = new Date();
     console.log('Initializing automated users scheduler...');
     console.log(`Scheduler enabled: ${this.isEnabled}`);
+    console.log(`Initialization time: ${initTime.toISOString()} (UTC)`);
+    console.log(`Current UTC time: ${new Date().toISOString()}`);
     
     // Check if we're in test mode (use shorter intervals for testing)
     const isTestMode = process.env.AUTOMATED_USERS_TEST_MODE === 'true';
@@ -195,14 +198,10 @@ class AutomatedUsersScheduler {
 
     console.log('✅ Using node-schedule (simpler and more reliable)');
     
-    // Add a heartbeat task (runs every 5 minutes) - reduced logging
+    // Add a heartbeat task (runs every 5 minutes) - logs every 5 minutes for debugging
     const heartbeatTask = scheduleJob('*/5 * * * *', () => {
-      // Only log heartbeat occasionally to reduce noise (every 30 minutes = 6 heartbeats)
       const now = new Date();
-      const minutes = now.getMinutes();
-      if (minutes % 30 === 0) {
-        console.log(`[SCHEDULER HEARTBEAT] Scheduler is alive at ${now.toISOString()}`);
-      }
+      console.log(`[SCHEDULER HEARTBEAT] Scheduler is alive at ${now.toISOString()} - All tasks scheduled: ${this.tasks.length}`);
     });
     if (heartbeatTask) {
       this.cronTasks.push(heartbeatTask);
@@ -251,10 +250,44 @@ class AutomatedUsersScheduler {
           const nextRun = this.calculateNextRun(task.cronExpression);
           task.nextRun = nextRun || undefined;
           
-          console.log(`✅ Scheduled task: ${task.name} with cron: ${task.cronExpression}`);
-          console.log(`   Task object type: ${typeof scheduledTask}, stored in memory`);
-          if (task.nextRun) {
-            console.log(`   Next run: ${task.nextRun.toISOString()}`);
+          // Verify the job is actually scheduled in node-schedule
+          const nextInvocation = scheduledTask.nextInvocation();
+          const actualNextRun = nextInvocation ? new Date(nextInvocation) : null;
+          
+          // Check if this task should have already run today
+          const now = new Date();
+          const todayAtScheduledTime = new Date();
+          const cronParts = task.cronExpression.split(/\s+/);
+          if (cronParts.length === 5) {
+            const hour = parseInt(cronParts[1]);
+            const minute = parseInt(cronParts[0]);
+            todayAtScheduledTime.setUTCHours(hour, minute, 0, 0);
+            const shouldHaveRunToday = todayAtScheduledTime < now && todayAtScheduledTime.getUTCDate() === now.getUTCDate();
+            
+            console.log(`✅ Scheduled task: ${task.name} with cron: ${task.cronExpression}`);
+            console.log(`   Task object type: ${typeof scheduledTask}, stored in memory`);
+            console.log(`   node-schedule nextInvocation: ${actualNextRun ? actualNextRun.toISOString() : 'null'}`);
+            if (task.nextRun) {
+              console.log(`   Calculated next run: ${task.nextRun.toISOString()}`);
+            }
+            if (shouldHaveRunToday) {
+              console.warn(`   ⚠️  This task should have run today at ${todayAtScheduledTime.toISOString()} but didn't (server may have restarted after that time)`);
+            }
+          } else {
+            console.log(`✅ Scheduled task: ${task.name} with cron: ${task.cronExpression}`);
+            console.log(`   Task object type: ${typeof scheduledTask}, stored in memory`);
+            console.log(`   node-schedule nextInvocation: ${actualNextRun ? actualNextRun.toISOString() : 'null'}`);
+            if (task.nextRun) {
+              console.log(`   Calculated next run: ${task.nextRun.toISOString()}`);
+            }
+          }
+          
+          // Log if there's a mismatch
+          if (actualNextRun && task.nextRun) {
+            const diff = Math.abs(actualNextRun.getTime() - task.nextRun.getTime());
+            if (diff > 60000) { // More than 1 minute difference
+              console.warn(`   ⚠️  Warning: Calculated nextRun differs from node-schedule nextInvocation by ${Math.floor(diff/1000)} seconds`);
+            }
           }
         } else {
           console.error(`❌ Failed to schedule task: ${task.name} - cron.schedule returned null/undefined`);

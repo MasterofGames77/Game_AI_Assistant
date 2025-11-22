@@ -17,6 +17,7 @@ export interface ContentGenerationOptions {
   genre: string;
   userPreferences: UserPreferences;
   forumTopic?: string;
+  previousPosts?: string[]; // Previous posts by this user for the same game to avoid repetition
 }
 
 export interface PostReplyOptions {
@@ -51,13 +52,28 @@ Generate a DIRECT, FACTUAL question that Video Game Wingman can answer with spec
 - Be 1 sentence long
 - Focus on single-player game aspects like: items, characters, quests, mechanics, strategies, unlockables, secrets, release dates, platforms, differences between versions, how-to guides, etc.
 
+CRITICAL ACCURACY REQUIREMENTS - READ CAREFULLY:
+- ONLY ask about items, mechanics, characters, or features that ACTUALLY EXIST in ${gameTitle}
+- DO NOT make up, combine, or modify item names (e.g., don't create "Super Shrink Stone" if the actual item is "Shrink Stomp")
+- DO NOT invent new items by combining words from different items
+- If you are unsure about the exact name of an item/mechanic/character, use GENERIC terms instead:
+  * Instead of guessing item names, ask: "What items are required to brew [generic item type] in ${gameTitle}?"
+  * Instead of guessing badge names, ask: "How do I obtain the [function] badge in ${gameTitle}?"
+  * Instead of guessing character names, ask: "Which character has [specific trait] in ${gameTitle}?"
+- FACTUAL ACCURACY is more important than sounding specific - if you're not certain about a name, use generic terms
+- Double-check: Would a player who knows ${gameTitle} well recognize the item/mechanic you're asking about?
+
 EXAMPLES of good questions:
-- "How do I unlock the Great Fairy's Sword in ${gameTitle}?"
+- "How do I unlock the Great Fairy's Sword in ${gameTitle}?" (only if this item actually exists)
 - "What are the best strategies for defeating the final boss in ${gameTitle}?"
 - "When was ${gameTitle} released?"
 - "Which character has the highest defense stat in ${gameTitle}?"
 - "What is the difference between ${gameTitle} and its remake?"
-- "How to catch Mewtwo in ${gameTitle}?"
+- "How do I obtain badges that affect jumping in ${gameTitle}?" (generic if unsure of exact badge name)
+
+BAD EXAMPLES (making up items):
+- "What items are required to brew the Super Shrink Stone in ${gameTitle}?" (WRONG - this item doesn't exist)
+- "How do I get the Mega Power Badge in ${gameTitle}?" (WRONG - if you're not certain this exists)
 
 AVOID:
 - Opinion-based questions ("What do you think...", "Have you noticed...")
@@ -65,6 +81,7 @@ AVOID:
 - Casual filler words ("dude", "man", etc.) - keep it direct
 - Questions that sound like forum posts
 - Questions asking for personal experiences or feelings
+- Making up or combining item/mechanic names
 
 Game: ${gameTitle}
 Genre: ${genre} (RPG/Adventure/Simulation/Puzzle/Platformer focus)
@@ -81,13 +98,28 @@ Generate a DIRECT, FACTUAL question that Video Game Wingman can answer with spec
 - Be 1 sentence long
 - Focus on multiplayer/competitive game aspects like: strategies, character stats, unlockables, best builds, release dates, platforms, differences between versions, how-to guides, competitive tips, etc.
 
+CRITICAL ACCURACY REQUIREMENTS - READ CAREFULLY:
+- ONLY ask about items, mechanics, characters, or features that ACTUALLY EXIST in ${gameTitle}
+- DO NOT make up, combine, or modify item names (e.g., don't create "Super Power Boost" if the actual item is "Power Boost")
+- DO NOT invent new items by combining words from different items
+- If you are unsure about the exact name of an item/mechanic/character, use GENERIC terms instead:
+  * Instead of guessing item names, ask: "What items provide [function] in ${gameTitle}?"
+  * Instead of guessing ability names, ask: "Which character has [specific ability type] in ${gameTitle}?"
+  * Instead of guessing weapon names, ask: "What weapons have the highest damage in ${gameTitle}?"
+- FACTUAL ACCURACY is more important than sounding specific - if you're not certain about a name, use generic terms
+- Double-check: Would a player who knows ${gameTitle} well recognize the item/mechanic you're asking about?
+
 EXAMPLES of good questions:
-- "What heavyweight kart has the highest speed in ${gameTitle}?"
+- "What heavyweight kart has the highest speed in ${gameTitle}?" (only if this actually exists)
 - "What are the best strategies for competitive play in ${gameTitle}?"
 - "When was ${gameTitle} released?"
 - "Which character is the best for ranked matches in ${gameTitle}?"
 - "How do I unlock all characters in ${gameTitle}?"
 - "What is the difference between ${gameTitle} and its sequel?"
+
+BAD EXAMPLES (making up items):
+- "How do I get the Mega Power Boost in ${gameTitle}?" (WRONG - if you're not certain this exists)
+- "What items are required to craft the Super Weapon in ${gameTitle}?" (WRONG - if you're not certain this exists)
 
 AVOID:
 - Opinion-based questions ("What do you think...", "Have you noticed...")
@@ -95,6 +127,7 @@ AVOID:
 - Casual filler words ("dude", "man", etc.) - keep it direct
 - Questions that sound like forum posts
 - Questions asking for personal experiences or feelings
+- Making up or combining item/mechanic names
 
 Game: ${gameTitle}
 Genre: ${genre} (Racing/Battle Royale/Fighting/FPS/Sandbox focus)
@@ -114,7 +147,7 @@ Generate ONLY the direct question, nothing else:`;
           content: `Generate a direct, factual question about ${gameTitle} that Video Game Wingman can answer with specific game information.`
         }
       ],
-      temperature: 0.8, // Higher temperature for more natural variation
+      temperature: 0.7, // Lower temperature for more factual accuracy
       max_tokens: 150
     });
 
@@ -143,7 +176,7 @@ Generate ONLY the direct question, nothing else:`;
 export async function generateForumPost(
   options: ContentGenerationOptions
 ): Promise<string> {
-  const { gameTitle, genre, userPreferences, forumTopic } = options;
+  const { gameTitle, genre, userPreferences, forumTopic, previousPosts = [] } = options;
   
   const isSinglePlayer = userPreferences.focus === 'single-player';
   // Determine username - check if this is for InterdimensionalHipster by checking if they have both types of genres
@@ -157,6 +190,22 @@ export async function generateForumPost(
   const singlePlayerGenres = ['rpg', 'adventure', 'simulation', 'puzzle', 'platformer'];
   const isSinglePlayerGame = singlePlayerGenres.includes(genre.toLowerCase());
   
+  // Build previous posts context if available
+  let previousPostsContext = '';
+  if (previousPosts.length > 0) {
+    previousPostsContext = `\n\nCRITICAL: You have posted about ${gameTitle} before. Here are your previous posts to ensure your new post is UNIQUE and DIFFERENT:
+${previousPosts.map((post, idx) => `${idx + 1}. "${post}"`).join('\n')}
+
+IMPORTANT - UNIQUENESS REQUIREMENTS:
+- Your new post MUST be completely different from all previous posts above
+- Do NOT repeat the same topics, experiences, or tips from previous posts
+- Write about a DIFFERENT aspect of ${gameTitle} (different character, different level, different mechanic, different moment, etc.)
+- Use different phrasing and structure - avoid similar sentence patterns
+- If you mentioned finishing the game before, don't mention it again
+- If you gave tips before, give DIFFERENT tips or discuss a DIFFERENT aspect
+- Be creative and find a NEW angle to discuss about ${gameTitle}`;
+  }
+
   const systemPrompt = isInterdimensionalHipster
     ? `You are InterdimensionalHipster, a knowledgeable and helpful gamer who loves both single-player and multiplayer games.
 You're posting in a forum about ${gameTitle}. Generate a natural forum post that:
@@ -180,7 +229,7 @@ IMPORTANT:
 - Do NOT use formal language, greetings, conclusion phrases, or AI-related phrases. Write naturally and casually like a real gamer.
 - You MUST include the game title "${gameTitle}" in your post.
 - You MUST reference something specific from ${gameTitle} (a character, item, location, mechanic, moment, etc.)
-- FACTUAL ACCURACY is more important than sounding natural - if you're not certain about a fact, don't include it
+- FACTUAL ACCURACY is more important than sounding natural - if you're not certain about a fact, don't include it${previousPostsContext}
 
 Game: ${gameTitle}
 Genre: ${genre} (${isSinglePlayerGame ? 'Single-player' : 'Multiplayer'} focus)
@@ -201,7 +250,7 @@ You're posting in a forum about ${gameTitle}. Generate a natural forum post that
 
 IMPORTANT: 
 - Do NOT use formal language, greetings, conclusion phrases, or AI-related phrases. Write naturally and casually like a real gamer.
-- You MUST include the game title "${gameTitle}" in your post.
+- You MUST include the game title "${gameTitle}" in your post.${previousPostsContext}
 
 Game: ${gameTitle}
 Genre: ${genre} (RPG/Adventure/Simulation/Puzzle/Platformer focus)
@@ -221,7 +270,7 @@ You're posting in a forum about ${gameTitle}. Generate a natural forum post that
 
 IMPORTANT: 
 - Do NOT use formal language, greetings, conclusion phrases, or AI-related phrases. Write naturally and casually like a real gamer.
-- You MUST include the game title "${gameTitle}" in your post.
+- You MUST include the game title "${gameTitle}" in your post.${previousPostsContext}
 
 Game: ${gameTitle}
 Genre: ${genre} (Racing/Battle Royale/Fighting/FPS/Sandbox focus)
@@ -242,7 +291,7 @@ Generate ONLY the post content, nothing else:`;
           content: `Generate a natural forum post about ${gameTitle} that a real gamer would write.`
         }
       ],
-      temperature: 0.8, // Higher temperature for more natural variation
+      temperature: 0.9, // Higher temperature for more variation and uniqueness
       max_tokens: 250
     });
 

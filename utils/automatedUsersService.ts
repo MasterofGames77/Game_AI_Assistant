@@ -425,12 +425,46 @@ export async function createForumPost(
       console.log(`Created new forum: ${forumTitle}`);
     }
     
+    // Fetch previous posts by this user for the same game to avoid repetition
+    const previousPosts: string[] = [];
+    try {
+      // Get all forums for this game
+      const gameForums = forums.filter((f: any) => 
+        f.gameTitle && f.gameTitle.toLowerCase() === actualGameTitle.toLowerCase()
+      );
+      
+      // Collect all posts by this user from forums about this game
+      for (const forum of gameForums) {
+        if (forum.posts && Array.isArray(forum.posts)) {
+          const userPosts = forum.posts
+            .filter((p: any) => 
+              p.username === username && 
+              p.message && 
+              p.message.trim().length > 0 &&
+              p.metadata?.status === 'active'
+            )
+            .map((p: any) => p.message.trim());
+          previousPosts.push(...userPosts);
+        }
+      }
+      
+      // Limit to most recent 5 posts to avoid overwhelming the prompt
+      // Reverse to get most recent first, then take first 5
+      previousPosts.reverse();
+      previousPosts.splice(5);
+      console.log(`Found ${previousPosts.length} previous posts by ${username} for ${actualGameTitle}`);
+    } catch (error) {
+      console.error('Error fetching previous posts:', error);
+      // Continue even if we can't fetch previous posts
+    }
+    
     // Generate natural forum post using the actual game title from the forum
     const postContent = await generateForumPost({
       gameTitle: actualGameTitle,
       genre: actualGenre,
       userPreferences,
-      forumTopic: forumTitle
+      forumTopic: forumTitle,
+      previousPosts: previousPosts
     });
     
     // Check content moderation
