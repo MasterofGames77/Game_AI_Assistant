@@ -810,3 +810,31 @@ export interface CronTask {
   lastRun?: Date;
   nextRun?: Date;
 }
+
+// Game Resume Interface:
+export interface GameResumeResponse {
+  game?: string;
+  suggestion?: {
+    type: 'challenge' | 'build' | 'achievement';
+    title: string;
+    description: string;
+    questionPrompt: string;
+  };
+  error?: string;
+}
+
+export interface GameResumeData {
+  game?: string;
+  suggestion?: {
+    type: 'challenge' | 'build' | 'achievement';
+    title: string;
+    description: string;
+    questionPrompt: string;
+  };
+  error?: string;
+}
+
+export interface SmartGameResumeProps {
+  username: string | null;
+  onAskQuestion: (question: string) => void;
+}

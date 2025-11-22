@@ -21,6 +21,7 @@ import useHealthMonitoring from "../hooks/useHealthMonitoring";
 import HealthStatusWidget from "../components/HealthStatusWidget";
 import HealthTipsWidget from "../components/HealthTipsWidget";
 import RecommendationsDisplay from "../components/RecommendationsDisplay";
+import SmartGameResume from "../components/SmartGameResume";
 // import { useRouter } from "next/navigation";
 // import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 // import { faPaperclip } from "@fortawesome/free-solid-svg-icons";
@@ -1488,6 +1489,24 @@ export default function Home() {
 
               {activeView === "chat" && (
                 <>
+                  {/* Smart Game Resume - Shows on login */}
+                  {username && (
+                    <SmartGameResume
+                      username={username}
+                      onAskQuestion={(question) => {
+                        setQuestion(question);
+                        // Focus the input field so user can edit or submit
+                        setTimeout(() => {
+                          const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+                          if (input) {
+                            input.focus();
+                            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          }
+                        }, 100);
+                      }}
+                    />
+                  )}
+
                   {/* Health Status Widget */}
                   <HealthStatusWidget
                     healthStatus={healthStatus}
