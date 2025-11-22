@@ -22,6 +22,7 @@ import HealthStatusWidget from "../components/HealthStatusWidget";
 import HealthTipsWidget from "../components/HealthTipsWidget";
 import RecommendationsDisplay from "../components/RecommendationsDisplay";
 import SmartGameResume from "../components/SmartGameResume";
+import QuickTemplates from "../components/QuickTemplates";
 // import { useRouter } from "next/navigation";
 // import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 // import { faPaperclip } from "@fortawesome/free-solid-svg-icons";
@@ -1521,30 +1522,21 @@ export default function Home() {
                     onDismiss={dismissHealthTips}
                   />
 
-                  {/* Quick Action Buttons */}
-                  <div className="w-full max-w-md mb-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setQuestion("Give me a random game recommendation")}
-                      className="px-3 py-1.5 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-                    >
-                      🎲 Random Game
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setQuestion("What should I play?")}
-                      className="px-3 py-1.5 text-sm bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors"
-                    >
-                      🎮 What Should I Play?
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setQuestion("Give me a daily gaming tip")}
-                      className="px-3 py-1.5 text-sm bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
-                    >
-                      💡 Daily Tip
-                    </button>
-                  </div>
+                  {/* Quick Question Templates */}
+                  <QuickTemplates
+                    username={username}
+                    onSelectTemplate={(question) => {
+                      setQuestion(question);
+                      // Focus the input field so user can edit or submit
+                      setTimeout(() => {
+                        const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+                        if (input) {
+                          input.focus();
+                          input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                      }, 100);
+                    }}
+                  />
 
                   <form
                     onSubmit={handleSubmit}

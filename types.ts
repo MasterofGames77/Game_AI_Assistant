@@ -838,3 +838,68 @@ export interface SmartGameResumeProps {
   username: string | null;
   onAskQuestion: (question: string) => void;
 }
+
+export interface UserContext {
+  recentGames?: string[];
+  topGenres?: string[];
+  preferences?: {
+    dominantGenres?: string[];
+    learningStyle?: string;
+    difficultyPreference?: string;
+    playstyleTags?: string[];
+    recentInterests?: string[];
+  };
+  activity?: {
+    lastQuestionTime?: Date | string;
+    questionsToday?: number;
+    questionsThisWeek?: number;
+    peakActivityHours?: number[]; // Hours of day (0-23) when user is most active
+  };
+  questionPatterns?: {
+    commonCategories?: string[]; // Most common questionCategory values
+    commonInteractionTypes?: string[]; // Most common interactionType values
+    recentQuestionTypes?: string[]; // Recent question patterns (e.g., "how to", "best", "tips")
+  };
+}
+
+export interface QuickTemplatesProps {
+  username: string | null;
+  onSelectTemplate: (question: string) => void;
+}
+
+export interface Template {
+  id: string;
+  label: string;
+  question: string;
+  icon: string;
+  color: string;
+  category: "general" | "game" | "genre" | "challenge";
+  game?: string; // For game-specific templates
+  genre?: string; // For genre-specific templates
+  priority?: number; // Calculated priority score for smart suggestions
+  matchReason?: string; // Why this template was prioritized
+}
+
+export interface UserContextResponse {
+  recentGames?: string[];
+  topGenres?: string[];
+  preferences?: {
+    dominantGenres?: string[];
+    learningStyle?: string;
+    difficultyPreference?: string;
+    playstyleTags?: string[];
+    recentInterests?: string[];
+  };
+  activity?: {
+    lastQuestionTime?: Date | string;
+    questionsToday?: number;
+    questionsThisWeek?: number;
+    peakActivityHours?: number[];
+  };
+  questionPatterns?: {
+    commonCategories?: string[];
+    commonInteractionTypes?: string[];
+    recentQuestionTypes?: string[];
+  };
+  error?: string;
+}
