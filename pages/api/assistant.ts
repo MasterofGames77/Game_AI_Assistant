@@ -1398,8 +1398,104 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     // Measure question processing time (use enhanced question if image was analyzed)
     const questionToProcess = imageEnhancedQuestion || question;
     const { result: processedAnswer, latency: processingLatency } = await measureLatency('Question Processing', async () => {
-      // Handle "What should I play?" with personalized recommendations based on user history
+      // Handle recommendation questions - check these BEFORE trying to extract a specific game
       const lowerQuestion = questionToProcess.toLowerCase();
+      
+      // Detect "best X games" patterns (e.g., "best platformer games for beginners")
+      const isBestGamesQuestion = /best\s+.*?\s+games?\s+(for|right now|currently|to play|that|which)/i.test(questionToProcess) ||
+                                  /what\s+(are|is)\s+the\s+best\s+.*?\s+games?/i.test(questionToProcess) ||
+                                  /recommend.*?\s+(me\s+)?(some|a|the\s+best)\s+.*?\s+games?/i.test(questionToProcess);
+      
+      if (isBestGamesQuestion) {
+        // Extract genre from question - handle multiple patterns
+        let genreText = '';
+        
+        // Pattern 1: "best [genre] games" or "the best [genre] games"
+        const pattern1 = questionToProcess.match(/(?:the\s+)?best\s+([a-z\s]+?)\s+games?/i);
+        if (pattern1 && pattern1[1]) {
+          genreText = pattern1[1].toLowerCase().trim();
+          // Remove trailing words like "right now", "currently", "for beginners", etc.
+          genreText = genreText.replace(/\s+(right\s+now|currently|to\s+play|that|which|for\s+.*?)$/i, '').trim();
+        }
+        
+        // Pattern 2: "what are the best [genre] games"
+        if (!genreText) {
+          const pattern2 = questionToProcess.match(/what\s+(are|is)\s+the\s+best\s+([a-z\s]+?)\s+games?/i);
+          if (pattern2 && pattern2[2]) {
+            genreText = pattern2[2].toLowerCase().trim();
+            // Remove trailing words
+            genreText = genreText.replace(/\s+(right\s+now|currently|to\s+play|that|which|for\s+.*?)$/i, '').trim();
+          }
+        }
+        
+        let detectedGenre = 'Action-Adventure'; // Default genre
+        
+        if (genreText) {
+          // Map common genre terms
+          const genreMap: { [key: string]: string } = {
+            'platformer': 'Platformer',
+            'platform': 'Platformer',
+            'rpg': 'RPG',
+            'role-playing': 'RPG',
+            'action': 'Action',
+            'adventure': 'Adventure',
+            'strategy': 'Strategy',
+            'puzzle': 'Puzzle',
+            'racing': 'Racing',
+            'fighting': 'Fighting',
+            'shooter': 'Shooter',
+            'fps': 'Shooter',
+            'first-person shooter': 'Shooter',
+            'horror': 'Horror',
+            'simulation': 'Simulation',
+            'sports': 'Sports',
+            'indie': 'Indie',
+            'casual': 'Casual',
+            'multiplayer': 'Multiplayer',
+            'single-player': 'Single-player',
+            'single player': 'Single-player'
+          };
+          
+          // Check for exact matches first, then partial matches
+          for (const [key, value] of Object.entries(genreMap)) {
+            if (genreText === key || genreText.includes(key)) {
+              detectedGenre = value;
+              break;
+            }
+          }
+        }
+        
+        // Check if it's asking for beginners
+        const isForBeginners = /for\s+beginners?|beginner|new to|starting|first time/i.test(questionToProcess);
+        
+        // Check if asking for current/popular games
+        const isCurrentPopular = /right now|currently|popular|trending|recent|what.*best.*now/i.test(questionToProcess);
+        
+        // Fetch recommendations for the detected genre with appropriate options
+        const cacheKey = `recommendations:${detectedGenre}:${isForBeginners ? 'beginners' : isCurrentPopular ? 'current' : 'general'}`;
+        const recommendations = await deduplicateRequest(cacheKey, () => 
+          fetchRecommendations(detectedGenre, {
+            forBeginners: isForBeginners,
+            currentPopular: isCurrentPopular,
+            userQuery: questionToProcess
+          })
+        );
+        
+        if (recommendations.length > 0) {
+          const gameList = recommendations.slice(0, 5).join(', ');
+          if (isForBeginners) {
+            return `Here are some great ${detectedGenre.toLowerCase()} games for beginners: ${gameList}. These games are known for being accessible and fun for players new to the genre. Would you like to know more about any of these games?`;
+          } else if (isCurrentPopular) {
+            return `Here are some of the best ${detectedGenre.toLowerCase()} games right now: ${gameList}. These are currently popular and highly regarded titles in the genre. Would you like more details about any specific game?`;
+          } else {
+            return `Here are some of the best ${detectedGenre.toLowerCase()} games: ${gameList}. These are highly regarded titles in the genre. Would you like more details about any specific game?`;
+          }
+        } else {
+          return `I'd be happy to recommend some ${detectedGenre.toLowerCase()} games! What aspects are you most interested in - story, gameplay mechanics, or something else?`;
+        }
+      }
+      
+      // Handle "What should I play?" with personalized recommendations based on user history
       if (lowerQuestion.includes("what should i play") || lowerQuestion.includes("what game should i play") || lowerQuestion.includes("recommend me a game")) {
         // Fetch user's question history
         const previousQuestionsRaw = await Question.find({ username })
