@@ -8,14 +8,27 @@
   --background-end-rgb: 255, 255, 255;
 }
 
+/* Class-based dark mode (manual override takes precedence) */
+.dark {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 0, 0, 0;
+  --background-end-rgb: 0, 0, 0;
+}
+
+.dark select option {
+  background-color: #1a1a1a;
+  color: white;
+}
+
+/* Media query dark mode (system preference, only if no class is set) */
 @media (prefers-color-scheme: dark) {
-  :root {
+  html:not(.dark):not(.light) {
     --foreground-rgb: 255, 255, 255;
     --background-start-rgb: 0, 0, 0;
     --background-end-rgb: 0, 0, 0;
   }
 
-  select option {
+  html:not(.dark):not(.light) select option {
     background-color: #1a1a1a;
     color: white;
   }
@@ -46,8 +59,13 @@ body {
     border-radius: 0.5rem;
   }
 
+  .dark .response-box {
+    color: rgb(255, 255, 255);
+    background-color: #2d2d2d;
+  }
+
   @media (prefers-color-scheme: dark) {
-    .response-box {
+    html:not(.dark):not(.light) .response-box {
       color: rgb(255, 255, 255);
       background-color: #2d2d2d;
     }
@@ -84,10 +102,18 @@ textarea {
   padding: 0.5rem;
 }
 
+.dark input[type="text"],
+.dark input[type="search"],
+.dark textarea {
+  background-color: #2d2d2d;
+  color: #ffffff;
+  border-color: #404040;
+}
+
 @media (prefers-color-scheme: dark) {
-  input[type="text"],
-  input[type="search"],
-  textarea {
+  html:not(.dark):not(.light) input[type="text"],
+  html:not(.dark):not(.light) input[type="search"],
+  html:not(.dark):not(.light) textarea {
     background-color: #2d2d2d;
     color: #ffffff;
     border-color: #404040;
@@ -174,8 +200,12 @@ img {
   color: #1e1e1e;
 }
 
+.dark .logo-section-text {
+  color: rgba(255, 255, 255, 0.9);
+}
+
 @media (prefers-color-scheme: dark) {
-  .logo-section-text {
+  html:not(.dark):not(.light) .logo-section-text {
     color: rgba(255, 255, 255, 0.9);
   }
 }
@@ -193,8 +223,12 @@ ul li {
   color: rgb(var(--foreground-rgb));
 }
 
+.dark ul li {
+  color: rgba(255, 255, 255, 0.9);
+}
+
 @media (prefers-color-scheme: dark) {
-  ul li {
+  html:not(.dark):not(.light) ul li {
     color: rgba(255, 255, 255, 0.9);
   }
 }
@@ -259,8 +293,13 @@ input[type="file"]:focus {
   background: #f9f9f9;
 }
 
+.dark .forum-post {
+  background: #222;
+  border-color: #444;
+}
+
 @media (prefers-color-scheme: dark) {
-  .forum-post {
+  html:not(.dark):not(.light) .forum-post {
     background: #222;
     border-color: #444;
   }

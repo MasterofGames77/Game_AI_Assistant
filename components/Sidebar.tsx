@@ -1,5 +1,6 @@
 import { SideBarProps } from "../types";
 import ProStatus from "./ProStatus";
+import DarkModeToggle from "./DarkModeToggle";
 import { useState, useEffect, useCallback } from "react";
 
 // Precompile the keyword pattern once
@@ -370,6 +371,9 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
           )}
         </div>
       )}
+
+      {/* Dark Mode Toggle */}
+      <DarkModeToggle />
 
       {/* View Switching Buttons */}
       <div className="grid grid-cols-2 gap-1 mb-6">
