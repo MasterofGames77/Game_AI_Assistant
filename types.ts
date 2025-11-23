@@ -903,3 +903,18 @@ export interface UserContextResponse {
   };
   error?: string;
 }
+
+export interface ShareableCardProps {
+  gameTitle: string;
+  question: string;
+  answerSnippet: string;
+  imageUrl?: string;
+  className?: string;
+}
+
+export interface ShareCardModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  conversation: Conversation | null;
+  detectedGame?: string;
+}
