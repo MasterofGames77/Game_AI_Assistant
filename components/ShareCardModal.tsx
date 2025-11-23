@@ -28,11 +28,25 @@ const ShareCardModal: React.FC<ShareCardModalProps> = ({
       // If response is under 3000 chars, show full response
       const answerSnippet = extractSnippet(conversation.response, 3000);
 
+      // Convert relative image URLs to absolute URLs
+      let imageUrl = conversation.imageUrl;
+      if (
+        imageUrl &&
+        typeof window !== "undefined" &&
+        !imageUrl.startsWith("http") &&
+        !imageUrl.startsWith("//")
+      ) {
+        // If it's a relative URL, make it absolute
+        imageUrl = imageUrl.startsWith("/")
+          ? `${window.location.origin}${imageUrl}`
+          : `${window.location.origin}/${imageUrl}`;
+      }
+
       setCardData({
         gameTitle,
         question: conversation.question,
         answerSnippet,
-        imageUrl: conversation.imageUrl,
+        imageUrl: imageUrl || undefined,
       });
       setError(null);
       setPreviewUrl(null);
@@ -40,44 +54,70 @@ const ShareCardModal: React.FC<ShareCardModalProps> = ({
   }, [isOpen, conversation, detectedGame]);
 
   const generatePreview = useCallback(async () => {
-    if (!cardData || !cardRef.current) return;
+    if (!cardData) return;
 
     setIsGenerating(true);
     setError(null);
 
     try {
-      // Wait for React to render the card
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Wait for React to render the card - give it more time if there's an image
+      const initialWait = cardData.imageUrl ? 800 : 500;
+      await new Promise((resolve) => setTimeout(resolve, initialWait));
+
+      // Retry logic to find the card element
+      let cardElement: HTMLElement | null = null;
+      let attempts = 0;
+      const maxAttempts = 10;
+
+      while (!cardElement && attempts < maxAttempts) {
+        if (!cardRef.current) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          attempts++;
+          continue;
+        }
+
+        cardElement = cardRef.current.querySelector(
+          "#shareable-card"
+        ) as HTMLElement;
+
+        if (!cardElement) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          attempts++;
+        }
+      }
+
+      if (!cardRef.current || !cardElement) {
+        throw new Error("Card element not found in DOM after waiting");
+      }
 
       // Wait for any images to load
-      const images = cardRef.current.querySelectorAll("img");
+      const images = cardElement.querySelectorAll("img");
       if (images.length > 0) {
         await Promise.all(
           Array.from(images).map((img) => {
-            if (img.complete) return Promise.resolve();
+            if (img.complete && img.naturalWidth > 0) return Promise.resolve();
             return new Promise<void>((resolve) => {
-              img.onload = () => resolve();
-              img.onerror = () => resolve();
+              const timeout = setTimeout(() => resolve(), 5000); // 5 second timeout per image
+              img.onload = () => {
+                clearTimeout(timeout);
+                resolve();
+              };
+              img.onerror = () => {
+                clearTimeout(timeout);
+                resolve(); // Continue even if image fails
+              };
             });
           })
         );
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
 
-      // Final wait
+      // Final wait to ensure everything is rendered
       await new Promise((resolve) => setTimeout(resolve, 300));
 
-      // Verify the card element exists and has content
-      if (!cardRef.current) {
-        throw new Error("Card element not found");
-      }
-
-      // Find the actual card element (the one with id="shareable-card")
-      const cardElement = cardRef.current.querySelector(
-        "#shareable-card"
-      ) as HTMLElement;
-      if (!cardElement) {
-        throw new Error("Card content not found in DOM");
+      // Verify card element is still valid
+      if (!cardElement || !cardElement.parentElement) {
+        throw new Error("Card element became invalid during generation");
       }
 
       // Generate preview from the card element directly
@@ -106,39 +146,65 @@ const ShareCardModal: React.FC<ShareCardModalProps> = ({
   }, [isOpen, cardData, generatePreview]);
 
   const handleDownload = async () => {
-    if (!cardData || !cardRef.current) return;
+    if (!cardData) return;
 
     setIsGenerating(true);
     setError(null);
 
     try {
-      // Wait for React to render
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Wait for React to render - give it more time if there's an image
+      const initialWait = cardData.imageUrl ? 800 : 500;
+      await new Promise((resolve) => setTimeout(resolve, initialWait));
 
-      // Wait for images
-      const images = cardRef.current.querySelectorAll("img");
+      // Retry logic to find the card element
+      let cardElement: HTMLElement | null = null;
+      let attempts = 0;
+      const maxAttempts = 10;
+
+      while (!cardElement && attempts < maxAttempts) {
+        if (!cardRef.current) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          attempts++;
+          continue;
+        }
+
+        cardElement = cardRef.current.querySelector(
+          "#shareable-card"
+        ) as HTMLElement;
+
+        if (!cardElement) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          attempts++;
+        }
+      }
+
+      if (!cardRef.current || !cardElement) {
+        throw new Error("Card element not found in DOM after waiting");
+      }
+
+      // Wait for any images to load
+      const images = cardElement.querySelectorAll("img");
       if (images.length > 0) {
         await Promise.all(
           Array.from(images).map((img) => {
-            if (img.complete) return Promise.resolve();
+            if (img.complete && img.naturalWidth > 0) return Promise.resolve();
             return new Promise<void>((resolve) => {
-              img.onload = () => resolve();
-              img.onerror = () => resolve();
+              const timeout = setTimeout(() => resolve(), 5000);
+              img.onload = () => {
+                clearTimeout(timeout);
+                resolve();
+              };
+              img.onerror = () => {
+                clearTimeout(timeout);
+                resolve();
+              };
             });
           })
         );
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
 
       await new Promise((resolve) => setTimeout(resolve, 300));
-
-      // Find the actual card element
-      const cardElement = cardRef.current.querySelector(
-        "#shareable-card"
-      ) as HTMLElement;
-      if (!cardElement) {
-        throw new Error("Card content not found in DOM");
-      }
 
       // Generate blob from the card element directly
       const blob = await toBlob(cardElement, {
@@ -168,39 +234,65 @@ const ShareCardModal: React.FC<ShareCardModalProps> = ({
   };
 
   const handleShareToDiscord = async () => {
-    if (!cardData || !cardRef.current) return;
+    if (!cardData) return;
 
     setIsGenerating(true);
     setError(null);
 
     try {
-      // Wait for React to render
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Wait for React to render - give it more time if there's an image
+      const initialWait = cardData.imageUrl ? 800 : 500;
+      await new Promise((resolve) => setTimeout(resolve, initialWait));
 
-      // Wait for images
-      const images = cardRef.current.querySelectorAll("img");
+      // Retry logic to find the card element
+      let cardElement: HTMLElement | null = null;
+      let attempts = 0;
+      const maxAttempts = 10;
+
+      while (!cardElement && attempts < maxAttempts) {
+        if (!cardRef.current) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          attempts++;
+          continue;
+        }
+
+        cardElement = cardRef.current.querySelector(
+          "#shareable-card"
+        ) as HTMLElement;
+
+        if (!cardElement) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          attempts++;
+        }
+      }
+
+      if (!cardRef.current || !cardElement) {
+        throw new Error("Card element not found in DOM after waiting");
+      }
+
+      // Wait for any images to load
+      const images = cardElement.querySelectorAll("img");
       if (images.length > 0) {
         await Promise.all(
           Array.from(images).map((img) => {
-            if (img.complete) return Promise.resolve();
+            if (img.complete && img.naturalWidth > 0) return Promise.resolve();
             return new Promise<void>((resolve) => {
-              img.onload = () => resolve();
-              img.onerror = () => resolve();
+              const timeout = setTimeout(() => resolve(), 5000);
+              img.onload = () => {
+                clearTimeout(timeout);
+                resolve();
+              };
+              img.onerror = () => {
+                clearTimeout(timeout);
+                resolve();
+              };
             });
           })
         );
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
 
       await new Promise((resolve) => setTimeout(resolve, 300));
-
-      // Find the actual card element
-      const cardElement = cardRef.current.querySelector(
-        "#shareable-card"
-      ) as HTMLElement;
-      if (!cardElement) {
-        throw new Error("Card content not found in DOM");
-      }
 
       // Generate blob from the card element directly
       const blob = await toBlob(cardElement, {

@@ -180,30 +180,38 @@ const ShareableCard: React.FC<ShareableCardProps> = ({
           </p>
         </div>
 
-        {/* Optional Image */}
+        {/* Optional Image - Centered below response */}
         {imageUrl && (
           <div
             style={{
-              position: "absolute",
-              bottom: "16px",
-              right: "16px",
-              width: "128px",
-              height: "128px",
-              borderRadius: "8px",
-              overflow: "hidden",
-              border: "2px solid rgba(255, 255, 255, 0.2)",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              marginTop: "16px",
+              flexShrink: 0,
             }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imageUrl}
-              alt="Game screenshot"
+            <div
               style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
+                width: "200px",
+                height: "150px",
+                borderRadius: "8px",
+                overflow: "hidden",
+                border: "2px solid rgba(255, 255, 255, 0.2)",
+                boxShadow: "0 4px 6px rgba(0, 0, 0, 0.3)",
               }}
-            />
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imageUrl}
+                alt="Game screenshot"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                }}
+              />
+            </div>
           </div>
         )}
 
