@@ -35,6 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         conversationCount: actualConversationCount, // Use actual count instead of user.conversationCount
         hasProAccess: user.hasProAccess,
         achievements: user.achievements || [],
+        challengeRewards: user.challengeRewards || [],
         progress: user.progress || {},
         subscription: user.subscription || null,
         healthMonitoring: user.healthMonitoring || null,

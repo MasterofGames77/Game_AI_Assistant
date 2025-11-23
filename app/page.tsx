@@ -24,6 +24,7 @@ import RecommendationsDisplay from "../components/RecommendationsDisplay";
 import SmartGameResume from "../components/SmartGameResume";
 import QuickTemplates from "../components/QuickTemplates";
 import ShareCardModal from "../components/ShareCardModal";
+import DailyChallengeBanner from "../components/DailyChallengeBanner";
 // import { useRouter } from "next/navigation";
 // import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 // import { faPaperclip } from "@fortawesome/free-solid-svg-icons";
@@ -1451,6 +1452,12 @@ export default function Home() {
                 width={350}
                 height={350}
                 priority={true}
+              />
+
+              {/* Daily Challenge Banner */}
+              <DailyChallengeBanner
+                username={username}
+                conversations={conversations}
               />
 
               {/* Display conversation count in the UI */}

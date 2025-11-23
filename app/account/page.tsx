@@ -90,6 +90,7 @@ export default function AccountPage() {
           subscriptionStatus: subscriptionData.subscriptionStatus,
           conversationCount: userData.user.conversationCount || 0,
           achievements: userData.user.achievements || [],
+          challengeRewards: userData.user.challengeRewards || [],
           progress: userData.user.progress || { totalQuestions: 0 },
           hasPassword: !!userData.user.password,
           healthMonitoring: userData.user.healthMonitoring,
@@ -1058,6 +1059,44 @@ export default function AccountPage() {
             </div>
           </div>
         </div>
+
+        {/* Challenge Rewards Section */}
+        {accountData.challengeRewards && accountData.challengeRewards.length > 0 && (
+          <div className="mt-8">
+            <div className="bg-[#252642]/50 backdrop-blur-sm rounded-2xl p-6 shadow-[0_0_15px_rgba(255,215,0,0.1)] border border-[#ffd700]/20">
+              <h2 className="text-2xl font-bold mb-6 text-[#ffd700]">
+                Challenge Rewards
+              </h2>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {accountData.challengeRewards
+                  .slice()
+                  .sort((a, b) => {
+                    // Sort by date earned (most recent first)
+                    const dateA = a.dateEarned ? new Date(a.dateEarned).getTime() : 0;
+                    const dateB = b.dateEarned ? new Date(b.dateEarned).getTime() : 0;
+                    return dateB - dateA;
+                  })
+                  .slice(0, 6)
+                  .map((reward, index) => (
+                    <div key={index} className="bg-[#1a1b2e]/50 rounded-lg p-4">
+                      <div className="text-2xl mb-2">{reward.icon || "🎁"}</div>
+                      <h3 className="font-semibold text-white">
+                        {reward.name}
+                      </h3>
+                      <p className="text-gray-400 text-sm mb-1">
+                        {reward.description}
+                      </p>
+                      {reward.dateEarned && (
+                        <p className="text-gray-500 text-xs">
+                          Earned: {formatDate(reward.dateEarned)}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Achievements Section */}
         {accountData.achievements.length > 0 && (

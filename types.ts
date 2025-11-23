@@ -22,6 +22,51 @@ export interface Conversation {
   response: string;
   timestamp: Date;
   imageUrl?: string; // Optional image URL for questions with screenshots
+  // Metadata fields for challenge detection
+  detectedGenre?: string[];
+  questionCategory?: string;
+  interactionType?: string;
+}
+
+export interface DailyChallenge {
+  id: string;
+  title: string;
+  description: string;
+  criteria: {
+    type: "genre" | "category" | "interaction" | "count";
+    value: string | number; // Genre name, category name, interaction type, or count
+  };
+  icon?: string; // Optional icon/emoji
+  reward?: string; // Optional reward description
+}
+
+export interface ChallengeProgress {
+  challengeId: string;
+  date: string; // YYYY-MM-DD format
+  completed: boolean;
+  completedAt?: Date;
+  progress?: number; // For count-based challenges
+  target?: number;
+}
+
+export interface ChallengeStreak {
+  currentStreak: number;
+  longestStreak: number;
+  lastCompletedDate: string; // YYYY-MM-DD format of last challenge completion
+}
+
+export interface ChallengeReward {
+  milestone: number; // Days required (5, 10, 20, 30, etc.)
+  type: 'badge' | 'title' | 'icon' | 'special';
+  name: string; // Reward name
+  description: string; // Reward description
+  icon?: string; // Emoji or icon
+  dateEarned?: Date; // When the reward was earned
+}
+
+export interface ChallengeRewardMilestone {
+  days: number;
+  reward: Omit<ChallengeReward, 'dateEarned'>;
 }
 
 export interface SideBarProps {
@@ -487,6 +532,7 @@ export interface AccountData {
   subscriptionStatus: SubscriptionStatus | null;
   conversationCount: number;
   achievements: Array<{ name: string; dateEarned: Date }>;
+  challengeRewards?: ChallengeReward[];
   progress: {
     totalQuestions: number;
     [key: string]: number;
@@ -917,4 +963,9 @@ export interface ShareCardModalProps {
   onClose: () => void;
   conversation: Conversation | null;
   detectedGame?: string;
+}
+
+export interface DailyChallengeBannerProps {
+  username: string | null;
+  conversations: Conversation[];
 }

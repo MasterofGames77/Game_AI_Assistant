@@ -2897,6 +2897,8 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
 
 /**
  * Determine question category based on content analysis
+ * Note: Order matters - more specific patterns should be checked first,
+ * but "how to" questions should be general_gameplay unless they match more specific patterns
  */
 function detectQuestionCategory(question: string): string | undefined {
   const lowerQuestion = question.toLowerCase();
@@ -2906,19 +2908,17 @@ function detectQuestionCategory(question: string): string | undefined {
     return 'boss_fight';
   }
 
-  // Level/walkthrough patterns (including temple, dungeon, area, clear)
-  if (/(walkthrough|guide|how to get|how to reach|how do i get|location|where is|find|locate|how to clear|how to complete|temple|dungeon|area|level)/i.test(lowerQuestion)) {
-    return 'level_walkthrough';
-  }
-
-  // Strategy patterns
+  // Strategy patterns (check before general "how to" to catch strategy questions)
   if (/(strategy|tactic|best build|loadout|optimal|build guide|meta|best way to|how should i)/i.test(lowerQuestion)) {
     return 'strategy';
   }
 
-  // Item lookup patterns
-  if (/(item|weapon|armor|equipment|gear|what does|item description|where to find|how to get)/i.test(lowerQuestion)) {
-    return 'item_lookup';
+  // Item lookup patterns (check before general "how to" to catch item questions)
+  if (/(item|weapon|armor|equipment|gear|what does|item description|where to find)/i.test(lowerQuestion)) {
+    // But exclude if it's a general "how to" question about items
+    if (!/^how to/i.test(lowerQuestion)) {
+      return 'item_lookup';
+    }
   }
 
   // Character patterns
@@ -2926,9 +2926,25 @@ function detectQuestionCategory(question: string): string | undefined {
     return 'character';
   }
 
-  // Achievement/completion patterns
+  // Achievement/completion patterns - but only if it's specifically about achievements/trophies
+  // Don't match just "unlock" if it's part of "how to unlock" (general gameplay)
+  if (/^(how to|what is|explain|tell me about|help with)/i.test(lowerQuestion)) {
+    // If it starts with general gameplay phrases, check if it's specifically about achievements
+    if (/(achievement|trophy|100%|complete|completion|collect all)/i.test(lowerQuestion)) {
+      return 'achievement';
+    }
+    // Otherwise, it's general gameplay
+    return 'general_gameplay';
+  }
+  
+  // Achievement pattern for questions that mention achievements but don't start with "how to"
   if (/(achievement|trophy|100%|complete|completion|collect all|unlock)/i.test(lowerQuestion)) {
     return 'achievement';
+  }
+
+  // Level/walkthrough patterns (including temple, dungeon, area, clear)
+  if (/(walkthrough|guide|how to get|how to reach|how do i get|location|where is|find|locate|how to clear|how to complete|temple|dungeon|area|level)/i.test(lowerQuestion)) {
+    return 'level_walkthrough';
   }
 
   // Performance/technical patterns
@@ -2936,7 +2952,7 @@ function detectQuestionCategory(question: string): string | undefined {
     return 'technical';
   }
 
-  // General gameplay
+  // General gameplay - catch-all for "how to", "what is", "explain", etc.
   if (/(how to|what is|explain|tell me about|help with)/i.test(lowerQuestion)) {
     return 'general_gameplay';
   }

@@ -1,5 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
-import { Achievement, Progress, Subscription, UsageLimit, HealthMonitoring } from '../types';
+import { Achievement, Progress, Subscription, UsageLimit, HealthMonitoring, ChallengeProgress, ChallengeStreak, ChallengeReward } from '../types';
 
 export interface IUser extends Document {
   userId: string;
@@ -25,6 +25,9 @@ export interface IUser extends Document {
     currentStreak?: number;
     longestStreak?: number;
   };
+  challengeProgress?: ChallengeProgress;
+  challengeStreak?: ChallengeStreak;
+  challengeRewards?: ChallengeReward[];
   createdAt?: Date; // Mongoose timestamp
   updatedAt?: Date; // Mongoose timestamp
   // Methods
@@ -222,7 +225,35 @@ const UserSchema = new Schema<IUser>({
     lastActivityDate: { type: Date },
     currentStreak: { type: Number, default: 0 },
     longestStreak: { type: Number, default: 0 }
-  }
+  },
+  // Daily challenge progress
+  challengeProgress: {
+    challengeId: { type: String },
+    date: { type: String }, // YYYY-MM-DD format
+    completed: { type: Boolean, default: false },
+    completedAt: { type: Date },
+    progress: { type: Number }, // For count-based challenges
+    target: { type: Number } // For count-based challenges
+  },
+  // Daily challenge streak tracking
+  challengeStreak: {
+    currentStreak: { type: Number, default: 0 },
+    longestStreak: { type: Number, default: 0 },
+    lastCompletedDate: { type: String } // YYYY-MM-DD format
+  },
+  // Challenge milestone rewards
+  challengeRewards: [{
+    milestone: { type: Number, required: true },
+    type: { 
+      type: String, 
+      enum: ['badge', 'title', 'icon', 'special'],
+      required: true 
+    },
+    name: { type: String, required: true },
+    description: { type: String, required: true },
+    icon: { type: String },
+    dateEarned: { type: Date, default: Date.now }
+  }]
 }, { collection: 'users' });
 
 // Create indexes for subscription-related queries
