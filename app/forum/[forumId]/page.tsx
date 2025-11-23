@@ -29,6 +29,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     editPost,
     deletePost,
     likePost,
+    reactToPost,
     updateForumUsers,
   } = useForum();
   const [message, setMessage] = useState("");
@@ -540,6 +541,15 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     }
   };
 
+  const handleReactToPost = async (postId: string, reactionType: string) => {
+    try {
+      await reactToPost(params.forumId, postId, reactionType);
+      // The context already updates currentForum, so no need to fetch again
+    } catch (err: any) {
+      setError(err.message || "Failed to react to post");
+    }
+  };
+
   if (loading) {
     return <div className="text-center">Loading forum...</div>;
   }
@@ -930,49 +940,42 @@ function ForumPage({ params }: { params: { forumId: string } }) {
                     </>
                   )}
                   {editingPostId !== post._id && (
-                    <div className="mt-2 flex items-center space-x-4">
-                      <button
-                        onClick={() => handleLikePost(post._id)}
-                        className={`flex items-center space-x-1 ${
-                          post.metadata.likedBy?.includes(
-                            localStorage.getItem("username") || "test-user"
-                          )
-                            ? "text-blue-600"
-                            : "text-gray-400"
-                        } hover:text-blue-700`}
-                      >
-                        {/* Heart icon: filled if liked, outline if not */}
-                        {post.metadata.likedBy?.includes(
-                          localStorage.getItem("username") || "test-user"
-                        ) ? (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5 fill-current"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" />
-                          </svg>
-                        ) : (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z"
-                            />
-                          </svg>
-                        )}
-                        <span>
-                          {post.metadata.likes || 0} Like
-                          {(post.metadata.likes || 0) !== 1 ? "s" : ""}
-                        </span>
-                      </button>
+                    <div className="mt-2 flex items-center space-x-4 flex-wrap">
+                      {/* Emoji Reactions */}
+                      <div className="flex items-center space-x-2">
+                        {["🔥", "💡", "❓", "❤️"].map((emoji) => {
+                          const currentUsername =
+                            localStorage.getItem("username") || "test-user";
+                          const reactions = post.metadata?.reactions || {};
+                          const reactionUsers = reactions[emoji] || [];
+                          const hasReacted = reactionUsers.includes(currentUsername);
+                          const count = reactionUsers.length;
+
+                          return (
+                            <button
+                              key={emoji}
+                              onClick={() => handleReactToPost(post._id, emoji)}
+                              className={`flex items-center space-x-1 px-2 py-1 rounded-md transition-colors ${
+                                hasReacted
+                                  ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+                                  : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                              }`}
+                              title={
+                                hasReacted
+                                  ? `Remove ${emoji} reaction`
+                                  : `Add ${emoji} reaction`
+                              }
+                            >
+                              <span className="text-lg">{emoji}</span>
+                              {count > 0 && (
+                                <span className="text-sm font-medium">
+                                  {count}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                       {post.createdBy ===
                         (localStorage.getItem("username") || "test-user") && (
                         <>

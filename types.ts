@@ -161,6 +161,9 @@ export interface ForumPost {
     editedBy?: string;
     likes?: number;
     likedBy?: string[];
+    reactions?: {
+      [emoji: string]: string[]; // Map of emoji to array of usernames who reacted
+    };
     attachments?: Array<{
       type: 'image' | 'link' | 'file';
       url: string;
@@ -197,6 +200,7 @@ export interface ForumContextType {
   editPost: (forumId: string, postId: string, message: string, imageFiles?: File[], existingAttachments?: any[]) => Promise<void>;
   deletePost: (forumId: string, postId: string) => Promise<void>;
   likePost: (forumId: string, postId: string) => Promise<void>;
+  reactToPost: (forumId: string, postId: string, reactionType: string) => Promise<void>;
   updateForumUsers: (forumId: string, allowedUsers: string[]) => Promise<boolean>;
   setCurrentForum: (forum: Forum | null) => void;
   setError: (error: string | null) => void;

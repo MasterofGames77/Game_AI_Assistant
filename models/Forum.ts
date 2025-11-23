@@ -18,6 +18,10 @@ const PostSchema = new mongoose.Schema({
     editedBy: { type: String },
     likes: { type: Number, default: 0 },
     likedBy: [{ type: String }],
+    reactions: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
+    },
     attachments: [{
       type: { type: String, enum: ['image', 'link', 'file'] },
       url: String,

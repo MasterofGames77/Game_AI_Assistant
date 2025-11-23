@@ -170,6 +170,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         editedBy: undefined,
         likes: 0,
         likedBy: [],
+        reactions: {},
         attachments: postAttachments.map((att: any) => ({
           type: 'image',
           url: att.url,

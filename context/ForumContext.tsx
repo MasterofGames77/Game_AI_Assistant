@@ -455,6 +455,46 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
     [currentForum]
   );
 
+  const reactToPost = useCallback(
+    async (forumId: string, postId: string, reactionType: string) => {
+      try {
+        setLoading(true);
+        const response = await axios.post(
+          "/api/reactToPost",
+          {
+            forumId,
+            postId,
+            username: localStorage.getItem("username"),
+            reactionType,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${
+                localStorage.getItem("userId") || "test-user"
+              }`,
+            },
+          }
+        );
+
+        const updatedForum = response.data.forum;
+        if (updatedForum) {
+          setForums((prevForums) =>
+            prevForums.map((f) => (f.forumId === forumId ? updatedForum : f))
+          );
+          if (currentForum?.forumId === forumId) {
+            setCurrentForum(updatedForum);
+          }
+        }
+      } catch (err: any) {
+        setError(err.message || "Failed to react to post");
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [currentForum]
+  );
+
   const updateForumUsers = useCallback(
     async (forumId: string, allowedUsers: string[]) => {
       try {
@@ -509,6 +549,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
     editPost,
     deletePost,
     likePost,
+    reactToPost,
     updateForumUsers,
     setCurrentForum,
     setError,
