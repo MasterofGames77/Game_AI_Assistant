@@ -154,6 +154,7 @@ export interface ForumPost {
   message: string;
   timestamp: Date;
   createdBy: string;
+  replyTo?: string | null; // ID of the post this is replying to
   likes: string[]; // Array of usernames who liked the post
   metadata: {
     edited: boolean;
@@ -196,7 +197,7 @@ export interface ForumContextType {
   fetchForums: (page: number, limit: number) => Promise<Forum[]>;
   createForum: (forumData: Partial<Forum>) => Promise<Forum | null>;
   deleteForum: (forumId: string) => Promise<void>;
-  addPost: (forumId: string, message: string, imageFiles?: File[]) => Promise<void>;
+  addPost: (forumId: string, message: string, imageFiles?: File[], replyTo?: string) => Promise<void>;
   editPost: (forumId: string, postId: string, message: string, imageFiles?: File[], existingAttachments?: any[]) => Promise<void>;
   deletePost: (forumId: string, postId: string) => Promise<void>;
   likePost: (forumId: string, postId: string) => Promise<void>;

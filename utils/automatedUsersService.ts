@@ -917,7 +917,8 @@ export async function respondToForumPost(
       {
         forumId,
         message: replyContent,
-        username
+        username,
+        replyTo: post._id // Pass the ID of the post being replied to
       },
       {
         headers: {

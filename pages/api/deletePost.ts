@@ -36,12 +36,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ error: 'Only the post creator can delete this post' });
     }
 
-    // Remove the post
-    forum.posts = forum.posts.filter((p: any) => p._id.toString() !== postId);
-    forum.metadata.totalPosts = forum.posts.length;
-    await forum.save();
+    // Use findOneAndUpdate with $pull to remove the post without validating entire array
+    // This avoids validation errors on existing posts that might be missing fields
+    const updatedForum = await Forum.findOneAndUpdate(
+      { forumId },
+      {
+        $pull: { posts: { _id: postId } },
+        $set: {
+          'metadata.totalPosts': forum.posts.length - 1,
+          'metadata.lastActivityAt': new Date()
+        }
+      },
+      {
+        new: true,
+        runValidators: false // Skip validation to avoid issues with existing posts
+      }
+    );
 
-    return res.status(200).json({ message: 'Post deleted', forum });
+    if (!updatedForum) {
+      return res.status(404).json({ error: 'Forum not found after update' });
+    }
+
+    return res.status(200).json({ message: 'Post deleted', forum: updatedForum });
   } catch (error) {
     console.error('Error deleting post:', error);
     return res.status(500).json({ error: 'Failed to delete post' });

@@ -12,6 +12,7 @@ const PostSchema = new mongoose.Schema({
   },
   timestamp: { type: Date, default: Date.now },
   createdBy: { type: String, required: true },
+  replyTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Post', default: null },
   metadata: {
     edited: { type: Boolean, default: false },
     editedAt: { type: Date },

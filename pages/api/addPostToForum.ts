@@ -13,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     await connectToMongoDB();
-    const { forumId, message, username, attachments } = req.body;
+    const { forumId, message, username, attachments, replyTo } = req.body;
 
     // Log the request for debugging (especially for 400 errors)
     console.log('addPostToForum request:', {
@@ -80,6 +80,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Check if forum is active
     if (forum.metadata.status !== 'active') {
       return res.status(403).json({ error: 'Forum is not active' });
+    }
+
+    // Validate replyTo if provided
+    let replyToObjectId = null;
+    if (replyTo) {
+      // Validate that replyTo is a valid ObjectId format
+      if (!mongoose.Types.ObjectId.isValid(replyTo)) {
+        return res.status(400).json({ error: 'Invalid replyTo post ID format' });
+      }
+      
+      // Check that the post being replied to exists in this forum
+      const repliedToPost = forum.posts.find((p: any) => 
+        p._id && p._id.toString() === replyTo.toString()
+      );
+      
+      if (!repliedToPost) {
+        return res.status(404).json({ error: 'Post being replied to not found in this forum' });
+      }
+      
+      replyToObjectId = new mongoose.Types.ObjectId(replyTo);
     }
 
     // Validate attachments if provided
@@ -164,6 +184,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       message: hasMessage ? message.trim() : '', // Allow empty message for image-only posts
       timestamp: new Date(),
       createdBy: username,
+      replyTo: replyToObjectId,
       metadata: {
         edited: false,
         editedAt: undefined,

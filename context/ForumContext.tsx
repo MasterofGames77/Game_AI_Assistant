@@ -111,7 +111,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addPost = useCallback(
-    async (forumId: string, message: string, imageFiles?: File[]) => {
+    async (forumId: string, message: string, imageFiles?: File[], replyTo?: string) => {
       try {
         setLoading(true);
 
@@ -195,6 +195,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
             message,
             username: localStorage.getItem("username"),
             attachments,
+            replyTo,
           },
           {
             headers: {

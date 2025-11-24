@@ -18,54 +18,46 @@ export default async function handler(
       return res.status(400).json({ message: 'Username is required' });
     }
 
-    // Check basic Pro access
-    const hasProAccess = await checkProAccess(username, userId);
+    // Check basic Pro access with error handling
+    let hasProAccess = false;
+    try {
+      hasProAccess = await checkProAccess(username, userId);
+    } catch (error) {
+      console.error('Error in checkProAccess function:', error);
+      // If checkProAccess fails, default to false but don't fail the entire request
+      hasProAccess = false;
+    }
 
-    // Get detailed subscription information
+    // Get detailed subscription information (optional - don't fail if this errors)
     let subscriptionStatus = null;
     if (hasProAccess) {
-      await connectToWingmanDB();
-      
-      // Debug: Find all users with this username to see what's happening
-      const allUsers = await User.find({ 
-        $or: [
-          { username },
-          { userId },
-          ...(userId ? [{ userId }] : [])
-        ]
-      });
-      
-      // console.log('checkProAccess - all users found:', allUsers.map(u => ({
-      //   // username: u.username,
-      //   // userId: u.userId,
-      //   // hasProAccess: u.hasProAccess,
-      //   // subscription: u.subscription
-      // }))); // Commented out for production
-      
-      const user = allUsers.find(u => u.hasProAccess) || allUsers[0];
-
-      // If user has Pro access, get detailed subscription status
-      if (user && user.hasProAccess) {
-        // console.log('checkProAccess - user found with Pro access:', {
-        //   // username: user.username,
-        //   // hasProAccess: user.hasProAccess,
-        //   // subscription: user.subscription,
-        //   // hasGetSubscriptionStatus: typeof user.getSubscriptionStatus === 'function'
-        // }); // Commented out for production
+      try {
+        await connectToWingmanDB();
         
-        try {
-          subscriptionStatus = user.getSubscriptionStatus();
-          // console.log('checkProAccess - user.getSubscriptionStatus() returned:', subscriptionStatus); // Commented out for production
-        } catch (error) {
-          console.error('Error calling getSubscriptionStatus:', error);
-          subscriptionStatus = null;
+        // Find all users with this username
+        const allUsers = await User.find({ 
+          $or: [
+            { username },
+            ...(userId ? [{ userId }] : [])
+          ]
+        }).limit(10); // Limit to prevent excessive queries
+        
+        const user = allUsers.find(u => u.hasProAccess) || allUsers[0];
+
+        // If user has Pro access, get detailed subscription status
+        if (user && user.hasProAccess && typeof user.getSubscriptionStatus === 'function') {
+          try {
+            subscriptionStatus = user.getSubscriptionStatus();
+          } catch (error) {
+            console.error('Error calling getSubscriptionStatus:', error);
+            subscriptionStatus = null;
+          }
         }
-      } else {
-        // console.log('checkProAccess - no user found or no Pro access:', {
-        //   userFound: !!user,
-        //   hasProAccess: user?.hasProAccess,
-        //   allUsersCount: allUsers.length
-        // }); // Commented out for production
+      } catch (error) {
+        // Don't fail the request if subscription details can't be fetched
+        // The user still has Pro access, we just can't provide detailed status
+        console.error('Error fetching subscription details (non-fatal):', error);
+        subscriptionStatus = null;
       }
     }
 
