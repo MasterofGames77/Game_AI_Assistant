@@ -28,6 +28,8 @@ export interface IUser extends Document {
   challengeProgress?: ChallengeProgress;
   challengeStreak?: ChallengeStreak;
   challengeRewards?: ChallengeReward[];
+  avatarUrl?: string; // Current avatar URL
+  avatarHistory?: Array<{ url: string; uploadedAt: Date }>; // Last 6 avatars
   createdAt?: Date; // Mongoose timestamp
   updatedAt?: Date; // Mongoose timestamp
   // Methods
@@ -253,6 +255,12 @@ const UserSchema = new Schema<IUser>({
     description: { type: String, required: true },
     icon: { type: String },
     dateEarned: { type: Date, default: Date.now }
+  }],
+  // Avatar/profile picture
+  avatarUrl: { type: String },
+  avatarHistory: [{
+    url: { type: String, required: true },
+    uploadedAt: { type: Date, default: Date.now }
   }]
 }, { collection: 'users' });
 

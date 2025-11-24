@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Avatar from "./Avatar";
+import AvatarSelector from "./AvatarSelector";
 import { ProStatusProps, SubscriptionStatus } from "@/types";
 
 const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
@@ -8,6 +10,8 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
     useState<SubscriptionStatus | null>(null);
   const [usageStatus, setUsageStatus] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [showAvatarSelector, setShowAvatarSelector] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -40,6 +44,17 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
         if (usageData.usageStatus) {
           setUsageStatus(usageData.usageStatus);
         }
+
+        // Fetch avatar
+        const avatarResponse = await fetch("/api/avatar/recent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username }),
+        });
+        if (avatarResponse.ok) {
+          const avatarData = await avatarResponse.json();
+          setAvatarUrl(avatarData.currentAvatar);
+        }
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -68,12 +83,20 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
       return (
         <div className="flex flex-col space-y-1">
           {username && (
-            <span
-              className="text-sm font-bold text-white dark:text-white drop-shadow-sm whitespace-nowrap"
-              style={{ textShadow: "0 1px 4px rgba(80,0,80,0.15)" }}
-            >
-              {username}
-            </span>
+            <div className="flex items-center space-x-2">
+              <Avatar
+                src={avatarUrl}
+                username={username}
+                size={32}
+                onClick={() => setShowAvatarSelector(true)}
+              />
+              <span
+                className="text-sm font-bold text-white dark:text-white drop-shadow-sm whitespace-nowrap"
+                style={{ textShadow: "0 1px 4px rgba(80,0,80,0.15)" }}
+              >
+                {username}
+              </span>
+            </div>
           )}
           <span
             className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm rounded-full whitespace-nowrap flex items-center justify-center"
@@ -91,14 +114,22 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
         return (
           <div className="flex flex-col space-y-1">
             {username && (
-              <span
-                className="text-sm font-bold text-white dark:text-white drop-shadow-sm whitespace-nowrap"
-                style={{
-                  textShadow: "0 1px 4px rgba(80,0,80,0.15)",
-                }}
-              >
-                {username}
-              </span>
+              <div className="flex items-center space-x-2">
+                <Avatar
+                  src={avatarUrl}
+                  username={username}
+                  size={32}
+                  onClick={() => setShowAvatarSelector(true)}
+                />
+                <span
+                  className="text-sm font-bold text-white dark:text-white drop-shadow-sm whitespace-nowrap"
+                  style={{
+                    textShadow: "0 1px 4px rgba(80,0,80,0.15)",
+                  }}
+                >
+                  {username}
+                </span>
+              </div>
             )}
             <span
               className={`px-2 py-1 text-white text-sm rounded-full whitespace-nowrap flex items-center justify-center ${
@@ -117,14 +148,22 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
         return (
           <div className="flex flex-col space-y-1">
             {username && (
-              <span
-                className="text-sm font-bold text-white dark:text-white drop-shadow-sm whitespace-nowrap"
-                style={{
-                  textShadow: "0 1px 4px rgba(80,0,80,0.15)",
-                }}
-              >
-                {username}
-              </span>
+              <div className="flex items-center space-x-2">
+                <Avatar
+                  src={avatarUrl}
+                  username={username}
+                  size={32}
+                  onClick={() => setShowAvatarSelector(true)}
+                />
+                <span
+                  className="text-sm font-bold text-white dark:text-white drop-shadow-sm whitespace-nowrap"
+                  style={{
+                    textShadow: "0 1px 4px rgba(80,0,80,0.15)",
+                  }}
+                >
+                  {username}
+                </span>
+              </div>
             )}
             <div className="flex items-center space-x-2">
               <span
@@ -149,14 +188,22 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
         return (
           <div className="flex flex-col space-y-1">
             {username && (
-              <span
-                className="text-sm font-bold text-white dark:text-white drop-shadow-sm whitespace-nowrap"
-                style={{
-                  textShadow: "0 1px 4px rgba(80,0,80,0.15)",
-                }}
-              >
-                {username}
-              </span>
+              <div className="flex items-center space-x-2">
+                <Avatar
+                  src={avatarUrl}
+                  username={username}
+                  size={32}
+                  onClick={() => setShowAvatarSelector(true)}
+                />
+                <span
+                  className="text-sm font-bold text-white dark:text-white drop-shadow-sm whitespace-nowrap"
+                  style={{
+                    textShadow: "0 1px 4px rgba(80,0,80,0.15)",
+                  }}
+                >
+                  {username}
+                </span>
+              </div>
             )}
             <div className="flex items-center space-x-2">
               <span
@@ -181,14 +228,22 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
         return (
           <div className="flex flex-col space-y-1">
             {username && (
-              <span
-                className="text-sm font-bold text-white dark:text-white drop-shadow-sm whitespace-nowrap"
-                style={{
-                  textShadow: "0 1px 4px rgba(80,0,80,0.15)",
-                }}
-              >
-                {username}
-              </span>
+              <div className="flex items-center space-x-2">
+                <Avatar
+                  src={avatarUrl}
+                  username={username}
+                  size={32}
+                  onClick={() => setShowAvatarSelector(true)}
+                />
+                <span
+                  className="text-sm font-bold text-white dark:text-white drop-shadow-sm whitespace-nowrap"
+                  style={{
+                    textShadow: "0 1px 4px rgba(80,0,80,0.15)",
+                  }}
+                >
+                  {username}
+                </span>
+              </div>
             )}
             <div className="flex items-center space-x-2">
               <span
@@ -214,14 +269,22 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
         return (
           <div className="flex flex-col space-y-1">
             {username && (
-              <span
-                className="text-sm font-bold text-white dark:text-white drop-shadow-sm whitespace-nowrap"
-                style={{
-                  textShadow: "0 1px 4px rgba(80,0,80,0.15)",
-                }}
-              >
-                {username}
-              </span>
+              <div className="flex items-center space-x-2">
+                <Avatar
+                  src={avatarUrl}
+                  username={username}
+                  size={32}
+                  onClick={() => setShowAvatarSelector(true)}
+                />
+                <span
+                  className="text-sm font-bold text-white dark:text-white drop-shadow-sm whitespace-nowrap"
+                  style={{
+                    textShadow: "0 1px 4px rgba(80,0,80,0.15)",
+                  }}
+                >
+                  {username}
+                </span>
+              </div>
             )}
             <span
               className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm rounded-full whitespace-nowrap flex items-center justify-center"
@@ -253,6 +316,20 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
         getStatusDisplay()
       ) : (
         <div className="flex items-center space-x-3">
+          {/* Username with Avatar for Free Users */}
+          {username && (
+            <div className="flex items-center space-x-2">
+              <Avatar
+                src={avatarUrl}
+                username={username}
+                size={32}
+                onClick={() => setShowAvatarSelector(true)}
+              />
+              <span className="text-sm font-bold text-white drop-shadow-sm whitespace-nowrap">
+                {username}
+              </span>
+            </div>
+          )}
           {/* Usage Status for Free Users */}
           {usageStatus && !usageStatus.isProUser && (
             <div className="text-sm text-gray-300">
@@ -282,6 +359,17 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
             Upgrade to Pro
           </button>
         </div>
+      )}
+      {/* Avatar Selector Modal */}
+      {username && (
+        <AvatarSelector
+          isOpen={showAvatarSelector}
+          onClose={() => setShowAvatarSelector(false)}
+          username={username}
+          onAvatarChange={(newAvatarUrl) => {
+            setAvatarUrl(newAvatarUrl);
+          }}
+        />
       )}
     </div>
   );

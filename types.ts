@@ -974,3 +974,62 @@ export interface DailyChallengeBannerProps {
   username: string | null;
   conversations: Conversation[];
 }
+
+export interface ProfileShareCardProps {
+  username: string;
+  avatarUrl?: string | null;
+  favoriteGenres?: string[];
+  achievements: Array<{ name: string; dateEarned?: Date }>;
+  streak: number;
+  currentChallenge?: {
+    title: string;
+    description: string;
+    icon?: string;
+    completed: boolean;
+    progress?: number;
+    target?: number;
+  };
+  className?: string;
+}
+
+export interface ProfileShareModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  username: string;
+}
+
+export interface ProfileShareData {
+  username: string;
+  avatarUrl?: string | null;
+  favoriteGenres: string[];
+  achievements: Array<{ name: string; dateEarned?: Date }>;
+  streak: number;
+  currentChallenge?: {
+    title: string;
+    description: string;
+    icon?: string;
+    completed: boolean;
+    progress?: number;
+    target?: number;
+  };
+}
+
+export interface AvatarProps {
+  src?: string | null;
+  username?: string;
+  size?: number;
+  className?: string;
+  onClick?: () => void;
+}
+
+export interface AvatarSelectorProps {
+  isOpen: boolean;
+  onClose: () => void;
+  username: string;
+  onAvatarChange?: (avatarUrl: string) => void;
+}
+
+export interface RecentAvatar {
+  url: string;
+  uploadedAt: Date | string;
+}

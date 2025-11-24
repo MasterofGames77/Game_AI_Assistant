@@ -4,6 +4,9 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { HealthMonitoring, AccountData } from "@/types";
 import axios from "axios";
+import ProfileShareModal from "@/components/ProfileShareModal";
+import Avatar from "@/components/Avatar";
+import AvatarSelector from "@/components/AvatarSelector";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -39,6 +42,13 @@ export default function AccountPage() {
   const [usernameResetSuccess, setUsernameResetSuccess] = useState("");
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [newUsername, setNewUsername] = useState("");
+
+  // Profile share modal state
+  const [showProfileShareModal, setShowProfileShareModal] = useState(false);
+
+  // Avatar state
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [showAvatarSelector, setShowAvatarSelector] = useState(false);
 
   useEffect(() => {
     const fetchAccountData = async () => {
@@ -99,6 +109,21 @@ export default function AccountPage() {
         // Initialize health settings if available
         if (userData.user.healthMonitoring) {
           setHealthSettings(userData.user.healthMonitoring);
+        }
+
+        // Fetch avatar
+        try {
+          const avatarResponse = await fetch("/api/avatar/recent", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: userData.user.username }),
+          });
+          if (avatarResponse.ok) {
+            const avatarData = await avatarResponse.json();
+            setAvatarUrl(avatarData.currentAvatar);
+          }
+        } catch (error) {
+          console.error("Error fetching avatar:", error);
         }
       } catch (err) {
         console.error("Error fetching account data:", err);
@@ -693,6 +718,28 @@ export default function AccountPage() {
               </h2>
 
               <div className="space-y-4">
+                {/* Avatar Section */}
+                <div>
+                  <label className="text-gray-400 text-sm mb-2 block">
+                    Profile Picture
+                  </label>
+                  <div className="flex items-center space-x-4 mb-4">
+                    <Avatar
+                      src={avatarUrl}
+                      username={accountData.username}
+                      size={64}
+                      onClick={() => setShowAvatarSelector(true)}
+                      className="cursor-pointer hover:opacity-80 transition-opacity"
+                    />
+                    <button
+                      onClick={() => setShowAvatarSelector(true)}
+                      className="px-4 py-2 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] text-white rounded-lg hover:opacity-90 transition-all duration-200 text-sm font-semibold"
+                    >
+                      Change Avatar
+                    </button>
+                  </div>
+                </div>
+
                 <div>
                   <label className="text-gray-400 text-sm">Username</label>
                   <div className="flex items-center justify-between">
@@ -743,6 +790,32 @@ export default function AccountPage() {
                     {accountData.progress.totalQuestions || 0}
                   </p>
                 </div>
+              </div>
+
+              {/* Profile Share Button */}
+              <div className="mt-6 pt-6 border-t border-gray-700">
+                <button
+                  onClick={() => setShowProfileShareModal(true)}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] text-white rounded-lg hover:opacity-90 transition-all duration-200 font-semibold flex items-center justify-center gap-2"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                  Share My Profile
+                </button>
+                <p className="text-gray-400 text-xs mt-2 text-center">
+                  Create a shareable profile card with your stats
+                </p>
               </div>
             </div>
 
@@ -1061,42 +1134,52 @@ export default function AccountPage() {
         </div>
 
         {/* Challenge Rewards Section */}
-        {accountData.challengeRewards && accountData.challengeRewards.length > 0 && (
-          <div className="mt-8">
-            <div className="bg-[#252642]/50 backdrop-blur-sm rounded-2xl p-6 shadow-[0_0_15px_rgba(255,215,0,0.1)] border border-[#ffd700]/20">
-              <h2 className="text-2xl font-bold mb-6 text-[#ffd700]">
-                Challenge Rewards
-              </h2>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {accountData.challengeRewards
-                  .slice()
-                  .sort((a, b) => {
-                    // Sort by date earned (most recent first)
-                    const dateA = a.dateEarned ? new Date(a.dateEarned).getTime() : 0;
-                    const dateB = b.dateEarned ? new Date(b.dateEarned).getTime() : 0;
-                    return dateB - dateA;
-                  })
-                  .slice(0, 6)
-                  .map((reward, index) => (
-                    <div key={index} className="bg-[#1a1b2e]/50 rounded-lg p-4">
-                      <div className="text-2xl mb-2">{reward.icon || "🎁"}</div>
-                      <h3 className="font-semibold text-white">
-                        {reward.name}
-                      </h3>
-                      <p className="text-gray-400 text-sm mb-1">
-                        {reward.description}
-                      </p>
-                      {reward.dateEarned && (
-                        <p className="text-gray-500 text-xs">
-                          Earned: {formatDate(reward.dateEarned)}
+        {accountData.challengeRewards &&
+          accountData.challengeRewards.length > 0 && (
+            <div className="mt-8">
+              <div className="bg-[#252642]/50 backdrop-blur-sm rounded-2xl p-6 shadow-[0_0_15px_rgba(255,215,0,0.1)] border border-[#ffd700]/20">
+                <h2 className="text-2xl font-bold mb-6 text-[#ffd700]">
+                  Challenge Rewards
+                </h2>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {accountData.challengeRewards
+                    .slice()
+                    .sort((a, b) => {
+                      // Sort by date earned (most recent first)
+                      const dateA = a.dateEarned
+                        ? new Date(a.dateEarned).getTime()
+                        : 0;
+                      const dateB = b.dateEarned
+                        ? new Date(b.dateEarned).getTime()
+                        : 0;
+                      return dateB - dateA;
+                    })
+                    .slice(0, 6)
+                    .map((reward, index) => (
+                      <div
+                        key={index}
+                        className="bg-[#1a1b2e]/50 rounded-lg p-4"
+                      >
+                        <div className="text-2xl mb-2">
+                          {reward.icon || "🎁"}
+                        </div>
+                        <h3 className="font-semibold text-white">
+                          {reward.name}
+                        </h3>
+                        <p className="text-gray-400 text-sm mb-1">
+                          {reward.description}
                         </p>
-                      )}
-                    </div>
-                  ))}
+                        {reward.dateEarned && (
+                          <p className="text-gray-500 text-xs">
+                            Earned: {formatDate(reward.dateEarned)}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* Achievements Section */}
         {accountData.achievements.length > 0 && (
@@ -1332,6 +1415,27 @@ export default function AccountPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Profile Share Modal */}
+      {accountData && (
+        <ProfileShareModal
+          isOpen={showProfileShareModal}
+          onClose={() => setShowProfileShareModal(false)}
+          username={accountData.username}
+        />
+      )}
+
+      {/* Avatar Selector Modal */}
+      {accountData && (
+        <AvatarSelector
+          isOpen={showAvatarSelector}
+          onClose={() => setShowAvatarSelector(false)}
+          username={accountData.username}
+          onAvatarChange={(newAvatarUrl) => {
+            setAvatarUrl(newAvatarUrl);
+          }}
+        />
       )}
     </div>
   );
