@@ -56,10 +56,23 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
           `/api/challenge-progress?username=${encodeURIComponent(username)}`
         );
 
+        let data: any = null;
         if (response.ok) {
-          const data = await response.json();
-          if (data.progress?.completed) {
+          data = await response.json();
+          // If already completed for today, set completed and don't re-check
+          if (
+            data.progress?.completed &&
+            data.progress?.date === getTodayDateString()
+          ) {
             setCompleted(true);
+            if (data.streak) {
+              setStreak(data.streak);
+            }
+            if (data.rewards) {
+              setRewards(data.rewards);
+            }
+            // Don't check conversations if already completed for today
+            return;
           }
           if (data.streak) {
             setStreak(data.streak);
@@ -69,16 +82,21 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
           }
         }
 
-        // Check if completed based on conversations
-        const isCompleted = hasCompletedChallenge(
-          conversations,
-          todaysChallenge
-        );
+        // Only check conversations if not already completed in backend for today
+        // This prevents re-triggering completion if already marked as done
+        if (
+          !data?.progress?.completed ||
+          data?.progress?.date !== getTodayDateString()
+        ) {
+          // Check if completed based on conversations
+          const isCompleted = hasCompletedChallenge(
+            conversations,
+            todaysChallenge
+          );
 
-        // Update completion status
-        setCompleted((prevCompleted) => {
-          // Only mark as completed if not already completed
-          if (isCompleted && !prevCompleted) {
+          // Update completion status
+          if (isCompleted) {
+            setCompleted(true);
             // Mark challenge as completed (async, but don't wait)
             markChallengeCompleted(username, todaysChallenge.id).then(() => {
               // Fetch updated data after completion (streak, rewards)
@@ -113,10 +131,10 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
                   );
                 });
             });
-            return true;
+          } else {
+            setCompleted(false);
           }
-          return isCompleted;
-        });
+        }
 
         // Get progress for count-based challenges
         if (todaysChallenge.criteria.type === "count") {

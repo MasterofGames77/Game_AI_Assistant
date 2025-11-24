@@ -35,10 +35,10 @@ export default async function handler(
         return res.status(404).json({ error: 'User not found' });
       }
 
-      // Get today's date string
+      // Get today's date string (UTC)
       const todayString = getTodayDateString();
 
-      // Check if progress exists and is for today
+      // Check if progress exists and is for today (UTC)
       if (
         user.challengeProgress &&
         user.challengeProgress.date === todayString
@@ -127,7 +127,7 @@ export default async function handler(
 
       await connectToMongoDB();
 
-      // Get today's date string to ensure we're saving for today
+      // Get today's date string to ensure we're saving for today (UTC)
       const today = new Date();
       const year = today.getUTCFullYear();
       const month = String(today.getUTCMonth() + 1).padStart(2, '0');

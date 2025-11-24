@@ -2,6 +2,8 @@ import { ChallengeStreak } from "../types";
 
 /**
  * Get today's date in YYYY-MM-DD format (UTC)
+ * Uses UTC to ensure consistency across timezones
+ * Challenges reset at midnight UTC (7 PM EST / 8 PM EDT)
  */
 export function getTodayDateString(): string {
   const today = new Date();
