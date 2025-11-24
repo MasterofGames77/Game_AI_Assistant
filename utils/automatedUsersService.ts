@@ -2,7 +2,7 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { generateQuestion, generateForumPost, generatePostReply, UserPreferences } from './automatedContentGenerator';
-import { findGameImage, getRandomGameImage, recordImageUsage } from './automatedImageService';
+import { getRandomGameImage, recordImageUsage } from './automatedImageService';
 import { containsOffensiveContent } from './contentModeration';
 import { GameList, ActivityResult } from '../types';
 
@@ -230,30 +230,52 @@ export async function askQuestion(
  */
 async function createForumForGame(
   username: string,
-  gameTitle: string,
-  genre: string
+  gameTitle: string
 ): Promise<{ forumId: string; forumTitle: string } | null> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
     
-    // Generate a natural forum title based on the game
-    const forumTitle = `${gameTitle} - General Discussion`;
+    // Available categories: speedruns, gameplay, mods, general, help
+    // Select category randomly but intelligently based on context
+    const allCategories = ['speedruns', 'gameplay', 'mods', 'general', 'help'];
     
-    // Select appropriate category based on genre
-    const categoryMap: { [key: string]: string } = {
-      'rpg': 'gameplay',
-      'adventure': 'gameplay',
-      'simulation': 'gameplay',
-      'puzzle': 'gameplay',
-      'platformer': 'gameplay',
-      'racing': 'gameplay',
-      'battle-royale': 'gameplay',
-      'fighting': 'gameplay',
-      'sandbox': 'gameplay',
-      'fps': 'gameplay'
+    // Weight categories based on what makes sense
+    // Most posts will be gameplay or general discussion
+    // Occasionally use speedruns, mods, or help
+    const categoryWeights: { [key: string]: number } = {
+      'gameplay': 0.35,      // 35% - most common
+      'general': 0.30,       // 30% - also common
+      'speedruns': 0.15,     // 15% - for competitive/speedrun-friendly games
+      'help': 0.12,          // 12% - for questions/help
+      'mods': 0.08           // 8% - less common, mainly for PC games
     };
     
-    const category = categoryMap[genre.toLowerCase()] || 'general';
+    // Select category based on weighted random
+    const random = Math.random();
+    let cumulative = 0;
+    let selectedCategory = 'gameplay'; // default
+    
+    for (const [cat, weight] of Object.entries(categoryWeights)) {
+      cumulative += weight;
+      if (random <= cumulative) {
+        selectedCategory = cat;
+        break;
+      }
+    }
+    
+    // Generate forum title based on category
+    const categoryTitles: { [key: string]: string } = {
+      'speedruns': `${gameTitle} - Speedruns`,
+      'gameplay': `${gameTitle} - Gameplay`,
+      'mods': `${gameTitle} - Mods`,
+      'general': `${gameTitle} - General Discussion`,
+      'help': `${gameTitle} - Help & Support`
+    };
+    
+    const forumTitle = categoryTitles[selectedCategory] || `${gameTitle} - General Discussion`;
+    const category = selectedCategory;
+    
+    console.log(`[FORUM CREATION] Creating forum for ${gameTitle} with category: ${category}, title: ${forumTitle}`);
     
     // Create forum via API
     const response = await axios.post(
@@ -294,8 +316,7 @@ async function createForumForGame(
 function findSuitableForum(
   forums: any[],
   username: string,
-  preferredGameTitle?: string,
-  preferredGenre?: string
+  preferredGameTitle?: string
 ): any | null {
   if (forums.length === 0) {
     return null;
@@ -387,7 +408,7 @@ export async function createForumPost(
     const { gameTitle, genre } = gameSelection;
     
     // Try to find a suitable existing forum
-    let targetForum = findSuitableForum(forums, username, gameTitle, genre);
+    let targetForum = findSuitableForum(forums, username, gameTitle);
     
     let forumId: string;
     let forumTitle: string;
@@ -408,7 +429,7 @@ export async function createForumPost(
     } else {
       // No suitable forum found, create a new one
       console.log(`No suitable forum found for ${gameTitle}, creating new forum...`);
-      const newForum = await createForumForGame(username, gameTitle, genre);
+      const newForum = await createForumForGame(username, gameTitle);
       
       if (!newForum) {
         return {
@@ -425,47 +446,93 @@ export async function createForumPost(
       console.log(`Created new forum: ${forumTitle}`);
     }
     
-    // Fetch previous posts by this user for the same game to avoid repetition
+    // Fetch previous posts by this user to avoid repetition
+    // Check ALL recent posts (not just for this game) to ensure uniqueness across all posts
     const previousPosts: string[] = [];
     try {
-      // Get all forums for this game
-      const gameForums = forums.filter((f: any) => 
-        f.gameTitle && f.gameTitle.toLowerCase() === actualGameTitle.toLowerCase()
-      );
+      // Collect all posts by this user from ALL forums (within last 7 days)
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       
-      // Collect all posts by this user from forums about this game
-      for (const forum of gameForums) {
+      for (const forum of forums) {
         if (forum.posts && Array.isArray(forum.posts)) {
           const userPosts = forum.posts
             .filter((p: any) => 
               p.username === username && 
               p.message && 
               p.message.trim().length > 0 &&
-              p.metadata?.status === 'active'
+              p.metadata?.status === 'active' &&
+              new Date(p.timestamp) > sevenDaysAgo
             )
             .map((p: any) => p.message.trim());
           previousPosts.push(...userPosts);
         }
       }
       
-      // Limit to most recent 5 posts to avoid overwhelming the prompt
-      // Reverse to get most recent first, then take first 5
-      previousPosts.reverse();
-      previousPosts.splice(5);
-      console.log(`Found ${previousPosts.length} previous posts by ${username} for ${actualGameTitle}`);
+      // Sort by timestamp (most recent first) and limit to most recent 10 posts
+      // This ensures we check against all recent posts, not just for the same game
+      previousPosts.sort((a, b) => {
+        // We don't have timestamps here, so just take the most recent ones we found
+        return 0;
+      });
+      previousPosts.splice(10); // Keep only the most recent 10
+      
+      console.log(`Found ${previousPosts.length} recent posts by ${username} across all forums`);
+      if (previousPosts.length > 0) {
+        console.log(`Sample previous posts: ${previousPosts.slice(0, 2).map(p => p.substring(0, 50) + '...').join(', ')}`);
+      }
     } catch (error) {
       console.error('Error fetching previous posts:', error);
       // Continue even if we can't fetch previous posts
     }
     
     // Generate natural forum post using the actual game title from the forum
-    const postContent = await generateForumPost({
-      gameTitle: actualGameTitle,
-      genre: actualGenre,
-      userPreferences,
-      forumTopic: forumTitle,
-      previousPosts: previousPosts
-    });
+    let postContent = '';
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    // Try to generate a unique post (retry if it's too similar to previous posts)
+    while (attempts < maxAttempts) {
+      attempts++;
+      postContent = await generateForumPost({
+        gameTitle: actualGameTitle,
+        genre: actualGenre,
+        userPreferences,
+        forumTopic: forumTitle,
+        previousPosts: previousPosts
+      });
+      
+      // Check if the generated post is too similar to any previous post
+      // Use stricter similarity checking - check both word overlap and topic similarity
+      const isDuplicate = previousPosts.some((prevPost: string) => {
+        const similarity = calculateSimilarity(postContent.toLowerCase(), prevPost.toLowerCase());
+        
+        // Also check for topic overlap (same game, similar themes)
+        const postWords = postContent.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+        const prevWords = prevPost.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+        const commonWords = postWords.filter(w => prevWords.includes(w));
+        const topicOverlap = commonWords.length / Math.max(postWords.length, prevWords.length);
+        
+        // If similarity is high OR topic overlap is high, consider it duplicate
+        // Lower threshold to 0.70 (was 0.85) for stricter uniqueness
+        return similarity > 0.70 || topicOverlap > 0.40;
+      });
+      
+      if (!isDuplicate) {
+        break; // Found a unique post
+      }
+      
+      console.warn(`Generated post is too similar to previous posts (attempt ${attempts}/${maxAttempts}), retrying...`);
+      console.warn(`Similarity check: post length=${postContent.length}, previous posts count=${previousPosts.length}`);
+      
+      // Add the failed attempt to previous posts to avoid generating similar content
+      if (attempts < maxAttempts) {
+        previousPosts.push(postContent);
+      }
+    }
+    
+    if (attempts >= maxAttempts) {
+      console.warn(`Failed to generate unique post after ${maxAttempts} attempts, using generated content anyway`);
+    }
     
     // Check content moderation
     const contentCheck = await containsOffensiveContent(postContent, username);
@@ -717,6 +784,57 @@ function findPostToRespondTo(
   }
   
   return null;
+}
+
+/**
+ * Calculate similarity between two strings using a more sophisticated algorithm
+ * Returns a value between 0 and 1 (1 = identical, 0 = completely different)
+ */
+function calculateSimilarity(str1: string, str2: string): number {
+  // Normalize strings (remove punctuation, lowercase)
+  const normalize = (s: string) => s.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const norm1 = normalize(str1);
+  const norm2 = normalize(str2);
+  
+  // Exact match check
+  if (norm1 === norm2) {
+    return 1.0;
+  }
+  
+  // Word-based similarity check
+  const words1 = norm1.split(/\s+/).filter(w => w.length > 3); // Only consider words longer than 3 chars
+  const words2 = norm2.split(/\s+/).filter(w => w.length > 3);
+  
+  if (words1.length === 0 || words2.length === 0) {
+    return 0;
+  }
+  
+  // Count common words (exact match)
+  const commonWords = words1.filter(w => words2.includes(w));
+  
+  // Also check for similar phrases (2-3 word sequences)
+  const getPhrases = (words: string[], length: number) => {
+    const phrases: string[] = [];
+    for (let i = 0; i <= words.length - length; i++) {
+      phrases.push(words.slice(i, i + length).join(' '));
+    }
+    return phrases;
+  };
+  
+  const phrases1_2 = getPhrases(words1, 2);
+  const phrases2_2 = getPhrases(words2, 2);
+  const commonPhrases = phrases1_2.filter(p => phrases2_2.includes(p));
+  
+  // Calculate similarity with both word and phrase overlap
+  const wordSimilarity = (commonWords.length * 2) / (words1.length + words2.length);
+  const phraseSimilarity = phrases1_2.length > 0 && phrases2_2.length > 0
+    ? (commonPhrases.length * 2) / (phrases1_2.length + phrases2_2.length)
+    : 0;
+  
+  // Weighted combination (phrases are more indicative of similarity)
+  const similarity = (wordSimilarity * 0.4) + (phraseSimilarity * 0.6);
+  
+  return Math.min(similarity, 1.0);
 }
 
 /**

@@ -134,6 +134,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
+    // Check for duplicate posts by the same user in this forum (within last 24 hours)
+    // This prevents automated users from posting the same message multiple times
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentPostsByUser = forum.posts.filter((p: any) => 
+      p.username === username &&
+      p.metadata?.status === 'active' &&
+      new Date(p.timestamp) > oneDayAgo &&
+      hasMessage && p.message && p.message.trim().length > 0
+    );
+    
+    // Check for exact duplicate message
+    if (hasMessage && recentPostsByUser.some((p: any) => 
+      p.message.trim().toLowerCase() === message.trim().toLowerCase()
+    )) {
+      console.warn('Duplicate post detected:', {
+        username,
+        forumId,
+        messagePreview: message.substring(0, 50) + '...',
+        duplicateCount: recentPostsByUser.length
+      });
+      return res.status(400).json({ 
+        error: 'Duplicate post detected',
+        message: 'You have already posted this exact message recently. Please post something different.'
+      });
+    }
+    
     // Check for offensive content
     console.log('Checking content moderation for message...');
     const contentCheck = await containsOffensiveContent(message, username);

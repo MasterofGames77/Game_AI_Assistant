@@ -147,7 +147,7 @@ Generate ONLY the direct question, nothing else:`;
           content: `Generate a direct, factual question about ${gameTitle} that Video Game Wingman can answer with specific game information.`
         }
       ],
-      temperature: 0.7, // Lower temperature for more factual accuracy
+      temperature: 0.8, // Slightly higher temperature for more variation in questions
       max_tokens: 150
     });
 
@@ -196,14 +196,20 @@ export async function generateForumPost(
     previousPostsContext = `\n\nCRITICAL: You have posted about ${gameTitle} before. Here are your previous posts to ensure your new post is UNIQUE and DIFFERENT:
 ${previousPosts.map((post, idx) => `${idx + 1}. "${post}"`).join('\n')}
 
-IMPORTANT - UNIQUENESS REQUIREMENTS:
+CRITICAL - UNIQUENESS REQUIREMENTS (READ CAREFULLY):
 - Your new post MUST be completely different from all previous posts above
-- Do NOT repeat the same topics, experiences, or tips from previous posts
-- Write about a DIFFERENT aspect of ${gameTitle} (different character, different level, different mechanic, different moment, etc.)
-- Use different phrasing and structure - avoid similar sentence patterns
+- Do NOT repeat the same topics, experiences, themes, or tips from previous posts
+- Write about a DIFFERENT aspect of ${gameTitle}:
+  * If previous posts discussed exploration, write about combat/mechanics/story/characters instead
+  * If previous posts discussed platforming, write about story/characters/items/quests instead
+  * If previous posts discussed hidden items, write about main story/characters/combat instead
+  * If previous posts discussed atmosphere, write about gameplay mechanics/tips/strategies instead
+- Use COMPLETELY different phrasing and structure - avoid similar sentence patterns or word choices
 - If you mentioned finishing the game before, don't mention it again
 - If you gave tips before, give DIFFERENT tips or discuss a DIFFERENT aspect
-- Be creative and find a NEW angle to discuss about ${gameTitle}`;
+- If you discussed a specific area/level before, discuss a DIFFERENT area/level
+- Be creative and find a NEW, UNIQUE angle to discuss about ${gameTitle}
+- Avoid repeating similar themes, topics, or experiences from previous posts`;
   }
 
   const systemPrompt = isInterdimensionalHipster
@@ -291,7 +297,7 @@ Generate ONLY the post content, nothing else:`;
           content: `Generate a natural forum post about ${gameTitle} that a real gamer would write.`
         }
       ],
-      temperature: 0.9, // Higher temperature for more variation and uniqueness
+      temperature: 1.0, // Maximum temperature for maximum variation and uniqueness
       max_tokens: 250
     });
 

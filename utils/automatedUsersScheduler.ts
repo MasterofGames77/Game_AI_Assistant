@@ -46,16 +46,22 @@ class AutomatedUsersScheduler {
    */
   public initialize(): void {
     if (!this.isEnabled) {
-      console.log('Automated users scheduler is disabled (AUTOMATED_USERS_ENABLED is not "true")');
-      console.log(`Current value: "${process.env.AUTOMATED_USERS_ENABLED}"`);
+      console.log('[SCHEDULER] Automated users scheduler is disabled (AUTOMATED_USERS_ENABLED is not "true")');
+      console.log(`[SCHEDULER] Current value: "${process.env.AUTOMATED_USERS_ENABLED}"`);
+      return;
+    }
+
+    // Prevent re-initialization if already initialized
+    if (this.tasks.length > 0) {
+      console.log(`[SCHEDULER] Scheduler already initialized with ${this.tasks.length} tasks, skipping...`);
       return;
     }
 
     const initTime = new Date();
-    console.log('Initializing automated users scheduler...');
-    console.log(`Scheduler enabled: ${this.isEnabled}`);
-    console.log(`Initialization time: ${initTime.toISOString()} (UTC)`);
-    console.log(`Current UTC time: ${new Date().toISOString()}`);
+    console.log('[SCHEDULER] Initializing automated users scheduler...');
+    console.log(`[SCHEDULER] Scheduler enabled: ${this.isEnabled}`);
+    console.log(`[SCHEDULER] Initialization time: ${initTime.toISOString()} (UTC)`);
+    console.log(`[SCHEDULER] Current UTC time: ${new Date().toISOString()}`);
     
     // Check if we're in test mode (use shorter intervals for testing)
     const isTestMode = process.env.AUTOMATED_USERS_TEST_MODE === 'true';
@@ -208,6 +214,15 @@ class AutomatedUsersScheduler {
       console.log('✅ Heartbeat task scheduled (runs every 5 minutes, logs every 30 minutes)');
     }
 
+    // Verify tasks were added
+    if (this.tasks.length === 0) {
+      console.error('[SCHEDULER ERROR] No tasks were added during initialization!');
+      console.error('[SCHEDULER ERROR] This should not happen - check addTask() calls above');
+      return;
+    }
+    
+    console.log(`[SCHEDULER] Added ${this.tasks.length} tasks to scheduler`);
+    
     // Start all tasks
     let scheduledCount = 0;
     this.tasks.forEach(task => {
@@ -218,25 +233,30 @@ class AutomatedUsersScheduler {
           const triggerTime = new Date();
           console.log(`[CRON TRIGGER] Task ${task.name} triggered by cron at ${triggerTime.toISOString()}`);
           
+          // Double-check if task is already running (race condition protection)
           if (task.isRunning) {
-            console.log(`Task ${task.name} is already running, skipping...`);
+            console.warn(`⚠️ Task ${task.name} is already running, skipping duplicate trigger...`);
             return;
           }
 
+          // Set running flag immediately to prevent race conditions
           task.isRunning = true;
           task.lastRun = new Date();
-          console.log(`Starting scheduled task: ${task.name} at ${new Date().toISOString()}`);
+          console.log(`[TASK START] Starting scheduled task: ${task.name} at ${new Date().toISOString()}`);
           
           try {
             await task.task();
-            console.log(`Completed scheduled task: ${task.name}`);
+            console.log(`[TASK SUCCESS] Completed scheduled task: ${task.name} at ${new Date().toISOString()}`);
           } catch (error) {
-            console.error(`Error in scheduled task ${task.name}:`, error);
+            console.error(`[TASK ERROR] Error in scheduled task ${task.name}:`, error);
             if (error instanceof Error) {
+              console.error(`Error message: ${error.message}`);
               console.error(`Error stack: ${error.stack}`);
             }
           } finally {
+            // Always reset the running flag, even on error
             task.isRunning = false;
+            console.log(`[TASK END] Task ${task.name} finished, isRunning set to false`);
           }
         });
 
@@ -251,8 +271,13 @@ class AutomatedUsersScheduler {
           task.nextRun = nextRun || undefined;
           
           // Verify the job is actually scheduled in node-schedule
-          const nextInvocation = scheduledTask.nextInvocation();
-          const actualNextRun = nextInvocation ? new Date(nextInvocation) : null;
+          let actualNextRun: Date | null = null;
+          try {
+            const nextInvocation = scheduledTask.nextInvocation();
+            actualNextRun = nextInvocation ? new Date(nextInvocation) : null;
+          } catch (error) {
+            console.warn(`   ⚠️  Could not get nextInvocation for ${task.name}:`, error);
+          }
           
           // Check if this task should have already run today
           const now = new Date();
@@ -289,8 +314,14 @@ class AutomatedUsersScheduler {
               console.warn(`   ⚠️  Warning: Calculated nextRun differs from node-schedule nextInvocation by ${Math.floor(diff/1000)} seconds`);
             }
           }
+          
+          // Verify the task is actually in node-schedule's job list
+          if (!actualNextRun) {
+            console.warn(`   ⚠️  Warning: Task ${task.name} may not be properly scheduled (nextInvocation returned null)`);
+          }
         } else {
-          console.error(`❌ Failed to schedule task: ${task.name} - cron.schedule returned null/undefined`);
+          console.error(`❌ Failed to schedule task: ${task.name} - scheduleJob returned null/undefined`);
+          console.error(`   This usually means the cron expression is invalid or node-schedule failed to create the job`);
         }
       } catch (error) {
         console.error(`❌ Error scheduling task ${task.name}:`, error);
@@ -301,14 +332,34 @@ class AutomatedUsersScheduler {
       }
     });
 
-    console.log(`Automated users scheduler initialized: ${scheduledCount}/${this.tasks.length} tasks scheduled`);
+    console.log(`[SCHEDULER INIT] Automated users scheduler initialized: ${scheduledCount}/${this.tasks.length} tasks scheduled`);
     
     if (scheduledCount < this.tasks.length) {
-      console.warn(`⚠️  Some tasks failed to schedule. Check cron expressions and logs above.`);
+      console.warn(`⚠️  [SCHEDULER WARNING] Some tasks failed to schedule. Check cron expressions and logs above.`);
+      const failedTasks = this.tasks.filter(t => !t.cronTask).map(t => t.name);
+      console.warn(`   Failed tasks: ${failedTasks.join(', ')}`);
+    } else {
+      console.log(`✅ [SCHEDULER SUCCESS] All ${scheduledCount} tasks scheduled successfully`);
     }
     
     // Log current UTC time for reference
-    console.log(`Current UTC time: ${new Date().toISOString()}`);
+    console.log(`[SCHEDULER] Current UTC time: ${new Date().toISOString()}`);
+    console.log(`[SCHEDULER] Scheduler will run tasks at their scheduled times. Monitor logs for [CRON TRIGGER] messages.`);
+    
+    // Verify all tasks are stored in memory (prevent garbage collection)
+    console.log(`[SCHEDULER] Stored ${this.cronTasks.length} cron job objects in memory to prevent garbage collection`);
+    
+    // Log when each task will next run for verification
+    console.log(`[SCHEDULER] Upcoming scheduled runs:`);
+    this.tasks.forEach(task => {
+      if (task.cronTask && task.nextRun) {
+        const nextRunDate = new Date(task.nextRun);
+        const timeUntil = nextRunDate.getTime() - new Date().getTime();
+        const hoursUntil = Math.floor(timeUntil / (1000 * 60 * 60));
+        const minutesUntil = Math.floor((timeUntil % (1000 * 60 * 60)) / (1000 * 60));
+        console.log(`   - ${task.name}: ${nextRunDate.toISOString()} (in ${hoursUntil}h ${minutesUntil}m)`);
+      }
+    });
   }
 
   /**
@@ -494,30 +545,65 @@ class AutomatedUsersScheduler {
 // Singleton instance
 let schedulerInstance: AutomatedUsersScheduler | null = null;
 let isInitialized: boolean = false;
+let initializationInProgress: boolean = false;
 
 /**
  * Get the scheduler instance
+ * Auto-initializes if enabled but not yet initialized
  */
 export function getScheduler(): AutomatedUsersScheduler {
   if (!schedulerInstance) {
     schedulerInstance = new AutomatedUsersScheduler();
   }
+  
   // Auto-initialize if enabled but not yet initialized
-  if (schedulerInstance.isEnabled && !isInitialized) {
-    schedulerInstance.initialize();
-    isInitialized = true;
+  // This ensures the scheduler works even if initializeScheduler() hasn't been called yet
+  if (schedulerInstance.isEnabled && !isInitialized && !initializationInProgress) {
+    console.log('[SCHEDULER] Auto-initializing scheduler on first access...');
+    try {
+      schedulerInstance.initialize();
+      isInitialized = true;
+      console.log('[SCHEDULER] Auto-initialization successful');
+    } catch (error) {
+      console.error('[SCHEDULER] Error during auto-initialization:', error);
+      // Don't set isInitialized to false here - allow manual retry
+    }
   }
+  
   return schedulerInstance;
 }
 
 /**
  * Initialize the scheduler (call this from server.ts)
+ * This ensures the scheduler is only initialized once, even if called multiple times
  */
 export function initializeScheduler(): void {
-  const scheduler = getScheduler();
-  if (!isInitialized) {
+  // Prevent multiple simultaneous initializations
+  if (isInitialized || initializationInProgress) {
+    console.log('[SCHEDULER] Scheduler already initialized or initialization in progress, skipping...');
+    return;
+  }
+  
+  initializationInProgress = true;
+  
+  try {
+    const scheduler = getScheduler();
+    
+    if (!scheduler.isEnabled) {
+      console.log('[SCHEDULER] Automated users scheduler is disabled, not initializing');
+      initializationInProgress = false;
+      return;
+    }
+    
+    console.log('[SCHEDULER] Initializing automated users scheduler...');
     scheduler.initialize();
     isInitialized = true;
+    console.log('[SCHEDULER] Scheduler initialized successfully');
+  } catch (error) {
+    console.error('[SCHEDULER] Error initializing scheduler:', error);
+    isInitialized = false; // Allow retry on error
+  } finally {
+    initializationInProgress = false;
   }
 }
 
