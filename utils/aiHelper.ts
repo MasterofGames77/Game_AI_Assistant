@@ -2490,7 +2490,6 @@ function isAPIResultRelevantToQuestion(apiResult: string, question: string, cand
   if (!apiResult || !question) return true; // If we can't validate, allow it
   
   const lowerResult = apiResult.toLowerCase();
-  const lowerQuestion = question.toLowerCase();
   const lowerCandidate = candidate.toLowerCase();
   
   // Extract distinctive words from candidate (numbers, remake/remaster, HD, version indicators, sequel indicators)

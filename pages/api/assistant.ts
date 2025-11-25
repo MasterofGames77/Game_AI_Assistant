@@ -396,8 +396,11 @@ const fetchAndCombineGameData = async (question: string, answer: string): Promis
         ? csvData.value.find((game: any) => game.title.toLowerCase() === gameName.toLowerCase())
         : null;
 
-    // Removed additional information section - just return the answer
-    // The answer from OpenAI/IGDB/RAWG should be complete and sufficient
+    if (csvGameInfo) {
+      const formattedInfo = formatGameInfo(csvGameInfo);
+      return `${answer}\n\nAdditional details from our library:\n${formattedInfo}`;
+    }
+
     return answer;
   } catch (error) {
     console.error("Error combining game data:", error);
@@ -1193,9 +1196,7 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     let answer: string | null;
 
     // Add timeout promises - longer timeout for vision API calls (60s), shorter for text-only (25s)
-    // Use timeout IDs so we can clear them when requests complete
-    let timeoutId: NodeJS.Timeout | null = null;
-    let visionTimeoutId: NodeJS.Timeout | null = null;
+    // Track cancellation for telemetry/debug visibility
     let timeoutCancelled = false;
     let visionTimeoutCancelled = false;
     
@@ -1270,11 +1271,9 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
     };
     
     const timeoutWrapper = createTimeoutPromise(25000, 'Request timeout');
-    timeoutId = timeoutWrapper.id;
     const timeoutPromise = timeoutWrapper.promise;
     
     const visionTimeoutWrapper = createTimeoutPromise(60000, 'Vision API request timeout');
-    visionTimeoutId = visionTimeoutWrapper.id;
     const visionTimeoutPromise = visionTimeoutWrapper.promise;
     
     // Helper function to clear timeouts

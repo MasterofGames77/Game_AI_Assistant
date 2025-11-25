@@ -14,7 +14,6 @@ import MyFeedbackList from "../components/MyFeedbackList";
 import AdminFeedbackDashboard from "../components/AdminFeedbackDashboard";
 import FeedbackList from "../components/FeedbackList";
 import FeedbackDetail from "../components/FeedbackDetail";
-import FeedbackStats from "../components/FeedbackStats";
 // import useSocket from "../hooks/useSocket"; // DISABLED due to 404 errors
 import useAchievementPolling from "../hooks/useAchievementPolling";
 import useHealthMonitoring from "../hooks/useHealthMonitoring";
@@ -26,8 +25,6 @@ import QuickTemplates from "../components/QuickTemplates";
 import ShareCardModal from "../components/ShareCardModal";
 import DailyChallengeBanner from "../components/DailyChallengeBanner";
 // import { useRouter } from "next/navigation";
-// import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-// import { faPaperclip } from "@fortawesome/free-solid-svg-icons";
 
 export default function Home() {
   const [question, setQuestion] = useState("");
@@ -72,7 +69,7 @@ export default function Home() {
   const [isLegacyUser, setIsLegacyUser] = useState(false);
   const [showEarlyAccessSetupModal, setShowEarlyAccessSetupModal] =
     useState(false);
-  const [isEarlyAccessUser, setIsEarlyAccessUser] = useState(false);
+  const [, setIsEarlyAccessUser] = useState(false); // intentionally unused; only need setter for downstream effects
   const [earlyAccessUserData, setEarlyAccessUserData] = useState<any>(null);
 
   // Feedback system state
