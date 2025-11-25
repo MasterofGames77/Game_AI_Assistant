@@ -79,7 +79,7 @@ export default async function handler(
       transitionData = {
         customerEmail: user.email,
         customerName: user.username,
-        amount: 199, // $1.99 in cents
+        amount: 99, // $0.99 in cents
         currency: 'usd',
         billingCycle: 'monthly',
         metadata: {
@@ -100,7 +100,7 @@ export default async function handler(
       transitionData = {
         customerEmail: user.email,
         customerName: user.username,
-        amount: 199,
+        amount: 99,
         currency: 'usd',
         billingCycle: 'monthly',
         metadata: {

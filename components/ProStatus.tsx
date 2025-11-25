@@ -8,7 +8,6 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
   const router = useRouter();
   const [subscriptionStatus, setSubscriptionStatus] =
     useState<SubscriptionStatus | null>(null);
-  const [usageStatus, setUsageStatus] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
@@ -31,18 +30,6 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
           if (data.subscriptionStatus) {
             setSubscriptionStatus(data.subscriptionStatus);
           }
-        }
-
-        // Fetch usage status for all users
-        const usageResponse = await fetch("/api/usageStatus", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username }),
-        });
-        const usageData = await usageResponse.json();
-
-        if (usageData.usageStatus) {
-          setUsageStatus(usageData.usageStatus);
         }
 
         // Fetch avatar
@@ -315,8 +302,7 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
       {hasProAccess ? (
         getStatusDisplay()
       ) : (
-        <div className="flex items-center space-x-3">
-          {/* Username with Avatar for Free Users */}
+        <div className="flex flex-col space-y-3">
           {username && (
             <div className="flex items-center space-x-2">
               <Avatar
@@ -330,31 +316,15 @@ const ProStatus: React.FC<ProStatusProps> = ({ hasProAccess, username }) => {
               </span>
             </div>
           )}
-          {/* Usage Status for Free Users */}
-          {usageStatus && !usageStatus.isProUser && (
-            <div className="text-sm text-gray-300">
-              <span className="font-semibold">
-                {usageStatus.questionsRemaining === -1
-                  ? "Unlimited"
-                  : `${usageStatus.questionsRemaining}/${usageStatus.questionsLimit}`}
-              </span>
-              <span className="text-gray-400 ml-1">
-                {usageStatus.questionsRemaining === -1
-                  ? "questions"
-                  : "questions left"}
-              </span>
-              {usageStatus.isInCooldown && usageStatus.cooldownUntil && (
-                <div className="text-xs text-orange-400 mt-1">
-                  Next question:{" "}
-                  {new Date(usageStatus.cooldownUntil).toLocaleTimeString()}
-                </div>
-              )}
-            </div>
-          )}
+
+          {/* <div className="text-xs text-gray-400">
+            Upgrade to Wingman Pro to create and manage forums, unlock advanced
+            analytics, and access exclusive perks.
+          </div> */}
 
           <button
             onClick={handleUpgradeClick}
-            className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 shadow-lg hover:shadow-xl"
+            className="w-full px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-200 shadow-lg hover:shadow-xl"
           >
             Upgrade to Pro
           </button>

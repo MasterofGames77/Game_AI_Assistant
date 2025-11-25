@@ -141,7 +141,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
        'subscription.currentPeriodStart': new Date((subscription as any).current_period_start * 1000),
        'subscription.currentPeriodEnd': new Date((subscription as any).current_period_end * 1000),
        'subscription.cancelAtPeriodEnd': subscription.cancel_at_period_end,
-       'subscription.amount': subscription.items.data[0]?.price.unit_amount || 199,
+       'subscription.amount': subscription.items.data[0]?.price.unit_amount || 99,
        'subscription.currency': subscription.currency,
        'subscription.billingCycle': 'monthly',
        hasProAccess: true
@@ -253,7 +253,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
       'subscription.status': 'active',
       'subscription.currentPeriodStart': new Date((invoice as any).period_start * 1000),
       'subscription.currentPeriodEnd': new Date((invoice as any).period_end * 1000),
-      'subscription.amount': (invoice as any).amount_paid || 199,
+      'subscription.amount': (invoice as any).amount_paid || 99,
       'subscription.currency': (invoice as any).currency || 'usd',
       'subscription.billingCycle': 'monthly',
       hasProAccess: true

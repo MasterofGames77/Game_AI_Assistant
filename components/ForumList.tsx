@@ -96,7 +96,8 @@ export default function ForumList() {
         <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-blue-800 text-sm">
             <strong>Pro Access Required:</strong> Upgrade to Wingman Pro to
-            create forums and participate in discussions.
+            create and manage forums. Free users can still browse discussions,
+            post, and reply.
           </p>
         </div>
       )}
@@ -160,7 +161,7 @@ export default function ForumList() {
             No forums found. Create one to get started!
             {!hasProAccess && (
               <div className="mt-2 text-sm">
-                <p>Upgrade to Pro to create and access exclusive forums.</p>
+                <p>Upgrade to Pro to create your own communities.</p>
               </div>
             )}
           </div>

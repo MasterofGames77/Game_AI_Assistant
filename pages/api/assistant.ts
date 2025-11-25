@@ -1170,25 +1170,11 @@ const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
       }
     }
 
-    // Connect to MongoDB to check usage limits
+    // Connect to MongoDB (required for downstream operations)
     await connectToMongoDB();
     
-    // Check usage limits for free users
+    // Load the user to update streak/usage data later
     const user = await User.findOne({ username });
-    if (user) {
-      const usageCheck = user.canAskQuestion();
-      if (!usageCheck.allowed) {
-        logger.info('User hit usage limit', { username, reason: usageCheck.reason });
-        return res.status(429).json({
-          error: 'Rate Limited',
-          message: usageCheck.reason,
-          cooldownUntil: usageCheck.cooldownUntil,
-          nextWindowReset: usageCheck.nextWindowReset,
-          questionsRemaining: usageCheck.questionsRemaining,
-          metrics
-        });
-      }
-    }
 
     // Track request
     requestMonitor.incrementRequest();

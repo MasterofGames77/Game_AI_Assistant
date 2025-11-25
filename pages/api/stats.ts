@@ -43,18 +43,13 @@ export default async function handler(
     // Get total questions (use actual count from Question model for accuracy)
     const totalQuestions = await Question.countDocuments({ username });
 
-    // Get streak data
-    const streak = user.streak || {
-      currentStreak: 0,
-      longestStreak: 0,
-      lastActivityDate: null
-    };
+    const streakStatus = await user.syncStreakStatus();
 
     return res.status(200).json({
       questionsToday,
       totalQuestions,
-      currentStreak: streak.currentStreak || 0,
-      longestStreak: streak.longestStreak || 0
+      currentStreak: streakStatus.currentStreak,
+      longestStreak: streakStatus.longestStreak
     });
   } catch (error) {
     console.error('Error fetching stats:', error);

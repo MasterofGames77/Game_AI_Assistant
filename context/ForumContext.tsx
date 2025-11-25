@@ -26,18 +26,9 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
       setForums(response.data.forums);
       return response.data;
     } catch (err: any) {
-      if (
-        err.response?.status === 403 &&
-        err.response?.data?.error?.includes("Pro access")
-      ) {
-        setError(
-          "Pro access required to view forums. Upgrade to Wingman Pro to access exclusive forums."
-        );
-      } else {
-        setError(
-          err.response?.data?.error || err.message || "Failed to fetch forums"
-        );
-      }
+      setError(
+        err.response?.data?.error || err.message || "Failed to fetch forums"
+      );
       return [];
     } finally {
       setLoading(false);
@@ -65,18 +56,9 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
       setForums((prevForums) => [...prevForums, newForum]);
       return newForum;
     } catch (err: any) {
-      if (
-        err.response?.status === 403 &&
-        err.response?.data?.error?.includes("Pro access")
-      ) {
-        setError(
-          "Pro access required to create forums. Upgrade to Wingman Pro to create forums and participate in discussions."
-        );
-      } else {
-        setError(
-          err.response?.data?.error || err.message || "Failed to create forum"
-        );
-      }
+      setError(
+        err.response?.data?.error || err.message || "Failed to create forum"
+      );
       return null;
     } finally {
       setLoading(false);
@@ -111,9 +93,16 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
   );
 
   const addPost = useCallback(
-    async (forumId: string, message: string, imageFiles?: File[], replyTo?: string) => {
+    async (
+      forumId: string,
+      message: string,
+      imageFiles?: File[],
+      replyTo?: string,
+      options?: { onStatus?: (status: "loading" | "error" | "success", message?: string) => void }
+    ) => {
       try {
         setLoading(true);
+        options?.onStatus?.("loading");
 
         // Upload images first if provided
         let attachments: any[] = [];
@@ -213,45 +202,52 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
         if (currentForum?._id === forumId) {
           setCurrentForum(updatedForum);
         }
+        options?.onStatus?.("success");
       } catch (err: any) {
         // Check for content policy violation - show user-friendly message
+        const duplicate =
+          err.response?.status === 400 &&
+          err.response?.data?.error === "Duplicate post detected";
+
         if (
           err.response?.status === 400 &&
           err.response?.data?.isContentViolation
         ) {
-          // Log the 400 error to console for debugging
           console.warn("Content policy violation (400):", {
             status: err.response.status,
             username: localStorage.getItem("username"),
             message: err.response.data.message,
             warningCount: err.response.data.warningCount,
           });
-          // Show user-friendly message on the page
-          setError(
+          const msg =
             err.response.data.message ||
-              "Your message contains inappropriate content."
-          );
-        } else if (
-          err.response?.status === 403 &&
-          err.response?.data?.error?.includes("Pro access")
-        ) {
-          setError(
-            "Pro access required to post in forums. Upgrade to Wingman Pro to participate in discussions."
-          );
+            "Your message contains inappropriate content.";
+          setError(msg);
+          options?.onStatus?.("error", msg);
+        } else if (duplicate) {
+          console.warn("Duplicate post detected:", {
+            username: localStorage.getItem("username"),
+            forumId,
+          });
+          const msg =
+            err.response?.data?.message ||
+            "You've already posted this message recently.";
+          setError(msg);
+          options?.onStatus?.("error", msg);
         } else {
-          // Log other 400 errors to console
           if (err.response?.status === 400) {
             console.error("Request failed with status code 400:", {
               error: err.response?.data?.error,
               details: err.response?.data?.details,
             });
           }
-          setError(
+          const msg =
             err.response?.data?.error ||
-              err.response?.data?.message ||
-              err.message ||
-              "Failed to add post"
-          );
+            err.response?.data?.message ||
+            err.message ||
+            "Failed to add post";
+          setError(msg);
+          options?.onStatus?.("error", msg);
         }
         throw err;
       } finally {

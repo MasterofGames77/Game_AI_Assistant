@@ -85,19 +85,13 @@ export const checkProAccess = async (identifier: string, userId?: string): Promi
         return true;
       }
 
-      // 2. Legacy check: If user has Pro in application DB (backward compatibility)
-      if (appUser.hasProAccess) {
-        console.log('Pro access granted via hasProAccess field for user:', appUser.username);
-        return true;
-      }
-
-      // 3. Check if user has active subscription status
+      // 2. Check if user has active subscription status
       if (appUser.subscription?.status === 'active' && appUser.subscription?.currentPeriodEnd && appUser.subscription.currentPeriodEnd > new Date()) {
         console.log('Pro access granted via active subscription for user:', appUser.username);
         return true;
       }
 
-      // 4. Check if user has canceled subscription but still has access until period end
+      // 3. Check if user has canceled subscription but still has access until period end
       if (appUser.subscription?.status === 'canceled' && appUser.subscription?.cancelAtPeriodEnd && appUser.subscription?.currentPeriodEnd && appUser.subscription.currentPeriodEnd > new Date()) {
         console.log('Pro access granted via canceled subscription (active until period end) for user:', appUser.username);
         return true;

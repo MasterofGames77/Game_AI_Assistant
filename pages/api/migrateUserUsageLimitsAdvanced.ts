@@ -10,122 +10,58 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     await connectToWingmanDB();
 
-    // console.log('🔄 Starting advanced user usage limits migration...'); // Commented out for production
+    // console.log('🔄 Starting unlimited usage limit cleanup...'); // Commented out for production
 
     // Get all users from the database
     const users = await User.find({});
-    // console.log(`📊 Found ${users.length} users to migrate`); // Commented out for production
+    // console.log(`📊 Found ${users.length} users to update`); // Commented out for production
 
-    let migratedCount = 0;
-    let skippedCount = 0;
-    let proUsersCount = 0;
-    let freeUsersCount = 0;
+    let updatedCount = 0;
     const errors: string[] = [];
 
     for (const user of users) {
       try {
-        // Check if user already has usageLimit data
-        if (user.usageLimit) {
-          // console.log(`⏭️  Skipping user ${user.username} - already has usage limit data`); // Commented out for production
-          skippedCount++;
-          continue;
-        }
-
         const now = new Date();
-        let usageLimit;
 
-        // Check if user has Pro access (early access or paid subscription)
-        const hasProAccess = user.hasActiveProAccess();
-        
-        if (hasProAccess) {
-          // Pro users get unlimited access (no usage limits needed)
-          usageLimit = {
-            freeQuestionsUsed: 0,
-            freeQuestionsLimit: -1, // Unlimited
-            windowStartTime: now,
-            windowDurationHours: 0, // No window for Pro users
-            lastQuestionTime: now
-          };
-          proUsersCount++;
-          // console.log(`👑 Pro user: ${user.username} (${user.subscription?.status || 'legacy'})`); // Commented out for production
-        } else {
-          // Free users get standard limits
-          usageLimit = {
-            freeQuestionsUsed: 0,
-            freeQuestionsLimit: 10,
-            windowStartTime: now,
-            windowDurationHours: 1,
-            lastQuestionTime: now
-          };
-          freeUsersCount++;
-          // console.log(`🆓 Free user: ${user.username}`); // Commented out for production
-        }
+        const unlimitedUsage = {
+          freeQuestionsUsed: 0,
+          freeQuestionsLimit: -1, // Unlimited for analytics consistency
+          windowStartTime: now,
+          windowDurationHours: 0,
+          lastQuestionTime: now,
+          cooldownUntil: undefined
+        };
 
-        // Update the user with usage limit data
         await User.findByIdAndUpdate(
           user._id,
-          { 
-            $set: { 
-              usageLimit: usageLimit 
-            } 
+          {
+            $set: {
+              usageLimit: unlimitedUsage
+            }
           },
           { new: true }
         );
 
-        // console.log(`✅ Migrated user: ${user.username}`); // Commented out for production
-        migratedCount++;
-
+        updatedCount++;
       } catch (error) {
-        const errorMsg = `Failed to migrate user ${user.username}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        const errorMsg = `Failed to update user ${user.username}: ${error instanceof Error ? error.message : 'Unknown error'}`;
         console.error(`❌ ${errorMsg}`);
         errors.push(errorMsg);
       }
     }
 
-    // Get updated counts by user type
-    const totalProUsers = await User.countDocuments({ hasProAccess: true });
-    const totalFreeUsers = await User.countDocuments({ hasProAccess: false });
-    const usersWithUsageLimits = await User.countDocuments({ 'usageLimit': { $exists: true } });
-    
-    // Get subscription breakdown
-    const earlyAccessUsers = await User.countDocuments({ 
-      'subscription.earlyAccessGranted': true 
-    });
-    const paidUsers = await User.countDocuments({ 
-      'subscription.status': 'active' 
-    });
-    const canceledUsers = await User.countDocuments({ 
-      'subscription.status': 'canceled' 
-    });
-
     const result = {
       totalUsers: users.length,
-      migrated: migratedCount,
-      skipped: skippedCount,
+      updated: updatedCount,
       errors: errors.length,
       errorDetails: errors,
-      userTypeBreakdown: {
-        proUsersMigrated: proUsersCount,
-        freeUsersMigrated: freeUsersCount
-      },
-      finalStats: {
-        totalProUsers,
-        totalFreeUsers,
-        usersWithUsageLimits,
-        subscriptionBreakdown: {
-          earlyAccessUsers,
-          paidUsers,
-          canceledUsers
-        }
-      },
       timestamp: new Date().toISOString()
     };
 
-    // console.log('🎉 Advanced migration completed!'); // Commented out for production
-    // console.log('📈 Final Stats:', result.finalStats); // Commented out for production
+    // console.log('🎉 Unlimited usage cleanup completed!'); // Commented out for production
 
     return res.status(200).json({
-      message: 'Advanced user usage limits migration completed successfully',
+      message: 'All users updated with unlimited usage limits',
       ...result
     });
 

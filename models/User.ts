@@ -72,6 +72,11 @@ export interface IUser extends Document {
   recordBreak(): void;
   getHealthTips(): string[];
   updateStreak(): void;
+  syncStreakStatus(): Promise<{
+    currentStreak: number;
+    longestStreak: number;
+    lastActivityDate: Date | null;
+  }>;
 }
 
 const UserSchema = new Schema<IUser>({
@@ -285,34 +290,36 @@ UserSchema.index({ 'lastPasswordResetRequest': 1 });
 // Method to check if user has active Pro access
 UserSchema.methods.hasActiveProAccess = function(): boolean {
   const now = new Date();
-  
-  // Check legacy hasProAccess flag (for users who were granted Pro access before subscription system)
-  if (this.hasProAccess) {
+  const subscription = this.subscription;
+  const currentPeriodEnd = subscription?.currentPeriodEnd;
+  const hasFuturePeriod = currentPeriodEnd ? currentPeriodEnd > now : false;
+
+  const hasActiveEarlyAccess =
+    subscription?.earlyAccessGranted &&
+    subscription?.earlyAccessEndDate &&
+    subscription.earlyAccessEndDate > now;
+
+  const hasManualLegacyAccess =
+    this.hasProAccess && !subscription;
+
+  const hasActivePaidSubscription =
+    subscription?.status === 'active' &&
+    (hasFuturePeriod || !currentPeriodEnd);
+
+  const hasCanceledButActiveSubscription =
+    subscription?.status === 'canceled' &&
+    subscription?.cancelAtPeriodEnd &&
+    hasFuturePeriod;
+
+  if (
+    hasActiveEarlyAccess ||
+    hasManualLegacyAccess ||
+    hasActivePaidSubscription ||
+    hasCanceledButActiveSubscription
+  ) {
     return true;
   }
-  
-  // Check early access period
-  if (this.subscription?.earlyAccessGranted && 
-      this.subscription?.earlyAccessEndDate && 
-      this.subscription.earlyAccessEndDate > now) {
-    return true;
-  }
-  
-  // Check paid subscription
-  if (this.subscription?.status === 'active' && 
-      this.subscription?.currentPeriodEnd && 
-      this.subscription.currentPeriodEnd > now) {
-    return true;
-  }
-  
-  // Check canceled subscription (still active until period end)
-  if (this.subscription?.status === 'canceled' && 
-      this.subscription?.cancelAtPeriodEnd && 
-      this.subscription?.currentPeriodEnd && 
-      this.subscription.currentPeriodEnd > now) {
-    return true;
-  }
-  
+
   return false;
 };
 
@@ -403,99 +410,16 @@ UserSchema.methods.canAskQuestion = function(): {
   cooldownUntil?: Date;
   nextWindowReset?: Date;
 } {
-  const now = new Date();
-  
-  // Pro users have unlimited access
-  if (this.hasActiveProAccess()) {
-    return {
-      allowed: true,
-      questionsRemaining: -1 // Unlimited
-    };
-  }
-  
-  // If no usage limit data, initialize it
-  if (!this.usageLimit) {
-    this.usageLimit = {
-      freeQuestionsUsed: 0,
-      freeQuestionsLimit: 10,
-      windowStartTime: now,
-      windowDurationHours: 1,
-      lastQuestionTime: now
-    };
-    return {
-      allowed: true,
-      questionsRemaining: 7
-    };
-  }
-  
-  const usageLimit = this.usageLimit;
-  const windowEndTime = new Date(usageLimit.windowStartTime.getTime() + (usageLimit.windowDurationHours * 60 * 60 * 1000));
-  
-  // Check if we're in cooldown period
-  if (usageLimit.cooldownUntil && usageLimit.cooldownUntil > now) {
-    return {
-      allowed: false,
-      reason: 'You are in cooldown period. Please wait before asking another question.',
-      cooldownUntil: usageLimit.cooldownUntil,
-      nextWindowReset: windowEndTime
-    };
-  }
-  
-  // Check if current window has expired
-  if (now >= windowEndTime) {
-    // Reset the window
-    usageLimit.freeQuestionsUsed = 0;
-    usageLimit.windowStartTime = now;
-    usageLimit.cooldownUntil = undefined;
-    
-    return {
-      allowed: true,
-      questionsRemaining: usageLimit.freeQuestionsLimit
-    };
-  }
-  
-  // Check if user has reached the limit
-  if (usageLimit.freeQuestionsUsed >= usageLimit.freeQuestionsLimit) {
-    // Set cooldown until window resets
-    usageLimit.cooldownUntil = windowEndTime;
-    
-    return {
-      allowed: false,
-      reason: `You've used all ${usageLimit.freeQuestionsLimit} free questions. Please wait 1 hour or upgrade to Pro for unlimited access.`,
-      cooldownUntil: usageLimit.cooldownUntil,
-      nextWindowReset: windowEndTime
-    };
-  }
-  
   return {
     allowed: true,
-    questionsRemaining: usageLimit.freeQuestionsLimit - usageLimit.freeQuestionsUsed
+    questionsRemaining: -1
   };
 };
 
 // Method to record question usage
 UserSchema.methods.recordQuestionUsage = function(): void {
-  const now = new Date();
-  
-  // Pro users don't need to track usage
-  if (this.hasActiveProAccess()) {
-    return;
-  }
-  
-  // Initialize usage limit if it doesn't exist
-  if (!this.usageLimit) {
-    this.usageLimit = {
-      freeQuestionsUsed: 0,
-      freeQuestionsLimit: 10,
-      windowStartTime: now,
-      windowDurationHours: 1,
-      lastQuestionTime: now
-    };
-  }
-  
-  // Increment usage count
-  this.usageLimit.freeQuestionsUsed += 1;
-  this.usageLimit.lastQuestionTime = now;
+  // Question usage tracking is no longer needed now that all users have unlimited access.
+  return;
 };
 
 // Method to get usage status for display
@@ -508,42 +432,14 @@ UserSchema.methods.getUsageStatus = function(): {
   isInCooldown: boolean;
   isProUser: boolean;
 } {
-  const now = new Date();
-  
-  // Pro users have unlimited access
-  if (this.hasActiveProAccess()) {
-    return {
-      questionsUsed: 0,
-      questionsRemaining: -1, // Unlimited
-      questionsLimit: -1,
-      isInCooldown: false,
-      isProUser: true
-    };
-  }
-  
-  // If no usage limit data, return default
-  if (!this.usageLimit) {
-    return {
-      questionsUsed: 0,
-      questionsRemaining: 10,
-      questionsLimit: 10,
-      isInCooldown: false,
-      isProUser: false
-    };
-  }
-  
-  const usageLimit = this.usageLimit;
-  const windowEndTime = new Date(usageLimit.windowStartTime.getTime() + (usageLimit.windowDurationHours * 60 * 60 * 1000));
-  const isInCooldown = usageLimit.cooldownUntil ? usageLimit.cooldownUntil > now : false;
-  
   return {
-    questionsUsed: usageLimit.freeQuestionsUsed,
-    questionsRemaining: Math.max(0, usageLimit.freeQuestionsLimit - usageLimit.freeQuestionsUsed),
-    questionsLimit: usageLimit.freeQuestionsLimit,
-    windowResetTime: windowEndTime,
-    cooldownUntil: usageLimit.cooldownUntil,
-    isInCooldown,
-    isProUser: false
+    questionsUsed: 0,
+    questionsRemaining: -1,
+    questionsLimit: -1,
+    windowResetTime: undefined,
+    cooldownUntil: undefined,
+    isInCooldown: false,
+    isProUser: this.hasActiveProAccess()
   };
 };
 
@@ -728,6 +624,65 @@ UserSchema.methods.updateStreak = function(): void {
   
   // Update last activity date
   this.streak.lastActivityDate = today;
+};
+
+// Method to ensure streak accurately reflects recent activity
+UserSchema.methods.syncStreakStatus = async function() {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (!this.streak) {
+    this.streak = {
+      currentStreak: 0,
+      longestStreak: 0,
+      lastActivityDate: null
+    };
+    return {
+      currentStreak: 0,
+      longestStreak: 0,
+      lastActivityDate: null
+    };
+  }
+
+  const streak = this.streak;
+  const lastActivityRaw = streak.lastActivityDate ? new Date(streak.lastActivityDate) : null;
+
+  if (!lastActivityRaw) {
+    return {
+      currentStreak: streak.currentStreak || 0,
+      longestStreak: streak.longestStreak || 0,
+      lastActivityDate: null
+    };
+  }
+
+  const lastActivityDate = new Date(
+    lastActivityRaw.getFullYear(),
+    lastActivityRaw.getMonth(),
+    lastActivityRaw.getDate()
+  );
+
+  const dayDifference = Math.floor(
+    (today.getTime() - lastActivityDate.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  let streakUpdated = false;
+
+  if (dayDifference > 1 && (streak.currentStreak || 0) !== 0) {
+    streak.currentStreak = 0;
+    streakUpdated = true;
+  }
+
+  if (streakUpdated) {
+    await this.updateOne({
+      $set: { 'streak.currentStreak': streak.currentStreak }
+    });
+  }
+
+  return {
+    currentStreak: streak.currentStreak || 0,
+    longestStreak: streak.longestStreak || 0,
+    lastActivityDate: streak.lastActivityDate || null
+  };
 };
 
 // Delete model from cache if it exists (handles hot-reload in Next.js)

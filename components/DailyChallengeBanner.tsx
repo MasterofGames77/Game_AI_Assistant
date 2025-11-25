@@ -224,10 +224,10 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
       )}
       {/* Challenge Banner */}
       <div
-        className={`mt-4 px-3 py-2 rounded-lg border-2 transition-all max-w-xl w-full ${
+        className={`mt-4 px-4 py-3 rounded-lg border-2 transition-all max-w-xl w-full ${
           completed
-            ? "bg-green-900/20 border-green-500 dark:bg-green-900/30"
-            : "bg-blue-900/20 border-blue-500 dark:bg-blue-900/30"
+            ? "bg-green-50 border-green-500 text-green-900 dark:bg-green-900/30 dark:text-white"
+            : "bg-blue-50 border-blue-500 text-blue-900 dark:bg-blue-900/30 dark:text-white"
         }`}
       >
         <div className="flex items-center justify-between">
@@ -237,23 +237,23 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
             </span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-white text-xs">
+                <h3 className="font-bold text-xs">
                   {completed ? "✅ " : ""}
                   Daily Challenge: {challenge.title}
                 </h3>
               </div>
-              <p className="text-xs text-gray-300 mt-0.5">
+              <p className="text-xs text-gray-700 dark:text-gray-300 mt-0.5">
                 {challenge.description}
               </p>
               {streak && streak.currentStreak > 0 && (
-                <div className="mt-1 text-xs font-semibold text-yellow-400">
+                <div className="mt-1 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
                   {getChallengeStreakInfo(streak).message}
                 </div>
               )}
               {milestoneInfo &&
                 milestoneInfo.progress &&
                 milestoneInfo.nextMilestone && (
-                  <div className="mt-1 text-xs text-gray-400">
+                  <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
                     Next reward: {milestoneInfo.nextMilestone.reward.icon}{" "}
                     {milestoneInfo.nextMilestone.reward.name} (
                     {milestoneInfo.progress.current}/
@@ -262,11 +262,11 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
                 )}
               {progress && (
                 <div className="mt-1.5">
-                  <div className="flex items-center gap-2 text-xs text-gray-300">
+                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
                     <span className="whitespace-nowrap text-xs">
                       Progress: {progress.current}/{progress.target}
                     </span>
-                    <div className="flex-1 bg-gray-700 rounded-full h-1.5 min-w-0">
+                    <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 min-w-0">
                       <div
                         className={`h-1.5 rounded-full transition-all ${
                           completed ? "bg-green-500" : "bg-blue-500"

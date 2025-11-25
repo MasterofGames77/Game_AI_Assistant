@@ -1,7 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import connectToMongoDB from '../../utils/mongodb';
 import Forum from '../../models/Forum';
-import { checkProAccess } from '../../utils/proAccessUtil';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -38,26 +37,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       hasMetadata: !!forum.metadata,
       postsCount: Array.isArray(forum.posts) ? forum.posts.length : 'not array'
     });
-
-    // Pro access check - all forums now require Pro access
-    // Wrap in try-catch in case checkProAccess throws an error
-    let hasProAccess = false;
-    try {
-      hasProAccess = await checkProAccess((username as string) || '');
-    } catch (proAccessError) {
-      console.error('Error in checkProAccess:', {
-        error: proAccessError instanceof Error ? proAccessError.message : String(proAccessError),
-        stack: proAccessError instanceof Error ? proAccessError.stack : undefined,
-        username: req.query.username,
-        forumId: req.query.forumId
-      });
-      // Default to false if check fails
-      hasProAccess = false;
-    }
-    
-    if (!hasProAccess) {
-      return res.status(403).json({ error: 'Pro access required to access forums. Upgrade to Wingman Pro to access forums.' });
-    }
 
     // Ensure metadata exists and has all required fields
     if (!forum.metadata) {

@@ -25,16 +25,12 @@ export default async function handler(
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const streak = user.streak || {
-      currentStreak: 0,
-      longestStreak: 0,
-      lastActivityDate: null
-    };
+    const streakStatus = await user.syncStreakStatus();
 
     return res.status(200).json({
-      currentStreak: streak.currentStreak || 0,
-      longestStreak: streak.longestStreak || 0,
-      lastActivityDate: streak.lastActivityDate || null
+      currentStreak: streakStatus.currentStreak,
+      longestStreak: streakStatus.longestStreak,
+      lastActivityDate: streakStatus.lastActivityDate
     });
   } catch (error) {
     console.error('Error fetching streak:', error);

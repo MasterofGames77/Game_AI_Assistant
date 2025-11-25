@@ -74,7 +74,8 @@ export default function CreateForum() {
         <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p className="text-yellow-800 text-sm">
             <strong>Pro Access Required:</strong> Upgrade to Wingman Pro to
-            create forums and participate in discussions.
+            create and manage forums. Free users can still join the
+            conversation by posting and replying.
           </p>
         </div>
       )}

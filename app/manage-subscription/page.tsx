@@ -236,7 +236,7 @@ export default function ManageSubscriptionPage() {
 
               <div className="flex justify-between">
                 <span className="text-gray-400">Price:</span>
-                <span className="text-white font-semibold">$1.99/month</span>
+                <span className="text-white font-semibold">$0.99/month</span>
               </div>
 
               {subscriptionData.subscriptionStatus?.expiresAt && (
@@ -257,23 +257,6 @@ export default function ManageSubscriptionPage() {
             </h2>
 
             <div className="space-y-3">
-              <div className="flex items-center">
-                <svg
-                  className="w-5 h-5 text-green-400 mr-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-                <span className="text-white">Unlimited questions</span>
-              </div>
-
               <div className="flex items-center">
                 <svg
                   className="w-5 h-5 text-green-400 mr-3"

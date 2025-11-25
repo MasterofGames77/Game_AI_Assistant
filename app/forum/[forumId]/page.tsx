@@ -112,6 +112,8 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     setImagePreviews(imagePreviews.filter((_, i) => i !== index));
   };
 
+  const [isPosting, setIsPosting] = useState(false);
+  const [postStatus, setPostStatus] = useState<string | null>(null);
   const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() && selectedImages.length === 0) {
@@ -120,11 +122,45 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     }
 
     try {
+      setPostStatus(null);
       await addPost(
         params.forumId,
         message,
-        selectedImages.length > 0 ? selectedImages : undefined
+        selectedImages.length > 0 ? selectedImages : undefined,
+        undefined,
+        {
+          onStatus: (status, msg) => {
+            setIsPosting(status === "loading");
+            if (status === "error" && msg) {
+              toast.error(msg, {
+                duration: 5000,
+                style: {
+                  background: "#fee2e2",
+                  color: "#991b1b",
+                  border: "1px solid #fca5a5",
+                  padding: "12px",
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                },
+              });
+            }
+            if (status === "success") {
+              toast.success("Post published!", {
+                duration: 3000,
+                style: {
+                  background: "#ecfccb",
+                  color: "#3f6212",
+                  border: "1px solid #bef264",
+                  padding: "12px",
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                },
+              });
+            }
+          },
+        }
       );
+      setIsPosting(false);
       setMessage("");
       setSelectedImages([]);
       // Clean up preview URLs
@@ -144,8 +180,28 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       );
       setCurrentForum(response.data);
     } catch (err: any) {
+      setIsPosting(false);
       // Handle image moderation errors with violation tracking
-      if (err.response?.status === 400 || err.response?.status === 403) {
+      if (
+        err.response?.status === 400 &&
+        err.response?.data?.error === "Duplicate post detected"
+      ) {
+        toast.error(
+          err.response?.data?.message ||
+            "You've already posted this message recently.",
+          {
+            duration: 4000,
+            style: {
+              background: "#fee2e2",
+              color: "#991b1b",
+              border: "1px solid #fca5a5",
+              padding: "16px",
+              borderRadius: "8px",
+              fontSize: "14px",
+            },
+          }
+        );
+      } else if (err.response?.status === 400 || err.response?.status === 403) {
         const errorData = err.response?.data;
 
         // Check if this is a content violation (warning/ban)
@@ -617,6 +673,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     setReplyImagePreviews(replyImagePreviews.filter((_, i) => i !== index));
   };
 
+  const [isReplyPosting, setIsReplyPosting] = useState(false);
   const handleReplySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyingToPostId || !currentForum) return;
@@ -650,8 +707,40 @@ function ForumPage({ params }: { params: { forumId: string } }) {
         params.forumId,
         finalMessage,
         replySelectedImages.length > 0 ? replySelectedImages : undefined,
-        replyingToPostId
+        replyingToPostId,
+        {
+          onStatus: (status, msg) => {
+            setIsReplyPosting(status === "loading");
+            if (status === "error" && msg) {
+              toast.error(msg, {
+                duration: 5000,
+                style: {
+                  background: "#fee2e2",
+                  color: "#991b1b",
+                  border: "1px solid #fca5a5",
+                  padding: "12px",
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                },
+              });
+            }
+            if (status === "success") {
+              toast.success("Reply posted!", {
+                duration: 3000,
+                style: {
+                  background: "#ecfccb",
+                  color: "#3f6212",
+                  border: "1px solid #bef264",
+                  padding: "12px",
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                },
+              });
+            }
+          },
+        }
       );
+      setIsReplyPosting(false);
       setReplyingToPostId(null);
       setReplyMessage("");
       setReplySelectedImages([]);
@@ -672,8 +761,28 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       );
       setCurrentForum(response.data);
     } catch (err: any) {
+      setIsReplyPosting(false);
       // Handle errors similar to regular post submission
-      if (err.response?.status === 400 || err.response?.status === 403) {
+      if (
+        err.response?.status === 400 &&
+        err.response?.data?.error === "Duplicate post detected"
+      ) {
+        toast.error(
+          err.response?.data?.message ||
+            "You've already posted this message recently.",
+          {
+            duration: 4000,
+            style: {
+              background: "#fee2e2",
+              color: "#991b1b",
+              border: "1px solid #fca5a5",
+              padding: "16px",
+              borderRadius: "8px",
+              fontSize: "14px",
+            },
+          }
+        );
+      } else if (err.response?.status === 400 || err.response?.status === 403) {
         const errorData = err.response?.data;
         if (errorData?.isContentViolation || errorData?.violationResult) {
           const violationResult = errorData.violationResult;
@@ -901,9 +1010,14 @@ function ForumPage({ params }: { params: { forumId: string } }) {
 
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            disabled={isPosting}
+            className={`px-4 py-2 rounded text-white transition-all duration-200 ${
+              isPosting
+                ? "bg-gray-500 cursor-not-allowed"
+                : "bg-blue-500 hover:bg-blue-600"
+            }`}
           >
-            Post
+            {isPosting ? "Posting..." : "Post"}
           </button>
         </form>
       </div>
@@ -1477,9 +1591,14 @@ function ForumPage({ params }: { params: { forumId: string } }) {
                           <div className="flex space-x-2">
                             <button
                               type="submit"
-                              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                              disabled={isReplyPosting}
+                              className={`px-4 py-2 rounded text-white transition-all duration-200 ${
+                                isReplyPosting
+                                  ? "bg-gray-500 cursor-not-allowed"
+                                  : "bg-green-500 hover:bg-green-600"
+                              }`}
                             >
-                              Post Reply
+                              {isReplyPosting ? "Posting..." : "Post Reply"}
                             </button>
                             <button
                               type="button"

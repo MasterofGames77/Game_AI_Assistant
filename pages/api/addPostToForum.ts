@@ -3,7 +3,6 @@ import mongoose from 'mongoose';
 import connectToMongoDB from '../../utils/mongodb';
 import Forum from '../../models/Forum';
 import { containsOffensiveContent } from '../../utils/contentModeration';
-import { checkProAccess } from '../../utils/proAccessUtil';
 import { checkUserBanStatus } from '../../utils/violationHandler';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -46,12 +45,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ 
         error: `Missing required fields: ${missingFields.join(', ')}` 
       });
-    }
-
-    // Pro access check
-    const hasProAccess = await checkProAccess(username);
-    if (!hasProAccess) {
-      return res.status(403).json({ error: 'Pro access required to post in forums. Upgrade to Wingman Pro to participate.' });
     }
 
     // Check if user is currently banned (before processing post)

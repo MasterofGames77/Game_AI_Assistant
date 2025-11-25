@@ -2,7 +2,6 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import connectToMongoDB from '../../utils/mongodb';
 import Forum from '../../models/Forum';
 import { validateUserAuthentication } from '../../utils/validation';
-import { checkProAccess } from '../../utils/proAccessUtil';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -25,9 +24,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // Check Pro access for the user
-    const hasProAccess = await checkProAccess(username);
-
     // Get pagination parameters
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
@@ -41,11 +37,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ],
       'metadata.status': 'active'
     };
-
-    // All forums now require Pro access - non-Pro users cannot access any forums
-    if (!hasProAccess) {
-      return res.status(403).json({ error: 'Pro access required to view forums. Upgrade to Wingman Pro to access forums.' });
-    }
 
     // Find forums that are either public or private but accessible to the user
     const forums = await Forum.find(baseConditions)

@@ -197,7 +197,15 @@ export interface ForumContextType {
   fetchForums: (page: number, limit: number) => Promise<Forum[]>;
   createForum: (forumData: Partial<Forum>) => Promise<Forum | null>;
   deleteForum: (forumId: string) => Promise<void>;
-  addPost: (forumId: string, message: string, imageFiles?: File[], replyTo?: string) => Promise<void>;
+  addPost: (
+    forumId: string,
+    message: string,
+    imageFiles?: File[],
+    replyTo?: string,
+    options?: {
+      onStatus?: (status: "loading" | "error" | "success", message?: string) => void;
+    }
+  ) => Promise<void>;
   editPost: (forumId: string, postId: string, message: string, imageFiles?: File[], existingAttachments?: any[]) => Promise<void>;
   deletePost: (forumId: string, postId: string) => Promise<void>;
   likePost: (forumId: string, postId: string) => Promise<void>;

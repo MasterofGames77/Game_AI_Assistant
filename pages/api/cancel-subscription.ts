@@ -44,22 +44,22 @@ export default async function handler(
           subscription = await stripe.subscriptions.retrieve(user.subscription.stripeSubscriptionId) as Stripe.Subscription;
         } catch (retrieveError) {
           console.log(`Stripe subscription ${user.subscription.stripeSubscriptionId} not found, treating as legacy subscription`);
-          // If subscription doesn't exist in Stripe, treat as legacy and update database only
           await User.findOneAndUpdate(
             { _id: user._id },
             {
-              'subscription.status': 'canceled',
-              'subscription.cancelAtPeriodEnd': true,
+              hasProAccess: false,
+              'subscription.status': 'expired_free',
+              'subscription.cancelAtPeriodEnd': false,
               'subscription.canceledAt': new Date(),
-              // Keep hasProAccess true until manually revoked for legacy users
-              hasProAccess: true
+              'subscription.currentPeriodEnd': new Date(),
+              'subscription.earlyAccessGranted': false
             }
           );
 
           return res.status(200).json({ 
-            message: 'Legacy subscription canceled successfully. You will retain access until manually revoked.',
-            subscriptionStatus: 'canceled',
-            accessUntil: user.subscription?.currentPeriodEnd || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            message: 'Subscription canceled and Pro access removed immediately.',
+            subscriptionStatus: 'expired',
+            accessUntil: new Date()
           });
         }
 
@@ -100,24 +100,25 @@ export default async function handler(
         });
       }
     } else {
-      // For users without Stripe subscriptions (legacy Pro users), just update the database
+      // For users without Stripe subscriptions (legacy Pro users), immediately revoke access
       await User.findOneAndUpdate(
         { _id: user._id },
         {
-          'subscription.status': 'canceled',
-          'subscription.cancelAtPeriodEnd': true,
+          hasProAccess: false,
+          'subscription.status': 'expired_free',
+          'subscription.cancelAtPeriodEnd': false,
           'subscription.canceledAt': new Date(),
-          // Keep hasProAccess true until manually revoked
-          hasProAccess: true
+          'subscription.currentPeriodEnd': new Date(),
+          'subscription.earlyAccessGranted': false
         }
       );
 
-      console.log(`Legacy subscription canceled for user: ${username}`);
+      console.log(`Legacy subscription canceled and access revoked for user: ${username}`);
 
       return res.status(200).json({ 
-        message: 'Subscription canceled successfully',
-        subscriptionStatus: 'canceled',
-        accessUntil: user.subscription?.currentPeriodEnd || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        message: 'Subscription canceled and Pro access removed immediately.',
+        subscriptionStatus: 'expired',
+        accessUntil: new Date()
       });
     }
 

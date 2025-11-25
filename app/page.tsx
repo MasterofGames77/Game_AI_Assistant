@@ -116,58 +116,61 @@ export default function Home() {
   const fetchConversations = useCallback(async (forceRefresh = false) => {
     const storedUsername = localStorage.getItem("username");
     if (!storedUsername) return;
-    
+
     // Add timestamp to bypass cache when forcing refresh (cache is already cleared server-side)
-    const cacheBuster = forceRefresh ? `&_t=${Date.now()}` : '';
-    
+    const cacheBuster = forceRefresh ? `&_t=${Date.now()}` : "";
+
     const res = await axios.get(
       `/api/getConversation?username=${storedUsername}&page=1&pageSize=20${cacheBuster}`
     );
-    
+
     // Merge fetched conversations with existing ones to preserve optimistic updates
     setConversations((prev) => {
       const fetched = res.data.conversations;
-      
+
       // If forcing refresh (after new question), replace all but keep optimistic updates
       if (forceRefresh) {
         // Find any temporary (optimistic) conversations in prev that aren't in fetched
-        const tempConversations = prev.filter(conv => conv._id?.startsWith('temp-'));
-        
+        const tempConversations = prev.filter((conv) =>
+          conv._id?.startsWith("temp-")
+        );
+
         // Start with fetched conversations (page 1 from server)
         const merged = [...fetched];
-        
+
         // Add optimistic conversations that aren't in fetched results yet
-        tempConversations.forEach(tempConv => {
+        tempConversations.forEach((tempConv) => {
           const existsInFetched = fetched.some(
-            (fetchedConv: Conversation) => 
+            (fetchedConv: Conversation) =>
               fetchedConv.question === tempConv.question &&
               Math.abs(
-                new Date(fetchedConv.timestamp).getTime() - 
-                new Date(tempConv.timestamp).getTime()
+                new Date(fetchedConv.timestamp).getTime() -
+                  new Date(tempConv.timestamp).getTime()
               ) < 10000 // Within 10 seconds
           );
-          
+
           // If temp conversation not in fetched results yet, keep it
           if (!existsInFetched) {
             merged.push(tempConv);
           }
         });
-        
+
         // Sort by timestamp (most recent first)
-        merged.sort((a, b) => 
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        merged.sort(
+          (a, b) =>
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         );
-        
+
         // Return merged conversations (page 1 from server + any optimistic updates)
         // The reset logic in Sidebar checks non-temp conversations, so it will correctly
         // detect that we're back to page 1 (20 non-temp conversations)
         return merged;
       }
-      
+
       // Normal fetch - just replace
       return fetched;
     });
-    
+
     // Use the actual total from pagination, not just the returned array length
     if (res.data.pagination && res.data.pagination.total !== undefined) {
       setTotalConversations(res.data.pagination.total);
@@ -830,31 +833,34 @@ export default function Home() {
       if (res.data.metrics) {
         setMetrics(res.data.metrics);
       }
-      
+
       // Optimistically add the new question to conversations immediately when response is received
       // This ensures the question appears in the sidebar right away
       const newConversation: Conversation = {
         _id: `temp-${Date.now()}`, // Temporary ID until we fetch from server
-        username: username || 'anonymous',
+        username: username || "anonymous",
         question: question,
         response: res.data.answer,
         timestamp: new Date(),
         imageUrl: imageUrlForAnalysis || undefined,
       };
-      
+
       // Add to conversations list immediately (optimistic update) - happens synchronously
       setConversations((prev) => {
         // Check if conversation already exists to avoid duplicates
         const exists = prev.some(
-          (conv) => conv.question === question && 
-          Math.abs(new Date(conv.timestamp).getTime() - new Date().getTime()) < 5000
+          (conv) =>
+            conv.question === question &&
+            Math.abs(
+              new Date(conv.timestamp).getTime() - new Date().getTime()
+            ) < 5000
         );
         if (exists) return prev;
         // Add new conversation at the beginning (most recent first)
         // This will cause the sidebar to update immediately
         return [newConversation, ...prev];
       });
-      
+
       // Force refresh conversations to sync with server (after a delay to allow DB write)
       // The merge logic in fetchConversations will preserve the optimistic update if needed
       setTimeout(() => {
@@ -1350,14 +1356,19 @@ export default function Home() {
       <ShareCardModal
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
-        conversation={selectedConversation || (response ? {
-          _id: '',
-          username: username || 'anonymous',
-          question: question,
-          response: response,
-          timestamp: new Date(),
-          imageUrl: responseImageUrl || undefined,
-        } as Conversation : null)}
+        conversation={
+          selectedConversation ||
+          (response
+            ? ({
+                _id: "",
+                username: username || "anonymous",
+                question: question,
+                response: response,
+                timestamp: new Date(),
+                imageUrl: responseImageUrl || undefined,
+              } as Conversation)
+            : null)
+        }
         detectedGame={(selectedConversation as any)?.detectedGame || undefined}
       />
       {/* Main App Content (only if signed in) */}
@@ -1436,7 +1447,8 @@ export default function Home() {
                 );
                 // Filter out duplicates from new conversations
                 const uniqueNew = newConversations.filter(
-                  (conv) => !existingKeys.has(`${conv.question}-${conv.timestamp}`)
+                  (conv) =>
+                    !existingKeys.has(`${conv.question}-${conv.timestamp}`)
                 );
                 return [...prev, ...uniqueNew];
               });
@@ -1463,46 +1475,15 @@ export default function Home() {
               {/* Display conversation count in the UI */}
               {conversationCount > 0 && (
                 <p className="text-sm text-white font-medium mt-2 bg-gray-800 px-3 py-2 rounded-lg border border-gray-700">
-                  {conversationCount} total conversation{conversationCount !== 1 ? "s" : ""}
+                  {conversationCount} total conversation
+                  {conversationCount !== 1 ? "s" : ""}
                   {conversations.length < conversationCount && (
                     <span className="text-gray-400 text-xs block mt-1">
-                      ({conversations.length} shown, {conversationCount - conversations.length} more available)
+                      ({conversations.length} shown,{" "}
+                      {conversationCount - conversations.length} more available)
                     </span>
                   )}
                 </p>
-              )}
-
-              {/* Display usage status for free users */}
-              {usageStatus && !usageStatus.isProUser && (
-                <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <div className="text-sm text-blue-800 dark:text-blue-200">
-                    <span className="font-semibold">
-                      {usageStatus.questionsRemaining === -1
-                        ? "Unlimited"
-                        : `${usageStatus.questionsRemaining}/${usageStatus.questionsLimit}`}
-                    </span>
-                    <span className="ml-1">
-                      {usageStatus.questionsRemaining === -1
-                        ? "questions"
-                        : "questions remaining"}
-                    </span>
-                    {usageStatus.isInCooldown && usageStatus.cooldownUntil && (
-                      <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                        Next question available at{" "}
-                        {new Date(
-                          usageStatus.cooldownUntil
-                        ).toLocaleTimeString()}
-                      </div>
-                    )}
-                    {usageStatus.questionsRemaining === 0 &&
-                      !usageStatus.isInCooldown && (
-                        <div className="text-xs text-red-600 dark:text-red-400 mt-1">
-                          You&apos;ve reached your limit! Upgrade to Pro for
-                          unlimited access.
-                        </div>
-                      )}
-                  </div>
-                </div>
               )}
 
               <ul className="mt-4 text-lg text-center">
@@ -1522,10 +1503,15 @@ export default function Home() {
                         setQuestion(question);
                         // Focus the input field so user can edit or submit
                         setTimeout(() => {
-                          const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+                          const input = document.querySelector(
+                            'input[type="text"]'
+                          ) as HTMLInputElement;
                           if (input) {
                             input.focus();
-                            input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            input.scrollIntoView({
+                              behavior: "smooth",
+                              block: "center",
+                            });
                           }
                         }, 100);
                       }}
@@ -1553,10 +1539,15 @@ export default function Home() {
                       setQuestion(question);
                       // Focus the input field so user can edit or submit
                       setTimeout(() => {
-                        const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+                        const input = document.querySelector(
+                          'input[type="text"]'
+                        ) as HTMLInputElement;
                         if (input) {
                           input.focus();
-                          input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          input.scrollIntoView({
+                            behavior: "smooth",
+                            block: "center",
+                          });
                         }
                       }, 100);
                     }}

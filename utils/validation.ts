@@ -136,24 +136,6 @@ export const validateUserAccess = (forum: Forum, username: string) => {
 };
 
 /**
- * Validates if a user has Pro access for Pro-only forums
- * @param forum - The forum to check Pro access for
- * @param hasProAccess - Whether the user has Pro access
- * @returns Array of error messages, empty if user has Pro access
- */
-export const validateProAccess = (forum: Forum, hasProAccess: boolean) => {
-  const errors: string[] = [];
-
-  // All forums now require Pro access by default
-  if (!hasProAccess) {
-    errors.push('Pro access required to access forums. Upgrade to Wingman Pro to access forums.');
-  }
-
-  return errors;
-};
-
-
-/**
  * Validates if a forum status is valid
  * @param status - The status to validate
  * @returns Boolean indicating if the status is valid
