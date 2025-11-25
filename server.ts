@@ -14,15 +14,31 @@ const handle = app.getRequestHandler();
 // Function to set up Google Vision credentials
 const setupGoogleCredentials = () => {
   const credentialsPath = path.join("/tmp", "service-account-key.json");
-  const credentials = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+  
+  // Check for GOOGLE_CREDENTIALS first (used by API routes), then fall back to GOOGLE_APPLICATION_CREDENTIALS_JSON
+  let credentials = process.env.GOOGLE_CREDENTIALS || process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+  
   if (credentials) {
-    // Write the JSON credentials to a file in the temporary directory
-    fs.writeFileSync(credentialsPath, credentials);
-    // Set the GOOGLE_APPLICATION_CREDENTIALS environment variable to point to the file
-    process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
-    console.log("Google Vision API credentials set up successfully.");
+    // If GOOGLE_CREDENTIALS is already a JSON object string, use it directly
+    // If it's already parsed or needs parsing, handle it
+    try {
+      // Try to parse if it's a string (GOOGLE_CREDENTIALS might already be JSON)
+      const parsed = typeof credentials === 'string' ? JSON.parse(credentials) : credentials;
+      // Write the JSON credentials to a file in the temporary directory
+      fs.writeFileSync(credentialsPath, JSON.stringify(parsed));
+      // Set the GOOGLE_APPLICATION_CREDENTIALS environment variable to point to the file
+      process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
+      console.log("Google Vision API credentials set up successfully.");
+    } catch (error) {
+      // If parsing fails, assume it's already a JSON string and write it directly
+      fs.writeFileSync(credentialsPath, credentials);
+      process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
+      console.log("Google Vision API credentials set up successfully.");
+    }
   } else {
-    console.error("GOOGLE_APPLICATION_CREDENTIALS_JSON is not set.");
+    // Only log as warning, not error, since the app can work without it (image moderation will be skipped)
+    console.warn("Google Vision API credentials not set. Image analysis and moderation features will be limited.");
+    console.warn("Set GOOGLE_CREDENTIALS or GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable to enable full functionality.");
   }
 };
 
@@ -45,10 +61,11 @@ app.prepare().then(async () => {
   console.log(`Node version: ${process.version}`);
   console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
   
-  // Add a simple test to verify the event loop is running
-  setInterval(() => {
-    console.log(`[SERVER KEEPALIVE] Server is alive at ${new Date().toISOString()}`);
-  }, 60000); // Every minute
+  // Server keepalive commented out - not needed with Standard 1x dyno (always on)
+  // The scheduler heartbeat (every 5 minutes) is sufficient for monitoring
+  // setInterval(() => {
+  //   console.log(`[SERVER KEEPALIVE] Server is alive at ${new Date().toISOString()}`);
+  // }, 60000); // Every minute
   
   initializeScheduler();
   setupGoogleCredentials();
