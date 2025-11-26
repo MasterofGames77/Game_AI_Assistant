@@ -1,5 +1,6 @@
 import { Decimal128 } from 'mongoose';
 import { ReactNode } from "react";
+import { BrightCollectorKey } from './utils/brightData';
 
 export interface Achievement {
   name: string;
@@ -1051,4 +1052,38 @@ export interface HotTopicSummary {
   totalPosts: number;
   lastActivityAt: Date | null;
   score?: number;
+}
+
+export interface CollectorDefinition {
+  id: string;
+  defaultInput?: Record<string, unknown>;
+  defaultMode?: 'sync' | 'async';
+  cacheTtlSeconds?: number;
+}
+
+export interface StartCollectorOptions {
+  collectorKey: BrightCollectorKey;
+  input?: Record<string, unknown>;
+  mode?: 'sync' | 'async';
+  name?: string;
+}
+
+export interface CollectorStartResponse {
+  collection_id: string;
+  status: string;
+  start_time: string;
+  message?: string;
+}
+
+export interface CollectionStatus {
+  collection_id: string;
+  status: 'building' | 'running' | 'failed' | 'done';
+  message?: string;
+}
+
+export interface RunCollectorOptions extends StartCollectorOptions {
+  cacheKey?: string;
+  cacheTtlSeconds?: number;
+  pollIntervalMs?: number;
+  timeoutMs?: number;
 }
