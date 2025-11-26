@@ -1041,3 +1041,14 @@ export interface RecentAvatar {
   url: string;
   uploadedAt: Date | string;
 }
+
+export interface HotTopicSummary {
+  forumId: string;
+  title: string;
+  gameTitle: string;
+  category: string;
+  viewCount: number;
+  totalPosts: number;
+  lastActivityAt: Date | null;
+  score?: number;
+}

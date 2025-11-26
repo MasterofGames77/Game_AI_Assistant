@@ -2,6 +2,7 @@ import { SideBarProps } from "../types";
 import ProStatus from "./ProStatus";
 import DarkModeToggle from "./DarkModeToggle";
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 
 // Precompile the keyword pattern once
 const keywords = [
@@ -61,6 +62,16 @@ const keywords = [
 
 const titlePattern = new RegExp(keywords, "i");
 
+type HotTopicSummary = {
+  forumId: string;
+  title: string;
+  gameTitle: string;
+  category: string;
+  viewCount: number;
+  totalPosts: number;
+  lastActivityAt: string | Date | null;
+};
+
 // Sidebar component that displays conversation history
 const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
   conversations,
@@ -84,11 +95,18 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
     totalQuestions: number;
     currentStreak: number;
   } | null>(null);
+  const [hotTopics, setHotTopics] = useState<{
+    trendingTopics: HotTopicSummary[];
+    newThisWeek: HotTopicSummary[];
+  }>({ trendingTopics: [], newThisWeek: [] });
+  const [hotTopicsLoading, setHotTopicsLoading] = useState(false);
+  const [hotTopicsError, setHotTopicsError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [actualTotalConversations, setActualTotalConversations] = useState<
     number | null
   >(null);
+  const [showHotTopics, setShowHotTopics] = useState(true);
 
   // Calculate if there are more conversations to load
   // Prioritize actualTotalConversations (fetched from API), then conversationCount prop, then check array length
@@ -185,9 +203,39 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
     }
   }, []);
 
+  const fetchHotTopics = useCallback(async (user?: string | null) => {
+    const effectiveUsername =
+      user || localStorage.getItem("username") || "test-user";
+    setHotTopicsLoading(true);
+    setHotTopicsError(null);
+    try {
+      const response = await fetch(
+        `/api/hotTopics?username=${encodeURIComponent(effectiveUsername)}`
+      );
+      if (!response.ok) {
+        throw new Error(`Failed to fetch hot topics (${response.status})`);
+      }
+      const data = await response.json();
+      setHotTopics({
+        trendingTopics: data.trendingTopics || [],
+        newThisWeek: data.newThisWeek || [],
+      });
+    } catch (error) {
+      console.error("Error fetching hot topics:", error);
+      setHotTopicsError("Unable to load hot topics right now.");
+      setHotTopics({ trendingTopics: [], newThisWeek: [] });
+    } finally {
+      setHotTopicsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     // Initial load
     updateUserData();
+    const storedHotTopicsPref = localStorage.getItem("showHotTopics");
+    if (storedHotTopicsPref !== null) {
+      setShowHotTopics(storedHotTopicsPref === "true");
+    }
 
     // Debounce function to prevent too many API calls
     let debounceTimer: NodeJS.Timeout;
@@ -248,12 +296,18 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
     };
   }, [updateUserData]);
 
+  useEffect(() => {
+    fetchHotTopics(username);
+  }, [username, fetchHotTopics]);
+
   // Reset currentPage when conversations are refreshed from parent (e.g., after new question)
   // This happens when conversations are reset to page 1
   useEffect(() => {
     // Count non-temporary conversations (excluding optimistic updates with temp- IDs)
-    const nonTempConversations = conversations.filter(conv => !conv._id?.startsWith('temp-'));
-    
+    const nonTempConversations = conversations.filter(
+      (conv) => !conv._id?.startsWith("temp-")
+    );
+
     // If we have 20 or fewer non-temp conversations, we're on page 1
     // Reset currentPage to ensure Load More works correctly
     if (nonTempConversations.length <= 20 && currentPage > 1) {
@@ -316,6 +370,23 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
     } catch (error) {
       console.error("Error deleting conversation:", error);
     }
+  };
+
+  const formatRelativeTime = (value: string | Date | null) => {
+    if (!value) return "No recent activity";
+    const date = value instanceof Date ? value : new Date(value);
+    const diffMs = Date.now() - date.getTime();
+    if (diffMs < 60 * 1000) return "Just now";
+    if (diffMs < 60 * 60 * 1000) {
+      const minutes = Math.floor(diffMs / (60 * 1000));
+      return `${minutes}m ago`;
+    }
+    if (diffMs < 24 * 60 * 60 * 1000) {
+      const hours = Math.floor(diffMs / (60 * 60 * 1000));
+      return `${hours}h ago`;
+    }
+    const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+    return `${days}d ago`;
   };
 
   return (
@@ -407,6 +478,104 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
         >
           Feedback
         </button>
+      </div>
+
+      {/* Hot Topics Widget */}
+      <div className="mb-6 p-3 bg-gray-800 rounded-lg border border-gray-700">
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+            Hot Topics
+          </div>
+          <div className="flex items-center space-x-2">
+            {hotTopicsLoading && (
+              <span className="text-[10px] text-gray-400 animate-pulse">
+                Refreshing...
+              </span>
+            )}
+            <button
+              onClick={() => {
+                const next = !showHotTopics;
+                setShowHotTopics(next);
+                localStorage.setItem("showHotTopics", String(next));
+              }}
+              className="text-xs text-gray-300 hover:text-white transition"
+            >
+              {showHotTopics ? "Hide" : "Show"}
+            </button>
+          </div>
+        </div>
+        {!showHotTopics ? (
+          <p className="text-xs text-gray-500 mt-2"></p>
+        ) : hotTopicsError ? (
+          <p className="text-xs text-red-400 mt-2">{hotTopicsError}</p>
+        ) : (
+          <>
+            <div className="mt-3">
+              <p className="text-[11px] uppercase text-gray-500 mb-1 tracking-wide">
+                Top 3 Trending
+              </p>
+              {hotTopics.trendingTopics.length === 0 ? (
+                <p className="text-xs text-gray-500">No trending topics yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {hotTopics.trendingTopics.map((topic, index) => (
+                    <Link
+                      key={`${topic.forumId}-${index}`}
+                      href={`/forum/${topic.forumId}`}
+                      className="block"
+                    >
+                      <div className="p-2 rounded-md bg-gray-900/40 hover:bg-gray-900 transition text-sm">
+                        <div className="flex justify-between text-xs text-gray-400">
+                          <span>#{index + 1}</span>
+                          <span>
+                            {formatRelativeTime(topic.lastActivityAt)}
+                          </span>
+                        </div>
+                        <div className="text-white font-semibold truncate">
+                          {topic.title}
+                        </div>
+                        <div className="text-xs text-gray-400 truncate">
+                          {topic.gameTitle} • Views {topic.viewCount} • Posts{" "}
+                          {topic.totalPosts}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4">
+              <p className="text-[11px] uppercase text-gray-500 mb-1 tracking-wide">
+                New this week
+              </p>
+              {hotTopics.newThisWeek.length === 0 ? (
+                <p className="text-xs text-gray-500">
+                  No fresh topics yet. Check back soon!
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {hotTopics.newThisWeek.map((topic) => (
+                    <Link
+                      key={`new-${topic.forumId}`}
+                      href={`/forum/${topic.forumId}`}
+                    >
+                      <div className="p-2 rounded-md bg-gray-900/30 hover:bg-gray-900/60 transition text-sm">
+                        <div className="text-white font-semibold truncate">
+                          {topic.title}
+                        </div>
+                        <div className="text-xs text-gray-400 truncate">
+                          {topic.gameTitle} • Updated{" "}
+                          {formatRelativeTime(topic.lastActivityAt)}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Account Button */}
