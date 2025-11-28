@@ -7,6 +7,21 @@ import { containsOffensiveContent } from './contentModeration';
 import { GameList, ActivityResult } from '../types';
 
 /**
+ * Get the base URL for API calls
+ * On Heroku/server-side, use localhost since we're on the same server
+ * Otherwise use NEXT_PUBLIC_BASE_URL or default to localhost:3000
+ */
+function getBaseUrl(): string {
+  // For server-side calls (which automated users are), use localhost
+  // This works on both local development and Heroku
+  if (process.env.NODE_ENV === 'production') {
+    const port = process.env.PORT || 3000;
+    return `http://localhost:${port}`;
+  }
+  return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+}
+
+/**
  * Load game list for a user based on their preferences
  * InterdimensionalHipster can access both single-player and multiplayer games
  */
@@ -189,7 +204,7 @@ export async function askQuestion(
     }
     
     // Call assistant API
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const baseUrl = getBaseUrl();
     const response = await axios.post(
       `${baseUrl}/api/assistant`,
       {
@@ -233,7 +248,8 @@ async function createForumForGame(
   gameTitle: string
 ): Promise<{ forumId: string; forumTitle: string } | null> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const baseUrl = getBaseUrl();
+    console.log(`[FORUM CREATION] Using baseUrl: ${baseUrl} for forum creation`);
     
     // Available categories: speedruns, gameplay, mods, general, help
     // Select category randomly but intelligently based on context
@@ -302,9 +318,21 @@ async function createForumForGame(
       };
     }
     
+    console.error(`[FORUM CREATION] Forum creation API returned no forum data. Response:`, JSON.stringify(response.data, null, 2));
     return null;
   } catch (error) {
-    console.error('Error creating forum:', error);
+    console.error('[FORUM CREATION] Error creating forum:', error);
+    if (axios.isAxiosError(error)) {
+      console.error('[FORUM CREATION] Axios error details:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url
+      });
+    } else if (error instanceof Error) {
+      console.error('[FORUM CREATION] Error stack:', error.stack);
+    }
     return null;
   }
 }
@@ -377,7 +405,7 @@ export async function createForumPost(
 ): Promise<ActivityResult> {
   try {
     // Get list of active forums first
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const baseUrl = getBaseUrl();
     let forumsResponse;
     try {
       forumsResponse = await axios.get(
@@ -432,10 +460,11 @@ export async function createForumPost(
       const newForum = await createForumForGame(username, gameTitle);
       
       if (!newForum) {
+        console.error(`[FORUM POST] Failed to create forum for ${gameTitle}. Check logs above for details.`);
         return {
           success: false,
           message: 'Failed to create forum for game',
-          error: 'Forum creation failed'
+          error: 'Forum creation failed - check server logs for details'
         };
       }
       
@@ -629,7 +658,7 @@ export async function likePost(
   postId: string
 ): Promise<ActivityResult> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const baseUrl = getBaseUrl();
     
     const response = await axios.post(
       `${baseUrl}/api/likePost`,

@@ -205,13 +205,33 @@ class AutomatedUsersScheduler {
     console.log('✅ Using node-schedule (simpler and more reliable)');
     
     // Add a heartbeat task (runs every 5 minutes) - logs every 5 minutes for debugging
+    // Also verify that node-schedule is actually working by checking if jobs are firing
     const heartbeatTask = scheduleJob('*/5 * * * *', () => {
       const now = new Date();
       console.log(`[SCHEDULER HEARTBEAT] Scheduler is alive at ${now.toISOString()} - All tasks scheduled: ${this.tasks.length}`);
+      
+      // Verify scheduled tasks are still active
+      const activeTasks = this.tasks.filter(t => t.cronTask).length;
+      if (activeTasks < this.tasks.length) {
+        console.warn(`[SCHEDULER WARNING] Only ${activeTasks}/${this.tasks.length} tasks have active cron jobs!`);
+      }
+      
+      // Log next run times for verification
+      this.tasks.forEach(task => {
+        if (task.cronTask && task.nextRun) {
+          const nextRun = new Date(task.nextRun);
+          const timeUntil = nextRun.getTime() - now.getTime();
+          if (timeUntil < 60000 && timeUntil > -60000) { // Within 1 minute
+            console.log(`[SCHEDULER] Task ${task.name} should run soon (in ${Math.floor(timeUntil/1000)}s)`);
+          }
+        }
+      });
     });
     if (heartbeatTask) {
       this.cronTasks.push(heartbeatTask);
-      console.log('✅ Heartbeat task scheduled (runs every 5 minutes, logs every 30 minutes)');
+      console.log('✅ Heartbeat task scheduled (runs every 5 minutes)');
+    } else {
+      console.error('❌ [SCHEDULER ERROR] Failed to schedule heartbeat task! This indicates node-schedule may not be working.');
     }
 
     // Verify tasks were added
@@ -446,6 +466,8 @@ class AutomatedUsersScheduler {
         console.log(`✅ ${username} created forum post successfully:`, result.details?.postContent?.substring(0, 50) + '...');
       } else {
         console.error(`❌ ${username} failed to create forum post:`, result.error);
+        console.error(`   Error details:`, result.details);
+        console.error(`   Full result:`, JSON.stringify(result, null, 2));
       }
     } catch (error) {
       console.error(`Error executing forum post for ${username}:`, error);
