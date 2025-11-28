@@ -30,6 +30,18 @@ export interface IUser extends Document {
   challengeRewards?: ChallengeReward[];
   avatarUrl?: string; // Current avatar URL
   avatarHistory?: Array<{ url: string; uploadedAt: Date }>; // Last 6 avatars
+  gameTracking?: {
+    wishlist: Array<{
+      gameName: string;
+      addedAt: Date;
+      notes?: string;
+    }>;
+    currentlyPlaying: Array<{
+      gameName: string;
+      startedAt: Date;
+      notes?: string;
+    }>;
+  };
   createdAt?: Date; // Mongoose timestamp
   updatedAt?: Date; // Mongoose timestamp
   // Methods
@@ -266,7 +278,20 @@ const UserSchema = new Schema<IUser>({
   avatarHistory: [{
     url: { type: String, required: true },
     uploadedAt: { type: Date, default: Date.now }
-  }]
+  }],
+  // Game tracking - wishlist and currently playing
+  gameTracking: {
+    wishlist: [{
+      gameName: { type: String, required: true },
+      addedAt: { type: Date, default: Date.now },
+      notes: { type: String } // Optional user notes about the game
+    }],
+    currentlyPlaying: [{
+      gameName: { type: String, required: true },
+      startedAt: { type: Date, default: Date.now },
+      notes: { type: String } // Optional user notes about progress
+    }]
+  }
 }, { collection: 'users' });
 
 // Create indexes for subscription-related queries

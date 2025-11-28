@@ -19,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await connectToWingmanDB();
 
     const user = await User.findOne({ username }).select(
-      'username avatarUrl achievements progress streak challengeProgress challengeStreak'
+      'username avatarUrl achievements progress streak challengeProgress challengeStreak gameTracking'
     );
 
     if (!user) {
@@ -69,6 +69,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
     }
 
+    // Get game tracking data
+    const gameTracking = user.gameTracking || {
+      wishlist: [],
+      currentlyPlaying: []
+    };
+
     // Return profile data for sharing
     const profileData = {
       username: user.username,
@@ -80,6 +86,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })),
       streak,
       currentChallenge,
+      gameTracking,
     };
 
     return res.status(200).json(profileData);

@@ -102,17 +102,18 @@ export const startCollector = async ({
     },
   };
 
-  const { data } = await brightApi.post<CollectorStartResponse>(`/collectors/${definition.id}/start`, payload);
+  // Do not prefix with "/" so axios does not strip the base path `/dca`
+  const { data } = await brightApi.post<CollectorStartResponse>(`collectors/${definition.id}/start`, payload);
   return data;
 };
 
 export const getCollectionStatus = async (collectionId: string): Promise<CollectionStatus> => {
-  const { data } = await brightApi.get<CollectionStatus>(`/collections/${collectionId}`);
+  const { data } = await brightApi.get<CollectionStatus>(`collections/${collectionId}`);
   return data;
 };
 
 export const fetchCollectionData = async <T = unknown>(collectionId: string): Promise<T[]> => {
-  const { data } = await brightApi.get<T[]>(`/collections/${collectionId}/data`, {
+  const { data } = await brightApi.get<T[]>(`collections/${collectionId}/data`, {
     params: { format: 'json' },
   });
   return data;

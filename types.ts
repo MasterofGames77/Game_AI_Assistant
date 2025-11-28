@@ -998,6 +998,7 @@ export interface ProfileShareCardProps {
     progress?: number;
     target?: number;
   };
+  gameTracking?: GameTracking;
   className?: string;
 }
 
@@ -1021,6 +1022,26 @@ export interface ProfileShareData {
     progress?: number;
     target?: number;
   };
+  gameTracking?: GameTracking;
+}
+
+// Game tracking types
+export interface GameEntry {
+  gameName: string;
+  addedAt?: Date | string;
+  startedAt?: Date | string;
+  notes?: string;
+}
+
+export interface GameTracking {
+  wishlist: GameEntry[];
+  currentlyPlaying: GameEntry[];
+}
+
+export interface GameTrackerProps {
+  username: string;
+  gameTracking?: GameTracking;
+  onUpdate?: () => void;
 }
 
 export interface AvatarProps {

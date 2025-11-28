@@ -7,6 +7,8 @@ import axios from "axios";
 import ProfileShareModal from "@/components/ProfileShareModal";
 import Avatar from "@/components/Avatar";
 import AvatarSelector from "@/components/AvatarSelector";
+import GameTracker from "@/components/GameTracker";
+import { GameTracking } from "@/types";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -49,6 +51,9 @@ export default function AccountPage() {
   // Avatar state
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
+
+  // Game tracking state
+  const [gameTracking, setGameTracking] = useState<GameTracking | null>(null);
 
   useEffect(() => {
     const fetchAccountData = async () => {
@@ -124,6 +129,21 @@ export default function AccountPage() {
           }
         } catch (error) {
           console.error("Error fetching avatar:", error);
+        }
+
+        // Fetch game tracking
+        try {
+          const gameTrackingResponse = await fetch("/api/game-tracking-get", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: userData.user.username }),
+          });
+          if (gameTrackingResponse.ok) {
+            const gameTrackingData = await gameTrackingResponse.json();
+            setGameTracking(gameTrackingData.gameTracking || null);
+          }
+        } catch (error) {
+          console.error("Error fetching game tracking:", error);
         }
       } catch (err) {
         console.error("Error fetching account data:", err);
@@ -925,6 +945,38 @@ export default function AccountPage() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Game Tracker */}
+            <div className="bg-[#252642]/50 backdrop-blur-sm rounded-2xl p-6 shadow-[0_0_15px_rgba(0,255,255,0.1)] border border-[#00ffff]/20 mt-6">
+              <h2 className="text-2xl font-bold mb-6 text-[#00ffff]">
+                Game Tracker
+              </h2>
+              <p className="text-gray-400 text-sm mb-4">
+                Track games you want to play or are currently playing. Share your gaming status with others!
+              </p>
+              {accountData && (
+                <GameTracker
+                  username={accountData.username}
+                  gameTracking={gameTracking || undefined}
+                  onUpdate={async () => {
+                    // Refresh game tracking data
+                    try {
+                      const response = await fetch("/api/game-tracking-get", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ username: accountData.username }),
+                      });
+                      if (response.ok) {
+                        const data = await response.json();
+                        setGameTracking(data.gameTracking || null);
+                      }
+                    } catch (error) {
+                      console.error("Error refreshing game tracking:", error);
+                    }
+                  }}
+                />
+              )}
             </div>
 
             {/* Health & Wellness Settings */}

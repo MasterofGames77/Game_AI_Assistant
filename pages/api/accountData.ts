@@ -39,6 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         progress: user.progress || {},
         subscription: user.subscription || null,
         healthMonitoring: user.healthMonitoring || null,
+        gameTracking: user.gameTracking || { wishlist: [], currentlyPlaying: [] },
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
       }

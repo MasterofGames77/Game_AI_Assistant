@@ -94,10 +94,14 @@ const ProfileShareModal: React.FC<ProfileShareModalProps> = ({
         throw new Error("Card element became invalid during generation");
       }
 
+      // Get the actual height of the card element
+      const cardHeight = cardElement.offsetHeight || cardElement.scrollHeight || 800;
+      const cardWidth = cardElement.offsetWidth || 1200;
+
       // Generate preview from the card element directly
       const dataUrl = await toPng(cardElement, {
-        width: 1200,
-        height: 800,
+        width: cardWidth,
+        height: cardHeight,
         quality: 1.0,
         pixelRatio: 2,
         backgroundColor: "#1a1b2e",
@@ -157,10 +161,14 @@ const ProfileShareModal: React.FC<ProfileShareModalProps> = ({
 
       await new Promise((resolve) => setTimeout(resolve, 300));
 
+      // Get the actual height of the card element
+      const cardHeight = cardElement.offsetHeight || cardElement.scrollHeight || 800;
+      const cardWidth = cardElement.offsetWidth || 1200;
+
       // Generate blob from the card element directly
       const blob = await toBlob(cardElement, {
-        width: 1200,
-        height: 800,
+        width: cardWidth,
+        height: cardHeight,
         quality: 1.0,
         pixelRatio: 2,
         backgroundColor: "#1a1b2e",
@@ -387,6 +395,7 @@ const ProfileShareModal: React.FC<ProfileShareModalProps> = ({
                 achievements={profileData.achievements}
                 streak={profileData.streak}
                 currentChallenge={profileData.currentChallenge}
+                gameTracking={profileData.gameTracking}
               />
             </div>
           )}

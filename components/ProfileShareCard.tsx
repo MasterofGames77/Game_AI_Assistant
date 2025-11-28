@@ -16,6 +16,7 @@ const ProfileShareCard: React.FC<ProfileShareCardProps> = ({
   achievements = [],
   streak = 0,
   currentChallenge,
+  gameTracking,
   className = "",
 }) => {
   // Generate initials from username
@@ -52,16 +53,92 @@ const ProfileShareCard: React.FC<ProfileShareCardProps> = ({
   // Format genres for display
   const displayGenres = favoriteGenres.slice(0, 5);
 
+  // Calculate dynamic height based on actual content
+  // This will scale up for more content and down for less content
+  let calculatedHeight = 0;
+  
+  // Base sections (always present)
+  calculatedHeight += 200; // Header (logo + avatar + username)
+  calculatedHeight += 120; // Stats section (streak + achievements)
+  calculatedHeight += 48; // Top padding
+  calculatedHeight += 48; // Bottom padding (will be adjusted)
+  
+  // Favorite genres section (only if present)
+  if (displayGenres.length > 0) {
+    calculatedHeight += 52; // Title height
+    calculatedHeight += 12; // Title margin bottom
+    calculatedHeight += 40; // Tags container (approximate)
+    calculatedHeight += 24; // Section margin bottom
+  }
+  
+  // Achievements section (only if present)
+  if (sortedAchievements.length > 0) {
+    calculatedHeight += 52; // Title height
+    calculatedHeight += 12; // Title margin bottom
+    // Each achievement: 12px top + 12px bottom padding = 24px, plus 8px gap = 32px per item
+    // But actual rendered height is ~48px per achievement including content
+    calculatedHeight += sortedAchievements.length * 48;
+    calculatedHeight += 24; // Section margin bottom
+  }
+  
+  // Current challenge section (only if present)
+  if (currentChallenge) {
+    calculatedHeight += 120; // Challenge box height
+    calculatedHeight += 24; // Section margin bottom
+  }
+  
+  // Game tracking section (only if present)
+  if (gameTracking) {
+    const hasCurrentlyPlaying = gameTracking.currentlyPlaying && gameTracking.currentlyPlaying.length > 0;
+    const hasWishlist = gameTracking.wishlist && gameTracking.wishlist.length > 0;
+    
+    if (hasCurrentlyPlaying || hasWishlist) {
+      // Title for currently playing
+      if (hasCurrentlyPlaying) {
+        calculatedHeight += 52; // Title height
+        calculatedHeight += 12; // Title margin bottom
+        // Each game tag: ~40px height, but they wrap, so estimate based on count
+        const playingCount = gameTracking.currentlyPlaying.length;
+        const playingRows = Math.ceil(playingCount / 3); // Assume ~3 tags per row
+        calculatedHeight += playingRows * 50;
+        if (hasWishlist) {
+          calculatedHeight += 16; // Margin between sections
+        }
+      }
+      
+      // Title for wishlist
+      if (hasWishlist) {
+        calculatedHeight += 52; // Title height
+        calculatedHeight += 12; // Title margin bottom
+        // Each game tag: ~40px height, but they wrap
+        const wishlistCount = gameTracking.wishlist.length;
+        const wishlistRows = Math.ceil(wishlistCount / 3); // Assume ~3 tags per row
+        calculatedHeight += wishlistRows * 50;
+      }
+      
+      calculatedHeight += 24; // Section margin bottom
+    }
+  }
+  
+  // Footer gradient: 8px
+  calculatedHeight += 8;
+  
+  // Add small buffer (reduced from 150 to 50) to prevent cut-off but minimize empty space
+  // Ensure minimum height for very sparse profiles
+  const finalHeight = Math.max(700, calculatedHeight + 50);
+
   return (
     <div
       style={{
         position: "relative",
         width: "1200px",
-        height: `${Math.max(800, 600 + sortedAchievements.length * 50)}px`,
+        height: `${finalHeight}px`,
+        minHeight: `${finalHeight}px`,
         background:
           "linear-gradient(to bottom right, #1a1b2e, #16213e, #0f3460)",
         color: "#ffffff",
         overflow: "visible",
+        boxSizing: "border-box",
         fontFamily:
           'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
@@ -91,6 +168,7 @@ const ProfileShareCard: React.FC<ProfileShareCardProps> = ({
           display: "flex",
           flexDirection: "column",
           padding: "48px",
+          paddingBottom: "60px", // Reduced padding to minimize empty space
         }}
       >
         {/* Header Section */}
@@ -462,6 +540,132 @@ const ProfileShareCard: React.FC<ProfileShareCardProps> = ({
                 }}
               >
                 ✓ Completed!
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Game Tracking Section */}
+        {gameTracking && (gameTracking.currentlyPlaying?.length > 0 || gameTracking.wishlist?.length > 0) && (
+          <div
+            style={{
+              marginBottom: "24px",
+              flexShrink: 0,
+            }}
+          >
+            {/* Currently Playing */}
+            {gameTracking.currentlyPlaying && gameTracking.currentlyPlaying.length > 0 && (
+              <div
+                style={{
+                  marginBottom: gameTracking.wishlist?.length > 0 ? "16px" : "0",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "14px",
+                    color: "#9ca3af",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    marginBottom: "12px",
+                  }}
+                >
+                  🎮 Currently Playing
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "8px",
+                  }}
+                >
+                  {gameTracking.currentlyPlaying.slice(0, 5).map((game, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        background: "rgba(34, 211, 238, 0.2)",
+                        border: "1px solid rgba(34, 211, 238, 0.4)",
+                        borderRadius: "8px",
+                        padding: "8px 16px",
+                        fontSize: "14px",
+                        color: "#22d3ee",
+                        fontWeight: "600",
+                      }}
+                    >
+                      {game.gameName}
+                    </div>
+                  ))}
+                  {gameTracking.currentlyPlaying.length > 5 && (
+                    <div
+                      style={{
+                        background: "rgba(34, 211, 238, 0.1)",
+                        border: "1px solid rgba(34, 211, 238, 0.3)",
+                        borderRadius: "8px",
+                        padding: "8px 16px",
+                        fontSize: "14px",
+                        color: "#22d3ee",
+                        fontWeight: "600",
+                      }}
+                    >
+                      +{gameTracking.currentlyPlaying.length - 5} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Wishlist */}
+            {gameTracking.wishlist && gameTracking.wishlist.length > 0 && (
+              <div>
+                <div
+                  style={{
+                    fontSize: "14px",
+                    color: "#9ca3af",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    marginBottom: "12px",
+                  }}
+                >
+                  ⭐ Wishlist
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "8px",
+                  }}
+                >
+                  {gameTracking.wishlist.slice(0, 5).map((game, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        background: "rgba(236, 72, 153, 0.2)",
+                        border: "1px solid rgba(236, 72, 153, 0.4)",
+                        borderRadius: "8px",
+                        padding: "8px 16px",
+                        fontSize: "14px",
+                        color: "#ec4899",
+                        fontWeight: "600",
+                      }}
+                    >
+                      {game.gameName}
+                    </div>
+                  ))}
+                  {gameTracking.wishlist.length > 5 && (
+                    <div
+                      style={{
+                        background: "rgba(236, 72, 153, 0.1)",
+                        border: "1px solid rgba(236, 72, 153, 0.3)",
+                        borderRadius: "8px",
+                        padding: "8px 16px",
+                        fontSize: "14px",
+                        color: "#ec4899",
+                        fontWeight: "600",
+                      }}
+                    >
+                      +{gameTracking.wishlist.length - 5} more
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
