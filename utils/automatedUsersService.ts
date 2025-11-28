@@ -5,16 +5,23 @@ import { generateQuestion, generateForumPost, generatePostReply, UserPreferences
 import { getRandomGameImage, recordImageUsage } from './automatedImageService';
 import { containsOffensiveContent } from './contentModeration';
 import { GameList, ActivityResult } from '../types';
+import connectToMongoDB from './mongodb';
+import Forum from '../models/Forum';
+import mongoose from 'mongoose';
 
 /**
  * Get the base URL for API calls
- * On Heroku/server-side, use localhost since we're on the same server
- * Otherwise use NEXT_PUBLIC_BASE_URL or default to localhost:3000
+ * On Heroku/server-side, try to use the app URL if available, otherwise use localhost
+ * For local development, use NEXT_PUBLIC_BASE_URL or default to localhost:3000
  */
 function getBaseUrl(): string {
-  // For server-side calls (which automated users are), use localhost
-  // This works on both local development and Heroku
+  // On Heroku, try to use the app URL first (if set), otherwise use localhost with PORT
   if (process.env.NODE_ENV === 'production') {
+    // Try Heroku app URL first (if available)
+    if (process.env.NEXT_PUBLIC_BASE_URL && process.env.NEXT_PUBLIC_BASE_URL.includes('herokuapp.com')) {
+      return process.env.NEXT_PUBLIC_BASE_URL;
+    }
+    // Fallback to localhost with PORT
     const port = process.env.PORT || 3000;
     return `http://localhost:${port}`;
   }
@@ -205,33 +212,50 @@ export async function askQuestion(
     
     // Call assistant API
     const baseUrl = getBaseUrl();
-    const response = await axios.post(
-      `${baseUrl}/api/assistant`,
-      {
-        username,
-        question,
-        userId: `auto-${username.toLowerCase()}-${Date.now()}`
-      },
-      {
-        timeout: 60000, // 60 second timeout
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    console.log(`[ASK QUESTION] Using baseUrl: ${baseUrl} for ${username}`);
     
-    return {
-      success: true,
-      message: 'Question asked successfully',
-      details: {
-        gameTitle,
-        genre,
-        question,
-        answer: response.data.answer
+    try {
+      const response = await axios.post(
+        `${baseUrl}/api/assistant`,
+        {
+          username,
+          question,
+          userId: `auto-${username.toLowerCase()}-${Date.now()}`
+        },
+        {
+          timeout: 60000, // 60 second timeout
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      return {
+        success: true,
+        message: 'Question asked successfully',
+        details: {
+          gameTitle,
+          genre,
+          question,
+          answer: response.data.answer
+        }
+      };
+    } catch (error) {
+      console.error('[ASK QUESTION] Error calling assistant API:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('[ASK QUESTION] Axios error details:', {
+          message: error.message,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          url: error.config?.url,
+          code: error.code
+        });
       }
-    };
+      throw error; // Re-throw to be caught by outer catch
+    }
   } catch (error) {
-    console.error('Error asking question:', error);
+    console.error('[ASK QUESTION] Error asking question:', error);
     return {
       success: false,
       message: 'Failed to ask question',
@@ -248,8 +272,7 @@ async function createForumForGame(
   gameTitle: string
 ): Promise<{ forumId: string; forumTitle: string } | null> {
   try {
-    const baseUrl = getBaseUrl();
-    console.log(`[FORUM CREATION] Using baseUrl: ${baseUrl} for forum creation`);
+    await connectToMongoDB();
     
     // Available categories: speedruns, gameplay, mods, general, help
     // Select category randomly but intelligently based on context
@@ -293,44 +316,39 @@ async function createForumForGame(
     
     console.log(`[FORUM CREATION] Creating forum for ${gameTitle} with category: ${category}, title: ${forumTitle}`);
     
-    // Create forum via API
-    const response = await axios.post(
-      `${baseUrl}/api/createForum`,
-      {
-        title: forumTitle,
-        gameTitle,
-        category,
-        isPrivate: false,
-        username
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${username}` // Simple auth for automated users
-        }
+    // Create forum directly in database (more reliable than HTTP)
+    const forumId = `forum_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    
+    const newForum = new Forum({
+      forumId,
+      gameTitle,
+      title: forumTitle,
+      category,
+      isPrivate: false,
+      allowedUsers: [],
+      createdBy: username,
+      posts: [],
+      metadata: {
+        totalPosts: 0,
+        lastActivityAt: new Date(),
+        viewCount: 0,
+        viewedBy: [],
+        status: 'active'
       }
-    );
+    });
     
-    if (response.data.forum) {
-      return {
-        forumId: response.data.forum.forumId,
-        forumTitle: response.data.forum.title || forumTitle
-      };
-    }
+    await newForum.save();
     
-    console.error(`[FORUM CREATION] Forum creation API returned no forum data. Response:`, JSON.stringify(response.data, null, 2));
-    return null;
+    console.log(`[FORUM CREATION] Successfully created forum ${forumId} in database`);
+    
+    return {
+      forumId,
+      forumTitle
+    };
   } catch (error) {
     console.error('[FORUM CREATION] Error creating forum:', error);
-    if (axios.isAxiosError(error)) {
-      console.error('[FORUM CREATION] Axios error details:', {
-        message: error.message,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        url: error.config?.url
-      });
-    } else if (error instanceof Error) {
+    if (error instanceof Error) {
+      console.error('[FORUM CREATION] Error message:', error.message);
       console.error('[FORUM CREATION] Error stack:', error.stack);
     }
     return null;
@@ -404,24 +422,38 @@ export async function createForumPost(
   userPreferences: UserPreferences
 ): Promise<ActivityResult> {
   try {
-    // Get list of active forums first
-    const baseUrl = getBaseUrl();
-    let forumsResponse;
-    try {
-      forumsResponse = await axios.get(
-        `${baseUrl}/api/getAllForums?username=${username}&limit=100`, // Get more forums to have better selection
-        {
-          headers: {
-            'username': username
-          }
-        }
-      );
-    } catch (error) {
-      console.error('Error fetching forums:', error);
-      forumsResponse = { data: { forums: [] } };
-    }
+    // Connect to database and get forums directly (more reliable than HTTP calls)
+    await connectToMongoDB();
     
-    const forums = forumsResponse.data.forums || [];
+    // Get list of active forums directly from database
+    let forums: any[] = [];
+    try {
+      const forumDocs = await Forum.find({
+        $or: [
+          { isPrivate: false },
+          { allowedUsers: username }
+        ],
+        'metadata.status': 'active'
+      })
+      .sort({ 'metadata.lastActivityAt': -1 })
+      .limit(100)
+      .lean(); // Use lean() for better performance
+      
+      forums = forumDocs.map(forum => ({
+        ...forum,
+        metadata: {
+          totalPosts: forum.metadata?.totalPosts || 0,
+          lastActivityAt: forum.metadata?.lastActivityAt || new Date(),
+          viewCount: forum.metadata?.viewCount || 0,
+          status: forum.metadata?.status || 'active'
+        }
+      }));
+      
+      console.log(`[FORUM POST] Fetched ${forums.length} forums from database`);
+    } catch (error) {
+      console.error('[FORUM POST] Error fetching forums from database:', error);
+      forums = [];
+    }
     
     // Select a random game from user's preferences
     const gameSelection = selectRandomGame(userPreferences);
@@ -608,37 +640,66 @@ export async function createForumPost(
       }
     }
     
-    // Post to forum
-    const postResponse = await axios.post(
-      `${baseUrl}/api/addPostToForum`,
-      {
-        forumId,
-        message: postContent,
+    // Post to forum directly via database (more reliable than HTTP)
+    try {
+      const forum = await Forum.findOne({ forumId });
+      if (!forum) {
+        return {
+          success: false,
+          message: 'Forum not found',
+          error: 'Forum not found in database'
+        };
+      }
+      
+      // Create new post
+      const newPost = {
+        _id: new mongoose.Types.ObjectId(),
         username,
-        attachments: attachments // Now includes image if available
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json'
+        message: postContent,
+        timestamp: new Date(),
+        createdBy: username,
+        replyTo: null,
+        metadata: {
+          edited: false,
+          likes: 0,
+          likedBy: [],
+          reactions: {},
+          attachments: attachments,
+          status: 'active'
         }
-      }
-    );
-    
-    return {
-      success: true,
-      message: 'Forum post created successfully',
-      details: {
-        forumId,
-        forumTitle,
-        gameTitle: actualGameTitle,
-        genre: actualGenre,
-        postContent,
-        imageUsed: imageUrl !== null,
-        imageUrl: imageUrl,
-        postId: postResponse.data.post?._id,
-        postedToExistingForum: targetForum !== null
-      }
-    };
+      };
+      
+      // Add post to forum
+      forum.posts.push(newPost);
+      forum.metadata.totalPosts = (forum.metadata.totalPosts || 0) + 1;
+      forum.metadata.lastActivityAt = new Date();
+      await forum.save();
+      
+      console.log(`[FORUM POST] Successfully added post to forum ${forumId}`);
+      
+      return {
+        success: true,
+        message: 'Forum post created successfully',
+        details: {
+          forumId,
+          forumTitle,
+          gameTitle: actualGameTitle,
+          genre: actualGenre,
+          postContent,
+          imageUsed: imageUrl !== null,
+          imageUrl: imageUrl,
+          postId: newPost._id.toString(),
+          postedToExistingForum: targetForum !== null
+        }
+      };
+    } catch (error) {
+      console.error('[FORUM POST] Error adding post to forum:', error);
+      return {
+        success: false,
+        message: 'Failed to add post to forum',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
   } catch (error) {
     console.error('Error creating forum post:', error);
     return {
@@ -938,29 +999,42 @@ export async function respondToForumPost(
   userPreferences: UserPreferences
 ): Promise<ActivityResult> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    // Connect to database and get forums directly (more reliable than HTTP calls)
+    await connectToMongoDB();
     
-    // Get list of active forums
-    let forumsResponse;
+    // Get list of active forums directly from database
+    let forums: any[] = [];
     try {
-      forumsResponse = await axios.get(
-        `${baseUrl}/api/getAllForums?username=${username}&limit=100`,
-        {
-          headers: {
-            'username': username
-          }
+      const forumDocs = await Forum.find({
+        $or: [
+          { isPrivate: false },
+          { allowedUsers: username }
+        ],
+        'metadata.status': 'active'
+      })
+      .sort({ 'metadata.lastActivityAt': -1 })
+      .limit(100)
+      .lean();
+      
+      forums = forumDocs.map(forum => ({
+        ...forum,
+        metadata: {
+          totalPosts: forum.metadata?.totalPosts || 0,
+          lastActivityAt: forum.metadata?.lastActivityAt || new Date(),
+          viewCount: forum.metadata?.viewCount || 0,
+          status: forum.metadata?.status || 'active'
         }
-      );
+      }));
+      
+      console.log(`[POST REPLY] Fetched ${forums.length} forums from database`);
     } catch (error) {
-      console.error('Error fetching forums:', error);
+      console.error('[POST REPLY] Error fetching forums from database:', error);
       return {
         success: false,
         message: 'Failed to fetch forums',
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
-    
-    const forums = forumsResponse.data.forums || [];
     
     // Filter to only forums with posts
     const forumsWithPosts = forums.filter((f: any) => 
@@ -975,33 +1049,34 @@ export async function respondToForumPost(
       };
     }
     
-    // Fetch full forum details with posts for a few forums
-    // Limit to first 10 forums to avoid too many API calls
+    // Fetch full forum details with posts directly from database
+    // Limit to first 10 forums to avoid too many database queries
     const forumsToCheck = forumsWithPosts.slice(0, 10);
     const forumsWithFullPosts: any[] = [];
     
     for (const forum of forumsToCheck) {
       try {
         const forumId = forum.forumId || forum._id;
-        const forumDetailResponse = await axios.get(
-          `${baseUrl}/api/getForumTopic?forumId=${forumId}&username=${username}&incrementView=false`,
-          {
-            headers: {
-              'username': username
-            }
-          }
-        );
+        const forumDoc = await Forum.findOne({ forumId }).lean();
         
-        if (forumDetailResponse.data.forum && forumDetailResponse.data.forum.posts) {
-          forumsWithFullPosts.push(forumDetailResponse.data.forum);
+        if (forumDoc && forumDoc.posts && Array.isArray(forumDoc.posts) && forumDoc.posts.length > 0) {
+          forumsWithFullPosts.push({
+            ...forumDoc,
+            metadata: {
+              totalPosts: forumDoc.metadata?.totalPosts || forumDoc.posts.length,
+              lastActivityAt: forumDoc.metadata?.lastActivityAt || new Date(),
+              viewCount: forumDoc.metadata?.viewCount || 0,
+              status: forumDoc.metadata?.status || 'active'
+            }
+          });
         }
       } catch (error) {
-        console.error(`Error fetching forum details for ${forum.forumId}:`, error);
+        console.error(`[POST REPLY] Error fetching forum details for ${forum.forumId}:`, error);
         // Continue to next forum if this one fails
       }
     }
     
-    // If we don't have posts from API calls, try using posts from getAllForums response
+    // If we don't have posts from database queries, try using posts from initial forums response
     if (forumsWithFullPosts.length === 0) {
       // Use forums that might have posts in the response
       for (const forum of forumsWithPosts) {
@@ -1058,36 +1133,65 @@ export async function respondToForumPost(
       };
     }
     
-    // Post reply to forum
-    const postResponse = await axios.post(
-      `${baseUrl}/api/addPostToForum`,
-      {
-        forumId,
-        message: replyContent,
+    // Post reply to forum directly via database (more reliable than HTTP)
+    try {
+      const forumDoc = await Forum.findOne({ forumId });
+      if (!forumDoc) {
+        return {
+          success: false,
+          message: 'Forum not found',
+          error: 'Forum not found in database'
+        };
+      }
+      
+      // Create reply post
+      const replyPost = {
+        _id: new mongoose.Types.ObjectId(),
         username,
-        replyTo: post._id // Pass the ID of the post being replied to
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json'
+        message: replyContent,
+        timestamp: new Date(),
+        createdBy: username,
+        replyTo: post._id ? new mongoose.Types.ObjectId(post._id) : null,
+        metadata: {
+          edited: false,
+          likes: 0,
+          likedBy: [],
+          reactions: {},
+          attachments: [],
+          status: 'active'
         }
-      }
-    );
-    
-    return {
-      success: true,
-      message: 'Forum post reply created successfully',
-      details: {
-        forumId,
-        forumTitle,
-        gameTitle,
-        genre,
-        replyContent,
-        repliedToPostId: post._id,
-        repliedToAuthor: originalPostAuthor,
-        postId: postResponse.data.post?._id
-      }
-    };
+      };
+      
+      // Add reply to forum
+      forumDoc.posts.push(replyPost);
+      forumDoc.metadata.totalPosts = (forumDoc.metadata.totalPosts || 0) + 1;
+      forumDoc.metadata.lastActivityAt = new Date();
+      await forumDoc.save();
+      
+      console.log(`[POST REPLY] Successfully added reply to forum ${forumId}`);
+      
+      return {
+        success: true,
+        message: 'Forum post reply created successfully',
+        details: {
+          forumId,
+          forumTitle,
+          gameTitle,
+          genre,
+          replyContent,
+          repliedToPostId: post._id,
+          repliedToAuthor: originalPostAuthor,
+          postId: replyPost._id.toString()
+        }
+      };
+    } catch (error) {
+      console.error('[POST REPLY] Error adding reply to forum:', error);
+      return {
+        success: false,
+        message: 'Failed to add reply to forum',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
   } catch (error) {
     console.error('Error responding to forum post:', error);
     return {
