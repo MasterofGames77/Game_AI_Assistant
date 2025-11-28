@@ -1057,7 +1057,7 @@ export async function respondToForumPost(
     for (const forum of forumsToCheck) {
       try {
         const forumId = forum.forumId || forum._id;
-        const forumDoc = await Forum.findOne({ forumId }).lean();
+        const forumDoc = await Forum.findOne({ forumId }).lean() as any;
         
         if (forumDoc && forumDoc.posts && Array.isArray(forumDoc.posts) && forumDoc.posts.length > 0) {
           forumsWithFullPosts.push({
