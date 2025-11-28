@@ -93,18 +93,39 @@ export const startCollector = async ({
 }: StartCollectorOptions): Promise<CollectorStartResponse> => {
   const definition = assertCollectorConfigured(collectorKey);
 
-  const payload = {
-    start: mode ?? definition.defaultMode ?? 'sync',
-    name: name ?? `wingman_${collectorKey}`,
-    inputs: {
-      ...(definition.defaultInput || {}),
-      ...(input || {}),
-    },
-  };
+  // Check if ID starts with 'c_' (trigger ID) or 'cltr_' (collector ID)
+  const isTriggerId = definition.id.startsWith('c_') && !definition.id.startsWith('cltr_');
 
-  // Do not prefix with "/" so axios does not strip the base path `/dca`
-  const { data } = await brightApi.post<CollectorStartResponse>(`collectors/${definition.id}/start`, payload);
-  return data;
+  if (isTriggerId) {
+    // Use trigger endpoint for c_ IDs
+    const payload = {
+      input: Array.isArray(input) ? input : [input || {}],
+    };
+
+    const { data } = await brightApi.post<{ collection_id: string; status: string }>(
+      `trigger?collector=${definition.id}&queue_next=1`,
+      payload,
+    );
+
+    return {
+      collection_id: data.collection_id,
+      status: data.status,
+      start_time: new Date().toISOString(),
+    };
+  } else {
+    // Use collector endpoint for cltr_ IDs
+    const payload = {
+      start: mode ?? definition.defaultMode ?? 'sync',
+      name: name ?? `wingman_${collectorKey}`,
+      inputs: {
+        ...(definition.defaultInput || {}),
+        ...(input || {}),
+      },
+    };
+
+    const { data } = await brightApi.post<CollectorStartResponse>(`collectors/${definition.id}/start`, payload);
+    return data;
+  }
 };
 
 export const getCollectionStatus = async (collectionId: string): Promise<CollectionStatus> => {
