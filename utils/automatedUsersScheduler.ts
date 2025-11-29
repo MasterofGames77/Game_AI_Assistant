@@ -219,8 +219,9 @@ class AutomatedUsersScheduler {
       
       // Count tasks that are still left for today
       // A task is "left for today" if:
-      // 1. Its scheduled time hasn't arrived yet today (upcoming), OR
-      // 2. Its scheduled time has passed but we haven't run it today (overdue/missed)
+      // 1. Its scheduled time is today AND hasn't arrived yet (upcoming), OR
+      // 2. Its scheduled time is today AND has passed BUT we've already run it today (count as done, not remaining)
+      // Note: Tasks that should have run but didn't (server restart) are NOT counted as "remaining"
       const tasksLeftForToday = this.tasks.filter(task => {
         try {
           const cronExpression = task.cronExpression;
@@ -255,13 +256,17 @@ class AutomatedUsersScheduler {
                            lastRunDate.getUTCFullYear() === utcNow.getUTCFullYear();
             }
             
-            // If we've already run today, this task is done for today
+            // If we've already run today, this task is done (not remaining)
             if (hasRunToday) {
               return false;
             }
             
-            // If we haven't run today and the scheduled time is today, it's left for today
-            return true;
+            // Only count as remaining if the scheduled time is still in the future (upcoming)
+            // If the scheduled time has already passed and we haven't run, don't count it
+            // (it was missed due to server restart or other issues)
+            const isUpcoming = todayAtScheduledTime > utcNow;
+            
+            return isUpcoming;
           }
           return false; // Not a daily task, don't count it
         } catch (error) {
