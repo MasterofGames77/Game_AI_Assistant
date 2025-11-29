@@ -1204,13 +1204,58 @@ export async function respondToForumPost(
       }
       
       // Create reply post
+      // Find the original post in the forum document to get the proper ObjectId
+      // This ensures we have the correct _id even if the post came from a lean() query
+      let replyToId = null;
+      if (post._id) {
+        try {
+          // First, try to find the post in the forum document by matching _id
+          const originalPost = forumDoc.posts.find((p: any) => {
+            if (!p._id) return false;
+            // Compare as strings to handle both ObjectId and string formats
+            const postIdStr = post._id.toString();
+            const pIdStr = p._id.toString();
+            return pIdStr === postIdStr;
+          });
+          
+          if (originalPost && originalPost._id) {
+            // Use the ObjectId from the forum document (guaranteed to be correct)
+            replyToId = originalPost._id;
+            console.log(`[POST REPLY] Found original post in forum, using _id: ${replyToId.toString()}`);
+          } else {
+            // Fallback: try to convert the post._id we have
+            // If it's already an ObjectId, use it; if it's a string, convert it
+            replyToId = typeof post._id === 'string' 
+              ? new mongoose.Types.ObjectId(post._id)
+              : post._id instanceof mongoose.Types.ObjectId
+              ? post._id
+              : new mongoose.Types.ObjectId(post._id.toString());
+            console.log(`[POST REPLY] Original post not found in forum, converted _id: ${replyToId.toString()}`);
+          }
+        } catch (error) {
+          console.error(`[POST REPLY] Error finding/converting post._id: ${post._id}`, error);
+          // Last resort: try to find by username, message, and timestamp
+          const originalPost = forumDoc.posts.find((p: any) => 
+            p.username === post.username && 
+            p.message === post.message &&
+            Math.abs(new Date(p.timestamp).getTime() - new Date(post.timestamp).getTime()) < 5000
+          );
+          if (originalPost && originalPost._id) {
+            replyToId = originalPost._id;
+            console.log(`[POST REPLY] Found post by content matching, using _id: ${replyToId.toString()}`);
+          } else {
+            console.warn(`[POST REPLY] Could not find original post _id, reply will not be linked`);
+          }
+        }
+      }
+      
       const replyPost = {
         _id: new mongoose.Types.ObjectId(),
         username,
         message: replyContent,
         timestamp: new Date(),
         createdBy: username,
-        replyTo: post._id ? new mongoose.Types.ObjectId(post._id) : null,
+        replyTo: replyToId,
         metadata: {
           edited: false,
           likes: 0,
@@ -1220,6 +1265,8 @@ export async function respondToForumPost(
           status: 'active'
         }
       };
+      
+      console.log(`[POST REPLY] Creating reply to post by ${originalPostAuthor}, replyTo ID: ${replyToId ? replyToId.toString() : 'null'}`);
       
       // Add reply to forum
       forumDoc.posts.push(replyPost);
