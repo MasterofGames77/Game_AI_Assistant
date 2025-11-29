@@ -460,7 +460,7 @@ Provide only the game title. If you cannot identify it with confidence, respond 
     try {
       // Use OpenAI to identify the game from the image description
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: 'gpt-4o-search-preview',
         messages: [
           {
             role: 'system',
@@ -817,7 +817,7 @@ export const getChatCompletionWithVision = async (
     });
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-4o-search-preview',
       messages: messages as any,
       max_completion_tokens: 1000,
       temperature: 0.7,
@@ -1186,7 +1186,7 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
 ${gameTitleForContext ? `\n⚠️ IMPORTANT: The user is asking about "${gameTitleForContext}" - you MUST answer about this exact game, not any other game with a similar name ⚠️` : ''}`;
       
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: 'gpt-4o-search-preview',
         messages: [
           { 
             role: 'system', 
@@ -1503,7 +1503,7 @@ ONLY include games where ${genre} is clearly the primary genre. If unsure, EXCLU
 
         try {
           const aiResponse = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
+            model: 'gpt-4o-search-preview',
             messages: [
               {
                 role: 'system',
@@ -1624,7 +1624,7 @@ ONLY include games where ${genre} is clearly the primary genre. If unsure, EXCLU
 
         try {
           const aiResponse = await openai.chat.completions.create({
-            model: 'gpt-4o',
+            model: 'gpt-4o-search-preview',
             messages: [
               {
                 role: 'system',

@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import ShareableCard from "./ShareableCard";
@@ -15,47 +21,62 @@ const ShareCardModal: React.FC<ShareCardModalProps> = ({
   conversation,
   detectedGame,
 }) => {
-  const [cardData, setCardData] = useState<CardData | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const isGeneratingRef = useRef(false);
 
-  useEffect(() => {
-    if (isOpen && conversation) {
-      const gameTitle = extractGameTitle(detectedGame, conversation.question);
-      // Use a larger maxLength to show more of the response (3000 chars to accommodate detailed responses)
-      // If response is under 3000 chars, show full response
-      const answerSnippet = extractSnippet(conversation.response, 3000);
+  // Memoize cardData to prevent unnecessary recreations
+  const cardData = useMemo<CardData | null>(() => {
+    if (!isOpen || !conversation) return null;
 
-      // Convert relative image URLs to absolute URLs
-      let imageUrl = conversation.imageUrl;
-      if (
-        imageUrl &&
-        typeof window !== "undefined" &&
-        !imageUrl.startsWith("http") &&
-        !imageUrl.startsWith("//")
-      ) {
-        // If it's a relative URL, make it absolute
-        imageUrl = imageUrl.startsWith("/")
-          ? `${window.location.origin}${imageUrl}`
-          : `${window.location.origin}/${imageUrl}`;
-      }
+    const gameTitle = extractGameTitle(detectedGame, conversation.question);
+    // Use a larger maxLength to show more of the response (3000 chars to accommodate detailed responses)
+    // If response is under 3000 chars, show full response
+    const answerSnippet = extractSnippet(conversation.response, 3000);
 
-      setCardData({
-        gameTitle,
-        question: conversation.question,
-        answerSnippet,
-        imageUrl: imageUrl || undefined,
-      });
-      setError(null);
-      setPreviewUrl(null);
+    // Convert relative image URLs to absolute URLs
+    let imageUrl = conversation.imageUrl;
+    if (
+      imageUrl &&
+      typeof window !== "undefined" &&
+      !imageUrl.startsWith("http") &&
+      !imageUrl.startsWith("//")
+    ) {
+      // If it's a relative URL, make it absolute
+      imageUrl = imageUrl.startsWith("/")
+        ? `${window.location.origin}${imageUrl}`
+        : `${window.location.origin}/${imageUrl}`;
     }
+
+    return {
+      gameTitle,
+      question: conversation.question,
+      answerSnippet,
+      imageUrl: imageUrl || undefined,
+    };
   }, [isOpen, conversation, detectedGame]);
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setPreviewUrl(null);
+      setError(null);
+      setIsGenerating(false);
+      isGeneratingRef.current = false;
+    }
+  }, [isOpen]);
 
   const generatePreview = useCallback(async () => {
     if (!cardData) return;
 
+    // Prevent concurrent generations
+    if (isGeneratingRef.current) {
+      return;
+    }
+
+    isGeneratingRef.current = true;
     setIsGenerating(true);
     setError(null);
 
@@ -136,14 +157,20 @@ const ShareCardModal: React.FC<ShareCardModalProps> = ({
       setError("Failed to generate card preview. Please try again.");
     } finally {
       setIsGenerating(false);
+      isGeneratingRef.current = false;
     }
   }, [cardData]);
 
+  // Generate preview when modal opens with cardData
   useEffect(() => {
-    if (isOpen && cardData) {
-      generatePreview();
+    if (isOpen && cardData && !previewUrl && !isGeneratingRef.current) {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        generatePreview();
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [isOpen, cardData, generatePreview]);
+  }, [isOpen, cardData, previewUrl, generatePreview]);
 
   const handleDownload = async () => {
     if (!cardData) return;

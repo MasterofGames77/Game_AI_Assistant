@@ -1741,7 +1741,7 @@ ${specificPlatform ? `Focus on whether this game has achievements SPECIFICALLY o
 Respond with ONLY "YES" or "NO" - nothing else.`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-4o-search-preview',
       messages: [
         {
           role: 'system',
