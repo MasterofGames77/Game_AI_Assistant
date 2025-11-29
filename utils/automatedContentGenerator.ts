@@ -193,23 +193,46 @@ export async function generateForumPost(
   // Build previous posts context if available
   let previousPostsContext = '';
   if (previousPosts.length > 0) {
+    // Analyze previous posts to identify specific topics to avoid
+    const previousTopics: string[] = [];
+    previousPosts.forEach(post => {
+      const lowerPost = post.toLowerCase();
+      if (lowerPost.includes('chapter')) previousTopics.push('chapter');
+      if (lowerPost.includes('level')) previousTopics.push('level');
+      if (lowerPost.includes('soundtrack') || lowerPost.includes('music')) previousTopics.push('music/soundtrack');
+      if (lowerPost.includes('visual') || lowerPost.includes('atmosphere') || lowerPost.includes('vibe')) previousTopics.push('visuals/atmosphere');
+      if (lowerPost.includes('mechanic') || lowerPost.includes('wind') || lowerPost.includes('dash')) previousTopics.push('gameplay mechanics');
+      if (lowerPost.includes('tip') || lowerPost.includes('pro tip') || lowerPost.includes('advice')) previousTopics.push('tips/advice');
+      if (lowerPost.includes('finished') || lowerPost.includes('completed')) previousTopics.push('completion status');
+    });
+    // Remove duplicates manually to avoid Set iteration issues
+    const uniqueTopics: string[] = [];
+    previousTopics.forEach(topic => {
+      if (!uniqueTopics.includes(topic)) {
+        uniqueTopics.push(topic);
+      }
+    });
+    
     previousPostsContext = `\n\nCRITICAL: You have posted about ${gameTitle} before. Here are your previous posts to ensure your new post is UNIQUE and DIFFERENT:
 ${previousPosts.map((post, idx) => `${idx + 1}. "${post}"`).join('\n')}
 
 CRITICAL - UNIQUENESS REQUIREMENTS (READ CAREFULLY):
 - Your new post MUST be completely different from all previous posts above
 - Do NOT repeat the same topics, experiences, themes, or tips from previous posts
-- Write about a DIFFERENT aspect of ${gameTitle}:
-  * If previous posts discussed exploration, write about combat/mechanics/story/characters instead
-  * If previous posts discussed platforming, write about story/characters/items/quests instead
-  * If previous posts discussed hidden items, write about main story/characters/combat instead
-  * If previous posts discussed atmosphere, write about gameplay mechanics/tips/strategies instead
+${uniqueTopics.length > 0 ? `- AVOID these specific topics that you've already discussed: ${uniqueTopics.join(', ')}` : ''}
+- Write about a COMPLETELY DIFFERENT aspect of ${gameTitle}:
+  * If previous posts discussed a specific chapter/level, write about a DIFFERENT chapter/level OR a completely different topic (story, characters, items, etc.)
+  * If previous posts discussed music/soundtrack, write about gameplay, story, characters, or mechanics instead
+  * If previous posts discussed visuals/atmosphere, write about gameplay mechanics, tips, strategies, or story instead
+  * If previous posts discussed gameplay mechanics (wind, dashes, etc.), write about story, characters, items, exploration, or secrets instead
+  * If previous posts gave tips/advice, write about your experience, favorite moments, characters, or story instead
+  * If previous posts mentioned finishing/completing, write about something else entirely
 - Use COMPLETELY different phrasing and structure - avoid similar sentence patterns or word choices
-- If you mentioned finishing the game before, don't mention it again
-- If you gave tips before, give DIFFERENT tips or discuss a DIFFERENT aspect
-- If you discussed a specific area/level before, discuss a DIFFERENT area/level
-- Be creative and find a NEW, UNIQUE angle to discuss about ${gameTitle}
-- Avoid repeating similar themes, topics, or experiences from previous posts`;
+- If you mentioned a specific chapter/level number before, do NOT mention the same chapter/level again
+- If you gave tips about a specific mechanic before, do NOT give tips about the same mechanic again
+- Be creative and find a NEW, UNIQUE angle to discuss about ${gameTitle} that you haven't covered before
+- Avoid repeating similar themes, topics, or experiences from previous posts
+- Think of a completely different aspect of the game: characters, story, items, secrets, different areas, different mechanics, different experiences`;
   }
 
   const systemPrompt = isInterdimensionalHipster

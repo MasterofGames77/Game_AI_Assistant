@@ -208,13 +208,62 @@ class AutomatedUsersScheduler {
     // Also verify that node-schedule is actually working by checking if jobs are firing
     const heartbeatTask = scheduleJob('*/5 * * * *', () => {
       const now = new Date();
-      console.log(`[SCHEDULER HEARTBEAT] Scheduler is alive at ${now.toISOString()} - All tasks scheduled: ${this.tasks.length}`);
+      const utcNow = new Date(now.toISOString());
+      console.log(`[SCHEDULER HEARTBEAT] Scheduler is alive at ${now.toISOString()} - Total tasks scheduled: ${this.tasks.length} (this number represents all scheduled tasks, not completed tasks)`);
       
       // Verify scheduled tasks are still active
       const activeTasks = this.tasks.filter(t => t.cronTask).length;
       if (activeTasks < this.tasks.length) {
         console.warn(`[SCHEDULER WARNING] Only ${activeTasks}/${this.tasks.length} tasks have active cron jobs!`);
       }
+      
+      // Count tasks that are still left for today
+      // A task is "left for today" if:
+      // 1. Its scheduled time hasn't arrived yet today (upcoming), OR
+      // 2. Its scheduled time has passed but we haven't run it today (overdue/missed)
+      const tasksLeftForToday = this.tasks.filter(task => {
+        try {
+          const cronExpression = task.cronExpression;
+          const parts = cronExpression.split(/\s+/);
+          if (parts.length !== 5) return false;
+          
+          const scheduledMinute = parts[0] === '*' ? null : parseInt(parts[0]);
+          const scheduledHour = parts[1] === '*' ? null : parseInt(parts[1]);
+          
+          // Only count daily tasks (not * for hour/minute)
+          if (scheduledHour !== null && scheduledMinute !== null) {
+            const todayAtScheduledTime = new Date(utcNow);
+            todayAtScheduledTime.setUTCHours(scheduledHour, scheduledMinute, 0, 0);
+            
+            // Check if we've already run today
+            let hasRunToday = false;
+            if (task.lastRun) {
+              const lastRunDate = new Date(task.lastRun);
+              hasRunToday = lastRunDate.getUTCDate() === utcNow.getUTCDate() &&
+                           lastRunDate.getUTCMonth() === utcNow.getUTCMonth() &&
+                           lastRunDate.getUTCFullYear() === utcNow.getUTCFullYear();
+            }
+            
+            // If we've already run today, this task is done for today
+            if (hasRunToday) {
+              return false;
+            }
+            
+            // If we haven't run today, check if the scheduled time is today
+            // (either upcoming or already passed)
+            const scheduledTimeIsToday = todayAtScheduledTime.getUTCDate() === utcNow.getUTCDate() &&
+                                        todayAtScheduledTime.getUTCMonth() === utcNow.getUTCMonth() &&
+                                        todayAtScheduledTime.getUTCFullYear() === utcNow.getUTCFullYear();
+            
+            return scheduledTimeIsToday;
+          }
+          return false; // Not a daily task, don't count it
+        } catch (error) {
+          return false;
+        }
+      }).length;
+      
+      console.log(`[SCHEDULER HEARTBEAT] Tasks remaining for today: ${tasksLeftForToday}`);
       
       // Log next run times for verification
       this.tasks.forEach(task => {

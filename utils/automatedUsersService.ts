@@ -391,22 +391,28 @@ function findSuitableForum(
     }
   }
 
-  // Priority 3: Forums created by this user (any game in their preferred genres)
-  const userCreatedForums = forums.filter((f: any) => f.createdBy === username);
-  if (userCreatedForums.length > 0) {
-    // Return a random forum created by the user to add variety
-    return userCreatedForums[Math.floor(Math.random() * userCreatedForums.length)];
-  }
-
-  // Priority 4: Any active forum (to encourage participation in existing discussions)
+  // Priority 3: Any active forum (to encourage participation in existing discussions)
+  // This includes forums created by others, promoting diversity
   // Filter to only include forums that are active and have some activity
   const activeForums = forums.filter((f: any) => 
     f.metadata?.status === 'active' && 
     (f.metadata?.totalPosts > 0 || f.posts?.length > 0)
   );
   if (activeForums.length > 0) {
+    // Prefer forums created by others (not this user) to encourage diverse participation
+    // But include user's own forums as well for variety
+    const othersForums = activeForums.filter((f: any) => f.createdBy !== username);
+    const forumsToChooseFrom = othersForums.length > 0 ? othersForums : activeForums;
     // Return a random active forum
-    return activeForums[Math.floor(Math.random() * activeForums.length)];
+    return forumsToChooseFrom[Math.floor(Math.random() * forumsToChooseFrom.length)];
+  }
+
+  // Priority 4: Forums created by this user (any game in their preferred genres)
+  // Only if no active forums exist
+  const userCreatedForums = forums.filter((f: any) => f.createdBy === username);
+  if (userCreatedForums.length > 0) {
+    // Return a random forum created by the user to add variety
+    return userCreatedForums[Math.floor(Math.random() * userCreatedForums.length)];
   }
 
   // Priority 5: Any forum at all
@@ -455,14 +461,36 @@ export async function createForumPost(
       forums = [];
     }
     
-    // Select a random game from user's preferences
-    const gameSelection = selectRandomGame(userPreferences);
+    // Sometimes select a game from existing forums to encourage diversity (30% chance)
+    // This ensures automated users post in forums about various games, not just their preferred ones
+    let gameSelection: { gameTitle: string; genre: string } | null = null;
+    let selectedFromExistingForums = false;
+    
+    if (forums.length > 0 && Math.random() < 0.3) {
+      // Select a random game from existing forums
+      const forumsWithGames = forums.filter((f: any) => f.gameTitle && f.metadata?.status === 'active');
+      if (forumsWithGames.length > 0) {
+        const randomForum = forumsWithGames[Math.floor(Math.random() * forumsWithGames.length)];
+        const forumGameTitle = randomForum.gameTitle;
+        const forumGenre = determineGenreFromGame(forumGameTitle);
+        if (forumGameTitle && forumGenre) {
+          gameSelection = { gameTitle: forumGameTitle, genre: forumGenre };
+          selectedFromExistingForums = true;
+          console.log(`[FORUM POST] Selected game from existing forum: ${forumGameTitle} (encouraging diversity)`);
+        }
+      }
+    }
+    
+    // If we didn't select from existing forums, use user preferences
     if (!gameSelection) {
-      return {
-        success: false,
-        message: 'No games available for user preferences',
-        error: 'No games found'
-      };
+      gameSelection = selectRandomGame(userPreferences);
+      if (!gameSelection) {
+        return {
+          success: false,
+          message: 'No games available for user preferences',
+          error: 'No games found'
+        };
+      }
     }
     
     const { gameTitle, genre } = gameSelection;
@@ -509,35 +537,50 @@ export async function createForumPost(
     
     // Fetch previous posts by this user to avoid repetition
     // Check ALL recent posts (not just for this game) to ensure uniqueness across all posts
+    // Also prioritize posts about the same game for stricter checking
     const previousPosts: string[] = [];
+    const previousPostsWithTimestamps: Array<{ post: string; timestamp: Date; gameTitle: string }> = [];
     try {
-      // Collect all posts by this user from ALL forums (within last 7 days)
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      // Collect all posts by this user from ALL forums (within last 30 days for better coverage)
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       
       for (const forum of forums) {
         if (forum.posts && Array.isArray(forum.posts)) {
+          const forumGameTitle = forum.gameTitle || '';
           const userPosts = forum.posts
             .filter((p: any) => 
               p.username === username && 
               p.message && 
               p.message.trim().length > 0 &&
               p.metadata?.status === 'active' &&
-              new Date(p.timestamp) > sevenDaysAgo
+              new Date(p.timestamp) > thirtyDaysAgo
             )
-            .map((p: any) => p.message.trim());
-          previousPosts.push(...userPosts);
+            .map((p: any) => ({
+              post: p.message.trim(),
+              timestamp: new Date(p.timestamp),
+              gameTitle: forumGameTitle
+            }));
+          previousPostsWithTimestamps.push(...userPosts);
         }
       }
       
-      // Sort by timestamp (most recent first) and limit to most recent 10 posts
-      // This ensures we check against all recent posts, not just for the same game
-      previousPosts.sort((a, b) => {
-        // We don't have timestamps here, so just take the most recent ones we found
-        return 0;
-      });
-      previousPosts.splice(10); // Keep only the most recent 10
+      // Sort by timestamp (most recent first)
+      previousPostsWithTimestamps.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       
-      console.log(`Found ${previousPosts.length} recent posts by ${username} across all forums`);
+      // Prioritize posts about the same game, but include all recent posts
+      // First add posts about the same game, then add other posts
+      const sameGamePosts = previousPostsWithTimestamps
+        .filter(p => p.gameTitle.toLowerCase() === actualGameTitle.toLowerCase())
+        .map(p => p.post);
+      const otherGamePosts = previousPostsWithTimestamps
+        .filter(p => p.gameTitle.toLowerCase() !== actualGameTitle.toLowerCase())
+        .map(p => p.post);
+      
+      // Include up to 15 posts about the same game, and 5 posts about other games
+      previousPosts.push(...sameGamePosts.slice(0, 15));
+      previousPosts.push(...otherGamePosts.slice(0, 5));
+      
+      console.log(`Found ${previousPosts.length} recent posts by ${username} (${sameGamePosts.length} about ${actualGameTitle}, ${otherGamePosts.length} about other games)`);
       if (previousPosts.length > 0) {
         console.log(`Sample previous posts: ${previousPosts.slice(0, 2).map(p => p.substring(0, 50) + '...').join(', ')}`);
       }
@@ -573,9 +616,25 @@ export async function createForumPost(
         const commonWords = postWords.filter(w => prevWords.includes(w));
         const topicOverlap = commonWords.length / Math.max(postWords.length, prevWords.length);
         
-        // If similarity is high OR topic overlap is high, consider it duplicate
-        // Lower threshold to 0.70 (was 0.85) for stricter uniqueness
-        return similarity > 0.70 || topicOverlap > 0.40;
+        // Check for specific topic/keyword overlap (chapters, mechanics, etc.)
+        const topicKeywords = ['chapter', 'level', 'area', 'boss', 'mechanic', 'tip', 'strategy', 'soundtrack', 'music', 'visual', 'atmosphere', 'vibe'];
+        const postHasTopicKeywords = topicKeywords.some(keyword => postContent.toLowerCase().includes(keyword));
+        const prevHasTopicKeywords = topicKeywords.some(keyword => prevPost.toLowerCase().includes(keyword));
+        const sameTopicKeywords = topicKeywords.filter(keyword => 
+          postContent.toLowerCase().includes(keyword) && prevPost.toLowerCase().includes(keyword)
+        );
+        
+        // If both posts mention the same topic keywords, they're likely too similar
+        const hasSameTopicFocus = sameTopicKeywords.length > 0 && postHasTopicKeywords && prevHasTopicKeywords;
+        
+        // Extract chapter/level numbers if mentioned
+        const postChapterMatch = postContent.match(/(?:chapter|level|area)\s*(\d+)/i);
+        const prevChapterMatch = prevPost.match(/(?:chapter|level|area)\s*(\d+)/i);
+        const sameChapter = postChapterMatch && prevChapterMatch && postChapterMatch[1] === prevChapterMatch[1];
+        
+        // If similarity is high OR topic overlap is high OR same chapter/topic focus, consider it duplicate
+        // Lower thresholds for stricter uniqueness: 0.60 similarity, 0.30 topic overlap
+        return similarity > 0.60 || topicOverlap > 0.30 || (hasSameTopicFocus && similarity > 0.50) || sameChapter;
       });
       
       if (!isDuplicate) {
