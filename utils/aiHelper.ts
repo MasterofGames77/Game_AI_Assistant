@@ -2281,12 +2281,73 @@ function extractGameTitleCandidates(question: string): string[] {
   }
 
   // Remove duplicates and filter candidates
-  const uniqueCandidates = Array.from(new Set(candidates))
+  let uniqueCandidates = Array.from(new Set(candidates))
     .filter(c => c.length >= 3 && c.length <= 60)
     .filter(c => !isLikelyQuestionWord(c))
     .filter(c => isValidGameTitleCandidate(c));
   
-  return uniqueCandidates;
+  if (uniqueCandidates.length === 0) {
+    return [];
+  }
+  
+  // Separate candidates into single-word and multi-word
+  const singleWordCandidates = uniqueCandidates.filter(c => c.split(/\s+/).length === 1);
+  const multiWordCandidates = uniqueCandidates.filter(c => c.split(/\s+/).length > 1);
+  
+  // If we have multi-word candidates, prefer them over single-word candidates
+  // Single words are often game content (items, ingredients, etc.) not game titles
+  let prioritizedCandidates: string[];
+  if (multiWordCandidates.length > 0) {
+    // Use multi-word candidates, but also include single-word candidates that look like proper nouns
+    // (start with capital letter and are reasonably long - might be game titles like "Deisim")
+    const validSingleWords = singleWordCandidates.filter(c => {
+      const words = c.split(/\s+/);
+      // Only keep single words that:
+      // 1. Start with capital letter (proper noun)
+      // 2. Are at least 5 characters (unlikely to be common words)
+      // 3. Don't look like common nouns (not in common word lists)
+      return words.length === 1 && 
+             /^[A-ZÀ-ÿĀ-ž]/.test(c) && 
+             c.length >= 5 &&
+             !isCommonNoun(c);
+    });
+    prioritizedCandidates = [...multiWordCandidates, ...validSingleWords];
+  } else {
+    // Only single-word candidates available, use them but be more strict
+    prioritizedCandidates = singleWordCandidates.filter(c => {
+      const words = c.split(/\s+/);
+      // Only keep if it's a proper noun and reasonably long
+      return words.length === 1 && 
+             /^[A-ZÀ-ÿĀ-ž]/.test(c) && 
+             c.length >= 5 &&
+             !isCommonNoun(c);
+    });
+  }
+  
+  // Prioritize longer, more complete candidates (likely full game titles)
+  // Sort by: 1) word count (more words = better), 2) length (longer = better), 3) position (later = better)
+  prioritizedCandidates = prioritizedCandidates
+    .map(candidate => ({
+      candidate,
+      wordCount: candidate.split(/\s+/).length,
+      length: candidate.length,
+      position: question.toLowerCase().indexOf(candidate.toLowerCase())
+    }))
+    .sort((a, b) => {
+      // First sort by word count (more words = more likely to be full title)
+      if (b.wordCount !== a.wordCount) {
+        return b.wordCount - a.wordCount;
+      }
+      // Then by length (longer = better, likely full title)
+      if (b.length !== a.length) {
+        return b.length - a.length;
+      }
+      // Finally by position (later in question = more likely to be game title)
+      return b.position - a.position;
+    })
+    .map(item => item.candidate);
+  
+  return prioritizedCandidates;
 }
 
 /**
@@ -2296,6 +2357,38 @@ function isLikelyQuestionWord(text: string): boolean {
   const questionWords = ['what', 'which', 'where', 'when', 'why', 'how', 'who', 'the', 'a', 'an'];
   return questionWords.includes(text.toLowerCase()) || 
          questionWords.some(word => text.toLowerCase().startsWith(word + ' '));
+}
+
+/**
+ * Check if a single word is a common noun (not a proper noun/game title)
+ * Common nouns are lowercase words that refer to general things, not specific titles
+ */
+function isCommonNoun(word: string): boolean {
+  const lower = word.toLowerCase();
+  
+  // Common nouns that might appear in game content but aren't game titles
+  const commonNouns = [
+    // Food/ingredients
+    'seafood', 'paella', 'ingredient', 'ingredients', 'recipe', 'recipes',
+    'cook', 'cooking', 'food', 'meal', 'meals', 'dish', 'dishes',
+    // Items/objects
+    'sword', 'shield', 'armor', 'weapon', 'item', 'items', 'tool', 'tools',
+    'potion', 'potions', 'key', 'keys', 'coin', 'coins', 'gem', 'gems',
+    // Characters/entities
+    'enemy', 'enemies', 'boss', 'bosses', 'character', 'characters',
+    'npc', 'npcs', 'monster', 'monsters', 'creature', 'creatures',
+    // Locations
+    'area', 'areas', 'zone', 'zones', 'level', 'levels', 'dungeon', 'dungeons',
+    'location', 'locations', 'place', 'places', 'room', 'rooms',
+    // Actions/mechanics
+    'attack', 'attacks', 'defense', 'defenses', 'skill', 'skills', 'ability', 'abilities',
+    'quest', 'quests', 'mission', 'missions', 'objective', 'objectives',
+    // Generic terms
+    'guide', 'guides', 'help', 'tips', 'tricks', 'strategy', 'strategies',
+    'walkthrough', 'walkthroughs', 'tutorial', 'tutorials'
+  ];
+  
+  return commonNouns.includes(lower);
 }
 
 /**
@@ -2321,6 +2414,20 @@ function isValidGameTitleCandidate(candidate: string): boolean {
   const words = lower.split(/\s+/).filter(w => w.length > 0);
   if (words.length === 1 && (words[0].length < 4 || commonWords.includes(words[0]))) {
     return false;
+  }
+  
+  // For single-word candidates, be more strict - they're likely game content, not game titles
+  // Multi-word candidates are more likely to be actual game titles
+  if (words.length === 1) {
+    // Reject if it's a common noun (not a proper noun)
+    if (isCommonNoun(candidate)) {
+      return false;
+    }
+    // Only accept single words if they look like proper nouns (start with capital)
+    // and are reasonably long (at least 5 chars)
+    if (!/^[A-ZÀ-ÿĀ-ž]/.test(candidate) || candidate.length < 5) {
+      return false;
+    }
   }
   
   // Reject generic two-word combinations that are likely not game titles
@@ -2584,8 +2691,92 @@ function isAPIResultRelevantToQuestion(apiResult: string, question: string, cand
 }
 
 /**
+ * Extract console name from question if it's about a console, not a game
+ * Returns console name if detected, undefined otherwise
+ */
+function extractConsoleFromQuestion(question: string): string | undefined {
+  const lowerQuestion = question.toLowerCase();
+  
+  // Console patterns - check for console-specific questions
+  const consolePatterns: { [key: string]: RegExp[] } = {
+    'Nintendo Switch 2': [
+      /nintendo\s+switch\s+2/i,
+      /switch\s+2/i
+    ],
+    'Nintendo Switch': [
+      /nintendo\s+switch(?!\s+2)/i,
+      /\bswitch\b(?!\s+2)/i
+    ],
+    'PlayStation 5': [/playstation\s+5/i, /ps5/i],
+    'PlayStation 4': [/playstation\s+4/i, /ps4/i],
+    'PlayStation 3': [/playstation\s+3/i, /ps3/i],
+    'Xbox Series X': [/xbox\s+series\s+x/i, /xsx/i],
+    'Xbox Series S': [/xbox\s+series\s+s/i, /xss/i],
+    'Xbox One': [/xbox\s+one/i],
+    'Xbox 360': [/xbox\s+360/i],
+    'PC': [/\b(pc|steam|epic|gog)\b(?!\s+engine)/i],
+    'Wii U': [/wii\s+u/i],
+    'Wii': [/\bwii\b(?!\s+u)/i],
+    'GameCube': [/gamecube|game\s+cube/i],
+    'Nintendo 64': [/nintendo\s+64|n64/i],
+    'Nintendo 3DS': [/nintendo\s+3ds/i],
+    'Nintendo DS': [/nintendo\s+ds/i],
+    'Nintendo Game Boy': [/nintendo\s+game\s+boy/i],
+    'Nintendo Game Boy Advance': [/nintendo\s+game\s+boy\s+advance/i],
+    'Nintendo Game Boy Color': [/nintendo\s+game\s+boy\s+color/i],
+    'PlayStation Portable': [/playstation\s+portable/i],
+    'PlayStation Vita': [/playstation\s+vita/i],
+    'PlayStation 2': [/playstation\s+2/i],
+    'PlayStation': [/playstation\s/i],
+    'Xbox ': [/xbox\s/i],
+    'Super Nintendo Entertainment System': [/super\s+nintendo\s+entertainment\s+system/i],
+    'Nintendo Entertainment System': [/nintendo\s+entertainment\s+system/i],
+    'Sega Genesis': [/sega\s+genesis/i],
+    'Sega Saturn': [/sega\s+saturn/i],
+    'Sega Dreamcast': [/sega\s+dreamcast/i],
+    'Sega Master System': [/sega\s+master\s+system/i],
+    'TurboGrafx-16': [/turbo\s+grafx-16/i],
+    'Atari 2600': [/atari\s+2600/i],
+    'Commodore 64': [/commodore\s+64/i],
+    'Amiga': [/amiga/i],
+    'PC Engine': [/pc\s+engine|pc-engine|turbo\s*grafx-?16/i],
+    'Sega CD': [/sega\s+cd/i],
+    'MSX': [/msx/i],
+    'ColecoVision': [/coleco\s+vision/i],
+    'Intellivision': [/intellivision/i],
+    'Neo Geo': [/neo\s+geo/i],
+    'Neo Geo Pocket': [/neo\s+geo\s+pocket/i],
+    'Sega Game Gear': [/sega\s+game\s+gear/i],
+    'Atari Jaguar': [/atari\s+jaguar/i],
+    'Virtual Boy': [/virtual\s+boy/i],
+    'Arcade': [/arcade/i]
+  };
+  
+  // Check if question is about console (price, release date, specs, etc.)
+  const consoleQuestionIndicators = [
+    /price|cost|how\s+much|release\s+date|when\s+(was|is|did).*release|specs|specifications|features|console/i
+  ];
+  
+  const isConsoleQuestion = consoleQuestionIndicators.some(pattern => pattern.test(question));
+  
+  if (isConsoleQuestion) {
+    // Check for console patterns in order of specificity (longer names first)
+    const sortedConsoles = Object.entries(consolePatterns).sort((a, b) => b[0].length - a[0].length);
+    
+    for (const [consoleName, patterns] of sortedConsoles) {
+      if (patterns.some(pattern => pattern.test(question))) {
+        return consoleName;
+      }
+    }
+  }
+  
+  return undefined;
+}
+
+/**
  * Extract game title from question text using IGDB and RAWG APIs for verification
  * This eliminates the need for hardcoded game title lists
+ * Also detects consoles if the question is about a console, not a game
  */
 export async function extractGameTitleFromQuestion(question: string): Promise<string | undefined> {
   if (!question || question.length < 3) {
@@ -2606,6 +2797,13 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
   if (isRecommendationQuestion) {
     // console.log('[Game Title] Skipping extraction for recommendation question');
     return undefined;
+  }
+
+  // First, check if this is a console question
+  const detectedConsole = extractConsoleFromQuestion(question);
+  if (detectedConsole) {
+    console.log(`[Game Title] Detected console: ${detectedConsole}`);
+    return detectedConsole;
   }
 
   try {

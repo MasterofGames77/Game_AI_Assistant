@@ -232,8 +232,19 @@ class AutomatedUsersScheduler {
           
           // Only count daily tasks (not * for hour/minute)
           if (scheduledHour !== null && scheduledMinute !== null) {
+            // Create the scheduled time for today
             const todayAtScheduledTime = new Date(utcNow);
             todayAtScheduledTime.setUTCHours(scheduledHour, scheduledMinute, 0, 0);
+            
+            // Check if the scheduled time is actually today (not tomorrow)
+            const scheduledTimeIsToday = todayAtScheduledTime.getUTCDate() === utcNow.getUTCDate() &&
+                                        todayAtScheduledTime.getUTCMonth() === utcNow.getUTCMonth() &&
+                                        todayAtScheduledTime.getUTCFullYear() === utcNow.getUTCFullYear();
+            
+            // If the scheduled time is not today, this task is not left for today
+            if (!scheduledTimeIsToday) {
+              return false;
+            }
             
             // Check if we've already run today
             let hasRunToday = false;
@@ -249,16 +260,12 @@ class AutomatedUsersScheduler {
               return false;
             }
             
-            // If we haven't run today, check if the scheduled time is today
-            // (either upcoming or already passed)
-            const scheduledTimeIsToday = todayAtScheduledTime.getUTCDate() === utcNow.getUTCDate() &&
-                                        todayAtScheduledTime.getUTCMonth() === utcNow.getUTCMonth() &&
-                                        todayAtScheduledTime.getUTCFullYear() === utcNow.getUTCFullYear();
-            
-            return scheduledTimeIsToday;
+            // If we haven't run today and the scheduled time is today, it's left for today
+            return true;
           }
           return false; // Not a daily task, don't count it
         } catch (error) {
+          console.error(`[SCHEDULER HEARTBEAT] Error checking task ${task.name}:`, error);
           return false;
         }
       }).length;
