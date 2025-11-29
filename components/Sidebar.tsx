@@ -78,6 +78,7 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
   onSelectConversation,
   onDeleteConversation,
   onNavigateToAccount,
+  onOpenGuides,
   activeView,
   setActiveView,
   className,
@@ -577,6 +578,32 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
           </>
         )}
       </div>
+
+      {/* My Guides Button */}
+      {username && onOpenGuides && (
+        <div className="mb-4">
+          <button
+            className="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold rounded-lg hover:opacity-90 transition-all duration-200 shadow-lg flex items-center justify-center space-x-2"
+            onClick={onOpenGuides}
+            aria-label="View My Guides"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+              />
+            </svg>
+            <span>My Guides</span>
+          </button>
+        </div>
+      )}
 
       {/* Account Button */}
       <div className="mb-6">

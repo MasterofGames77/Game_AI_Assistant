@@ -24,6 +24,8 @@ import SmartGameResume from "../components/SmartGameResume";
 import QuickTemplates from "../components/QuickTemplates";
 import ShareCardModal from "../components/ShareCardModal";
 import DailyChallengeBanner from "../components/DailyChallengeBanner";
+import MyGuides from "../components/MyGuides";
+import { isLongGuide, extractGuideTitle } from "../utils/guideDetection";
 // import { useRouter } from "next/navigation";
 
 export default function Home() {
@@ -67,6 +69,9 @@ export default function Home() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [showPasswordSetupModal, setShowPasswordSetupModal] = useState(false);
   const [isLegacyUser, setIsLegacyUser] = useState(false);
+  const [savingGuide, setSavingGuide] = useState(false);
+  const [guideSaved, setGuideSaved] = useState(false);
+  const [showGuidesModal, setShowGuidesModal] = useState(false);
   const [showEarlyAccessSetupModal, setShowEarlyAccessSetupModal] =
     useState(false);
   const [, setIsEarlyAccessUser] = useState(false); // intentionally unused; only need setter for downstream effects
@@ -1199,6 +1204,56 @@ export default function Home() {
     window.location.href = "/account";
   };
 
+  // Handle saving a guide
+  const handleSaveGuide = async () => {
+    if (!username) {
+      setError("Please sign in to save guides");
+      return;
+    }
+
+    const currentResponse = response || selectedConversation?.response || "";
+    const currentQuestion = question || selectedConversation?.question || "";
+
+    if (!currentResponse || !currentQuestion) {
+      setError("No guide to save");
+      return;
+    }
+
+    try {
+      setSavingGuide(true);
+      setGuideSaved(false);
+      setError("");
+
+      const guideTitle = extractGuideTitle(currentQuestion);
+
+      const res = await axios.post("/api/guides/save", {
+        username,
+        question: currentQuestion,
+        response: currentResponse,
+        title: guideTitle,
+        imageUrl:
+          responseImageUrl || selectedConversation?.imageUrl || undefined,
+      });
+
+      if (res.data.success) {
+        setGuideSaved(true);
+        // Reset the saved state after 3 seconds
+        setTimeout(() => {
+          setGuideSaved(false);
+        }, 3000);
+      }
+    } catch (error: any) {
+      console.error("Error saving guide:", error);
+      if (error.response?.data?.message) {
+        setError(error.response.data.message);
+      } else {
+        setError("Failed to save guide. Please try again.");
+      }
+    } finally {
+      setSavingGuide(false);
+    }
+  };
+
   // Used for debugging
   // if (typeof window !== "undefined") {
   //   console.log("Current username:", localStorage.getItem("username")); // Already commented out
@@ -1368,6 +1423,13 @@ export default function Home() {
         }
         detectedGame={(selectedConversation as any)?.detectedGame || undefined}
       />
+
+      {/* My Guides Modal */}
+      <MyGuides
+        username={username}
+        isOpen={showGuidesModal}
+        onClose={() => setShowGuidesModal(false)}
+      />
       {/* Main App Content (only if signed in) */}
       {!showUsernameModal && (
         <>
@@ -1433,6 +1495,7 @@ export default function Home() {
             onClear={handleClear}
             onTwitchAuth={handleTwitchAuth}
             onNavigateToAccount={handleNavigateToAccount}
+            onOpenGuides={() => setShowGuidesModal(true)}
             activeView={activeView}
             setActiveView={setActiveView}
             conversationCount={conversationCount}
@@ -1797,8 +1860,71 @@ export default function Home() {
                       )}
                     </div>
 
-                    {/* Share Card Button */}
-                    <div className="mt-4 flex justify-end">
+                    {/* Action Buttons */}
+                    <div className="mt-4 flex justify-end gap-3">
+                      {/* Save Guide Button - Show when response is a long guide */}
+                      {isLongGuide(
+                        response || selectedConversation?.response || "",
+                        question || selectedConversation?.question
+                      ) && (
+                        <button
+                          onClick={handleSaveGuide}
+                          disabled={savingGuide || guideSaved || !username}
+                          className={`px-4 py-2 font-semibold rounded-lg transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl ${
+                            guideSaved
+                              ? "bg-green-500 text-white cursor-default"
+                              : savingGuide
+                              ? "bg-gray-400 text-white cursor-not-allowed"
+                              : !username
+                              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                              : "bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white"
+                          }`}
+                          title={
+                            !username
+                              ? "Sign in to save guides"
+                              : guideSaved
+                              ? "Guide saved!"
+                              : "Save this guide to My Guides"
+                          }
+                        >
+                          {guideSaved ? (
+                            <>
+                              <svg
+                                className="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                              Saved!
+                            </>
+                          ) : (
+                            <>
+                              <svg
+                                className="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                                />
+                              </svg>
+                              {savingGuide ? "Saving..." : "Save Guide"}
+                            </>
+                          )}
+                        </button>
+                      )}
+                      {/* Share Card Button */}
                       <button
                         onClick={() => setShowShareModal(true)}
                         className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-600 hover:to-pink-600 text-white font-semibold rounded-lg transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl"

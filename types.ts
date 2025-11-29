@@ -77,6 +77,7 @@ export interface SideBarProps {
   onClear: () => void;
   onTwitchAuth: () => void;
   onNavigateToAccount: () => void;
+  onOpenGuides?: () => void;
   activeView: "chat" | "forum" | "feedback";
   setActiveView: (view: "chat" | "forum" | "feedback") => void;
   conversationCount: number;
@@ -1038,6 +1039,22 @@ export interface GameTracking {
   currentlyPlaying: GameEntry[];
 }
 
+// Saved Guide types
+export interface SavedGuide {
+  _id?: string;
+  title: string;
+  question: string;
+  response: string;
+  savedAt: Date | string;
+  imageUrl?: string;
+}
+
+export interface MyGuidesProps {
+  username: string | null;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
 export interface GameTrackerProps {
   username: string;
   gameTracking?: GameTracking;
@@ -1094,11 +1111,13 @@ export interface CollectorStartResponse {
   status: string;
   start_time: string;
   message?: string;
+  data?: any[]; // For trigger endpoints that return data directly
+  start_eta?: string; // For trigger endpoints - when the job will start
 }
 
 export interface CollectionStatus {
   collection_id: string;
-  status: 'building' | 'running' | 'failed' | 'done';
+  status: 'building' | 'running' | 'failed' | 'done' | 'processing' | 'started';
   message?: string;
 }
 
@@ -1107,4 +1126,18 @@ export interface RunCollectorOptions extends StartCollectorOptions {
   cacheTtlSeconds?: number;
   pollIntervalMs?: number;
   timeoutMs?: number;
+}
+
+export interface UpdateResult {
+  source: string;
+  success: boolean;
+  recordCount?: number;
+  error?: string;
+  collectionTime?: number;
+}
+
+export interface MyGuidesProps {
+  username: string | null;
+  isOpen: boolean;
+  onClose: () => void;
 }

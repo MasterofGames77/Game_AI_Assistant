@@ -42,6 +42,13 @@ export interface IUser extends Document {
       notes?: string;
     }>;
   };
+  guides?: Array<{
+    title: string;
+    question: string;
+    response: string;
+    savedAt: Date;
+    imageUrl?: string;
+  }>;
   createdAt?: Date; // Mongoose timestamp
   updatedAt?: Date; // Mongoose timestamp
   // Methods
@@ -291,7 +298,15 @@ const UserSchema = new Schema<IUser>({
       startedAt: { type: Date, default: Date.now },
       notes: { type: String } // Optional user notes about progress
     }]
-  }
+  },
+  // Saved guides - array of guides saved by the user
+  guides: [{
+    title: { type: String, required: true }, // Guide title (extracted from question or auto-generated)
+    question: { type: String, required: true }, // Original question
+    response: { type: String, required: true }, // Full guide response
+    savedAt: { type: Date, default: Date.now }, // When the guide was saved
+    imageUrl: { type: String } // Optional image URL if the question had an image
+  }]
 }, { collection: 'users' });
 
 // Create indexes for subscription-related queries
