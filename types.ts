@@ -1141,3 +1141,28 @@ export interface MyGuidesProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+// Leaderboard Types
+export type LeaderboardType = 'questions' | 'achievements' | 'forumPosts' | 'contributors' | 'genreSpecialists';
+export type Timeframe = 'weekly' | 'monthly' | 'allTime';
+
+export interface LeaderboardEntry {
+  username: string;
+  count: number;
+  rank: number;
+  metadata?: {
+    genre?: string;
+    achievementCount?: number;
+    questionCount?: number;
+    forumPostCount?: number;
+  };
+}
+
+export interface LeaderboardResponse {
+  type: LeaderboardType;
+  timeframe: Timeframe;
+  entries: LeaderboardEntry[];
+  generatedAt: Date;
+  cached: boolean;
+  genre?: string; // For genre specialists
+}
