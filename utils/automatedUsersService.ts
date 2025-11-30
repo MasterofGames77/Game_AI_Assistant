@@ -1167,19 +1167,25 @@ export async function respondToForumPost(
     const { forum, post, gameTitle, genre } = postToRespondTo;
     const forumId = forum.forumId || forum._id;
     const forumTitle = forum.title || forum.gameTitle || 'General Discussion';
-    const originalPostAuthor = post.username;
+    const originalPostAuthor = post.createdBy || post.username || 'Unknown';
     const originalPostContent = post.message;
     
     console.log(`Responding to post by ${originalPostAuthor} in forum: ${forumTitle} (${gameTitle})`);
     
     // Generate relevant reply
-    const replyContent = await generatePostReply({
+    let replyContent = await generatePostReply({
       gameTitle,
       genre,
       originalPost: originalPostContent,
       originalPostAuthor,
       forumTopic: forumTitle
     });
+    
+    // Prepend @mention if not already present (same logic as manual replies)
+    const mentionPattern = new RegExp(`^@${originalPostAuthor}\\s+`, "i");
+    if (!mentionPattern.test(replyContent.trim())) {
+      replyContent = `@${originalPostAuthor} ${replyContent.trim()}`;
+    }
     
     // Check content moderation
     const contentCheck = await containsOffensiveContent(replyContent, username);
