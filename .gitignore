@@ -146,3 +146,5 @@ DAILY_CHALLENGE_VERIFICATION.md
 NINTENDO_DATA_SETUP.md
 
 assets/*
+
+pages/api/test-email.ts

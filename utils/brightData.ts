@@ -7,9 +7,9 @@ const BRIGHT_DATA_BASE_URL = 'https://api.brightdata.com/dca';
 const DEFAULT_POLL_INTERVAL_MS = 4_000;
 const DEFAULT_TIMEOUT_MS = 120_000;
 
-if (!BRIGHT_DATA_API_KEY) {
-  console.warn('[BrightData] BRIGHT_DATA_API_KEY is not set. Bright Data calls will fail until it is provided.');
-}
+// if (!BRIGHT_DATA_API_KEY) {
+//   console.warn('[BrightData] BRIGHT_DATA_API_KEY is not set. Bright Data calls will fail until it is provided.');
+// }
 
 // Central cache so repeated queries reuse recently fetched datasets
 const responseCache = new NodeCache({
