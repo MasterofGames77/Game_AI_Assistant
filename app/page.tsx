@@ -1023,26 +1023,173 @@ export default function Home() {
   //   }
   // };
 
+  // Extract domain name from URL for display
+  const getSourceName = (url: string): string => {
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname.replace(/^www\./, "");
+
+      // Map common domains to friendly names
+      const domainMap: { [key: string]: string } = {
+        "wikipedia.org": "Wikipedia",
+        "en.wikipedia.org": "Wikipedia",
+        "gamesradar.com": "GamesRadar+",
+        "tomsguide.com": "Tom's Guide",
+        "techradar.com": "TechRadar",
+        "gamespot.com": "GameSpot",
+        "ign.com": "IGN",
+        "polygon.com": "Polygon",
+        "kotaku.com": "Kotaku",
+        "theverge.com": "The Verge",
+        "engadget.com": "Engadget",
+        "nintendo.com": "Nintendo",
+        "playstation.com": "PlayStation",
+        "xbox.com": "Xbox",
+        "steamdeck.com": "Steam Deck",
+        "popularmechanics.com": "Popular Mechanics",
+        "nintendolife.com": "Nintendo Life",
+        "gamerant.com": "Gamerant",
+        "videogamechronicles.com": "VGC",
+        "thegamer.com": "The Gamer",
+        "game8.co": "Game8",
+        "eurogamer.net": "Eurogamer",
+        "gamefaqs.gamespot.com": "GameFAQs",
+        "youtube.com": "YouTube",
+        "nintendowire.com": "Nintendo Wire",
+        "store.steampowered.com": "Steam",
+        "epicgames.com": "Epic Games",
+        "currently.att.yahoo.com": "Yahoo",
+      };
+
+      // Check for exact match first
+      if (domainMap[hostname]) {
+        return domainMap[hostname];
+      }
+
+      // Check for partial matches (e.g., subdomains)
+      for (const [domain, name] of Object.entries(domainMap)) {
+        if (hostname.includes(domain) || domain.includes(hostname)) {
+          return name;
+        }
+      }
+
+      // Extract main domain name (e.g., "example.com" from "subdomain.example.com")
+      const parts = hostname.split(".");
+      if (parts.length >= 2) {
+        const mainDomain = parts.slice(-2).join(".");
+        // Capitalize first letter of each word
+        return mainDomain
+          .split(".")
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(".");
+      }
+
+      return hostname;
+    } catch {
+      return url;
+    }
+  };
+
+  // Parse markdown links and extract sources
+  const parseResponseWithSources = (
+    response: string
+  ): {
+    formattedText: string;
+    sources: Array<{ name: string; url: string }>;
+  } => {
+    const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+    const sourcesMap = new Map<string, { name: string; url: string }>();
+    const urlToSourceName = new Map<string, string>();
+
+    // First pass: find all markdown links and extract sources
+    let match;
+    const matches: Array<{ fullMatch: string; url: string }> = [];
+    while ((match = markdownLinkRegex.exec(response)) !== null) {
+      const [fullMatch, linkText, url] = match;
+      matches.push({ fullMatch, url });
+
+      // Store unique sources and their display names
+      if (!sourcesMap.has(url)) {
+        const sourceName = getSourceName(url);
+        sourcesMap.set(url, { name: sourceName, url });
+        urlToSourceName.set(url, sourceName);
+      }
+    }
+
+    // Second pass: replace all markdown links with shortened source names
+    let formattedText = response;
+    matches.forEach(({ fullMatch, url }) => {
+      const sourceName = urlToSourceName.get(url) || getSourceName(url);
+      // Escape special regex characters in the full match
+      const escapedMatch = fullMatch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      formattedText = formattedText.replace(
+        new RegExp(escapedMatch, "g"),
+        `(${sourceName})`
+      );
+    });
+
+    // Convert map to array
+    const sources = Array.from(sourcesMap.values());
+
+    return { formattedText, sources };
+  };
+
   // format assistant's response
   const formatResponse = (response: string) => {
-    const sentences = response.split("\n").map((sentence) => sentence.trim());
+    const { formattedText, sources } = parseResponseWithSources(response);
+    const sentences = formattedText
+      .split("\n")
+      .map((sentence) => sentence.trim());
     let stepCounter = 1;
-    return sentences.map((sentence, index) => {
-      if (sentence.match(/^\d+\.\s/)) {
-        return (
-          <p key={`step-${index}-${stepCounter}`} className="mt-2">
-            <strong>{stepCounter++}. </strong>
-            {sentence.replace(/^\d+\.\s/, "").trim()}
-          </p>
-        );
-      } else {
-        return (
-          <p key={`sentence-${index}`} className="mt-2">
-            {sentence}
-          </p>
-        );
-      }
-    });
+    return {
+      content: sentences.map((sentence, index) => {
+        if (sentence.match(/^\d+\.\s/)) {
+          return (
+            <p key={`step-${index}-${stepCounter}`} className="mt-2">
+              <strong>{stepCounter++}. </strong>
+              {sentence.replace(/^\d+\.\s/, "").trim()}
+            </p>
+          );
+        } else {
+          return (
+            <p key={`sentence-${index}`} className="mt-2">
+              {sentence}
+            </p>
+          );
+        }
+      }),
+      sources,
+    };
+  };
+
+  // Component to render formatted response with sources
+  const FormattedResponse = ({ response }: { response: string }) => {
+    const formatted = formatResponse(response);
+    return (
+      <>
+        <div>{formatted.content}</div>
+        {formatted.sources && formatted.sources.length > 0 && (
+          <div className="mt-6 pt-4 border-t border-gray-300 dark:border-gray-600">
+            <p className="text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+              Sources:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {formatted.sources.map((source, index) => (
+                <a
+                  key={index}
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
+                >
+                  {source.name}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+      </>
+    );
   };
 
   const handleUsernameSubmit = async (e: React.FormEvent) => {
@@ -1551,6 +1698,9 @@ export default function Home() {
                 <li>Get personalized game recommendations.</li>
                 <li>Analyze gameplay data to improve your strategies.</li>
                 <li>Access detailed game guides.</li>
+                <li>
+                  Info about game sales, console bundles, and technical specs.
+                </li>
               </ul>
 
               {activeView === "chat" && (
@@ -1855,9 +2005,11 @@ export default function Home() {
                       </div>
                     )}
                     <div className="bg-gray-100 p-4 rounded response-box">
-                      {formatResponse(
-                        response || selectedConversation?.response || ""
-                      )}
+                      <FormattedResponse
+                        response={
+                          response || selectedConversation?.response || ""
+                        }
+                      />
                     </div>
 
                     {/* Action Buttons */}
