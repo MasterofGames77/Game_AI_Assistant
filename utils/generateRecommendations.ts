@@ -704,10 +704,15 @@ async function generateCommonMistakes(
  * Generate personalized tips based on user's playstyle
  * Phase 3 Step 2: Enhanced Personalized Tips
  * Includes: quick tips, playstyle insights, optimization suggestions, common mistakes
+ * 
+ * @param username - Username to generate tips for
+ * @param currentQuestion - Optional current question for context
+ * @param patterns - Optional pre-calculated patterns (to avoid duplicate analysis)
  */
 export const generatePersonalizedTips = async (
   username: string,
-  currentQuestion?: string
+  currentQuestion?: string,
+  patterns?: Awaited<ReturnType<typeof analyzeGameplayPatterns>>
 ): Promise<{
   tips: string[];
   basedOn: string;
@@ -735,11 +740,13 @@ export const generatePersonalizedTips = async (
     }
 
     const preferences = user.progress.personalized.preferenceProfile;
-    const patterns = user.progress.personalized.gameplayPatterns;
+    const storedPatterns = user.progress.personalized.gameplayPatterns;
     const tips: string[] = [];
 
-    // Get fresh patterns for more accurate insights
-    const freshPatterns = await analyzeGameplayPatterns(username);
+    // Use provided patterns if available (to avoid duplicate analysis), otherwise calculate fresh
+    // If called from generatePersonalizedRecommendations, patterns are already calculated
+    // If called standalone, calculate fresh patterns for accurate insights
+    const freshPatterns = patterns || await analyzeGameplayPatterns(username, true); // forceRefresh=true for fresh analysis
     const context = currentQuestion ? await extractQuestionContext(currentQuestion) : undefined;
 
     // 1. Quick tips based on current question
@@ -775,9 +782,11 @@ export const generatePersonalizedTips = async (
       }
 
       // Tips based on session frequency
-      if (patterns?.sessionFrequency === 'daily') {
+      // Note: sessionPattern is in patterns.frequency, not patterns.sessionFrequency
+      const sessionPattern = freshPatterns?.frequency?.sessionPattern;
+      if (sessionPattern === 'daily') {
         tips.push('📅 You\'re very active! Consider setting gaming goals to track your progress');
-      } else if (patterns?.sessionFrequency === 'sporadic') {
+      } else if (sessionPattern === 'sporadic') {
         tips.push('⏰ Try shorter gaming sessions with focused objectives');
       }
     }
@@ -3212,7 +3221,7 @@ export const generatePersonalizedRecommendations = async (
     }
 
     // 4. Get user patterns (fresh analysis)
-    const patterns = await analyzeGameplayPatterns(username);
+    const patterns = await analyzeGameplayPatterns(username, true); // forceRefresh=true for fresh analysis
 
     // 5. Get user preferences from stored data
     const preferences = user?.progress?.personalized?.preferenceProfile;
@@ -3241,7 +3250,8 @@ export const generatePersonalizedRecommendations = async (
     // 7. Generate all recommendation types (excluding game recommendations)
     const strategyTips = await generateStrategyTips(patterns, context, preferences);
     const learningPath = generateLearningPath(patterns, preferences, context, currentQuestion);
-    const personalizedTips = await generatePersonalizedTips(username, currentQuestion);
+    // Pass already-calculated patterns to avoid duplicate expensive analysis
+    const personalizedTips = await generatePersonalizedTips(username, currentQuestion, patterns);
 
     // Update recommendation history (only if we're actually showing recommendations)
     // This runs asynchronously so it doesn't slow down the response
