@@ -17,6 +17,7 @@ export interface ContentGenerationOptions {
   genre: string;
   userPreferences: UserPreferences;
   forumTopic?: string;
+  forumCategory?: string; // Category of the forum (gameplay, general, mods, etc.)
   previousPosts?: string[]; // Previous posts by this user for the same game to avoid repetition
 }
 
@@ -26,6 +27,7 @@ export interface PostReplyOptions {
   originalPost: string;
   originalPostAuthor: string;
   forumTopic?: string;
+  forumCategory?: string; // Category of the forum (gameplay, general, mods, speedruns, help and supportetc.)
 }
 
 /**
@@ -171,12 +173,198 @@ Generate ONLY the direct question, nothing else:`;
 }
 
 /**
+ * Analyze forum topic and generate topic-specific requirements
+ * This ensures posts stay on-topic and address the specific forum discussion
+ * 
+ * This function works dynamically for ANY forum topic, not just hardcoded examples.
+ * It analyzes the forum title and category to determine requirements:
+ * - Extracts specific topics from forum titles
+ * - Uses category (gameplay, mods, speedruns, help, general) to guide content
+ * - Detects common patterns (favorite character, mods, story, etc.)
+ * - Falls back to general requirements for any custom topics
+ * 
+ * This will work for:
+ * - New forums created by automated users
+ * - New forums created by real users
+ * - Any game title
+ * - Any forum topic or category
+ */
+function analyzeForumTopic(forumTopic: string | undefined, forumCategory: string | undefined, gameTitle: string): string {
+  // Normalize inputs
+  const topicLower = (forumTopic || '').toLowerCase();
+  const gameTitleLower = gameTitle.toLowerCase();
+  const categoryLower = (forumCategory || '').toLowerCase();
+  
+  // Check if this is truly a "General Discussion" (no specific topic)
+  const isGeneralDiscussion = !forumTopic || 
+    forumTopic === 'General Discussion' || 
+    topicLower === 'general discussion' ||
+    (topicLower.includes('general') && topicLower.includes('discussion'));
+  
+  if (isGeneralDiscussion) {
+    // For general discussion, use category to guide content
+    if (categoryLower === 'gameplay') {
+      return `CRITICAL TOPIC REQUIREMENT: This forum is specifically about GAMEPLAY. Your post MUST focus on:
+- Gameplay mechanics, controls, strategies, tips, or techniques
+- How to play, combat systems, movement, or game mechanics
+- DO NOT focus primarily on story, themes, characters' emotional journeys, or narrative elements
+- You can mention story/characters briefly if relevant to gameplay, but gameplay should be the MAIN focus`;
+    } else if (categoryLower === 'mods') {
+      return `CRITICAL TOPIC REQUIREMENT: This forum is specifically about MODS. Your post MUST:
+- Discuss mods, modifications, or user-generated content for ${gameTitle}
+- Mods can include: gameplay mods, graphics mods, bug fixes, content additions, ports, recompiled versions, overhauls, etc.
+- Mention specific mods, installation, compatibility, mod features, or modding experiences
+- If the forum title mentions a specific mod, you MUST mention that mod by name
+- You can discuss various aspects: mod features, installation, compatibility, performance, mod development, comparisons to vanilla, etc.
+- DO NOT just discuss the vanilla/unmodified game without mentioning mods or modifications
+- If discussing vanilla gameplay, make it clear you're comparing it to modded versions or discussing it in the context of mods`;
+    } else if (categoryLower === 'speedruns') {
+      return `CRITICAL TOPIC REQUIREMENT: This forum is specifically about SPEEDRUNS. Your post MUST focus on:
+- Speedrunning strategies, routes, times, or techniques
+- Speedrun-specific mechanics, glitches, or optimizations
+- DO NOT focus on casual play, story, or general gameplay unless it relates to speedrunning`;
+    } else if (categoryLower === 'help') {
+      return `CRITICAL TOPIC REQUIREMENT: This forum is specifically for HELP & SUPPORT. Your post MUST:
+- Ask questions, provide solutions, or offer help
+- Focus on troubleshooting, guides, or assistance
+- Be helpful and solution-oriented`;
+    }
+    return ''; // General discussion - no specific restrictions
+  }
+  
+  // Extract the specific topic from the forum title (remove game title)
+  let specificTopic = topicLower.replace(gameTitleLower, '').trim();
+  // Remove common forum title patterns
+  specificTopic = specificTopic.replace(/^-\s*/, '').replace(/\s*-\s*general discussion$/i, '').trim();
+  
+  // Check for character/favorite hero topics
+  if (topicLower.includes('favorite') && (topicLower.includes('hero') || topicLower.includes('character'))) {
+    return `CRITICAL TOPIC REQUIREMENT: This forum is specifically about FAVORITE HERO/CHARACTER. Your post MUST:
+- Explicitly state or discuss YOUR favorite hero/character from ${gameTitle}
+- Explain WHY they are your favorite - you can discuss ANY aspect that makes them your favorite:
+  * Their abilities, skills, or combat effectiveness, if applicable
+  * Their personality, character growth, or development arc, if applicable
+  * Their impact on the story or narrative, if applicable
+  * Their design, voice acting, or visual appeal, if applicable
+  * Their role in the party or team dynamics, if applicable
+  * Any combination of the above
+- You can mention other characters for comparison, but you MUST identify a specific favorite
+- DO NOT just discuss general lore, story, or world-building without identifying a favorite hero/character
+- The key requirement is that you MUST identify which character is your favorite and explain why - you can discuss any aspect of them (growth, story impact, abilities, etc.) as long as it relates to why they're your favorite
+- If discussing multiple characters, make it clear which one is your favorite
+- Start your post by stating your favorite (e.g., "My favorite hero has to be...", "I'd say my favorite is...", etc.)`;
+  }
+  
+  // Check for mod-specific topics
+  // Mods can include: recompiled versions, gameplay mods, graphics mods, bug fixes, content additions, ports, etc.
+  // Look for mod-related keywords in the topic
+  const modKeywords = [
+    'recompiled', 'mod', 'port', 'unofficial', 'fan-made', 'custom', 'modded', 'modification',
+    'mods', 'modding', 'modder', 'vanilla', 'unmodified', 'patch', 'overhaul', 'remaster',
+    'enhanced', 'improved', 'community', 'user-generated', 'sdk', 'development kit'
+  ];
+  const hasModKeyword = modKeywords.some(keyword => topicLower.includes(keyword));
+  
+  // Also check category
+  const isModCategory = categoryLower === 'mods';
+  
+  if (hasModKeyword || isModCategory) {
+    // Try to extract the mod name from the topic
+    // Look for patterns like "GameName - ModName" or "ModName" after the game title
+    let modName = '';
+    const afterGameTitle = topicLower.replace(gameTitleLower, '').trim();
+    
+    // Try to extract a specific mod name
+    if (topicLower.includes('recompiled')) {
+      modName = 'Recompiled';
+    } else if (afterGameTitle && afterGameTitle.length > 0 && afterGameTitle.length < 50) {
+      // Use the part after the game title as the mod name
+      modName = afterGameTitle.replace(/^-\s*/, '').replace(/\s*-\s*.*$/, '').trim();
+      // Clean up common patterns
+      modName = modName.replace(/\s*-\s*mods?$/i, '').replace(/\s*-\s*mod$/i, '').trim();
+      if (modName.length > 30 || modName.length < 2) modName = ''; // Too long or too short, use generic
+    }
+    
+    const modNameText = modName ? ` (specifically "${modName}")` : '';
+    
+    return `CRITICAL TOPIC REQUIREMENT: This forum is specifically about MODS or MODIFICATIONS${modNameText}. Your post MUST:
+- Discuss mods, modifications, or user-generated content for ${gameTitle}
+- If the forum title mentions a specific mod name, you MUST mention that mod by name in your post
+- You can discuss various aspects of mods:
+  * Mod features, installation, compatibility, or performance
+  * Graphics mods, gameplay mods, bug fixes, or content additions
+  * Mod development, modding tools, or SDKs
+  * Specific mods you've tried, recommendations, or experiences
+  * Comparisons between modded and vanilla (unmodified) versions
+- You can mention the base game for context, but mods/modifications MUST be the primary focus
+- DO NOT just discuss the vanilla/unmodified game without mentioning mods or modifications
+- If discussing vanilla gameplay, make it clear you're comparing it to modded versions or discussing it in the context of mods`;
+  }
+  
+  // Check for gameplay category
+  if (forumCategory === 'gameplay' || topicLower.includes('gameplay')) {
+    return `CRITICAL TOPIC REQUIREMENT: This forum is specifically about GAMEPLAY. Your post MUST focus on:
+- Gameplay mechanics, controls, strategies, tips, or techniques
+- How to play, combat systems, movement, or game mechanics
+- DO NOT focus primarily on story, themes, characters' emotional journeys, or narrative elements
+- DO NOT discuss story themes, character development, or narrative depth as the main focus - gameplay should be the MAIN focus
+- You can mention story/characters briefly if relevant to gameplay, but gameplay should be the PRIMARY focus
+- Focus on what you DO in the game, not what the story is about`;
+  }
+  
+  // Check for story/narrative topics
+  if (topicLower.includes('story') || topicLower.includes('narrative') || topicLower.includes('plot')) {
+    return `CRITICAL TOPIC REQUIREMENT: This forum is specifically about STORY/NARRATIVE. Your post MUST focus on:
+- Story elements, plot, narrative, character development, or themes
+- Story-related experiences, moments, or discussions
+- DO NOT focus primarily on gameplay mechanics, strategies, or tips unless they relate to story`;
+  }
+  
+  // Check for specific character mentions
+  const characterMatch = topicLower.match(/(?:about|discuss|featuring|with)\s+([a-z\s]+?)(?:\s+in\s+|\s*$|$)/i);
+  if (characterMatch && !topicLower.includes('favorite')) {
+    const characterName = characterMatch[1].trim();
+    if (characterName.length > 2 && characterName.length < 30) {
+      return `CRITICAL TOPIC REQUIREMENT: This forum is specifically about "${characterName}". Your post MUST:
+- Focus on or discuss this specific character
+- Mention this character by name in your post
+- DO NOT just discuss the game in general without addressing this character`;
+    }
+  }
+  
+  // If there's a specific topic extracted, ensure it's addressed
+  // This handles any custom forum topic dynamically
+  if (specificTopic && specificTopic.length > 5 && !specificTopic.includes('general')) {
+    // Check if it's a question format (e.g., "How to...", "Best way to...")
+    const isQuestionFormat = /^(how|what|when|where|why|which|best|top|worst|should|can|do|does|did)/i.test(specificTopic.trim());
+    
+    if (isQuestionFormat) {
+      return `CRITICAL TOPIC REQUIREMENT: This forum is specifically about "${specificTopic}". Your post MUST:
+- Directly address or answer the question/topic: "${specificTopic}"
+- Provide relevant information, experiences, or discussion related to this specific question
+- Stay focused on this topic - do not drift to unrelated topics
+- Make sure your post clearly relates to and addresses "${specificTopic}"`;
+    } else {
+      return `CRITICAL TOPIC REQUIREMENT: This forum is specifically about "${specificTopic}". Your post MUST:
+- Directly address or discuss this specific topic: "${specificTopic}"
+- Stay relevant to "${specificTopic}" - do not drift to unrelated topics
+- Make sure your post is clearly related to this topic
+- If the topic asks about something specific (like a character, mechanic, or feature), make sure you discuss that specific thing`;
+    }
+  }
+  
+  // If no specific topic requirements were found, return empty string
+  // This allows general discussion without restrictions
+  return ''; // No specific requirements
+}
+
+/**
  * Generate a natural forum post for an automated user
  */
 export async function generateForumPost(
   options: ContentGenerationOptions
 ): Promise<string> {
-  const { gameTitle, genre, userPreferences, forumTopic, previousPosts = [] } = options;
+  const { gameTitle, genre, userPreferences, forumTopic, forumCategory, previousPosts = [] } = options;
   
   const isSinglePlayer = userPreferences.focus === 'single-player';
   // Determine username - check if this is for InterdimensionalHipster by checking if they have both types of genres
@@ -189,6 +377,9 @@ export async function generateForumPost(
   // Check if this is a single-player or multiplayer game based on genre
   const singlePlayerGenres = ['rpg', 'adventure', 'simulation', 'puzzle', 'platformer'];
   const isSinglePlayerGame = singlePlayerGenres.includes(genre.toLowerCase());
+  
+  // Analyze forum topic to get topic-specific requirements
+  const topicRequirements = analyzeForumTopic(forumTopic, forumCategory, gameTitle);
   
   // Build previous posts context if available
   let previousPostsContext = '';
@@ -213,10 +404,21 @@ export async function generateForumPost(
       }
     });
     
-    previousPostsContext = `\n\nCRITICAL: You have posted about ${gameTitle} before. Here are your previous posts to ensure your new post is UNIQUE and DIFFERENT:
-${previousPosts.map((post, idx) => `${idx + 1}. "${post}"`).join('\n')}
-
-CRITICAL - UNIQUENESS REQUIREMENTS (READ CAREFULLY):
+    // Build topic-specific uniqueness guidance
+    let uniquenessGuidance = '';
+    if (topicRequirements) {
+      // If there's a specific topic requirement, ensure uniqueness within that topic
+      uniquenessGuidance = `\n\nCRITICAL - UNIQUENESS WITHIN TOPIC (READ CAREFULLY):
+- You MUST stay on-topic (see topic requirements above), BUT find a NEW angle within that topic
+- Do NOT repeat the same specific examples, characters, or experiences from previous posts
+- If the topic is about favorite heroes/characters, discuss a DIFFERENT hero or provide DIFFERENT reasons
+- If the topic is about gameplay, discuss DIFFERENT mechanics, strategies, or tips
+- If the topic is about mods, discuss DIFFERENT mod features or experiences
+- Use COMPLETELY different phrasing and structure - avoid similar sentence patterns or word choices
+- Find a NEW, UNIQUE angle within the forum topic that you haven't covered before`;
+    } else {
+      // General uniqueness guidance
+      uniquenessGuidance = `\n\nCRITICAL - UNIQUENESS REQUIREMENTS (READ CAREFULLY):
 - Your new post MUST be completely different from all previous posts above
 - Do NOT repeat the same topics, experiences, themes, or tips from previous posts
 ${uniqueTopics.length > 0 ? `- AVOID these specific topics that you've already discussed: ${uniqueTopics.join(', ')}` : ''}
@@ -233,6 +435,11 @@ ${uniqueTopics.length > 0 ? `- AVOID these specific topics that you've already d
 - Be creative and find a NEW, UNIQUE angle to discuss about ${gameTitle} that you haven't covered before
 - Avoid repeating similar themes, topics, or experiences from previous posts
 - Think of a completely different aspect of the game: characters, story, items, secrets, different areas, different mechanics, different experiences`;
+    }
+    
+    previousPostsContext = `\n\nCRITICAL: You have posted about ${gameTitle} before. Here are your previous posts to ensure your new post is UNIQUE and DIFFERENT:
+${previousPosts.map((post, idx) => `${idx + 1}. "${post}"`).join('\n')}
+${uniquenessGuidance}`;
   }
 
   const systemPrompt = isInterdimensionalHipster
@@ -248,6 +455,8 @@ You're posting in a forum about ${gameTitle}. Generate a natural forum post that
 - Write as if you're sharing with friends on a gaming forum
 - Shows knowledge about the game - mention specific items, characters, locations, mechanics, or memorable moments
 
+${topicRequirements ? `\n${topicRequirements}\n` : ''}
+
 CRITICAL ACCURACY REQUIREMENTS:
 - ${isSinglePlayerGame ? 'This is a SINGLE-PLAYER game - do NOT mention multiplayer, online matches, or competitive play features' : 'This is a MULTIPLAYER game - focus on online, competitive, or multiplayer features'}
 - Spell character names, locations, and game terms CORRECTLY - double-check spelling before generating
@@ -258,11 +467,13 @@ IMPORTANT:
 - Do NOT use formal language, greetings, conclusion phrases, or AI-related phrases. Write naturally and casually like a real gamer.
 - You MUST include the game title "${gameTitle}" in your post.
 - You MUST reference something specific from ${gameTitle} (a character, item, location, mechanic, moment, etc.)
-- FACTUAL ACCURACY is more important than sounding natural - if you're not certain about a fact, don't include it${previousPostsContext}
+- FACTUAL ACCURACY is more important than sounding natural - if you're not certain about a fact, don't include it
+- MOST IMPORTANTLY: Your post MUST directly address and stay relevant to the forum topic "${forumTopic || 'General Discussion'}"${previousPostsContext}
 
 Game: ${gameTitle}
 Genre: ${genre} (${isSinglePlayerGame ? 'Single-player' : 'Multiplayer'} focus)
 Forum Topic: ${forumTopic || 'General Discussion'}
+Forum Category: ${forumCategory || 'general'}
 
 Generate ONLY the post content, nothing else:`
     : isSinglePlayer
@@ -277,13 +488,17 @@ You're posting in a forum about ${gameTitle}. Generate a natural forum post that
 - Focuses on story, exploration, character builds, world details, puzzle solutions, or platforming tips
 - Write as if you're sharing with friends on a gaming forum
 
+${topicRequirements ? `\n${topicRequirements}\n` : ''}
+
 IMPORTANT: 
 - Do NOT use formal language, greetings, conclusion phrases, or AI-related phrases. Write naturally and casually like a real gamer.
-- You MUST include the game title "${gameTitle}" in your post.${previousPostsContext}
+- You MUST include the game title "${gameTitle}" in your post.
+- MOST IMPORTANTLY: Your post MUST directly address and stay relevant to the forum topic "${forumTopic || 'General Discussion'}"${previousPostsContext}
 
 Game: ${gameTitle}
 Genre: ${genre} (RPG/Adventure/Simulation/Puzzle/Platformer focus)
 Forum Topic: ${forumTopic || 'General Discussion'}
+Forum Category: ${forumCategory || 'general'}
 
 Generate ONLY the post content, nothing else:`
     : `You are WaywardJammer, a real gamer who loves multiplayer racing games, battle royale games, fighting games, first-person shooters, and sandbox games.
@@ -297,13 +512,17 @@ You're posting in a forum about ${gameTitle}. Generate a natural forum post that
 - Focuses on strategies, competitive play, online matches, multiplayer features, or sandbox creations
 - Write as if you're sharing with friends on a gaming forum
 
+${topicRequirements ? `\n${topicRequirements}\n` : ''}
+
 IMPORTANT: 
 - Do NOT use formal language, greetings, conclusion phrases, or AI-related phrases. Write naturally and casually like a real gamer.
-- You MUST include the game title "${gameTitle}" in your post.${previousPostsContext}
+- You MUST include the game title "${gameTitle}" in your post.
+- MOST IMPORTANTLY: Your post MUST directly address and stay relevant to the forum topic "${forumTopic || 'General Discussion'}"${previousPostsContext}
 
 Game: ${gameTitle}
 Genre: ${genre} (Racing/Battle Royale/Fighting/FPS/Sandbox focus)
 Forum Topic: ${forumTopic || 'General Discussion'}
+Forum Category: ${forumCategory || 'general'}
 
 Generate ONLY the post content, nothing else:`;
 
@@ -350,11 +569,14 @@ Generate ONLY the post content, nothing else:`;
 export async function generatePostReply(
   options: PostReplyOptions
 ): Promise<string> {
-  const { gameTitle, genre, originalPost, originalPostAuthor, forumTopic } = options;
+  const { gameTitle, genre, originalPost, originalPostAuthor, forumTopic, forumCategory } = options;
   
   // Determine if this is a single-player or multiplayer game based on genre
   const singlePlayerGenres = ['rpg', 'adventure', 'simulation', 'puzzle', 'platformer'];
   const isSinglePlayerGame = singlePlayerGenres.includes(genre.toLowerCase());
+  
+  // Analyze forum topic to get topic-specific requirements
+  const topicRequirements = analyzeForumTopic(forumTopic, forumCategory, gameTitle);
   
   const systemPrompt = `You are InterdimensionalHipster, a knowledgeable and helpful gamer who loves both single-player and multiplayer games.
 You're replying to a post in a forum about ${gameTitle}. The original post was written by ${originalPostAuthor}.
@@ -371,6 +593,8 @@ Generate a natural, helpful forum reply that:
 - Shows knowledge about the game - mention specific items, characters, locations, mechanics, or memorable moments from ${gameTitle}
 - Builds on what they said - agree, add to it, share a related experience, or provide helpful information
 
+${topicRequirements ? `\n${topicRequirements}\n` : ''}
+
 CRITICAL ACCURACY REQUIREMENTS:
 - ${isSinglePlayerGame ? 'This is a SINGLE-PLAYER game - do NOT mention multiplayer, online matches, or competitive play features' : 'This is a MULTIPLAYER game - focus on online, competitive, or multiplayer features'}
 - Spell character names, locations, and game terms CORRECTLY - double-check spelling before generating (e.g., "Taion" not "Tion" in Xenoblade Chronicles 3)
@@ -383,10 +607,12 @@ IMPORTANT:
 - You MUST include the game title "${gameTitle}" in your reply.
 - You MUST reference something specific from ${gameTitle} (a character, item, location, mechanic, moment, etc.)
 - Make sure your reply is directly relevant to what ${originalPostAuthor} wrote - don't just talk about the game in general
+- MOST IMPORTANTLY: Your reply MUST stay relevant to the forum topic "${forumTopic || 'General Discussion'}" - ensure your response addresses the forum's specific topic
 
 Game: ${gameTitle}
 Genre: ${genre} (${isSinglePlayerGame ? 'Single-player' : 'Multiplayer'} focus)
 Forum Topic: ${forumTopic || 'General Discussion'}
+Forum Category: ${forumCategory || 'general'}
 Original Post Author: ${originalPostAuthor}
 
 Original Post:

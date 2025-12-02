@@ -502,6 +502,7 @@ export async function createForumPost(
     let forumTitle: string;
     let actualGameTitle: string;
     let actualGenre: string;
+    let forumCategory = 'general'; // Initialize with default value
     
     if (targetForum) {
       // Use existing forum
@@ -512,8 +513,10 @@ export async function createForumPost(
       // IMPORTANT: Determine genre from the actual game title in the forum, not the randomly selected game
       // This ensures we use the correct genre for the game that's actually being discussed
       actualGenre = determineGenreFromGame(actualGameTitle);
+      // Get category from existing forum
+      forumCategory = targetForum.category || 'general';
       console.log(`Posting to existing forum: ${forumTitle} (created by: ${targetForum.createdBy || 'unknown'})`);
-      console.log(`Using game title: ${actualGameTitle}, genre: ${actualGenre}`);
+      console.log(`Using game title: ${actualGameTitle}, genre: ${actualGenre}, category: ${forumCategory}`);
     } else {
       // No suitable forum found, create a new one
       console.log(`No suitable forum found for ${gameTitle}, creating new forum...`);
@@ -532,7 +535,16 @@ export async function createForumPost(
       forumTitle = newForum.forumTitle;
       actualGameTitle = gameTitle;
       actualGenre = genre;
-      console.log(`Created new forum: ${forumTitle}`);
+      // Fetch the category for the newly created forum
+      try {
+        const newForumDoc = await Forum.findOne({ forumId }).lean() as any;
+        if (newForumDoc && newForumDoc.category) {
+          forumCategory = newForumDoc.category;
+        }
+      } catch (error) {
+        console.warn(`[FORUM POST] Could not fetch category for newly created forum ${forumId}, using 'general'`);
+      }
+      console.log(`Created new forum: ${forumTitle} (category: ${forumCategory})`);
     }
     
     // Fetch previous posts by this user to avoid repetition
@@ -590,6 +602,7 @@ export async function createForumPost(
     }
     
     // Generate natural forum post using the actual game title from the forum
+    // Note: forumCategory is already set above in the if/else block
     let postContent = '';
     let attempts = 0;
     const maxAttempts = 3;
@@ -602,6 +615,7 @@ export async function createForumPost(
         genre: actualGenre,
         userPreferences,
         forumTopic: forumTitle,
+        forumCategory: forumCategory,
         previousPosts: previousPosts
       });
       
@@ -1167,6 +1181,7 @@ export async function respondToForumPost(
     const { forum, post, gameTitle, genre } = postToRespondTo;
     const forumId = forum.forumId || forum._id;
     const forumTitle = forum.title || forum.gameTitle || 'General Discussion';
+    const forumCategory = forum.category || 'general';
     const originalPostAuthor = post.createdBy || post.username || 'Unknown';
     const originalPostContent = post.message;
     
@@ -1178,7 +1193,8 @@ export async function respondToForumPost(
       genre,
       originalPost: originalPostContent,
       originalPostAuthor,
-      forumTopic: forumTitle
+      forumTopic: forumTitle,
+      forumCategory: forumCategory
     });
     
     // Prepend @mention if not already present (same logic as manual replies)
