@@ -1514,7 +1514,6 @@ ONLY include games where ${genre} is clearly the primary genre. If unsure, EXCLU
                 content: aiPrompt
               }
             ],
-            temperature: 0.3,
             max_tokens: 500
           });
 
@@ -1635,7 +1634,6 @@ ONLY include games where ${genre} is clearly the primary genre. If unsure, EXCLU
                 content: aiPrompt
               }
             ],
-            temperature: 0.3,
             max_tokens: 600
           });
 

@@ -40,6 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         subscription: user.subscription || null,
         healthMonitoring: user.healthMonitoring || null,
         gameTracking: user.gameTracking || { wishlist: [], currentlyPlaying: [] },
+        weeklyDigest: user.weeklyDigest || { enabled: true },
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
       }

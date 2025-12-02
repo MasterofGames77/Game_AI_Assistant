@@ -49,6 +49,11 @@ export interface IUser extends Document {
     savedAt: Date;
     imageUrl?: string;
   }>;
+  weeklyDigest?: {
+    firstEmailSentAt?: Date; // Track when first weekly digest was sent
+    lastEmailSentAt?: Date; // Track when last weekly digest was sent
+    enabled?: boolean; // User preference: whether to receive weekly digest emails (default: true for opt-in)
+  };
   createdAt?: Date; // Mongoose timestamp
   updatedAt?: Date; // Mongoose timestamp
   // Methods
@@ -306,7 +311,13 @@ const UserSchema = new Schema<IUser>({
     response: { type: String, required: true }, // Full guide response
     savedAt: { type: Date, default: Date.now }, // When the guide was saved
     imageUrl: { type: String } // Optional image URL if the question had an image
-  }]
+  }],
+  // Weekly digest email tracking
+  weeklyDigest: {
+    firstEmailSentAt: { type: Date }, // Track when first weekly digest was sent
+    lastEmailSentAt: { type: Date }, // Track when last weekly digest was sent
+    enabled: { type: Boolean, default: true } // User preference: whether to receive weekly digest emails (default: true for opt-in)
+  }
 }, { collection: 'users' });
 
 // Create indexes for subscription-related queries

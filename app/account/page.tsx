@@ -38,6 +38,12 @@ export default function AccountPage() {
   const [healthSettingsError, setHealthSettingsError] = useState("");
   const [healthSettingsSuccess, setHealthSettingsSuccess] = useState("");
 
+  // Email preferences state
+  const [weeklyDigestEnabled, setWeeklyDigestEnabled] = useState(true);
+  const [emailPreferencesLoading, setEmailPreferencesLoading] = useState(false);
+  const [emailPreferencesError, setEmailPreferencesError] = useState("");
+  const [emailPreferencesSuccess, setEmailPreferencesSuccess] = useState("");
+
   // Username reset state
   const [usernameResetLoading, setUsernameResetLoading] = useState(false);
   const [usernameResetError, setUsernameResetError] = useState("");
@@ -110,6 +116,11 @@ export default function AccountPage() {
           hasPassword: !!userData.user.password,
           healthMonitoring: userData.user.healthMonitoring,
         });
+
+        // Initialize email preferences
+        if (userData.user.weeklyDigest !== undefined) {
+          setWeeklyDigestEnabled(userData.user.weeklyDigest.enabled !== false); // Default to true if not set
+        }
 
         // Initialize health settings if available
         if (userData.user.healthMonitoring) {
@@ -1180,6 +1191,101 @@ export default function AccountPage() {
                     "Save Health Settings"
                   )}
                 </button>
+              </div>
+            </div>
+
+            {/* Email Preferences */}
+            <div className="bg-[#252642]/50 backdrop-blur-sm rounded-2xl p-6 shadow-[0_0_15px_rgba(0,255,255,0.1)] border border-[#00ffff]/20 mt-6">
+              <h2 className="text-2xl font-bold mb-6 text-[#00ffff]">
+                Email Preferences
+              </h2>
+
+              <div className="space-y-6">
+                {/* Weekly Digest Toggle */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-white font-semibold">
+                      Weekly Digest Email
+                    </label>
+                    <p className="text-gray-400 text-sm">
+                      Receive a weekly summary of your achievements, forum activity, and game recommendations
+                    </p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      const newValue = !weeklyDigestEnabled;
+                      setWeeklyDigestEnabled(newValue);
+                      
+                      // Auto-save when toggled
+                      setEmailPreferencesLoading(true);
+                      setEmailPreferencesError("");
+                      setEmailPreferencesSuccess("");
+                      
+                      try {
+                        const username = localStorage.getItem("username");
+                        if (!username) {
+                          setEmailPreferencesError("User not found. Please sign in again.");
+                          setWeeklyDigestEnabled(!newValue); // Revert
+                          return;
+                        }
+
+                        const response = await axios.post("/api/email-preferences", {
+                          username,
+                          weeklyDigestEnabled: newValue,
+                        });
+
+                        if (response.data.success) {
+                          setEmailPreferencesSuccess(
+                            newValue 
+                              ? "Weekly digest emails enabled" 
+                              : "Weekly digest emails disabled"
+                          );
+                          setTimeout(() => setEmailPreferencesSuccess(""), 3000);
+                        }
+                      } catch (error: any) {
+                        console.error("Error updating email preferences:", error);
+                        setEmailPreferencesError(
+                          error.response?.data?.message ||
+                            "Failed to update email preferences. Please try again."
+                        );
+                        setWeeklyDigestEnabled(!newValue); // Revert on error
+                      } finally {
+                        setEmailPreferencesLoading(false);
+                      }
+                    }}
+                    disabled={emailPreferencesLoading}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      weeklyDigestEnabled
+                        ? "bg-[#00ffff]"
+                        : "bg-gray-600"
+                    } disabled:opacity-50`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        weeklyDigestEnabled
+                          ? "translate-x-6"
+                          : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Error/Success Messages */}
+                {emailPreferencesError && (
+                  <div className="p-3 bg-red-500/20 border border-red-500/40 rounded-lg">
+                    <p className="text-red-200 text-sm">
+                      {emailPreferencesError}
+                    </p>
+                  </div>
+                )}
+
+                {emailPreferencesSuccess && (
+                  <div className="p-3 bg-green-500/20 border border-green-500/40 rounded-lg">
+                    <p className="text-green-200 text-sm">
+                      {emailPreferencesSuccess}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
