@@ -4181,27 +4181,135 @@ function measureExplorationTendencies(
 // };
 
 // ============================================================================
+// Performance Safeguards: Caching and Rate Limiting
+// Phase 4: Performance Safeguards Implementation
+// ============================================================================
+
+/**
+ * Cache for gameplay pattern analysis results
+ * Phase 4.1: Intelligent Caching
+ */
+const patternCache = new Map<
+  string,
+  {
+    data: Awaited<ReturnType<typeof analyzeGameplayPatternsInternal>>;
+    timestamp: number;
+    ttl: number;
+  }
+>();
+
+const PATTERN_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Get cached patterns or calculate and cache new ones
+ * Phase 4.1: Intelligent Caching
+ * 
+ * @param username - Username to get patterns for
+ * @param forceRefresh - If true, bypass cache and recalculate
+ * @returns Cached or freshly calculated patterns
+ */
+async function getOrCalculatePatterns(
+  username: string,
+  forceRefresh: boolean = false
+): Promise<Awaited<ReturnType<typeof analyzeGameplayPatternsInternal>>> {
+  const cached = patternCache.get(username);
+  const now = Date.now();
+
+  // Return cached data if valid and not forcing refresh
+  if (!forceRefresh && cached && now - cached.timestamp < cached.ttl) {
+    const cacheAge = Math.round((now - cached.timestamp) / 1000); // Age in seconds
+    console.log(`[Performance Safeguards] Cache HIT for ${username} (age: ${cacheAge}s, TTL: ${PATTERN_CACHE_TTL / 1000}s)`);
+    return cached.data;
+  }
+
+  // Calculate and cache
+  if (forceRefresh) {
+    console.log(`[Performance Safeguards] Cache BYPASS for ${username} (forceRefresh=true)`);
+  } else if (cached) {
+    const cacheAge = Math.round((now - cached.timestamp) / 1000);
+    console.log(`[Performance Safeguards] Cache EXPIRED for ${username} (age: ${cacheAge}s, recalculating)`);
+  } else {
+    console.log(`[Performance Safeguards] Cache MISS for ${username} (calculating new)`);
+  }
+
+  const data = await analyzeGameplayPatternsInternal(username);
+  patternCache.set(username, {
+    data,
+    timestamp: now,
+    ttl: PATTERN_CACHE_TTL,
+  });
+
+  console.log(`[Performance Safeguards] Cache UPDATED for ${username} (cache size: ${patternCache.size})`);
+  return data;
+}
+
+/**
+ * Check if analysis should run based on rate limiting
+ * Phase 4.3: Rate Limiting
+ * 
+ * Only analyzes once per 3 hours to avoid excessive database queries
+ * 
+ * @param username - Username to check
+ * @returns true if analysis should run, false otherwise
+ */
+export async function shouldRunAnalysis(username: string): Promise<boolean> {
+  try {
+    const User = (await import('../models/User')).default;
+    const user = await User.findOne({ username }).select('progress.personalized.recommendationHistory.lastAnalysisTime').lean() as any;
+    
+    const lastAnalysis = user?.progress?.personalized?.recommendationHistory?.lastAnalysisTime;
+
+    // If no previous analysis, allow it
+    if (!lastAnalysis) {
+      console.log(`[Performance Safeguards] Rate limit CHECK for ${username}: ALLOWED (no previous analysis)`);
+      return true;
+    }
+
+    const hoursSinceLastAnalysis =
+      (Date.now() - new Date(lastAnalysis).getTime()) / (1000 * 60 * 60);
+
+    // Only analyze once per 3 hours
+    const shouldRun = hoursSinceLastAnalysis >= 3;
+    
+    if (shouldRun) {
+      console.log(`[Performance Safeguards] Rate limit CHECK for ${username}: ALLOWED (${hoursSinceLastAnalysis.toFixed(2)}h since last, threshold: 3h)`);
+    } else {
+      console.log(`[Performance Safeguards] Rate limit CHECK for ${username}: BLOCKED (${hoursSinceLastAnalysis.toFixed(2)}h since last, threshold: 3h)`);
+    }
+    
+    return shouldRun;
+  } catch (error) {
+    // On error, allow analysis (fail open)
+    console.error('[Performance Safeguards] Rate limit ERROR for', username, '- allowing analysis (fail open):', error);
+    return true;
+  }
+}
+
+// ============================================================================
 // Main Pattern Analysis Function
 // This function orchestrates all helper functions to analyze user gameplay patterns
 // ============================================================================
 
 /**
- * Main function to analyze gameplay patterns for a user
- * Combines all helper functions to provide comprehensive pattern analysis
+ * Internal function that performs the actual pattern analysis
+ * This is separated from the public API to allow caching wrapper
  * Phase 2 Step 2: Pattern Detection - Main Orchestrator
  */
-export const analyzeGameplayPatterns = async (username: string) => {
+async function analyzeGameplayPatternsInternal(username: string) {
   try {
     const Question = (await import('../models/Question')).default;
     
-    // Fetch user's questions (last 100 for analysis)
-    const questions = await Question.find({ username })
+    // Phase 4.2: Query Optimization
+    // Use efficient query with limit and select to only fetch needed fields
+    // This is optimized for performance - only fetches last 100 questions with specific fields
+    // Using .lean() for faster queries (returns plain objects instead of Mongoose documents)
+    const questionsForAnalysis = await Question.find({ username })
       .sort({ timestamp: -1 })
       .limit(100)
       .select('timestamp detectedGenre difficultyHint questionCategory interactionType detectedGame')
       .lean();
 
-    if (!questions || questions.length === 0) {
+    if (!questionsForAnalysis || questionsForAnalysis.length === 0) {
       return {
         frequency: {
           totalQuestions: 0,
@@ -4228,7 +4336,7 @@ export const analyzeGameplayPatterns = async (username: string) => {
     }
 
     // Prepare questions for analysis (ensure proper format)
-    const questionsWithTimestamp = questions
+    const questionsWithTimestamp = questionsForAnalysis
       .filter((q: any) => q.timestamp)
       .map((q: any) => ({
         timestamp: q.timestamp,
@@ -4241,7 +4349,7 @@ export const analyzeGameplayPatterns = async (username: string) => {
 
     // Analyze frequency patterns
     const frequency = {
-      totalQuestions: questions.length,
+      totalQuestions: questionsForAnalysis.length,
       questionsPerWeek: calculateWeeklyRate(questionsWithTimestamp),
       peakActivityTimes: detectPeakHours(questionsWithTimestamp),
       sessionPattern: detectSessionPatterns(questionsWithTimestamp),
@@ -4301,6 +4409,24 @@ export const analyzeGameplayPatterns = async (username: string) => {
       },
     };
   }
+}
+
+/**
+ * Public API for analyzing gameplay patterns with caching
+ * Phase 4.1: Intelligent Caching - Wrapper function
+ * 
+ * This function wraps the internal analysis with caching to avoid
+ * recalculating patterns for the same user within the cache TTL period.
+ * 
+ * @param username - Username to analyze patterns for
+ * @param forceRefresh - If true, bypass cache and recalculate (default: false)
+ * @returns Analyzed gameplay patterns
+ */
+export const analyzeGameplayPatterns = async (
+  username: string,
+  forceRefresh: boolean = false
+) => {
+  return getOrCalculatePatterns(username, forceRefresh);
 };
 
 /**

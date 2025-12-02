@@ -148,3 +148,5 @@ NINTENDO_DATA_SETUP.md
 assets/*
 
 pages/api/test-email.ts
+
+PERFORMANCE_SAFEGUARDS_TESTING.md

@@ -3,7 +3,7 @@ import axios from 'axios';
 import connectToMongoDB from '../../utils/mongodb';
 import Question from '../../models/Question';
 import User from '../../models/User';
-import { getChatCompletion, getChatCompletionWithVision, fetchRecommendations, analyzeUserQuestions, getAICache, extractQuestionMetadata, updateQuestionMetadata, analyzeGameplayPatterns, extractGameTitleFromImageContext, enhanceQuestionWithGameContext } from '../../utils/aiHelper';
+import { getChatCompletion, getChatCompletionWithVision, fetchRecommendations, analyzeUserQuestions, getAICache, extractQuestionMetadata, updateQuestionMetadata, analyzeGameplayPatterns, extractGameTitleFromImageContext, enhanceQuestionWithGameContext, shouldRunAnalysis } from '../../utils/aiHelper';
 import { storeUserPatterns } from '../../utils/storeUserPatterns';
 import { generatePersonalizedRecommendations } from '../../utils/generateRecommendations';
 import { getClientCredentialsAccessToken, getAccessToken, getTwitchUserData, redirectToTwitch } from '../../utils/twitchAuth';
@@ -2017,11 +2017,21 @@ CRITICAL INSTRUCTIONS:
     // Phase 2 Step 2: Pattern Analysis
     // Analyze gameplay patterns asynchronously after response is sent
     // This runs in the background and doesn't affect user experience
-    // Only run if user has enough questions for meaningful analysis (at least 3)
+    // Phase 4.3: Rate Limiting - Only run if enough time has passed since last analysis
     if (username) {
       setImmediate(async () => {
         try {
-          // Run pattern analysis (this will use all the helper functions we've implemented)
+          // Phase 4.3: Check if analysis should run (rate limiting)
+          const shouldRun = await shouldRunAnalysis(username);
+          
+          if (!shouldRun) {
+            // Skip analysis if rate limit hasn't been reached
+            console.log(`[Pattern Analysis] Skipping analysis for ${username} due to rate limiting`);
+            return;
+          }
+
+          // Phase 4.1: Run pattern analysis with caching (getOrCalculatePatterns handles caching internally)
+          // This will use cached results if available, or calculate and cache new results
           const patterns = await analyzeGameplayPatterns(username);
           
           // Log patterns for debugging (commented out for production)
