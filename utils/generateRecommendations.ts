@@ -56,8 +56,11 @@ function mapGenreToTemplateKey(genreName: string): string {
     'simulation specialist': 'simulation',
     'sandboxbuilder': 'sandbox',
     'sandbox builder': 'sandbox',
+    'shootemupsniper': 'shootem up',
+    'shootem up sniper': 'shootem up',
     'battleroyale': 'battle-royale',
     'battle royale': 'battle-royale',
+    'battle royale master': 'battle-royale',
   };
   
   // Check internal genre names first (remove spaces and check)

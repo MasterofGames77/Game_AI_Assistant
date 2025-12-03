@@ -154,6 +154,7 @@ const UserSchema = new Schema<IUser>({
     beatEmUpBrawler: { type: Number, default: 0 },
     rhythmMaster: { type: Number, default: 0 },
     sandboxBuilder: { type: Number, default: 0 },
+    shootemUpSniper: { type: Number, default: 0 },
     totalQuestions: { type: Number, default: 0 },
     dailyExplorer: { type: Number, default: 0 },
     speedrunner: { type: Number, default: 0 },

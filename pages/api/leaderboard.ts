@@ -31,7 +31,7 @@ const GENRE_TO_ACHIEVEMENT_MAP: Record<string, string> = {
   'Sports': 'sportsChampion',
   'Simulation': 'simulationSpecialist',
   'Survival': 'survivalSpecialist',
-  'Battle Royale': 'battleRoyale',
+  'Battle Royale': 'battleRoyaleMaster',
   'Stealth': 'stealthExpert',
   'Horror': 'horrorHero',
   'Fighting': 'fightingFanatic',
@@ -39,6 +39,7 @@ const GENRE_TO_ACHIEVEMENT_MAP: Record<string, string> = {
   'Beat Em Up': 'beatEmUpBrawler',
   'Rhythm': 'rhythmMaster',
   'Sandbox': 'sandboxBuilder',
+  'Shootem Up': 'shootemUpSniper',
 };
 
 /**

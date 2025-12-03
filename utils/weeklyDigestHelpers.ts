@@ -176,6 +176,7 @@ export async function getWeeklyGameRecommendations(
       'simulationSpecialist': 'Simulation',
       'survivalSpecialist': 'Survival',
       'sandboxBuilder': 'Simulation', // Sandbox games often fall under Simulation
+      'shootemUpSniper': 'Shoot em Up',
       'bossBuster': 'Action', // Boss battles are typically action games
       'rhythmMaster': 'Indie', // Rhythm games often indie
     };

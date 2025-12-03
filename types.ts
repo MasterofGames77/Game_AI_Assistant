@@ -443,6 +443,7 @@ export interface Progress {
   beatEmUpBrawler?: number;
   rhythmMaster?: number;
   sandboxBuilder?: number;
+  shootemUpSniper?: number;
   totalQuestions?: number;
   dailyExplorer?: number;
   speedrunner?: number;

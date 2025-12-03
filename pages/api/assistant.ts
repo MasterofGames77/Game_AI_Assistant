@@ -448,7 +448,7 @@ export const checkQuestionType = (question: string): string[] => {
     'jak', 'daxter', 'sly cooper', 'banjo', 'kazooie', 'metroid',
     'mega man', 'kirby', 'yoshi', 'platformer', 'jumping', 'a hat in time',
     'psychonauts', 'braid', 'shovel knight', 'cuphead', 'platforming', 'freedom planet',
-    'sackboy'
+    'sackboy', 'yooka-laylee', 'bubsy', 'pac-man world'
   ];
 
   const rpgGames = [
@@ -579,6 +579,11 @@ export const checkQuestionType = (question: string): string[] => {
     'no man\'s sky', 'valheim', 'astroneer', 'besiege', 'unturned'
   ];
 
+  const shootemUpGames = [ 'Gunstar Heroes', 'gradius', 'Enter the Gungeon', 'Ikaruga', 'Radiant Silvergun', 'DoDonPachi',
+    'Thunder Force', 'Fantasy Zone', 'Magical Chase', 'Centipede', 'Galaxian', 'Metal Slug', 'Contra', 'Steel Empire',
+    'Paradius', 'Darius', 'Space Invaders', 'Raiden', 'Shock Troopers'
+  ];
+
   // Check for genre keywords in the question
   const genreKeywords = {
     platformerPro: ['platform', 'jump', 'collect coins', 'collect', '3d platformer', '2d platformer'],
@@ -587,10 +592,10 @@ export const checkQuestionType = (question: string): string[] => {
     survivalSpecialist: ['survival', 'survive', 'horror', 'zombie', 'craft', 'resource', 'gather'],
     strategySpecialist: ['strategy', 'tactics', 'turn-based', 'rts', 'build', 'command'],
     actionAficionado: ['action', 'combat', 'combo', 'fight', 'hack and slash', 'battle system'],
-    battleRoyale: ['battle royale', 'fortnite', 'pubg', 'last man standing', 'battle pass'],
+    battleRoyaleMaster: ['battle royale', 'fortnite', 'pubg', 'last man standing', 'battle pass'],
     sportsChampion: ['sports', 'score', 'tournament', 'championship', 'league', 'competition', 'event'],
     adventureAddict: ['adventure', 'explore', 'open world', 'quest', 'story'],
-    shooterSpecialist: ['shooter', 'fps', 'third person shooter', 'aim', 'gun', 'shooting'],
+    shooterSpecialist: ['shooter', 'fps', 'first person shooter', 'third person shooter', 'aim', 'gun', 'shooting'],
     simulationSpecialist: ['simulation', 'sim', 'management', 'construction', 'management simulation', 'town', 'city'],
     fightingFanatic: ['fighting', 'combo', 'cancel', 'air dodge', 'frame', 'mixup', 'throw', 'hit stun', 'stun lock', 'block'],
     puzzlePro: ['puzzle', 'solve', 'riddle', 'brain teaser', 'logic'],
@@ -601,7 +606,8 @@ export const checkQuestionType = (question: string): string[] => {
     triviaMaster: ['trivia', 'quiz', 'knowledge', 'question', 'answer', 'category'],
     beatEmUpBrawler: ['brawler', 'side-scrolling', 'frame advantage', 'belt-scroll', 'pressure', 'dash'],
     rhythmMaster: ['rhythm', 'music', 'beat', 'dance', 'song', 'beatmap', 'notes', 'streams', 'beats per minute'],
-    sandboxBuilder: ['sandbox', 'build', 'construct', 'create', 'world', 'craft', 'creative', 'free-form gameplay', 'design', 'materials']
+    sandboxBuilder: ['sandbox', 'build', 'construct', 'create', 'world', 'craft', 'creative', 'free-form gameplay', 'design', 'materials'],
+    shootemUpSniper: ['fixed shooter, side-scrolling shooter, vertical shooter, top-down shooter, run and gun', 'multidirectional shooter']
   };
 
   // Check all game genres and collect all matches
@@ -614,7 +620,7 @@ export const checkQuestionType = (question: string): string[] => {
     { games: strategyGames, achievement: 'strategySpecialist' },
     { games: shooterGames, achievement: 'shooterSpecialist' },
     { games: simulationGames, achievement: 'simulationSpecialist' },
-    { games: battleRoyaleGames, achievement: 'battleRoyale' },
+    { games: battleRoyaleGames, achievement: 'battleRoyaleMaster' },
     { games: stealthGames, achievement: 'stealthExpert' },
     { games: horrorGames, achievement: 'horrorHero' },
     { games: adventureGames, achievement: 'adventureAddict' },
@@ -624,7 +630,8 @@ export const checkQuestionType = (question: string): string[] => {
     { games: beatEmUpGames, achievement: 'beatEmUpBrawler' },
     { games: rhythmGames, achievement: 'rhythmMaster' },
     { games: platformerGames, achievement: 'platformerPro' },
-    { games: sandboxGames, achievement: 'sandboxBuilder' }
+    { games: sandboxGames, achievement: 'sandboxBuilder' },
+    { games: shootemUpGames, achievement: 'shootemUpSniper' }
   ];
 
   for (const check of genreChecks) {
@@ -685,7 +692,7 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
       { name: 'Survival Specialist', field: 'survivalSpecialist', threshold: 5 },
       { name: 'Strategy Specialist', field: 'strategySpecialist', threshold: 5 },
       { name: 'Action Aficionado', field: 'actionAficionado', threshold: 5 },
-      { name: 'Battle Royale Master', field: 'battleRoyale', threshold: 5 },
+      { name: 'Battle Royale Master', field: 'battleRoyaleMaster', threshold: 5 },
       { name: 'Sports Champion', field: 'sportsChampion', threshold: 5 },
       { name: 'Adventure Addict', field: 'adventureAddict', threshold: 5 },
       { name: 'Shooter Specialist', field: 'shooterSpecialist', threshold: 5 },
@@ -699,7 +706,8 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
       { name: 'Story Seeker', field: 'storySeeker', threshold: 5 },
       { name: 'Beat Em Up Brawler', field: 'beatEmUpBrawler', threshold: 5 },
       { name: 'Rhythm Master', field: 'rhythmMaster', threshold: 5 },
-      { name: 'Sandbox Builder', field: 'sandboxBuilder', threshold: 5 }
+      { name: 'Sandbox Builder', field: 'sandboxBuilder', threshold: 5 },
+      { name: 'Shootem Up Sniper', field: 'shootemUpSniper', threshold: 5 }
     ];
 
     // Check each achievement
@@ -823,7 +831,7 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
     { name: 'Survival Specialist', field: 'survivalSpecialist', threshold: 5 },
     { name: 'Strategy Specialist', field: 'strategySpecialist', threshold: 5 },
     { name: 'Action Aficionado', field: 'actionAficionado', threshold: 5 },
-    { name: 'Battle Royale Master', field: 'battleRoyale', threshold: 5 },
+    { name: 'Battle Royale Master', field: 'battleRoyaleMaster', threshold: 5 },
     { name: 'Sports Champion', field: 'sportsChampion', threshold: 5 },
     { name: 'Adventure Addict', field: 'adventureAddict', threshold: 5 },
     { name: 'Shooter Specialist', field: 'shooterSpecialist', threshold: 5 },
@@ -837,7 +845,8 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
     { name: 'Story Seeker', field: 'storySeeker', threshold: 5 },
     { name: 'Beat Em Up Brawler', field: 'beatEmUpBrawler', threshold: 5 },
     { name: 'Rhythm Master', field: 'rhythmMaster', threshold: 5 },
-    { name: 'Sandbox Builder', field: 'sandboxBuilder', threshold: 5 }
+    { name: 'Sandbox Builder', field: 'sandboxBuilder', threshold: 5 },
+    { name: 'Shootem Up Sniper', field: 'shootemUpSniper', threshold: 5 }
   ];
 
   // Check each achievement
@@ -935,7 +944,7 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
     // console.log('New achievements to award:', newAchievements); // Commented out for production
 
     // Update the user with the new achievements
-    const updateResult = await User.findOneAndUpdate(
+    await User.findOneAndUpdate(
       { username },
       { 
         $set: { progress },
@@ -943,8 +952,6 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
       },
       { session: session || undefined, new: true }
     );
-
-    // console.log('Update result:', updateResult); // Commented out for production
 
     // Emit achievement event with enhanced data for Pro users (only if Socket.IO is available)
     if (newAchievements.length > 0) {

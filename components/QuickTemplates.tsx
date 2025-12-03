@@ -193,6 +193,8 @@ export default function QuickTemplates({
       "simulation specialist": "simulation",
       sandboxbuilder: "sandbox",
       "sandbox builder": "sandbox",
+      shootemupsniper: "shootem up",
+      "shootem up sniper": "shootem up",
     };
 
     // Check normalized internal name first
