@@ -430,7 +430,7 @@ export interface Progress {
   simulationSpecialist?: number;
   fightingFanatic?: number;
   actionAficionado?: number;
-  battleRoyale?: number;
+  battleRoyaleMaster?: number;
   sportsChampion?: number;
   adventureAddict?: number;
   shooterSpecialist?: number;

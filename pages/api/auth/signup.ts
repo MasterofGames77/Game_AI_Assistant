@@ -133,7 +133,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         actionAficionado: 0,
         fightingFanatic: 0,
         simulationSpecialist: 0,
-        battleRoyale: 0,
+        battleRoyaleMaster: 0,
         sportsChampion: 0,
         adventureAddict: 0,
         shooterSpecialist: 0,

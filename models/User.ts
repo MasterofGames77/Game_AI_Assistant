@@ -141,7 +141,7 @@ const UserSchema = new Schema<IUser>({
     actionAficionado: { type: Number, default: 0 },
     fightingFanatic: { type: Number, default: 0 },
     simulationSpecialist: { type: Number, default: 0 },
-    battleRoyale: { type: Number, default: 0 },
+    battleRoyaleMaster: { type: Number, default: 0 },
     sportsChampion: { type: Number, default: 0 },
     adventureAddict: { type: Number, default: 0 },
     shooterSpecialist: { type: Number, default: 0 },
