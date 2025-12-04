@@ -76,6 +76,7 @@ export interface SideBarProps {
   onDeleteConversation: (id: string) => void;
   onClear: () => void;
   onTwitchAuth: () => void;
+  onDiscordAuth: () => void;
   onNavigateToAccount: () => void;
   onOpenGuides?: () => void;
   activeView: "chat" | "forum" | "feedback";

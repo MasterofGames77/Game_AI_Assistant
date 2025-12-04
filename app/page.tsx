@@ -1103,16 +1103,43 @@ export default function Home() {
     }
   };
 
+  // Shorten URL for inline display (e.g., "youtube.com/watch?v=abc123...")
+  const shortenUrl = (url: string, maxLength: number = 40): string => {
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname.replace(/^www\./, "");
+      const pathname = urlObj.pathname;
+      const search = urlObj.search;
+
+      // Combine hostname + pathname + search params
+      let fullPath = hostname + pathname + search;
+
+      // If it's too long, truncate and add ellipsis
+      if (fullPath.length > maxLength) {
+        return fullPath.substring(0, maxLength - 3) + "...";
+      }
+
+      return fullPath;
+    } catch {
+      // If URL parsing fails, just truncate the original URL
+      return url.length > maxLength
+        ? url.substring(0, maxLength - 3) + "..."
+        : url;
+    }
+  };
+
   // Parse markdown links and extract sources
   const parseResponseWithSources = (
     response: string
   ): {
     formattedText: string;
     sources: Array<{ name: string; url: string }>;
+    linkMap: Map<string, { url: string; shortened: string }>;
   } => {
     const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
     const sourcesMap = new Map<string, { name: string; url: string }>();
     const urlToSourceName = new Map<string, string>();
+    const linkMap = new Map<string, { url: string; shortened: string }>();
 
     // First pass: find all markdown links and extract sources
     let match;
@@ -1129,27 +1156,129 @@ export default function Home() {
       }
     }
 
-    // Second pass: replace all markdown links with shortened source names
+    // Second pass: replace all markdown links with shortened URL (inline format)
     let formattedText = response;
     matches.forEach(({ fullMatch, url }) => {
-      const sourceName = urlToSourceName.get(url) || getSourceName(url);
+      const shortened = shortenUrl(url);
+
+      // Create a placeholder with just the shortened URL in parentheses
+      // Format: (shortened-url) where shortened-url will be clickable
+      // This matches the screenshot style: ([domain.com](url))
+      const placeholder = `(${shortened})`;
+
+      // Store the mapping for later rendering
+      linkMap.set(placeholder, { url, shortened });
+
       // Escape special regex characters in the full match
       const escapedMatch = fullMatch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       formattedText = formattedText.replace(
         new RegExp(escapedMatch, "g"),
-        `(${sourceName})`
+        placeholder
       );
+    });
+
+    // Third pass: Move links that appear after colons with whitespace/newlines to be inline
+    // Pattern: colon + whitespace/newlines + link placeholder -> colon + space + link placeholder
+    // This removes empty space after colons by moving links to the same line
+    const placeholders = Array.from(linkMap.keys());
+    placeholders.forEach((placeholder) => {
+      const escapedPlaceholder = placeholder.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&"
+      );
+      // Match colon followed by any whitespace (including newlines) and then our placeholder
+      // This handles cases like "video:\n(link)" or "video:  (link)" -> "video: (link)"
+      // \s+ matches any whitespace including spaces, tabs, and newlines
+      const colonPattern = new RegExp(`(:\\s+)(${escapedPlaceholder})`, "g");
+      formattedText = formattedText.replace(colonPattern, `: $2`);
     });
 
     // Convert map to array
     const sources = Array.from(sourcesMap.values());
 
-    return { formattedText, sources };
+    return { formattedText, sources, linkMap };
+  };
+
+  // Parse text and convert source placeholders to clickable links
+  const parseInlineLinks = (
+    text: string,
+    linkMap: Map<string, { url: string; shortened: string }>
+  ): React.ReactNode[] => {
+    // If linkMap is empty, just return the text as-is
+    if (linkMap.size === 0) {
+      return [text];
+    }
+
+    // Build a regex pattern from all placeholders in linkMap
+    // Escape special regex characters in each placeholder
+    const placeholderPatterns = Array.from(linkMap.keys())
+      .map((placeholder) => placeholder.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("|");
+
+    if (!placeholderPatterns) {
+      return [text];
+    }
+
+    const placeholderRegex = new RegExp(`(${placeholderPatterns})`, "g");
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = placeholderRegex.exec(text)) !== null) {
+      const fullMatch = match[0];
+      const matchStart = match.index;
+      const matchEnd = matchStart + fullMatch.length;
+
+      // Add text before the match
+      if (matchStart > lastIndex) {
+        const beforeText = text.substring(lastIndex, matchStart);
+        if (beforeText) {
+          parts.push(beforeText);
+        }
+      }
+
+      // Get link info from linkMap
+      const linkInfo = linkMap.get(fullMatch);
+      if (linkInfo) {
+        // Render as: (clickable-shortened-url) - compact format like screenshot
+        parts.push(
+          <span key={`link-${matchStart}`}>
+            (
+            <a
+              href={linkInfo.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline"
+            >
+              {linkInfo.shortened}
+            </a>
+            )
+          </span>
+        );
+      } else {
+        // Shouldn't happen, but fallback to plain text
+        parts.push(fullMatch);
+      }
+
+      lastIndex = matchEnd;
+    }
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      const remainingText = text.substring(lastIndex);
+      if (remainingText) {
+        parts.push(remainingText);
+      }
+    }
+
+    // If no matches found, return the original text
+    return parts.length > 0 ? parts : [text];
   };
 
   // format assistant's response
   const formatResponse = (response: string) => {
-    const { formattedText, sources } = parseResponseWithSources(response);
+    const { formattedText, sources, linkMap } =
+      parseResponseWithSources(response);
     const sentences = formattedText
       .split("\n")
       .map((sentence) => sentence.trim());
@@ -1157,16 +1286,18 @@ export default function Home() {
     return {
       content: sentences.map((sentence, index) => {
         if (sentence.match(/^\d+\.\s/)) {
+          const stepNumber = stepCounter++;
+          const stepContent = sentence.replace(/^\d+\.\s/, "").trim();
           return (
-            <p key={`step-${index}-${stepCounter}`} className="mt-2">
-              <strong>{stepCounter++}. </strong>
-              {sentence.replace(/^\d+\.\s/, "").trim()}
+            <p key={`step-${index}-${stepNumber}`} className="mt-2">
+              <strong>{stepNumber}. </strong>
+              {parseInlineLinks(stepContent, linkMap)}
             </p>
           );
         } else {
           return (
             <p key={`sentence-${index}`} className="mt-2">
-              {sentence}
+              {parseInlineLinks(sentence, linkMap)}
             </p>
           );
         }
@@ -1654,6 +1785,7 @@ export default function Home() {
             onDeleteConversation={handleDeleteConversation}
             onClear={handleClear}
             onTwitchAuth={handleTwitchAuth}
+            onDiscordAuth={handleDiscordAuth}
             onNavigateToAccount={handleNavigateToAccount}
             onOpenGuides={() => setShowGuidesModal(true)}
             activeView={activeView}
@@ -2260,23 +2392,6 @@ export default function Home() {
                           </button>
                         </div>
                       )}
-
-                    {/* Move buttons below the response */}
-                    <div className="mt-4 footer-buttons">
-                      <button
-                        onClick={handleTwitchAuth}
-                        className="mt-2 p-2 bg-blue-500 text-white rounded"
-                      >
-                        Login with Twitch
-                      </button>
-
-                      <button
-                        onClick={handleDiscordAuth}
-                        className="mt-2 p-2 bg-[#5865F2] text-white rounded"
-                      >
-                        Login with Discord
-                      </button>
-                    </div>
                   </div>
                 )}
               {username && (
