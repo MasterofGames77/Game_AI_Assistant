@@ -62,9 +62,26 @@ cp .env.example .env.local
 
 4. Run the development server:
 
+**For normal frontend development (with HMR and Fast Refresh):**
+
 ```bash
 npm run dev
 ```
+
+**For full-stack development (includes Discord bot, Socket.IO, and all services):**
+
+```bash
+npm run dev:full
+```
+
+**When to use each:**
+
+- Use `npm run dev` for most development work - it's faster with Hot Module Replacement (HMR) and Fast Refresh
+- Use `npm run dev:full` when you need to test:
+  - Discord bot functionality
+  - Socket.IO real-time features
+  - Automated scheduler
+  - Full integration testing
 
 5. Open [http://localhost:3000](http://localhost:3000) in your browser
 
@@ -73,6 +90,30 @@ npm run dev
 1. Create a Discord application at [Discord Developer Portal](https://discord.com/developers/applications)
 2. Add the bot to your server using the invite link
 3. Configure the bot with your Discord Application ID
+
+### Setting Up Bot Information Channel
+
+To create an informational channel in your Discord server that explains how to use the bot:
+
+1. **Create the channel** in your Discord server (e.g., `#bot-information` or `#how-to-use-bot`)
+
+2. **Run the information script** to automatically populate the channel with helpful guides:
+
+```bash
+npx tsx scripts/sendBotInfoToChannel.ts bot-information
+```
+
+Replace `bot-information` with the name of your channel (without the `#`).
+
+The script will send multiple informational embeds covering:
+
+- How to communicate with the bot (DMs, mentions, slash commands)
+- What kinds of questions you can ask
+- Pro Access information
+- How to add the bot to other servers
+- Additional tips and information
+
+**Note:** Make sure your Discord bot is running (`npm run dev:full`) and has access to the channel before running the script.
 
 ## 🏗️ Architecture
 

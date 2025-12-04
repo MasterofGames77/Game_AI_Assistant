@@ -825,7 +825,7 @@ export default function Home() {
         }
       );
 
-      const endTime = performance.now();
+      //const endTime = performance.now();
       // console.log(
       //   `Total frontend latency: ${(endTime - startTime).toFixed(2)}ms`
       // ); // Commented out for production
@@ -1004,24 +1004,37 @@ export default function Home() {
     window.open(twitchLoginUrl, "_blank");
   };
 
-  // const handleDiscordAuth = async () => {
-  //   try {
-  //     // Get the current domain based on environment
-  //     const domain =
-  //       process.env.NODE_ENV === "production"
-  //         ? "https://assistant.videogamewingman.com"
-  //         : "http://localhost:3000";
+  const handleDiscordAuth = async () => {
+    try {
+      // Get the current logged-in username from localStorage
+      const currentUsername = localStorage.getItem("username");
 
-  //     // Construct the Discord login URL
-  //     const discordLoginUrl = `${domain}/api/discordLogin`;
+      if (!currentUsername) {
+        setError(
+          "Please log in to Video Game Wingman before connecting Discord."
+        );
+        return;
+      }
 
-  //     // Open Discord login in new tab instead of current window
-  //     window.open(discordLoginUrl, "_blank");
-  //   } catch (error) {
-  //     console.error("Error during Discord authentication:", error); // Already commented out
-  //     setError("Failed to authenticate with Discord");
-  //   }
-  // };
+      // Get the current domain based on environment
+      const domain =
+        process.env.NODE_ENV === "production"
+          ? "https://assistant.videogamewingman.com"
+          : "http://localhost:3000";
+
+      // Construct the Discord login URL with username parameter
+      // This ensures the correct Video Game Wingman account is linked to the Discord account
+      const discordLoginUrl = `${domain}/api/discordLogin?username=${encodeURIComponent(
+        currentUsername
+      )}`;
+
+      // Open Discord login in new tab instead of current window
+      window.open(discordLoginUrl, "_blank");
+    } catch (error) {
+      console.error("Error during Discord authentication:", error); // Already commented out
+      setError("Failed to authenticate with Discord");
+    }
+  };
 
   // Extract domain name from URL for display
   const getSourceName = (url: string): string => {
@@ -2257,12 +2270,12 @@ export default function Home() {
                         Login with Twitch
                       </button>
 
-                      {/* <button
+                      <button
                         onClick={handleDiscordAuth}
                         className="mt-2 p-2 bg-[#5865F2] text-white rounded"
                       >
                         Login with Discord
-                      </button> */}
+                      </button>
                     </div>
                   </div>
                 )}

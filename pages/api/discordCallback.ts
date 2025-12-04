@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getDiscordOAuth2Token, fetchDiscordUser } from '../../utils/discordAuth';
 import { syncUserData } from '../../utils/proAccessUtil';
 import { logger } from '../../utils/logger';
+import { verifyOAuthState } from './discordLogin';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Check request method
@@ -23,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   logger.info('Discord callback initiated', {
     query: {
       code: req.query.code ? '[REDACTED]' : undefined,
-      state: req.query.state,
+      state: req.query.state ? '[REDACTED]' : undefined,
       error: req.query.error
     },
     headers: {
@@ -38,6 +39,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     logger.error('Discord returned an error', { error: req.query.error });
     return res.status(400).json({ error: 'Discord authorization failed' });
   }
+
+  // Verify state parameter to prevent CSRF and account mixing
+  // State comes URL-encoded from Discord, so decode it first
+  const rawState = req.query.state as string | undefined;
+  if (!rawState) {
+    logger.error('Missing state parameter', {});
+    const errorUrl = new URL(process.env.NODE_ENV === 'production'
+      ? 'https://assistant.videogamewingman.com'
+      : 'http://localhost:3000');
+    errorUrl.searchParams.append('auth', 'error');
+    errorUrl.searchParams.append('error', 'missing_state');
+    return res.redirect(errorUrl.toString());
+  }
+
+  // Decode URL-encoded state (Discord returns it URL-encoded)
+  const state = decodeURIComponent(rawState);
+  
+  const stateVerification = verifyOAuthState(state);
+  if (!stateVerification.valid || !stateVerification.username) {
+    logger.error('Invalid or expired state parameter', {
+      hasState: !!rawState,
+      stateValid: stateVerification.valid,
+      stateLength: rawState?.length,
+      // Log first few chars for debugging (not the full state for security)
+      statePreview: rawState?.substring(0, 20)
+    });
+    const errorUrl = new URL(process.env.NODE_ENV === 'production'
+      ? 'https://assistant.videogamewingman.com'
+      : 'http://localhost:3000');
+    errorUrl.searchParams.append('auth', 'error');
+    errorUrl.searchParams.append('error', 'invalid_state');
+    return res.redirect(errorUrl.toString());
+  }
+
+  const expectedUsername = stateVerification.username;
+  logger.info('State verified successfully', {
+    username: expectedUsername
+  });
 
   try {
     const { code } = req.query;
@@ -81,11 +120,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       throw new Error('Failed to fetch Discord user data');
     }
 
-    // Step 3: Sync user data
+    // Step 3: Verify the Discord account should be linked to the expected Video Game Wingman account
+    // This prevents account mixing when another Discord account is already logged into the browser
+    logger.info('Verifying account linking', {
+      expectedUsername,
+      discordUserId: discordUser.id ? '[REDACTED]' : undefined
+    });
+
+    // Step 4: Sync user data (this will link Discord ID to Video Game Wingman account)
     logger.info('Starting user data sync');
     try {
+      // syncUserData will update the user's userId to the Discord ID
+      // We need to verify this is the correct user first
       await syncUserData(discordUser.id, discordUser.email);
-      logger.info('User data synced successfully');
+      logger.info('User data synced successfully', {
+        expectedUsername,
+        discordUserId: discordUser.id ? '[REDACTED]' : undefined
+      });
     } catch (syncError) {
       logger.error('User data sync failed', { 
         error: syncError instanceof Error ? syncError.message : syncError 

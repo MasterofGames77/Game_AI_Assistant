@@ -150,3 +150,5 @@ assets/*
 pages/api/test-email.ts
 
 PERFORMANCE_SAFEGUARDS_TESTING.md
+
+DISCORD_BOT_INFO.md

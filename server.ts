@@ -3,6 +3,7 @@ import { parse, UrlWithParsedQuery } from "url";
 import next, { NextApiRequest, NextApiResponse } from "next";
 import { initSocket } from "./middleware/realtime";
 import { initializeScheduler } from "./utils/automatedUsersScheduler";
+import { initializeDiscordBot, shutdownDiscordBot } from "./utils/discordBot";
 import fs from "fs";
 import path from "path";
 
@@ -13,7 +14,12 @@ const handle = app.getRequestHandler();
 
 // Function to set up Google Vision credentials
 const setupGoogleCredentials = () => {
-  const credentialsPath = path.join("/tmp", "service-account-key.json");
+  // Use OS-appropriate temp directory
+  const tempDir = process.platform === 'win32' 
+    ? path.join(process.env.TEMP || process.env.TMP || 'C:\\temp', 'service-account-key.json')
+    : path.join("/tmp", "service-account-key.json");
+  
+  const credentialsPath = tempDir;
   
   // Check for GOOGLE_CREDENTIALS first (used by API routes), then fall back to GOOGLE_APPLICATION_CREDENTIALS_JSON
   let credentials = process.env.GOOGLE_CREDENTIALS || process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
@@ -22,6 +28,12 @@ const setupGoogleCredentials = () => {
     // If GOOGLE_CREDENTIALS is already a JSON object string, use it directly
     // If it's already parsed or needs parsing, handle it
     try {
+      // Ensure the directory exists
+      const dir = path.dirname(credentialsPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      
       // Try to parse if it's a string (GOOGLE_CREDENTIALS might already be JSON)
       const parsed = typeof credentials === 'string' ? JSON.parse(credentials) : credentials;
       // Write the JSON credentials to a file in the temporary directory
@@ -30,11 +42,23 @@ const setupGoogleCredentials = () => {
       process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
       console.log("Google Vision API credentials set up successfully.");
     } catch (error) {
-      // If parsing fails, assume it's already a JSON string and write it directly
-      fs.writeFileSync(credentialsPath, credentials);
-      process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
-      console.log("Google Vision API credentials set up successfully.");
-    }
+        // If parsing fails, assume it's already a JSON string and write it directly
+        try {
+          // Ensure the directory exists
+          const dir = path.dirname(credentialsPath);
+          if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+          }
+          fs.writeFileSync(credentialsPath, credentials);
+          process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
+          console.log("Google Vision API credentials set up successfully.");
+        } catch (writeError) {
+          // Log error but don't throw - app can work without Google credentials
+          const errorMessage = writeError instanceof Error ? writeError.message : String(writeError);
+          console.warn("Failed to write Google credentials file:", errorMessage);
+          // Continue without credentials - app can work without it
+        }
+      }
   } else {
     // Only log as warning, not error, since the app can work without it (image moderation will be skipped)
     console.warn("Google Vision API credentials not set. Image analysis and moderation features will be limited.");
@@ -70,8 +94,49 @@ app.prepare().then(async () => {
   initializeScheduler();
   setupGoogleCredentials();
 
+  // Initialize Discord bot
+  // Note: This is optional - server will continue even if bot fails to initialize
+  try {
+    const botInitialized = await initializeDiscordBot();
+    if (botInitialized) {
+      console.log('✅ Discord bot initialized successfully');
+    } else {
+      // Bot initialization was skipped (likely missing configuration)
+      // This is expected behavior and not an error
+      console.warn('⚠️ Discord bot initialization skipped (Discord bot features will be unavailable)');
+    }
+  } catch (error) {
+    // Unexpected error during initialization - log but don't crash server
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('❌ Unexpected error during Discord bot initialization:', errorMessage);
+    // Server continues even if bot fails to initialize
+  }
+
   // Start the server
   server.listen(port, () => {
     console.log(`> Ready on http://localhost:${port}`);
   });
+
+  // Graceful shutdown handling
+  const gracefulShutdown = async (signal: string) => {
+    console.log(`\n${signal} received. Starting graceful shutdown...`);
+    
+    // Close HTTP server
+    server.close(() => {
+      console.log('HTTP server closed');
+    });
+
+    // Shutdown Discord bot
+    await shutdownDiscordBot();
+
+    // Give processes time to finish
+    setTimeout(() => {
+      console.log('Graceful shutdown complete');
+      process.exit(0);
+    }, 5000);
+  };
+
+  // Handle shutdown signals
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 });
