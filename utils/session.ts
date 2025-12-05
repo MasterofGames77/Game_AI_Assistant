@@ -118,6 +118,52 @@ export const clearAuthCookies = (res: NextApiResponse): void => {
 };
 
 /**
+ * Set authentication cookies with custom domain (for cross-domain authentication)
+ */
+export const setAuthCookiesWithDomain = (
+  res: NextApiResponse,
+  userId: string,
+  username: string,
+  email: string | undefined,
+  domain: string
+): void => {
+  // Generate tokens
+  const accessToken = generateAccessToken({ userId, username, email });
+  const refreshToken = generateRefreshToken({ userId, username, email });
+
+  // Calculate expiration times
+  const accessTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+  const refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+  // Use cookie library's serialize function for proper formatting with domain
+  const accessTokenCookie = serialize(ACCESS_TOKEN_COOKIE, accessToken, {
+    httpOnly: COOKIE_OPTIONS.httpOnly,
+    secure: COOKIE_OPTIONS.secure,
+    sameSite: 'lax', // Use 'lax' for cross-domain cookies
+    path: COOKIE_OPTIONS.path,
+    domain: domain,
+    expires: accessTokenExpiry,
+  });
+
+  const refreshTokenCookie = serialize(REFRESH_TOKEN_COOKIE, refreshToken, {
+    httpOnly: COOKIE_OPTIONS.httpOnly,
+    secure: COOKIE_OPTIONS.secure,
+    sameSite: 'lax', // Use 'lax' for cross-domain cookies
+    path: COOKIE_OPTIONS.path,
+    domain: domain,
+    expires: refreshTokenExpiry,
+  });
+
+  // Set both cookies
+  if (typeof (res as any).appendHeader === 'function') {
+    res.setHeader('Set-Cookie', accessTokenCookie);
+    (res as any).appendHeader('Set-Cookie', refreshTokenCookie);
+  } else {
+    res.setHeader('Set-Cookie', [accessTokenCookie, refreshTokenCookie]);
+  }
+};
+
+/**
  * Extract token from cookies
  */
 export const getTokenFromCookies = (cookieHeader: string | undefined, cookieName: string): string | null => {

@@ -208,6 +208,109 @@ export default function Home() {
     const initializeUser = async () => {
       setLoading(true);
       try {
+        // Check for token in URL parameters first (for cross-domain authentication)
+        const urlParams = new URLSearchParams(
+          typeof window !== "undefined" ? window.location.search : ""
+        );
+        const token = urlParams.get("token");
+        const tokenUserId = urlParams.get("userId");
+        const tokenEmail = urlParams.get("email");
+
+        // If token is present, exchange it for session cookies
+        if (token) {
+          try {
+            console.log("Token detected in URL, exchanging for session...");
+            
+            // Exchange token for session cookies
+            const exchangeRes = await axios.post(
+              "/api/auth/exchange-token",
+              {
+                token,
+                userId: tokenUserId || undefined,
+                email: tokenEmail || undefined,
+              },
+              {
+                withCredentials: true, // Ensure cookies are sent and received
+              }
+            );
+
+            if (exchangeRes.data && exchangeRes.data.success && exchangeRes.data.user) {
+              const userData = exchangeRes.data.user;
+              const newUsername = userData.username || tokenUserId || "";
+
+              // Clear any existing session to prevent logging in wrong user
+              const oldUsername = localStorage.getItem("username");
+              const oldUserId = localStorage.getItem("userId");
+              localStorage.removeItem("username");
+              localStorage.removeItem("userId");
+              localStorage.removeItem("userEmail");
+
+              // Store user data
+              console.log("Token exchange successful, setting localStorage for user:", {
+                username: newUsername,
+                userId: userData.userId,
+                email: userData.email,
+              });
+
+              localStorage.setItem("username", newUsername);
+              localStorage.setItem("userId", userData.userId);
+              localStorage.setItem("userEmail", userData.email);
+
+              // Dispatch custom events to notify components
+              window.dispatchEvent(
+                new CustomEvent("localStorageChange", {
+                  detail: {
+                    key: "username",
+                    oldValue: oldUsername,
+                    newValue: newUsername,
+                  },
+                })
+              );
+              window.dispatchEvent(
+                new CustomEvent("localStorageChange", {
+                  detail: {
+                    key: "userId",
+                    oldValue: oldUserId,
+                    newValue: userData.userId,
+                  },
+                })
+              );
+
+              setUserId(userData.userId);
+              setUsername(newUsername);
+
+              // Clean up URL parameters
+              if (typeof window !== "undefined") {
+                window.history.replaceState({}, "", window.location.pathname);
+              }
+
+              // Proceed with normal flow
+              setShowUsernameModal(false);
+              fetchConversations();
+              setLoading(false);
+              return;
+            }
+          } catch (err: any) {
+            console.error("Error exchanging token:", err);
+            
+            // If token exchange fails, show error and fall through to normal flow
+            if (err.response?.status === 401 || err.response?.status === 403) {
+              const errorMessage =
+                err.response?.data?.message ||
+                "Authentication failed. Please try logging in again.";
+              console.error("Token exchange failed:", errorMessage);
+              // Don't show alert - let user proceed to normal login flow
+            }
+            
+            // Clean up URL parameters even on error
+            if (typeof window !== "undefined") {
+              window.history.replaceState({}, "", window.location.pathname);
+            }
+            
+            // Fall through to normal flow
+          }
+        }
+
         // Robust URL parameter parsing to handle malformed URLs
         const parseEarlyAccessParams = (searchString: string) => {
           const urlParams = new URLSearchParams(searchString);
