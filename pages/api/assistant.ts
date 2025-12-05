@@ -18,6 +18,7 @@ import { containsOffensiveContent } from '../../utils/contentModeration';
 import { Metrics } from '../../types';
 import fs from 'fs';
 import { clearUserCache } from './getConversation';
+import { requireAuth, AuthenticatedRequest } from '../../middleware/auth';
 
 // Optimized performance monitoring with conditional logging
 const measureLatency = async (operation: string, callback: () => Promise<any>, enableLogging: boolean = false) => {
@@ -1139,21 +1140,32 @@ class ValidationError extends AssistantError {
 }
 
 // Main API handler function that processes incoming requests
-const assistantHandler = async (req: NextApiRequest, res: NextApiResponse) => {
+const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
   const startTime = performance.now();
-  const { username, question, code, imageFilePath, imageUrl } = req.body;
+  const { question, code, imageFilePath, imageUrl } = req.body;
   const metrics: Metrics = {};
   const requestMonitor = new RequestMonitor();
   const aiCache = getAICache();
+  let username: string | undefined; // Declare outside try block for error handling
   
   try {
-    // Validate question and username
-    if (!question || typeof question !== 'string') {
-      throw new ValidationError('Invalid question format - question must be a non-empty string');
+    // Authenticate user - get username from authenticated session
+    const authResult = await requireAuth(req, res);
+    
+    if (!authResult.authenticated || !authResult.username) {
+      return res.status(401).json({
+        error: 'Authentication required',
+        message: 'Please sign in to use the assistant',
+        metrics
+      });
     }
 
-    if (!username || typeof username !== 'string') {
-      throw new ValidationError('Username is required');
+    // Use authenticated username (security: prevent username spoofing)
+    username = authResult.username;
+
+    // Validate question
+    if (!question || typeof question !== 'string') {
+      throw new ValidationError('Invalid question format - question must be a non-empty string');
     }
 
     // Check for offensive content first
@@ -1949,7 +1961,7 @@ CRITICAL INSTRUCTIONS:
             }
 
             // Check achievements only once with the updated progress
-            if (result.userDoc && questionType.length > 0) {
+            if (result.userDoc && questionType.length > 0 && username) {
               await checkAndAwardAchievements(username, result.userDoc.progress, session);
             }
           });
@@ -2027,29 +2039,30 @@ CRITICAL INSTRUCTIONS:
     // This runs in the background and doesn't affect user experience
     // Phase 4.3: Rate Limiting - Only run if enough time has passed since last analysis
     if (username) {
+      const authenticatedUsername = username; // Type narrowing for async callback
       setImmediate(async () => {
         try {
           // Phase 4.3: Check if analysis should run (rate limiting)
-          const shouldRun = await shouldRunAnalysis(username);
+          const shouldRun = await shouldRunAnalysis(authenticatedUsername);
           
           if (!shouldRun) {
             // Skip analysis if rate limit hasn't been reached
-            console.log(`[Pattern Analysis] Skipping analysis for ${username} due to rate limiting`);
+            console.log(`[Pattern Analysis] Skipping analysis for ${authenticatedUsername} due to rate limiting`);
             return;
           }
 
           // Phase 4.1: Run pattern analysis with caching (getOrCalculatePatterns handles caching internally)
           // This will use cached results if available, or calculate and cache new results
-          const patterns = await analyzeGameplayPatterns(username);
+          const patterns = await analyzeGameplayPatterns(authenticatedUsername);
           
           // Log patterns for debugging (commented out for production)
-          // console.log('[Pattern Analysis] Completed pattern analysis for user:', username);
+          // console.log('[Pattern Analysis] Completed pattern analysis for user:', authenticatedUsername);
           // console.log('[Pattern Analysis] Results:', JSON.stringify(patterns, null, 2));
           
           // Store patterns in User model for future use in recommendations
           // Only store if we have meaningful data (at least some questions analyzed)
           if (patterns.frequency.totalQuestions > 0) {
-            await storeUserPatterns(username, patterns);
+            await storeUserPatterns(authenticatedUsername, patterns);
           }
         } catch (error) {
           // Log error but don't throw - this is a background operation
@@ -2063,11 +2076,12 @@ CRITICAL INSTRUCTIONS:
     // Recommendations respect progressive disclosure and are stored for later retrieval
     // This doesn't block the user's response
     if (username) {
+      const authenticatedUsername = username; // Type narrowing for async callback
       setImmediate(async () => {
         try {
           // Generate recommendations with current question as context
           // Don't force show - respect progressive disclosure
-          await generatePersonalizedRecommendations(username, question, false);
+          await generatePersonalizedRecommendations(authenticatedUsername, question, false);
           
           // Note: updateRecommendationHistory is called inside generatePersonalizedRecommendations
           // if recommendations are actually shown (progressive disclosure passed)
@@ -2095,7 +2109,7 @@ CRITICAL INSTRUCTIONS:
     
     // Enhanced error logging
     logger.error('API request failed', {
-      username,
+      username: username || 'unknown',
       error: error instanceof Error ? {
         name: error.name,
         message: error.message,
