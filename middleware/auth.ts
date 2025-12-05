@@ -26,6 +26,12 @@ export const requireAuth = async (
     }
 
     if (!token) {
+      // Log for debugging (only in development)
+      // Commented out for production
+      // if (process.env.NODE_ENV === 'development') {
+      //   console.log('[Auth] No token found in cookies or headers');
+      //   console.log('[Auth] Cookie header:', req.headers.cookie ? 'present' : 'missing');
+      // }
       return { authenticated: false };
     }
 
@@ -45,6 +51,10 @@ export const requireAuth = async (
     };
   } catch (error) {
     // Token is invalid or expired
+    // Commented out for production
+    // if (process.env.NODE_ENV === 'development') {
+    //   console.log('[Auth] Token verification failed:', error instanceof Error ? error.message : 'Unknown error');
+    // }
     return { authenticated: false };
   }
 };

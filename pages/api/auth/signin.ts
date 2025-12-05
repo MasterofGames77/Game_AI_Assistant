@@ -4,32 +4,47 @@ import User from '../../../models/User';
 import { comparePassword } from '../../../utils/passwordUtils';
 import { setAuthCookies } from '../../../utils/session';
 import mongoose from 'mongoose';
-import rateLimit from 'express-rate-limit';
-import { applyRateLimit } from '../../../middleware/rateLimit';
 
-// Rate limiting configuration for login endpoint
-const loginRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 login attempts per window
-  message: 'Too many login attempts. Please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-  skipSuccessfulRequests: true, // Don't count successful logins
-});
+// Simple in-memory rate limiting for Next.js (no Express dependency)
+const loginAttempts = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
+const MAX_ATTEMPTS = 5;
+
+function checkRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
+  const now = Date.now();
+  const record = loginAttempts.get(ip);
+
+  if (!record || now > record.resetTime) {
+    // Reset or create new record
+    loginAttempts.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    return { allowed: true };
+  }
+
+  if (record.count >= MAX_ATTEMPTS) {
+    const retryAfter = Math.ceil((record.resetTime - now) / 1000);
+    return { allowed: false, retryAfter };
+  }
+
+  record.count++;
+  return { allowed: true };
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  // Apply rate limiting
-  try {
-    await applyRateLimit(req, res, loginRateLimit);
-  } catch (rateLimitError) {
-    // Rate limit exceeded
+  // Simple rate limiting (get IP from headers)
+  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || 
+             (req.headers['x-real-ip'] as string) || 
+             req.socket.remoteAddress || 
+             'unknown';
+  
+  const rateLimitCheck = checkRateLimit(ip);
+  if (!rateLimitCheck.allowed) {
     return res.status(429).json({
       message: 'Too many login attempts. Please try again later.',
-      retryAfter: 15 * 60, // 15 minutes in seconds
+      retryAfter: rateLimitCheck.retryAfter,
     });
   }
 
@@ -108,6 +123,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Set authentication cookies (HTTP-only, secure)
     setAuthCookies(res, user.userId, user.username, user.email);
+
+    // Debug: Log cookie headers in development
+    // Commented out for production
+    // if (process.env.NODE_ENV === 'development') {
+    //   const setCookieHeaders = res.getHeader('Set-Cookie');
+    //   const headerCount = Array.isArray(setCookieHeaders) ? setCookieHeaders.length : setCookieHeaders ? 1 : 0;
+    //   console.log('[SignIn] Set-Cookie headers count:', headerCount);
+    //   if (Array.isArray(setCookieHeaders)) {
+    //     console.log('[SignIn] Cookie names:', setCookieHeaders.map(h => {
+    //       const match = h.match(/^([^=]+)=/);
+    //       return match ? match[1] : 'unknown';
+    //     }));
+    //   }
+    // }
 
     // Successful authentication
     const { password: _, ...userResponse } = user.toObject();

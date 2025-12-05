@@ -1,5 +1,6 @@
 import type { NextApiResponse } from 'next';
-import { generateAccessToken, generateRefreshToken, ACCESS_TOKEN_EXPIRY, REFRESH_TOKEN_EXPIRY } from './jwt';
+import { serialize } from 'cookie';
+import { generateAccessToken, generateRefreshToken } from './jwt';
 
 // Cookie configuration
 const COOKIE_OPTIONS = {
@@ -30,34 +31,90 @@ export const setAuthCookies = (
   const accessTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
   const refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-  // Set access token cookie
-  res.setHeader(
-    'Set-Cookie',
-    `${ACCESS_TOKEN_COOKIE}=${accessToken}; HttpOnly; Secure=${COOKIE_OPTIONS.secure}; SameSite=${COOKIE_OPTIONS.sameSite}; Path=${COOKIE_OPTIONS.path}; Expires=${accessTokenExpiry.toUTCString()}`
-  );
+  // Use cookie library's serialize function for proper formatting
+  const accessTokenCookie = serialize(ACCESS_TOKEN_COOKIE, accessToken, {
+    httpOnly: COOKIE_OPTIONS.httpOnly,
+    secure: COOKIE_OPTIONS.secure,
+    sameSite: COOKIE_OPTIONS.sameSite,
+    path: COOKIE_OPTIONS.path,
+    expires: accessTokenExpiry,
+  });
 
-  // Set refresh token cookie
-  res.setHeader(
-    'Set-Cookie',
-    `${REFRESH_TOKEN_COOKIE}=${refreshToken}; HttpOnly; Secure=${COOKIE_OPTIONS.secure}; SameSite=${COOKIE_OPTIONS.sameSite}; Path=${COOKIE_OPTIONS.path}; Expires=${refreshTokenExpiry.toUTCString()}`
-  );
+  const refreshTokenCookie = serialize(REFRESH_TOKEN_COOKIE, refreshToken, {
+    httpOnly: COOKIE_OPTIONS.httpOnly,
+    secure: COOKIE_OPTIONS.secure,
+    sameSite: COOKIE_OPTIONS.sameSite,
+    path: COOKIE_OPTIONS.path,
+    expires: refreshTokenExpiry,
+  });
+
+  // Set both cookies as an array
+  // Next.js should handle this correctly, but if only one appears in response,
+  // it may be a proxy/HTTP/2 issue (Cloudflare/Heroku)
+  const cookiesArray = [accessTokenCookie, refreshTokenCookie];
+  
+  // Try using appendHeader if available (for HTTP/2 compatibility)
+  if (typeof (res as any).appendHeader === 'function') {
+    res.setHeader('Set-Cookie', accessTokenCookie);
+    (res as any).appendHeader('Set-Cookie', refreshTokenCookie);
+  } else {
+    // Standard approach: set both as array
+    res.setHeader('Set-Cookie', cookiesArray);
+  }
+  
+  // Debug: Verify both cookies are being set (development only)
+  // Commented out for production
+  // if (process.env.NODE_ENV === 'development') {
+  //   const setCookieHeaders = res.getHeader('Set-Cookie');
+  //   const headerCount = Array.isArray(setCookieHeaders) ? setCookieHeaders.length : setCookieHeaders ? 1 : 0;
+  //   console.log('[setAuthCookies] Setting cookies:', {
+  //     accessTokenLength: accessToken.length,
+  //     refreshTokenLength: refreshToken.length,
+  //     accessTokenCookieStartsWith: accessTokenCookie.substring(0, 30),
+  //     refreshTokenCookieStartsWith: refreshTokenCookie.substring(0, 30),
+  //     headerCount,
+  //   });
+  // }
 };
 
 /**
  * Clear authentication cookies (logout)
  */
 export const clearAuthCookies = (res: NextApiResponse): void => {
-  const pastDate = new Date(0).toUTCString();
+  const pastDate = new Date(0);
 
-  res.setHeader(
-    'Set-Cookie',
-    `${ACCESS_TOKEN_COOKIE}=; HttpOnly; Secure=${COOKIE_OPTIONS.secure}; SameSite=${COOKIE_OPTIONS.sameSite}; Path=${COOKIE_OPTIONS.path}; Expires=${pastDate}`
-  );
+  // Use cookie library's serialize function to clear cookies
+  const accessTokenCookie = serialize(ACCESS_TOKEN_COOKIE, '', {
+    httpOnly: COOKIE_OPTIONS.httpOnly,
+    secure: COOKIE_OPTIONS.secure,
+    sameSite: COOKIE_OPTIONS.sameSite,
+    path: COOKIE_OPTIONS.path,
+    expires: pastDate,
+  });
 
-  res.setHeader(
-    'Set-Cookie',
-    `${REFRESH_TOKEN_COOKIE}=; HttpOnly; Secure=${COOKIE_OPTIONS.secure}; SameSite=${COOKIE_OPTIONS.sameSite}; Path=${COOKIE_OPTIONS.path}; Expires=${pastDate}`
-  );
+  const refreshTokenCookie = serialize(REFRESH_TOKEN_COOKIE, '', {
+    httpOnly: COOKIE_OPTIONS.httpOnly,
+    secure: COOKIE_OPTIONS.secure,
+    sameSite: COOKIE_OPTIONS.sameSite,
+    path: COOKIE_OPTIONS.path,
+    expires: pastDate,
+  });
+
+  // Clear cookies - append to existing Set-Cookie headers
+  const existingSetCookie = res.getHeader('Set-Cookie');
+  let cookiesToSet: string[];
+  
+  if (Array.isArray(existingSetCookie)) {
+    // Filter to ensure all values are strings
+    const existingStrings = existingSetCookie.filter((c): c is string => typeof c === 'string');
+    cookiesToSet = [...existingStrings, accessTokenCookie, refreshTokenCookie];
+  } else if (typeof existingSetCookie === 'string') {
+    cookiesToSet = [existingSetCookie, accessTokenCookie, refreshTokenCookie];
+  } else {
+    cookiesToSet = [accessTokenCookie, refreshTokenCookie];
+  }
+  
+  res.setHeader('Set-Cookie', cookiesToSet);
 };
 
 /**

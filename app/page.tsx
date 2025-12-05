@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import axios from "axios";
+import axios from "../utils/axiosConfig";
 import Sidebar from "../components/Sidebar";
 import Image from "next/image";
 import { Conversation } from "../types";
@@ -852,22 +852,37 @@ export default function Home() {
         }
       }
 
-      const res = await axios.post(
-        "/api/assistant",
-        {
-          userId,
-          username,
-          question,
-          imageFilePath: imageFilePath, // For backward compatibility
-          imageUrl: imageUrlForAnalysis, // New: cloud storage URL
-        },
-        {
-          timeout: 65000, // Increased timeout to 65 seconds to accommodate vision API calls (60s + buffer)
-          headers: {
-            "Content-Type": "application/json",
+      let res;
+      try {
+        res = await axios.post(
+          "/api/assistant",
+          {
+            question,
+            imageFilePath: imageFilePath, // For backward compatibility
+            imageUrl: imageUrlForAnalysis, // New: cloud storage URL
+            // Note: username and userId are now extracted from JWT token in cookies
           },
+          {
+            timeout: 65000, // Increased timeout to 65 seconds to accommodate vision API calls (60s + buffer)
+            headers: {
+              "Content-Type": "application/json",
+            },
+            withCredentials: true, // Ensure cookies are sent
+          }
+        );
+      } catch (error: any) {
+        // Handle authentication errors gracefully
+        if (error.response?.status === 401) {
+          setResponse("Please sign in to use the assistant. Redirecting to sign-in page...");
+          // Small delay before redirect to show message
+          setTimeout(() => {
+            window.location.href = '/signin';
+          }, 1500);
+          return;
         }
-      );
+        // Re-throw other errors
+        throw error;
+      }
 
       //const endTime = performance.now();
       // console.log(
@@ -1428,6 +1443,8 @@ export default function Home() {
       const res = await axios.post("/api/auth/signin", {
         identifier: usernameInput.trim(),
         password: passwordInput,
+      }, {
+        withCredentials: true, // Ensure cookies are sent and received
       });
 
       if (res.data && res.data.user) {

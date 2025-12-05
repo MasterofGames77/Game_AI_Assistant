@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import axios from "axios";
+import axios from "../../utils/axiosConfig";
 import Image from "next/image";
 import PasswordSetupModal from "../../components/PasswordSetupModal";
 
@@ -77,6 +77,8 @@ const SignInPage: React.FC = () => {
       const res = await axios.post("/api/auth/signin", {
         identifier: usernameInput.trim(),
         password: passwordInput,
+      }, {
+        withCredentials: true, // Ensure cookies are sent and received
       });
 
       if (res.data && res.data.user) {
