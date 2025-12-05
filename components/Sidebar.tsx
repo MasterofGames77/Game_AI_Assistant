@@ -1,3 +1,5 @@
+"use client";
+
 import { SideBarProps } from "../types";
 import ProStatus from "./ProStatus";
 import DarkModeToggle from "./DarkModeToggle";
@@ -725,8 +727,8 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
           );
         })}
 
-        {/* Load More Button */}
-        {hasMore && (
+        {/* Load More Button - only show when user is logged in and has more conversations */}
+        {hasMore && username && (
           <div className="mt-4 mb-2">
             <button
               onClick={async () => {

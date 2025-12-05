@@ -35,6 +35,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [username, setUsername] = useState<string | null>(null);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editMessage, setEditMessage] = useState("");
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
@@ -51,6 +52,39 @@ function ForumPage({ params }: { params: { forumId: string } }) {
   const [replySelectedImages, setReplySelectedImages] = useState<File[]>([]);
   const [replyImagePreviews, setReplyImagePreviews] = useState<string[]>([]);
   const router = useRouter();
+
+  // Check if user is logged in
+  useEffect(() => {
+    const checkUser = () => {
+      if (typeof window !== "undefined") {
+        const storedUsername = localStorage.getItem("username");
+        setUsername(storedUsername);
+      }
+    };
+    checkUser();
+
+    // Listen for storage changes to update username
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "username") {
+        setUsername(e.newValue);
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+
+    // Listen for custom localStorage change events (same-tab)
+    const handleCustomStorage = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.key === "username") {
+        setUsername(customEvent.detail.newValue);
+      }
+    };
+    window.addEventListener("localStorageChange", handleCustomStorage);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("localStorageChange", handleCustomStorage);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchForum = async () => {
@@ -116,6 +150,15 @@ function ForumPage({ params }: { params: { forumId: string } }) {
   const [postStatus, setPostStatus] = useState<string | null>(null);
   const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check if user is logged in
+    if (!username) {
+      setError(
+        "Please sign in to add a post. Click 'Sign In/Up' to get started."
+      );
+      return;
+    }
+
     if (!message.trim() && selectedImages.length === 0) {
       setError("Please enter a message or attach an image");
       return;
@@ -614,6 +657,25 @@ function ForumPage({ params }: { params: { forumId: string } }) {
   };
 
   const handleStartReply = (postId: string) => {
+    // Check if user is logged in
+    if (!username) {
+      toast.error(
+        "Please sign in to reply to posts. Click 'Sign In/Up' to get started.",
+        {
+          duration: 4000,
+          style: {
+            background: "#fee2e2",
+            color: "#991b1b",
+            border: "1px solid #fca5a5",
+            padding: "16px",
+            borderRadius: "8px",
+            fontSize: "14px",
+          },
+        }
+      );
+      return;
+    }
+
     setReplyingToPostId(postId);
     setReplyMessage("");
     setReplySelectedImages([]);
@@ -677,6 +739,14 @@ function ForumPage({ params }: { params: { forumId: string } }) {
   const handleReplySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyingToPostId || !currentForum) return;
+
+    // Check if user is logged in
+    if (!username) {
+      setError(
+        "Please sign in to reply to posts. Click 'Sign In/Up' to get started."
+      );
+      return;
+    }
 
     if (!replyMessage.trim() && replySelectedImages.length === 0) {
       setError("Please enter a message or attach an image");
@@ -928,98 +998,117 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       )}
 
       <div className="mb-8">
-        <form onSubmit={handlePostSubmit} className="space-y-4">
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="What's new..?"
-            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-            rows={4}
-          />
-
-          {/* Image Upload Section */}
-          <div className="space-y-2">
-            <label
-              htmlFor="image-upload"
-              className="cursor-pointer inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 mr-2"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-              </svg>
-              Attach Images (max 5)
-            </label>
-            <input
-              id="image-upload"
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleImageSelect}
-              className="hidden"
+        {username ? (
+          <form onSubmit={handlePostSubmit} className="space-y-4">
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="What's new..?"
+              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+              rows={4}
             />
 
-            {/* Image Previews */}
-            {imagePreviews.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-                {imagePreviews.map((preview, index) => (
-                  <div key={index} className="relative group">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={preview}
-                      alt={`Preview ${index + 1}`}
-                      className="w-full h-32 object-cover rounded border border-gray-300 dark:border-gray-600"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(index)}
-                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                      aria-label="Remove image"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
+            {/* Image Upload Section */}
+            <div className="space-y-2">
+              <label
+                htmlFor="image-upload"
+                className="cursor-pointer inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 mr-2"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+                Attach Images (max 5)
+              </label>
+              <input
+                id="image-upload"
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+
+              {/* Image Previews */}
+              {imagePreviews.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                  {imagePreviews.map((preview, index) => (
+                    <div key={index} className="relative group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={preview}
+                        alt={`Preview ${index + 1}`}
+                        className="w-full h-32 object-cover rounded border border-gray-300 dark:border-gray-600"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-label="Remove image"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {error && <div className="text-red-500 text-sm">{error}</div>}
+
+            <button
+              type="submit"
+              disabled={isPosting}
+              className={`px-4 py-2 rounded text-white transition-all duration-200 ${
+                isPosting
+                  ? "bg-gray-500 cursor-not-allowed"
+                  : "bg-blue-500 hover:bg-blue-600"
+              }`}
+            >
+              {isPosting ? "Posting..." : "Post"}
+            </button>
+          </form>
+        ) : (
+          <div className="p-6 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 text-center">
+            <p className="text-gray-700 dark:text-gray-300 text-lg mb-2">
+              Want to add a post?
+            </p>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Sign in or sign up to join the conversation.
+            </p>
+            <button
+              onClick={() => {
+                window.location.href = "/signin";
+              }}
+              className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium"
+            >
+              Sign In/Up
+            </button>
           </div>
-
-          {error && <div className="text-red-500 text-sm">{error}</div>}
-
-          <button
-            type="submit"
-            disabled={isPosting}
-            className={`px-4 py-2 rounded text-white transition-all duration-200 ${
-              isPosting
-                ? "bg-gray-500 cursor-not-allowed"
-                : "bg-blue-500 hover:bg-blue-600"
-            }`}
-          >
-            {isPosting ? "Posting..." : "Post"}
-          </button>
-        </form>
+        )}
       </div>
 
       <div className="space-y-4">
@@ -1507,108 +1596,127 @@ function ForumPage({ params }: { params: { forumId: string } }) {
                     {/* Reply Form */}
                     {replyingToPostId === post._id && (
                       <div className="mt-4 pt-4 border-t border-gray-300 dark:border-gray-700">
-                        <form
-                          onSubmit={handleReplySubmit}
-                          className="space-y-4"
-                        >
-                          <textarea
-                            value={replyMessage}
-                            onChange={(e) => setReplyMessage(e.target.value)}
-                            placeholder="Write a reply..."
-                            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                            rows={3}
-                          />
-
-                          {/* Image Upload Section for Reply */}
-                          <div className="space-y-2">
-                            <label
-                              htmlFor="reply-image-upload"
-                              className="cursor-pointer inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-5 w-5 mr-2"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                                />
-                              </svg>
-                              Attach Images (max 5)
-                            </label>
-                            <input
-                              id="reply-image-upload"
-                              type="file"
-                              accept="image/*"
-                              multiple
-                              onChange={handleReplyImageSelect}
-                              className="hidden"
+                        {username ? (
+                          <form
+                            onSubmit={handleReplySubmit}
+                            className="space-y-4"
+                          >
+                            <textarea
+                              value={replyMessage}
+                              onChange={(e) => setReplyMessage(e.target.value)}
+                              placeholder="Write a reply..."
+                              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                              rows={3}
                             />
 
-                            {/* Image Previews */}
-                            {replyImagePreviews.length > 0 && (
-                              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-                                {replyImagePreviews.map((preview, index) => (
-                                  <div key={index} className="relative group">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                      src={preview}
-                                      alt={`Preview ${index + 1}`}
-                                      className="w-full h-32 object-cover rounded border border-gray-300 dark:border-gray-600"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => removeReplyImage(index)}
-                                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                      aria-label="Remove image"
-                                    >
-                                      <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        className="h-4 w-4"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M6 18L18 6M6 6l12 12"
-                                        />
-                                      </svg>
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
+                            {/* Image Upload Section for Reply */}
+                            <div className="space-y-2">
+                              <label
+                                htmlFor="reply-image-upload"
+                                className="cursor-pointer inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className="h-5 w-5 mr-2"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                  />
+                                </svg>
+                                Attach Images (max 5)
+                              </label>
+                              <input
+                                id="reply-image-upload"
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                onChange={handleReplyImageSelect}
+                                className="hidden"
+                              />
 
-                          <div className="flex space-x-2">
+                              {/* Image Previews */}
+                              {replyImagePreviews.length > 0 && (
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                                  {replyImagePreviews.map((preview, index) => (
+                                    <div key={index} className="relative group">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img
+                                        src={preview}
+                                        alt={`Preview ${index + 1}`}
+                                        className="w-full h-32 object-cover rounded border border-gray-300 dark:border-gray-600"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => removeReplyImage(index)}
+                                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        aria-label="Remove image"
+                                      >
+                                        <svg
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          className="h-4 w-4"
+                                          fill="none"
+                                          viewBox="0 0 24 24"
+                                          stroke="currentColor"
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M6 18L18 6M6 6l12 12"
+                                          />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex space-x-2">
+                              <button
+                                type="submit"
+                                disabled={isReplyPosting}
+                                className={`px-4 py-2 rounded text-white transition-all duration-200 ${
+                                  isReplyPosting
+                                    ? "bg-gray-500 cursor-not-allowed"
+                                    : "bg-green-500 hover:bg-green-600"
+                                }`}
+                              >
+                                {isReplyPosting ? "Posting..." : "Post Reply"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleCancelReply}
+                                className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 text-center">
+                            <p className="text-gray-700 dark:text-gray-300 mb-2">
+                              Want to add a reply?
+                            </p>
+                            <p className="text-gray-600 dark:text-gray-400 mb-4">
+                              Sign in or sign up to join the conversation.
+                            </p>
                             <button
-                              type="submit"
-                              disabled={isReplyPosting}
-                              className={`px-4 py-2 rounded text-white transition-all duration-200 ${
-                                isReplyPosting
-                                  ? "bg-gray-500 cursor-not-allowed"
-                                  : "bg-green-500 hover:bg-green-600"
-                              }`}
+                              onClick={() => {
+                                window.location.href = "/signin";
+                              }}
+                              className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium"
                             >
-                              {isReplyPosting ? "Posting..." : "Post Reply"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleCancelReply}
-                              className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-                            >
-                              Cancel
+                              Sign In/Up
                             </button>
                           </div>
-                        </form>
+                        )}
                       </div>
                     )}
                   </div>

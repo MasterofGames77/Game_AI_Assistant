@@ -113,9 +113,16 @@ export default function Home() {
   });
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Set mounted state after component mounts
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // function to get conversations
   const fetchConversations = useCallback(async (forceRefresh = false) => {
+    if (typeof window === "undefined") return;
     const storedUsername = localStorage.getItem("username");
     if (!storedUsername) return;
 
@@ -182,7 +189,22 @@ export default function Home() {
     }
   }, []);
 
+  // Check for query parameter to show sign-in modal (runs first, independently)
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("showSignIn") === "true") {
+      setShowUsernameModal(true);
+      // Clean up the URL
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []); // Run only once on mount
+
+  useEffect(() => {
+    // Only initialize if component is mounted (client-side only)
+    if (typeof window === "undefined") return;
+
     const initializeUser = async () => {
       setLoading(true);
       try {
@@ -244,7 +266,9 @@ export default function Home() {
           userId: earlyAccessUserId,
           email: earlyAccessEmail,
           isEarlyAccess,
-        } = parseEarlyAccessParams(window.location.search);
+        } = parseEarlyAccessParams(
+          typeof window !== "undefined" ? window.location.search : ""
+        );
 
         if (isEarlyAccess && earlyAccessUserId) {
           // Handle early access user
@@ -378,15 +402,15 @@ export default function Home() {
               setLoading(false);
               return;
             } else {
-              // Username not found, treat as new user
-              setShowUsernameModal(true);
+              // Username not found, treat as new user - don't show modal
+              setShowUsernameModal(false);
               setLoading(false);
               return;
             }
           } catch (err: any) {
-            // If error is 404, user not found, treat as new user
+            // If error is 404, user not found, treat as new user - don't show modal
             if (err.response && err.response.status === 404) {
-              setShowUsernameModal(true);
+              setShowUsernameModal(false);
               setLoading(false);
               return;
             } else {
@@ -395,8 +419,8 @@ export default function Home() {
             }
           }
         }
-        // No username in localStorage, show modal
-        setShowUsernameModal(true);
+        // No username in localStorage - don't show modal, allow viewing the app
+        setShowUsernameModal(false);
       } catch (error) {
         console.error("Error initializing user:", error);
       } finally {
@@ -493,6 +517,7 @@ export default function Home() {
 
   // function to get usage status
   const fetchUsageStatus = useCallback(async () => {
+    if (typeof window === "undefined") return;
     const storedUsername = localStorage.getItem("username");
     if (!storedUsername) return;
 
@@ -625,7 +650,12 @@ export default function Home() {
   // Check user type and admin status
   useEffect(() => {
     const checkUserStatus = async () => {
-      if (!username) return;
+      if (!username) {
+        // Reset user type and admin status when no username
+        setUserType("free");
+        setIsAdmin(false);
+        return;
+      }
 
       try {
         // Lightweight admin check - uses dedicated endpoint that doesn't trigger errors
@@ -660,6 +690,9 @@ export default function Home() {
         if (usageResponse.ok) {
           const usageData = await usageResponse.json();
           setUserType(usageData.usageStatus?.isProUser ? "pro" : "free");
+        } else {
+          // If API call fails, default to free
+          setUserType("free");
         }
       } catch (error) {
         console.error("Error checking user status:", error);
@@ -711,6 +744,17 @@ export default function Home() {
   // function to handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check if user is logged in
+    if (!username) {
+      setError(
+        "Please sign in to ask questions. Click 'Sign In/Up' to get started."
+      );
+      // Navigate to sign-in page
+      window.location.href = "/signin";
+      return;
+    }
+
     setLoading(true);
     setError("");
     // Clear previous recommendations when asking a new question
@@ -1387,10 +1431,38 @@ export default function Home() {
       });
 
       if (res.data && res.data.user) {
-        setUsername(res.data.user.username);
+        // Get old values before updating
+        const oldUsername = localStorage.getItem("username");
+        const oldUserId = localStorage.getItem("userId");
+
+        // Update localStorage
         localStorage.setItem("username", res.data.user.username);
         localStorage.setItem("userId", res.data.user.userId);
         localStorage.setItem("userEmail", res.data.user.email);
+
+        // Dispatch custom events to notify Sidebar and other components
+        window.dispatchEvent(
+          new CustomEvent("localStorageChange", {
+            detail: {
+              key: "username",
+              oldValue: oldUsername,
+              newValue: res.data.user.username,
+            },
+          })
+        );
+        window.dispatchEvent(
+          new CustomEvent("localStorageChange", {
+            detail: {
+              key: "userId",
+              oldValue: oldUserId,
+              newValue: res.data.user.userId,
+            },
+          })
+        );
+
+        // Update state
+        setUsername(res.data.user.username);
+        setUserId(res.data.user.userId);
         setShowUsernameModal(false);
         setConversations([]); // Clear old conversations
         fetchConversations(); // Fetch new user's conversations
@@ -1467,6 +1539,10 @@ export default function Home() {
   const handleSignOut = () => {
     setIsSigningOut(true);
 
+    // Get old values before clearing
+    const oldUsername = localStorage.getItem("username");
+    const oldUserId = localStorage.getItem("userId");
+
     // Clear state immediately for better UX
     setUsername(null);
     setUserId(null);
@@ -1480,10 +1556,35 @@ export default function Home() {
     setShowEarlyAccessSetupModal(false);
     setIsEarlyAccessUser(false);
     setEarlyAccessUserData(null);
+    setUserType("free"); // Reset user type on sign out
+    setIsAdmin(false); // Reset admin status on sign out
+
+    // Clear localStorage
     localStorage.removeItem("username");
     localStorage.removeItem("userId");
     localStorage.removeItem("userEmail");
-    setShowUsernameModal(true);
+
+    // Dispatch custom events to notify Sidebar and other components
+    window.dispatchEvent(
+      new CustomEvent("localStorageChange", {
+        detail: {
+          key: "username",
+          oldValue: oldUsername,
+          newValue: null,
+        },
+      })
+    );
+    window.dispatchEvent(
+      new CustomEvent("localStorageChange", {
+        detail: {
+          key: "userId",
+          oldValue: oldUserId,
+          newValue: null,
+        },
+      })
+    );
+
+    setShowUsernameModal(false); // Don't show modal, allow viewing the app
 
     // Reset signing out state after a brief delay
     setTimeout(() => {
@@ -1550,12 +1651,47 @@ export default function Home() {
   //   console.log("Current username:", localStorage.getItem("username")); // Already commented out
   // }
 
+  // Prevent hydration mismatch by not rendering until mounted
+  if (!isMounted) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen">
       {/* Sign In Modal */}
       {showUsernameModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
-          <div className="bg-white dark:bg-gray-900 p-8 rounded-lg shadow-lg w-full max-w-md flex flex-col items-center">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60"
+          onClick={() => setShowUsernameModal(false)}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 p-8 rounded-lg shadow-lg w-full max-w-md flex flex-col items-center relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setShowUsernameModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              aria-label="Close sign in modal"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
             <Image
               src="/assets/video-game-wingman-logo.png"
               alt="Video Game Wingman Logo"
@@ -1721,176 +1857,142 @@ export default function Home() {
         isOpen={showGuidesModal}
         onClose={() => setShowGuidesModal(false)}
       />
-      {/* Main App Content (only if signed in) */}
-      {!showUsernameModal && (
-        <>
-          {/* Hamburger menu for mobile */}
-          <button
-            className="hamburger"
-            aria-label="Open sidebar menu"
-            onClick={() => setSidebarOpen(true)}
+      {/* Main App Content - always visible, even for non-logged-in users */}
+      <>
+        {/* Hamburger menu for mobile */}
+        <button
+          className="hamburger"
+          aria-label="Open sidebar menu"
+          onClick={() => setSidebarOpen(true)}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
           >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <rect
-                x="4"
-                y="6"
-                width="16"
-                height="2.5"
-                rx="1.25"
-                fill="currentColor"
-              />
-              <rect
-                x="4"
-                y="11"
-                width="16"
-                height="2.5"
-                rx="1.25"
-                fill="currentColor"
-              />
-              <rect
-                x="4"
-                y="16"
-                width="16"
-                height="2.5"
-                rx="1.25"
-                fill="currentColor"
-              />
-            </svg>
-            <span className="hamburger-label">Menu</span>
-          </button>
-          {/* Show hamburger only on mobile via CSS */}
-          <style>{`
+            <rect
+              x="4"
+              y="6"
+              width="16"
+              height="2.5"
+              rx="1.25"
+              fill="currentColor"
+            />
+            <rect
+              x="4"
+              y="11"
+              width="16"
+              height="2.5"
+              rx="1.25"
+              fill="currentColor"
+            />
+            <rect
+              x="4"
+              y="16"
+              width="16"
+              height="2.5"
+              rx="1.25"
+              fill="currentColor"
+            />
+          </svg>
+          <span className="hamburger-label">Menu</span>
+        </button>
+        {/* Show hamburger only on mobile via CSS */}
+        <style>{`
             @media (max-width: 767px) {
               .hamburger { display: flex !important; }
             }
           `}</style>
 
-          {/* Sidebar Drawer and Backdrop for mobile */}
-          {sidebarOpen && (
-            <div
-              className="sidebar-backdrop"
-              onClick={() => setSidebarOpen(false)}
-            ></div>
-          )}
-          <Sidebar
-            conversations={conversations}
-            onSelectConversation={(convo) => {
-              setSelectedConversation(convo);
-              setSidebarOpen(false); // Close sidebar on mobile after selecting
-            }}
-            onDeleteConversation={handleDeleteConversation}
-            onClear={handleClear}
-            onTwitchAuth={handleTwitchAuth}
-            onDiscordAuth={handleDiscordAuth}
-            onNavigateToAccount={handleNavigateToAccount}
-            onOpenGuides={() => setShowGuidesModal(true)}
-            activeView={activeView}
-            setActiveView={setActiveView}
-            conversationCount={conversationCount}
-            onLoadMore={(newConversations) => {
-              setConversations((prev) => {
-                // Create a Set of existing conversation IDs (using question + timestamp as unique key)
-                const existingKeys = new Set(
-                  prev.map((conv) => `${conv.question}-${conv.timestamp}`)
-                );
-                // Filter out duplicates from new conversations
-                const uniqueNew = newConversations.filter(
-                  (conv) =>
-                    !existingKeys.has(`${conv.question}-${conv.timestamp}`)
-                );
-                return [...prev, ...uniqueNew];
-              });
-            }}
-            className={sidebarOpen ? "sidebar open" : "sidebar"}
-          />
-          <div className="main-content flex-1">
-            <div className="flex-1 flex flex-col items-center justify-center py-2">
-              <Image
-                src="/assets/video-game-wingman-logo.png"
-                alt="Video Game Wingman Logo"
-                className="logo"
-                width={350}
-                height={350}
-                priority={true}
-              />
+        {/* Sidebar Drawer and Backdrop for mobile */}
+        {sidebarOpen && (
+          <div
+            className="sidebar-backdrop"
+            onClick={() => setSidebarOpen(false)}
+          ></div>
+        )}
+        <Sidebar
+          key={username || "no-user"} // Force re-render when username changes
+          conversations={conversations}
+          onSelectConversation={(convo) => {
+            setSelectedConversation(convo);
+            setSidebarOpen(false); // Close sidebar on mobile after selecting
+          }}
+          onDeleteConversation={handleDeleteConversation}
+          onClear={handleClear}
+          onTwitchAuth={handleTwitchAuth}
+          onDiscordAuth={handleDiscordAuth}
+          onNavigateToAccount={handleNavigateToAccount}
+          onOpenGuides={() => setShowGuidesModal(true)}
+          activeView={activeView}
+          setActiveView={setActiveView}
+          conversationCount={conversationCount}
+          onLoadMore={(newConversations) => {
+            setConversations((prev) => {
+              // Create a Set of existing conversation IDs (using question + timestamp as unique key)
+              const existingKeys = new Set(
+                prev.map((conv) => `${conv.question}-${conv.timestamp}`)
+              );
+              // Filter out duplicates from new conversations
+              const uniqueNew = newConversations.filter(
+                (conv) =>
+                  !existingKeys.has(`${conv.question}-${conv.timestamp}`)
+              );
+              return [...prev, ...uniqueNew];
+            });
+          }}
+          className={sidebarOpen ? "sidebar open" : "sidebar"}
+        />
+        <div className="main-content flex-1">
+          <div className="flex-1 flex flex-col items-center justify-center py-2">
+            <Image
+              src="/assets/video-game-wingman-logo.png"
+              alt="Video Game Wingman Logo"
+              className="logo"
+              width={350}
+              height={350}
+              priority={true}
+            />
 
-              {/* Daily Challenge Banner */}
+            {/* Daily Challenge Banner - only show for logged-in users */}
+            {username && (
               <DailyChallengeBanner
                 username={username}
                 conversations={conversations}
               />
+            )}
 
-              {/* Display conversation count in the UI */}
-              {conversationCount > 0 && (
-                <p className="text-sm text-white font-medium mt-2 bg-gray-800 px-3 py-2 rounded-lg border border-gray-700">
-                  {conversationCount} total conversation
-                  {conversationCount !== 1 ? "s" : ""}
-                  {conversations.length < conversationCount && (
-                    <span className="text-gray-400 text-xs block mt-1">
-                      ({conversations.length} shown,{" "}
-                      {conversationCount - conversations.length} more available)
-                    </span>
-                  )}
-                </p>
-              )}
+            {/* Display conversation count in the UI - only for logged-in users */}
+            {username && conversationCount > 0 && (
+              <p className="text-sm text-white font-medium mt-2 bg-gray-800 px-3 py-2 rounded-lg border border-gray-700">
+                {conversationCount} total conversation
+                {conversationCount !== 1 ? "s" : ""}
+                {conversations.length < conversationCount && (
+                  <span className="text-gray-400 text-xs block mt-1">
+                    ({conversations.length} shown,{" "}
+                    {conversationCount - conversations.length} more available)
+                  </span>
+                )}
+              </p>
+            )}
 
-              <ul className="mt-4 text-lg text-center">
-                <li>Discover a game&apos;s hidden secrets.</li>
-                <li>Get personalized game recommendations.</li>
-                <li>Analyze gameplay data to improve your strategies.</li>
-                <li>Access detailed game guides.</li>
-                <li>
-                  Info about game sales, console bundles, and technical specs.
-                </li>
-              </ul>
+            <ul className="mt-4 text-lg text-center">
+              <li>Discover a game&apos;s hidden secrets.</li>
+              <li>Get personalized game recommendations.</li>
+              <li>Analyze gameplay data to improve your strategies.</li>
+              <li>Access detailed game guides.</li>
+              <li>
+                Info about game sales, console bundles, and technical specs.
+              </li>
+            </ul>
 
-              {activeView === "chat" && (
-                <>
-                  {/* Smart Game Resume - Shows on login */}
-                  {username && (
-                    <SmartGameResume
-                      username={username}
-                      onAskQuestion={(question) => {
-                        setQuestion(question);
-                        // Focus the input field so user can edit or submit
-                        setTimeout(() => {
-                          const input = document.querySelector(
-                            'input[type="text"]'
-                          ) as HTMLInputElement;
-                          if (input) {
-                            input.focus();
-                            input.scrollIntoView({
-                              behavior: "smooth",
-                              block: "center",
-                            });
-                          }
-                        }, 100);
-                      }}
-                    />
-                  )}
-
-                  {/* Health Status Widget */}
-                  <HealthStatusWidget
-                    healthStatus={healthStatus}
-                    onRecordBreak={recordBreak}
-                    onEndBreak={endBreak}
-                    onSnoozeReminder={snoozeReminder}
-                  />
-
-                  {/* Health Tips Widget */}
-                  <HealthTipsWidget
-                    tips={healthTips}
-                    onDismiss={dismissHealthTips}
-                  />
-
-                  {/* Quick Question Templates */}
-                  <QuickTemplates
+            {activeView === "chat" && (
+              <>
+                {/* Smart Game Resume - Shows on login */}
+                {username && (
+                  <SmartGameResume
                     username={username}
-                    onSelectTemplate={(question) => {
+                    onAskQuestion={(question) => {
                       setQuestion(question);
                       // Focus the input field so user can edit or submit
                       setTimeout(() => {
@@ -1907,513 +2009,598 @@ export default function Home() {
                       }, 100);
                     }}
                   />
+                )}
 
-                  <form
-                    onSubmit={handleSubmit}
-                    className="w-full max-w-md mt-2"
-                  >
-                    <input
-                      type="text"
-                      value={question}
-                      onChange={(e) => setQuestion(e.target.value)}
-                      placeholder="Message Video Game Wingman"
-                      className="w-full p-2 border border-gray-300 rounded mb-4"
-                    />
+                {/* Health Status Widget - only show for logged-in users */}
+                {username && (
+                  <HealthStatusWidget
+                    healthStatus={healthStatus}
+                    onRecordBreak={recordBreak}
+                    onEndBreak={endBreak}
+                    onSnoozeReminder={snoozeReminder}
+                  />
+                )}
 
-                    {/* Image upload UI section */}
-                    <div className="mb-4">
-                      <div className="flex flex-col gap-3">
-                        <label className="cursor-pointer inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors w-fit">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5 mr-2"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                            />
-                          </svg>
-                          <span>Attach Screenshot</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleImageChange}
-                            className="hidden"
-                            id="question-image-upload"
-                          />
-                        </label>
-                        {imageUrl && (
-                          <div className="relative inline-block">
-                            <Image
-                              src={imageUrl}
-                              alt="Selected screenshot"
-                              width={200}
-                              height={200}
-                              className="rounded border border-gray-300 dark:border-gray-600"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setImage(null);
-                                setImageUrl(null);
-                                // Reset file input
-                                const fileInput = document.getElementById(
-                                  "question-image-upload"
-                                ) as HTMLInputElement;
-                                if (fileInput) fileInput.value = "";
-                              }}
-                              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-75 hover:opacity-100 transition-opacity"
-                              aria-label="Remove image"
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-4 w-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M6 18L18 6M6 6l12 12"
-                                />
-                              </svg>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                {/* Health Tips Widget - only show for logged-in users */}
+                {username && (
+                  <HealthTipsWidget
+                    tips={healthTips}
+                    onDismiss={dismissHealthTips}
+                  />
+                )}
 
-                    <div className="flex space-x-4">
-                      <button
-                        type="submit"
-                        className="w-full p-2 bg-blue-500 text-white rounded"
-                      >
-                        Submit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleClear}
-                        className="w-full p-2 bg-blue-500 text-white rounded"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </form>
-                </>
-              )}
-
-              {activeView === "forum" && (
-                <ForumProvider>
-                  <div className="w-full mt-4">
-                    <ForumList />
-                  </div>
-                </ForumProvider>
-              )}
-
-              {activeView === "feedback" && (
-                <div className="w-full mt-4">
-                  {/* Feedback Navigation */}
-                  <div className="mb-6">
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      {!isAdmin && (
-                        <>
-                          <button
-                            onClick={() => setFeedbackView("form")}
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                              feedbackView === "form"
-                                ? "bg-blue-600 text-white"
-                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                            }`}
-                          >
-                            Submit Feedback
-                          </button>
-                          <button
-                            onClick={() => setFeedbackView("my-feedback")}
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                              feedbackView === "my-feedback"
-                                ? "bg-blue-600 text-white"
-                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                            }`}
-                          >
-                            My Feedback
-                          </button>
-                        </>
-                      )}
-                      {isAdmin && (
-                        <>
-                          <button
-                            onClick={() => setFeedbackView("admin-dashboard")}
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                              feedbackView === "admin-dashboard"
-                                ? "bg-blue-600 text-white"
-                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                            }`}
-                          >
-                            Dashboard
-                          </button>
-                          <button
-                            onClick={() => setFeedbackView("admin-list")}
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                              feedbackView === "admin-list"
-                                ? "bg-blue-600 text-white"
-                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                            }`}
-                          >
-                            All Feedback
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Feedback Content */}
-                  {feedbackView === "form" && (
-                    <FeedbackForm
-                      username={username}
-                      userType={userType}
-                      onFeedbackSubmitted={() => setFeedbackView("my-feedback")}
-                    />
-                  )}
-
-                  {feedbackView === "my-feedback" && (
-                    <MyFeedbackList username={username} />
-                  )}
-
-                  {isAdmin && feedbackView === "admin-dashboard" && (
-                    <AdminFeedbackDashboard username={username} />
-                  )}
-
-                  {isAdmin && feedbackView === "admin-list" && (
-                    <FeedbackList
-                      username={username}
-                      onFeedbackSelect={setSelectedFeedback}
-                    />
-                  )}
-                </div>
-              )}
-
-              {/* Feedback Detail Modal */}
-              {selectedFeedback && (
-                <FeedbackDetail
-                  feedback={selectedFeedback}
+                {/* Quick Question Templates */}
+                <QuickTemplates
                   username={username}
-                  onClose={() => setSelectedFeedback(null)}
-                  onStatusUpdate={() => {
-                    // Refresh the current view if it's an admin view
-                    if (
-                      isAdmin &&
-                      (feedbackView === "admin-list" ||
-                        feedbackView === "admin-dashboard")
-                    ) {
-                      // The components will handle their own refresh
-                    }
-                  }}
-                  onResponseSubmit={() => {
-                    // Refresh the current view if it's an admin view
-                    if (
-                      isAdmin &&
-                      (feedbackView === "admin-list" ||
-                        feedbackView === "admin-dashboard")
-                    ) {
-                      // The components will handle their own refresh
-                    }
+                  onSelectTemplate={(question) => {
+                    setQuestion(question);
+                    // Focus the input field so user can edit or submit
+                    setTimeout(() => {
+                      const input = document.querySelector(
+                        'input[type="text"]'
+                      ) as HTMLInputElement;
+                      if (input) {
+                        input.focus();
+                        input.scrollIntoView({
+                          behavior: "smooth",
+                          block: "center",
+                        });
+                      }
+                    }, 100);
                   }}
                 />
-              )}
 
-              {loading && <div className="spinner mt-4"></div>}
-              {error && <div className="mt-4 text-red-500">{error}</div>}
-              {activeView === "chat" &&
-                (response || selectedConversation?.response) && (
-                  <div className="mt-8 w-full max-w-3xl">
-                    <h2 className="text-2xl font-bold">Response</h2>
-                    {/* Show the image that was analyzed if it exists for this response */}
-                    {responseImageUrl && (
-                      <div className="mt-4 mb-4 relative inline-block">
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                          Analyzed screenshot:
-                        </p>
-                        <Image
-                          src={responseImageUrl}
-                          alt="Screenshot that was analyzed"
-                          width={300}
-                          height={300}
-                          className="rounded border border-gray-300 dark:border-gray-600"
-                        />
-                      </div>
-                    )}
-                    <div className="bg-gray-100 p-4 rounded response-box">
-                      <FormattedResponse
-                        response={
-                          response || selectedConversation?.response || ""
-                        }
-                      />
-                    </div>
+                <form onSubmit={handleSubmit} className="w-full max-w-md mt-2">
+                  <input
+                    type="text"
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    placeholder={
+                      username
+                        ? "Message Video Game Wingman"
+                        : "Sign in to ask questions"
+                    }
+                    className="w-full p-2 border border-gray-300 rounded mb-4"
+                    disabled={!username}
+                  />
 
-                    {/* Action Buttons */}
-                    <div className="mt-4 flex justify-end gap-3">
-                      {/* Save Guide Button - Show when response is a long guide */}
-                      {isLongGuide(
-                        response || selectedConversation?.response || "",
-                        question || selectedConversation?.question
-                      ) && (
-                        <button
-                          onClick={handleSaveGuide}
-                          disabled={savingGuide || guideSaved || !username}
-                          className={`px-4 py-2 font-semibold rounded-lg transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl ${
-                            guideSaved
-                              ? "bg-green-500 text-white cursor-default"
-                              : savingGuide
-                              ? "bg-gray-400 text-white cursor-not-allowed"
-                              : !username
-                              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                              : "bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white"
-                          }`}
-                          title={
-                            !username
-                              ? "Sign in to save guides"
-                              : guideSaved
-                              ? "Guide saved!"
-                              : "Save this guide to My Guides"
-                          }
-                        >
-                          {guideSaved ? (
-                            <>
-                              <svg
-                                className="w-5 h-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M5 13l4 4L19 7"
-                                />
-                              </svg>
-                              Saved!
-                            </>
-                          ) : (
-                            <>
-                              <svg
-                                className="w-5 h-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-                                />
-                              </svg>
-                              {savingGuide ? "Saving..." : "Save Guide"}
-                            </>
-                          )}
-                        </button>
-                      )}
-                      {/* Share Card Button */}
-                      <button
-                        onClick={() => setShowShareModal(true)}
-                        className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-600 hover:to-pink-600 text-white font-semibold rounded-lg transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl"
-                        title="Share this conversation as an image card"
+                  {/* Image upload UI section */}
+                  <div className="mb-4">
+                    <div className="flex flex-col gap-3">
+                      <label
+                        className={`inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded transition-colors w-fit ${
+                          username
+                            ? "cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600"
+                            : "opacity-50 cursor-not-allowed"
+                        }`}
                       >
                         <svg
-                          className="w-5 h-5"
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5 mr-2"
                           fill="none"
-                          stroke="currentColor"
                           viewBox="0 0 24 24"
+                          stroke="currentColor"
                         >
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             strokeWidth={2}
-                            d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                            d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
                           />
                         </svg>
-                        Share Card
-                      </button>
-                    </div>
-
-                    {/* Display metrics if available */}
-                    {Object.keys(metrics).length > 0 && (
-                      <div className="mt-4 text-xs text-gray-500">
-                        <details>
-                          <summary>Performance Metrics</summary>
-                          <div className="mt-2 p-2 bg-gray-100 rounded">
-                            {metrics.totalTime && (
-                              <p>
-                                Total time:{" "}
-                                {Number(metrics.totalTime).toFixed(2)}
-                                ms
-                              </p>
-                            )}
-                            {metrics.responseSize && (
-                              <p>
-                                Response size:{" "}
-                                {metrics.responseSize.kilobytes || "N/A"}
-                              </p>
-                            )}
-                            {metrics.aiCacheMetrics && (
-                              <p>
-                                Cache hit rate:{" "}
-                                {metrics.aiCacheMetrics.hitRate || "N/A"}
-                              </p>
-                            )}
-                          </div>
-                        </details>
-                      </div>
-                    )}
-
-                    {/* Phase 3 Step 3: Display Recommendations */}
-                    {recommendationsMessage && (
-                      <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                        <div className="flex items-start gap-2">
-                          <span className="text-yellow-600 dark:text-yellow-400 text-lg">
-                            ℹ️
-                          </span>
-                          <div className="flex-1">
-                            <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
-                              Recommendations Not Available
-                            </p>
-                            <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                              {recommendationsMessage}
-                            </p>
-                            <button
-                              onClick={() => setRecommendationsMessage(null)}
-                              className="mt-2 text-xs text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200"
-                            >
-                              Dismiss
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    {recommendations && username && (
-                      <RecommendationsDisplay
-                        username={username}
-                        recommendations={recommendations}
-                        onDismiss={() => {
-                          // console.log("[Recommendations] Dismissed by user");
-                          setRecommendations(null);
-                          setRecommendationsMessage(null);
-                        }}
-                      />
-                    )}
-                    {/* Get Recommendations Button - appears after response */}
-                    {username &&
-                      response &&
-                      !recommendations &&
-                      !recommendationsMessage &&
-                      activeView === "chat" && (
-                        <div className="mt-6 flex items-center justify-center">
+                        <span>Attach Screenshot</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageChange}
+                          className="hidden"
+                          id="question-image-upload"
+                          disabled={!username}
+                        />
+                      </label>
+                      {imageUrl && (
+                        <div className="relative inline-block">
+                          <Image
+                            src={imageUrl}
+                            alt="Selected screenshot"
+                            width={200}
+                            height={200}
+                            className="rounded border border-gray-300 dark:border-gray-600"
+                          />
                           <button
-                            onClick={async () => {
-                              try {
-                                setRecommendationsLoading(true);
-                                setRecommendationsMessage(null);
-                                const recRes = await axios.get(
-                                  `/api/recommendations?username=${encodeURIComponent(
-                                    username
-                                  )}&question=${encodeURIComponent(question)}`
-                                );
-                                // console.log(
-                                //   "[Recommendations] Fetch response:",
-                                //   recRes.data
-                                // );
-
-                                if (
-                                  recRes.data.success &&
-                                  recRes.data.recommendations
-                                ) {
-                                  const recs = recRes.data.recommendations;
-                                  const hasContent =
-                                    recs.strategyTips?.tips?.length > 0 ||
-                                    recs.learningPath?.suggestions?.length >
-                                      0 ||
-                                    recs.learningPath?.nextSteps?.length > 0 ||
-                                    recs.personalizedTips?.tips?.length > 0;
-
-                                  if (hasContent) {
-                                    setRecommendations(recs);
-                                    setRecommendationsMessage(null);
-                                  } else {
-                                    // Show user-friendly message
-                                    const reason =
-                                      recRes.data.progressiveDisclosure
-                                        ?.reason ||
-                                      "Not enough activity yet. Keep asking questions to get personalized recommendations!";
-                                    setRecommendationsMessage(reason);
-                                    setRecommendations(null);
-                                  }
-                                } else {
-                                  // Show message if recommendations aren't available
-                                  const reason =
-                                    recRes.data.progressiveDisclosure?.reason ||
-                                    "Recommendations not available at this time.";
-                                  setRecommendationsMessage(reason);
-                                }
-                              } catch (error: any) {
-                                console.error(
-                                  "[Recommendations] Fetch error:",
-                                  error
-                                );
-                                setRecommendationsMessage(
-                                  `Error: ${
-                                    error.response?.data?.error ||
-                                    error.message ||
-                                    "Failed to load recommendations"
-                                  }`
-                                );
-                              } finally {
-                                setRecommendationsLoading(false);
-                              }
+                            type="button"
+                            onClick={() => {
+                              setImage(null);
+                              setImageUrl(null);
+                              // Reset file input
+                              const fileInput = document.getElementById(
+                                "question-image-upload"
+                              ) as HTMLInputElement;
+                              if (fileInput) fileInput.value = "";
                             }}
-                            disabled={recommendationsLoading}
-                            className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-75 hover:opacity-100 transition-opacity"
+                            aria-label="Remove image"
                           >
-                            {recommendationsLoading ? (
-                              <>
-                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                Loading personalized recommendations...
-                              </>
-                            ) : (
-                              <>💡 Get Personalized Recommendations</>
-                            )}
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
                           </button>
                         </div>
                       )}
-                  </div>
-                )}
-              {username && (
-                <button
-                  onClick={handleSignOut}
-                  disabled={isSigningOut}
-                  className="absolute top-4 right-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 shadow disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSigningOut ? (
-                    <div className="flex items-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 dark:border-gray-300 mr-2"></div>
-                      Signing Out...
                     </div>
+                  </div>
+
+                  <div className="flex space-x-4">
+                    <button
+                      type="submit"
+                      className="w-full p-2 bg-blue-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={!username}
+                      title={
+                        !username ? "Please sign in to submit questions" : ""
+                      }
+                    >
+                      Submit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClear}
+                      className="w-full p-2 bg-blue-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={!username}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+
+            {activeView === "forum" && (
+              <ForumProvider>
+                <div className="w-full mt-4">
+                  <ForumList />
+                </div>
+              </ForumProvider>
+            )}
+
+            {activeView === "feedback" && (
+              <div className="w-full mt-4">
+                {/* Feedback Navigation */}
+                <div className="mb-6">
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {!isAdmin && (
+                      <>
+                        <button
+                          onClick={() => setFeedbackView("form")}
+                          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                            feedbackView === "form"
+                              ? "bg-blue-600 text-white"
+                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          }`}
+                        >
+                          Submit Feedback
+                        </button>
+                        <button
+                          onClick={() => setFeedbackView("my-feedback")}
+                          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                            feedbackView === "my-feedback"
+                              ? "bg-blue-600 text-white"
+                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          }`}
+                        >
+                          My Feedback
+                        </button>
+                      </>
+                    )}
+                    {isAdmin && (
+                      <>
+                        <button
+                          onClick={() => setFeedbackView("admin-dashboard")}
+                          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                            feedbackView === "admin-dashboard"
+                              ? "bg-blue-600 text-white"
+                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          }`}
+                        >
+                          Dashboard
+                        </button>
+                        <button
+                          onClick={() => setFeedbackView("admin-list")}
+                          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                            feedbackView === "admin-list"
+                              ? "bg-blue-600 text-white"
+                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          }`}
+                        >
+                          All Feedback
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Feedback Content */}
+                {feedbackView === "form" &&
+                  (username ? (
+                    <FeedbackForm
+                      username={username}
+                      userType={userType}
+                      onFeedbackSubmitted={() => setFeedbackView("my-feedback")}
+                    />
                   ) : (
-                    "Sign Out"
+                    <div className="max-w-2xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+                      <div className="text-center">
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                          Submit Feedback
+                        </h2>
+                        <p className="text-gray-600 dark:text-gray-400 mb-4">
+                          Want to submit feedback?
+                        </p>
+                        <p className="text-gray-600 dark:text-gray-400 mb-6">
+                          Sign in or sign up to share your thoughts, report
+                          bugs, or suggest new features.
+                        </p>
+                        <button
+                          onClick={() => {
+                            window.location.href = "/signin";
+                          }}
+                          className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium"
+                        >
+                          Sign In/Up
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                {feedbackView === "my-feedback" && (
+                  <MyFeedbackList username={username} />
+                )}
+
+                {isAdmin && feedbackView === "admin-dashboard" && (
+                  <AdminFeedbackDashboard username={username} />
+                )}
+
+                {isAdmin && feedbackView === "admin-list" && (
+                  <FeedbackList
+                    username={username}
+                    onFeedbackSelect={setSelectedFeedback}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Feedback Detail Modal */}
+            {selectedFeedback && (
+              <FeedbackDetail
+                feedback={selectedFeedback}
+                username={username}
+                onClose={() => setSelectedFeedback(null)}
+                onStatusUpdate={() => {
+                  // Refresh the current view if it's an admin view
+                  if (
+                    isAdmin &&
+                    (feedbackView === "admin-list" ||
+                      feedbackView === "admin-dashboard")
+                  ) {
+                    // The components will handle their own refresh
+                  }
+                }}
+                onResponseSubmit={() => {
+                  // Refresh the current view if it's an admin view
+                  if (
+                    isAdmin &&
+                    (feedbackView === "admin-list" ||
+                      feedbackView === "admin-dashboard")
+                  ) {
+                    // The components will handle their own refresh
+                  }
+                }}
+              />
+            )}
+
+            {loading && <div className="spinner mt-4"></div>}
+            {error && <div className="mt-4 text-red-500">{error}</div>}
+            {activeView === "chat" &&
+              (response || selectedConversation?.response) && (
+                <div className="mt-8 w-full max-w-3xl">
+                  <h2 className="text-2xl font-bold">Response</h2>
+                  {/* Show the image that was analyzed if it exists for this response */}
+                  {responseImageUrl && (
+                    <div className="mt-4 mb-4 relative inline-block">
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                        Analyzed screenshot:
+                      </p>
+                      <Image
+                        src={responseImageUrl}
+                        alt="Screenshot that was analyzed"
+                        width={300}
+                        height={300}
+                        className="rounded border border-gray-300 dark:border-gray-600"
+                      />
+                    </div>
                   )}
-                </button>
+                  <div className="bg-gray-100 p-4 rounded response-box">
+                    <FormattedResponse
+                      response={
+                        response || selectedConversation?.response || ""
+                      }
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="mt-4 flex justify-end gap-3">
+                    {/* Save Guide Button - Show when response is a long guide */}
+                    {isLongGuide(
+                      response || selectedConversation?.response || "",
+                      question || selectedConversation?.question
+                    ) && (
+                      <button
+                        onClick={handleSaveGuide}
+                        disabled={savingGuide || guideSaved || !username}
+                        className={`px-4 py-2 font-semibold rounded-lg transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl ${
+                          guideSaved
+                            ? "bg-green-500 text-white cursor-default"
+                            : savingGuide
+                            ? "bg-gray-400 text-white cursor-not-allowed"
+                            : !username
+                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            : "bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white"
+                        }`}
+                        title={
+                          !username
+                            ? "Sign in to save guides"
+                            : guideSaved
+                            ? "Guide saved!"
+                            : "Save this guide to My Guides"
+                        }
+                      >
+                        {guideSaved ? (
+                          <>
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            Saved!
+                          </>
+                        ) : (
+                          <>
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                              />
+                            </svg>
+                            {savingGuide ? "Saving..." : "Save Guide"}
+                          </>
+                        )}
+                      </button>
+                    )}
+                    {/* Share Card Button */}
+                    <button
+                      onClick={() => setShowShareModal(true)}
+                      className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-600 hover:to-pink-600 text-white font-semibold rounded-lg transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl"
+                      title="Share this conversation as an image card"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                        />
+                      </svg>
+                      Share Card
+                    </button>
+                  </div>
+
+                  {/* Display metrics if available */}
+                  {Object.keys(metrics).length > 0 && (
+                    <div className="mt-4 text-xs text-gray-500">
+                      <details>
+                        <summary>Performance Metrics</summary>
+                        <div className="mt-2 p-2 bg-gray-100 rounded">
+                          {metrics.totalTime && (
+                            <p>
+                              Total time: {Number(metrics.totalTime).toFixed(2)}
+                              ms
+                            </p>
+                          )}
+                          {metrics.responseSize && (
+                            <p>
+                              Response size:{" "}
+                              {metrics.responseSize.kilobytes || "N/A"}
+                            </p>
+                          )}
+                          {metrics.aiCacheMetrics && (
+                            <p>
+                              Cache hit rate:{" "}
+                              {metrics.aiCacheMetrics.hitRate || "N/A"}
+                            </p>
+                          )}
+                        </div>
+                      </details>
+                    </div>
+                  )}
+
+                  {/* Phase 3 Step 3: Display Recommendations */}
+                  {recommendationsMessage && (
+                    <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <span className="text-yellow-600 dark:text-yellow-400 text-lg">
+                          ℹ️
+                        </span>
+                        <div className="flex-1">
+                          <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
+                            Recommendations Not Available
+                          </p>
+                          <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                            {recommendationsMessage}
+                          </p>
+                          <button
+                            onClick={() => setRecommendationsMessage(null)}
+                            className="mt-2 text-xs text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {recommendations && username && (
+                    <RecommendationsDisplay
+                      username={username}
+                      recommendations={recommendations}
+                      onDismiss={() => {
+                        // console.log("[Recommendations] Dismissed by user");
+                        setRecommendations(null);
+                        setRecommendationsMessage(null);
+                      }}
+                    />
+                  )}
+                  {/* Get Recommendations Button - appears after response */}
+                  {username &&
+                    response &&
+                    !recommendations &&
+                    !recommendationsMessage &&
+                    activeView === "chat" && (
+                      <div className="mt-6 flex items-center justify-center">
+                        <button
+                          onClick={async () => {
+                            try {
+                              setRecommendationsLoading(true);
+                              setRecommendationsMessage(null);
+                              const recRes = await axios.get(
+                                `/api/recommendations?username=${encodeURIComponent(
+                                  username
+                                )}&question=${encodeURIComponent(question)}`
+                              );
+                              // console.log(
+                              //   "[Recommendations] Fetch response:",
+                              //   recRes.data
+                              // );
+
+                              if (
+                                recRes.data.success &&
+                                recRes.data.recommendations
+                              ) {
+                                const recs = recRes.data.recommendations;
+                                const hasContent =
+                                  recs.strategyTips?.tips?.length > 0 ||
+                                  recs.learningPath?.suggestions?.length > 0 ||
+                                  recs.learningPath?.nextSteps?.length > 0 ||
+                                  recs.personalizedTips?.tips?.length > 0;
+
+                                if (hasContent) {
+                                  setRecommendations(recs);
+                                  setRecommendationsMessage(null);
+                                } else {
+                                  // Show user-friendly message
+                                  const reason =
+                                    recRes.data.progressiveDisclosure?.reason ||
+                                    "Not enough activity yet. Keep asking questions to get personalized recommendations!";
+                                  setRecommendationsMessage(reason);
+                                  setRecommendations(null);
+                                }
+                              } else {
+                                // Show message if recommendations aren't available
+                                const reason =
+                                  recRes.data.progressiveDisclosure?.reason ||
+                                  "Recommendations not available at this time.";
+                                setRecommendationsMessage(reason);
+                              }
+                            } catch (error: any) {
+                              console.error(
+                                "[Recommendations] Fetch error:",
+                                error
+                              );
+                              setRecommendationsMessage(
+                                `Error: ${
+                                  error.response?.data?.error ||
+                                  error.message ||
+                                  "Failed to load recommendations"
+                                }`
+                              );
+                            } finally {
+                              setRecommendationsLoading(false);
+                            }
+                          }}
+                          disabled={recommendationsLoading}
+                          className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          {recommendationsLoading ? (
+                            <>
+                              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                              Loading personalized recommendations...
+                            </>
+                          ) : (
+                            <>💡 Get Personalized Recommendations</>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                </div>
               )}
-            </div>
+            {/* Sign Out / Sign In/Up Button */}
+            {username ? (
+              <button
+                onClick={handleSignOut}
+                disabled={isSigningOut}
+                className="absolute top-4 right-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 shadow disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSigningOut ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 dark:border-gray-300 mr-2"></div>
+                    Signing Out...
+                  </div>
+                ) : (
+                  "Sign Out"
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  // Show sign-in modal on main page
+                  setShowUsernameModal(true);
+                }}
+                className="absolute top-4 right-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 shadow"
+              >
+                Sign In/Up
+              </button>
+            )}
           </div>
-        </>
-      )}
+        </div>
+      </>
     </div>
   );
 }

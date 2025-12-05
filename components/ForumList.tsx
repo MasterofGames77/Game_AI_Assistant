@@ -27,15 +27,31 @@ export default function ForumList() {
       try {
         const username = localStorage.getItem("username");
         const userId = localStorage.getItem("userId");
+
+        // Only check Pro access if user is logged in
+        if (!username) {
+          setHasProAccess(false);
+          return;
+        }
+
         const response = await fetch("/api/checkProAccess", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username, userId }),
         });
+
+        if (!response.ok) {
+          // If request fails, assume no Pro access
+          setHasProAccess(false);
+          return;
+        }
+
         const data = await response.json();
-        setHasProAccess(data.hasProAccess);
+        setHasProAccess(data.hasProAccess || false);
       } catch (error) {
         console.error("Error checking Pro access:", error);
+        // On error, assume no Pro access
+        setHasProAccess(false);
       }
     };
 

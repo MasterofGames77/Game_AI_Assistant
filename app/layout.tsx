@@ -33,6 +33,26 @@ export default function RootLayout({
             `,
           }}
         />
+        {/* Unregister any existing service workers from splash page or other sources */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for(let registration of registrations) {
+                      registration.unregister().then(function(success) {
+                        if (success) {
+                          console.log('Service worker unregistered successfully');
+                        }
+                      });
+                    }
+                  });
+                }
+              })();
+            `,
+          }}
+        />
         {/* Google Analytics */}
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GOOGLE_MEASUREMENT_ID}`}
