@@ -180,23 +180,129 @@ export async function askQuestion(
   userPreferences: UserPreferences
 ): Promise<ActivityResult> {
   try {
-    // Select a random game
-    const gameSelection = selectRandomGame(userPreferences);
+    await connectToMongoDB();
+    
+    // Fetch previous questions from ALL automated users to ensure variety
+    const automatedUsers = ['MysteriousMrEnter', 'WaywardJammer', 'InterdimensionalHipster'];
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    
+    let previousQuestions: Array<{ question: string; gameTitle: string; timestamp: Date; username: string }> = [];
+    let gamesAskedAbout: { [gameTitle: string]: number } = {};
+    let questionTypes: { [type: string]: number } = {};
+    
+    try {
+      const Question = (await import('../models/Question')).default;
+      const questionDocs = await Question.find({
+        username: { $in: automatedUsers },
+        timestamp: { $gte: thirtyDaysAgo }
+      })
+      .sort({ timestamp: -1 })
+      .limit(100)
+      .lean() as any[];
+      
+      previousQuestions = questionDocs.map(q => ({
+        question: q.question || '',
+        gameTitle: q.detectedGame || 'Unknown',
+        timestamp: new Date(q.timestamp),
+        username: q.username
+      }));
+      
+      // Track which games have been asked about and how many times
+      previousQuestions.forEach(q => {
+        const gameLower = q.gameTitle.toLowerCase();
+        gamesAskedAbout[gameLower] = (gamesAskedAbout[gameLower] || 0) + 1;
+        
+        // Track question types (How, What, When, Which, Who, Where)
+        const firstWord = q.question.trim().split(' ')[0]?.toLowerCase() || '';
+        if (['how', 'what', 'when', 'which', 'who', 'where'].includes(firstWord)) {
+          questionTypes[firstWord] = (questionTypes[firstWord] || 0) + 1;
+        }
+      });
+      
+      console.log(`[ASK QUESTION] Found ${previousQuestions.length} previous questions from automated users`);
+      console.log(`[ASK QUESTION] Games asked about: ${Object.keys(gamesAskedAbout).length} unique games`);
+      console.log(`[ASK QUESTION] Question types: ${JSON.stringify(questionTypes)}`);
+    } catch (error) {
+      console.error('[ASK QUESTION] Error fetching previous questions:', error);
+      // Continue even if we can't fetch previous questions
+    }
+    
+    // Load available games
+    const { games } = loadGameList(userPreferences);
+    
+    // Prioritize games that haven't been asked about recently (70% chance)
+    // Or games that have been asked about fewer times
+    const shouldPrioritizeNewGames = Math.random() < 0.7;
+    
+    let gameSelection: { gameTitle: string; genre: string } | null = null;
+    
+    if (shouldPrioritizeNewGames && games.length > 0) {
+      // Find games that haven't been asked about (or asked about less frequently)
+      const gamesNotAskedAbout = games.filter(game => {
+        const gameLower = game.toLowerCase();
+        const askCount = gamesAskedAbout[gameLower] || 0;
+        // Prioritize games with 0-2 questions (not asked about much)
+        return askCount < 3;
+      });
+      
+      if (gamesNotAskedAbout.length > 0) {
+        // Select from games that haven't been asked about much
+        const randomGame = gamesNotAskedAbout[Math.floor(Math.random() * gamesNotAskedAbout.length)];
+        const gameGenre = determineGenreFromGame(randomGame);
+        if (randomGame && gameGenre) {
+          gameSelection = { gameTitle: randomGame, genre: gameGenre };
+          console.log(`[ASK QUESTION] Selected game NOT asked about recently: ${randomGame}`);
+        }
+      }
+    }
+    
+    // Fallback: select random game from preferences
     if (!gameSelection) {
-      return {
-        success: false,
-        message: 'No games available for user preferences',
-        error: 'No games found'
-      };
+      gameSelection = selectRandomGame(userPreferences);
+      if (!gameSelection) {
+        return {
+          success: false,
+          message: 'No games available for user preferences',
+          error: 'No games found'
+        };
+      }
+      console.log(`[ASK QUESTION] Selected game from preferences: ${gameSelection.gameTitle}`);
     }
     
     const { gameTitle, genre } = gameSelection;
     
-    // Generate natural question
+    // Filter previous questions to get relevant context
+    // Include questions about the same game (for uniqueness) and questions about other games (for variety)
+    const sameGameQuestions = previousQuestions
+      .filter(q => q.gameTitle.toLowerCase() === gameTitle.toLowerCase())
+      .map(q => q.question)
+      .slice(0, 10); // Last 10 questions about this game
+    
+    const otherGameQuestions = previousQuestions
+      .filter(q => q.gameTitle.toLowerCase() !== gameTitle.toLowerCase())
+      .map(q => q.question)
+      .slice(0, 5); // Last 5 questions about other games
+    
+    const allPreviousQuestions = [...sameGameQuestions, ...otherGameQuestions];
+    
+    // Determine question type variety - try to use less common question types
+    const questionTypeOrder = ['how', 'what', 'when', 'which', 'who', 'where'];
+    const leastUsedTypes = questionTypeOrder
+      .map(type => ({ type, count: questionTypes[type] || 0 }))
+      .sort((a, b) => a.count - b.count)
+      .slice(0, 3)
+      .map(t => t.type);
+    
+    console.log(`[ASK QUESTION] Previous questions about ${gameTitle}: ${sameGameQuestions.length}`);
+    console.log(`[ASK QUESTION] Encouraging question types: ${leastUsedTypes.join(', ')}`);
+    
+    // Generate natural question with previous questions context
     const question = await generateQuestion({
       gameTitle,
       genre,
-      userPreferences
+      userPreferences,
+      previousQuestions: allPreviousQuestions,
+      preferredQuestionTypes: leastUsedTypes
     });
     
     // Check content moderation
@@ -461,12 +567,55 @@ export async function createForumPost(
       forums = [];
     }
     
-    // Sometimes select a game from existing forums to encourage diversity (30% chance)
-    // This ensures automated users post in forums about various games, not just their preferred ones
+    // NEW LOGIC: Prioritize creating forums for games that DON'T have forums yet
+    // Track which games already have forums
+    const gamesWithForums = new Set<string>();
+    const forumCountsByGame: { [gameTitle: string]: number } = {};
+    
+    forums.forEach((f: any) => {
+      if (f.gameTitle && f.metadata?.status === 'active') {
+        const gameTitleLower = f.gameTitle.toLowerCase();
+        gamesWithForums.add(gameTitleLower);
+        forumCountsByGame[gameTitleLower] = (forumCountsByGame[gameTitleLower] || 0) + 1;
+      }
+    });
+    
+    console.log(`[FORUM POST] Games with existing forums: ${gamesWithForums.size}`);
+    console.log(`[FORUM POST] Forum counts: ${JSON.stringify(forumCountsByGame)}`);
+    
+    // Strategy: 60% chance to prioritize games WITHOUT forums (to create new forums)
+    // 40% chance to post in existing forums (to maintain activity)
+    const shouldPrioritizeNewForums = Math.random() < 0.6;
+    
     let gameSelection: { gameTitle: string; genre: string } | null = null;
     let selectedFromExistingForums = false;
+    let shouldCreateNewForum = false;
     
-    if (forums.length > 0 && Math.random() < 0.3) {
+    if (shouldPrioritizeNewForums) {
+      // PRIORITY: Find games from user preferences that DON'T have forums yet
+      const { games } = loadGameList(userPreferences);
+      const gamesWithoutForums = games.filter(game => {
+        const gameLower = game.toLowerCase();
+        const hasForum = gamesWithForums.has(gameLower);
+        const forumCount = forumCountsByGame[gameLower] || 0;
+        // Also avoid games that already have 3+ forums (too many)
+        return !hasForum || forumCount < 3;
+      });
+      
+      if (gamesWithoutForums.length > 0) {
+        // Select a random game that doesn't have a forum (or has few forums)
+        const randomGame = gamesWithoutForums[Math.floor(Math.random() * gamesWithoutForums.length)];
+        const gameGenre = determineGenreFromGame(randomGame);
+        if (randomGame && gameGenre) {
+          gameSelection = { gameTitle: randomGame, genre: gameGenre };
+          shouldCreateNewForum = true;
+          console.log(`[FORUM POST] Selected game WITHOUT forum: ${randomGame} (will create new forum)`);
+        }
+      }
+    }
+    
+    // If we didn't find a game without forums, try existing forums (40% chance or fallback)
+    if (!gameSelection && forums.length > 0) {
       // Select a random game from existing forums
       const forumsWithGames = forums.filter((f: any) => f.gameTitle && f.metadata?.status === 'active');
       if (forumsWithGames.length > 0) {
@@ -476,12 +625,12 @@ export async function createForumPost(
         if (forumGameTitle && forumGenre) {
           gameSelection = { gameTitle: forumGameTitle, genre: forumGenre };
           selectedFromExistingForums = true;
-          console.log(`[FORUM POST] Selected game from existing forum: ${forumGameTitle} (encouraging diversity)`);
+          console.log(`[FORUM POST] Selected game from existing forum: ${forumGameTitle} (will post to existing)`);
         }
       }
     }
     
-    // If we didn't select from existing forums, use user preferences
+    // Final fallback: use user preferences (but still check if we should create a forum)
     if (!gameSelection) {
       gameSelection = selectRandomGame(userPreferences);
       if (!gameSelection) {
@@ -491,12 +640,32 @@ export async function createForumPost(
           error: 'No games found'
         };
       }
+      // Check if this game has a forum
+      const gameLower = gameSelection.gameTitle.toLowerCase();
+      if (!gamesWithForums.has(gameLower)) {
+        shouldCreateNewForum = true;
+        console.log(`[FORUM POST] Selected game from preferences without forum: ${gameSelection.gameTitle} (will create new forum)`);
+      }
     }
     
     const { gameTitle, genre } = gameSelection;
     
-    // Try to find a suitable existing forum
-    let targetForum = findSuitableForum(forums, username, gameTitle);
+    // If we should create a new forum, skip finding existing forum
+    // Otherwise, try to find a suitable existing forum
+    let targetForum: any | null = null;
+    if (!shouldCreateNewForum) {
+      targetForum = findSuitableForum(forums, username, gameTitle);
+      
+      // Even if a forum exists, sometimes create a new one for diversity (20% chance)
+      // But only if the game doesn't already have too many forums
+      const gameLower = gameTitle.toLowerCase();
+      const forumCount = forumCountsByGame[gameLower] || 0;
+      if (targetForum && forumCount < 3 && Math.random() < 0.2) {
+        console.log(`[FORUM POST] Creating additional forum for ${gameTitle} to increase diversity (has ${forumCount} forums)`);
+        targetForum = null; // Force creation of new forum
+        shouldCreateNewForum = true;
+      }
+    }
     
     let forumId: string;
     let forumTitle: string;
@@ -547,21 +716,22 @@ export async function createForumPost(
       console.log(`Created new forum: ${forumTitle} (category: ${forumCategory})`);
     }
     
-    // Fetch previous posts by this user to avoid repetition
-    // Check ALL recent posts (not just for this game) to ensure uniqueness across all posts
-    // Also prioritize posts about the same game for stricter checking
+    // IMPROVED: Fetch previous posts by ALL automated users to ensure uniqueness
+    // This prevents similar content across different automated users
     const previousPosts: string[] = [];
-    const previousPostsWithTimestamps: Array<{ post: string; timestamp: Date; gameTitle: string }> = [];
+    const previousPostsWithTimestamps: Array<{ post: string; timestamp: Date; gameTitle: string; username: string }> = [];
+    const automatedUsers = ['MysteriousMrEnter', 'WaywardJammer', 'InterdimensionalHipster'];
+    
     try {
-      // Collect all posts by this user from ALL forums (within last 30 days for better coverage)
+      // Collect all posts by ALL automated users from ALL forums (within last 30 days)
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       
       for (const forum of forums) {
         if (forum.posts && Array.isArray(forum.posts)) {
           const forumGameTitle = forum.gameTitle || '';
-          const userPosts = forum.posts
+          const allAutomatedPosts = forum.posts
             .filter((p: any) => 
-              p.username === username && 
+              automatedUsers.includes(p.username) && // Include ALL automated users
               p.message && 
               p.message.trim().length > 0 &&
               p.metadata?.status === 'active' &&
@@ -570,17 +740,17 @@ export async function createForumPost(
             .map((p: any) => ({
               post: p.message.trim(),
               timestamp: new Date(p.timestamp),
-              gameTitle: forumGameTitle
+              gameTitle: forumGameTitle,
+              username: p.username
             }));
-          previousPostsWithTimestamps.push(...userPosts);
+          previousPostsWithTimestamps.push(...allAutomatedPosts);
         }
       }
       
       // Sort by timestamp (most recent first)
       previousPostsWithTimestamps.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       
-      // Prioritize posts about the same game, but include all recent posts
-      // First add posts about the same game, then add other posts
+      // Prioritize posts about the same game, but include all recent posts from all automated users
       const sameGamePosts = previousPostsWithTimestamps
         .filter(p => p.gameTitle.toLowerCase() === actualGameTitle.toLowerCase())
         .map(p => p.post);
@@ -588,13 +758,18 @@ export async function createForumPost(
         .filter(p => p.gameTitle.toLowerCase() !== actualGameTitle.toLowerCase())
         .map(p => p.post);
       
-      // Include up to 15 posts about the same game, and 5 posts about other games
-      previousPosts.push(...sameGamePosts.slice(0, 15));
-      previousPosts.push(...otherGamePosts.slice(0, 5));
+      // Include up to 20 posts about the same game (from all automated users), and 10 posts about other games
+      // This ensures we check for similarity across ALL automated users, not just the current one
+      previousPosts.push(...sameGamePosts.slice(0, 20));
+      previousPosts.push(...otherGamePosts.slice(0, 10));
       
-      console.log(`Found ${previousPosts.length} recent posts by ${username} (${sameGamePosts.length} about ${actualGameTitle}, ${otherGamePosts.length} about other games)`);
+      const userPostsCount = previousPostsWithTimestamps.filter(p => p.username === username).length;
+      const otherUsersPostsCount = previousPostsWithTimestamps.length - userPostsCount;
+      
+      console.log(`Found ${previousPosts.length} recent posts by ALL automated users (${userPostsCount} by ${username}, ${otherUsersPostsCount} by others)`);
+      console.log(`Posts about ${actualGameTitle}: ${sameGamePosts.length}, other games: ${otherGamePosts.length}`);
       if (previousPosts.length > 0) {
-        console.log(`Sample previous posts: ${previousPosts.slice(0, 2).map(p => p.substring(0, 50) + '...').join(', ')}`);
+        console.log(`Sample previous posts: ${previousPosts.slice(0, 3).map(p => p.substring(0, 50) + '...').join(', ')}`);
       }
     } catch (error) {
       console.error('Error fetching previous posts:', error);

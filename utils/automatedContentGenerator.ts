@@ -19,6 +19,8 @@ export interface ContentGenerationOptions {
   forumTopic?: string;
   forumCategory?: string; // Category of the forum (gameplay, general, mods, etc.)
   previousPosts?: string[]; // Previous posts by this user for the same game to avoid repetition
+  previousQuestions?: string[]; // Previous questions asked (for question generation uniqueness)
+  preferredQuestionTypes?: string[]; // Preferred question types (how, what, when, etc.) for variety
 }
 
 export interface PostReplyOptions {
@@ -37,10 +39,43 @@ export interface PostReplyOptions {
 export async function generateQuestion(
   options: ContentGenerationOptions
 ): Promise<string> {
-  const { gameTitle, genre, userPreferences } = options;
+  const { gameTitle, genre, userPreferences, previousQuestions = [], preferredQuestionTypes = [] } = options;
   
   const isSinglePlayer = userPreferences.focus === 'single-player';
   const username = isSinglePlayer ? 'MysteriousMrEnter' : 'WaywardJammer';
+  
+  // Build previous questions context for uniqueness
+  let previousQuestionsContext = '';
+  if (previousQuestions.length > 0) {
+    const sameGameQuestions = previousQuestions.filter(q => 
+      q.toLowerCase().includes(gameTitle.toLowerCase())
+    );
+    const otherQuestions = previousQuestions.filter(q => 
+      !q.toLowerCase().includes(gameTitle.toLowerCase())
+    );
+    
+    previousQuestionsContext = `\n\nCRITICAL - UNIQUENESS REQUIREMENTS:
+You have asked questions before (from you and other automated users). Here are previous questions to ensure your new question is UNIQUE and DIFFERENT:
+${sameGameQuestions.length > 0 ? `\nPrevious questions about ${gameTitle}:\n${sameGameQuestions.map((q, idx) => `${idx + 1}. "${q}"`).join('\n')}` : ''}
+${otherQuestions.length > 0 ? `\nPrevious questions about other games:\n${otherQuestions.slice(0, 5).map((q, idx) => `${idx + 1}. "${q}"`).join('\n')}` : ''}
+
+IMPORTANT:
+- Your question MUST be completely different from ALL previous questions shown above
+- Do NOT ask about the same topic, mechanic, character, or feature that was asked about before
+- If previous questions asked "How do I...", ask "What is..." or "When was..." instead (vary question types)
+- If previous questions asked about a specific character, ask about a different character or a different aspect
+- If previous questions asked about mechanics, ask about story, release date, platforms, or differences between versions instead
+- Find a COMPLETELY NEW angle or topic that hasn't been covered
+- Use a different question type (How, What, When, Which, Who, Where) to ensure variety`;
+  }
+  
+  // Add question type guidance if preferred types are provided
+  let questionTypeGuidance = '';
+  if (preferredQuestionTypes.length > 0) {
+    questionTypeGuidance = `\n\nQUESTION TYPE VARIETY:
+To ensure variety, try starting your question with one of these less-used question types: ${preferredQuestionTypes.join(', ')}.
+This helps ensure questions don't all start with the same word (e.g., "How...").`;
+  }
   
   const systemPrompt = isSinglePlayer
     ? `You are MysteriousMrEnter, a real gamer asking Video Game Wingman a direct question about ${gameTitle}.
@@ -52,7 +87,9 @@ Generate a DIRECT, FACTUAL question that Video Game Wingman can answer with spec
 - Ask about SPECIFIC game facts, mechanics, items, characters, strategies, or information
 - Be answerable with factual information (not opinions or feelings)
 - Be 1 sentence long
+- Be CLEAR and COHESIVE - Video Game Wingman must be able to provide a clear, comprehensive answer
 - Focus on single-player game aspects like: items, characters, quests, mechanics, strategies, unlockables, secrets, release dates, platforms, differences between versions, how-to guides, etc.
+- Ask questions that have definitive answers (not vague or subjective)
 
 CRITICAL ACCURACY REQUIREMENTS - READ CAREFULLY:
 - ONLY ask about items, mechanics, characters, or features that ACTUALLY EXIST in ${gameTitle}
@@ -84,9 +121,19 @@ AVOID:
 - Questions that sound like forum posts
 - Questions asking for personal experiences or feelings
 - Making up or combining item/mechanic names
+- Vague questions that can't be answered clearly ("What's good about...", "Is it worth...")
+- Questions that require subjective answers
+
+ENSURE YOUR QUESTION IS ANSWERABLE:
+- Video Game Wingman must be able to provide a clear, factual answer
+- The question should have a definitive answer (not "maybe" or "it depends")
+- Ask about concrete facts: release dates, platforms, mechanics, items, characters, strategies
+- Avoid questions that require opinion or personal preference
 
 Game: ${gameTitle}
 Genre: ${genre} (RPG/Adventure/Simulation/Puzzle/Platformer focus)
+${previousQuestionsContext}
+${questionTypeGuidance}
 
 Generate ONLY the direct question, nothing else:`
     : `You are WaywardJammer, a real gamer asking Video Game Wingman a direct question about ${gameTitle}.
@@ -98,7 +145,9 @@ Generate a DIRECT, FACTUAL question that Video Game Wingman can answer with spec
 - Ask about SPECIFIC game facts, mechanics, items, characters, strategies, or information
 - Be answerable with factual information (not opinions or feelings)
 - Be 1 sentence long
+- Be CLEAR and COHESIVE - Video Game Wingman must be able to provide a clear, comprehensive answer
 - Focus on multiplayer/competitive game aspects like: strategies, character stats, unlockables, best builds, release dates, platforms, differences between versions, how-to guides, competitive tips, etc.
+- Ask questions that have definitive answers (not vague or subjective)
 
 CRITICAL ACCURACY REQUIREMENTS - READ CAREFULLY:
 - ONLY ask about items, mechanics, characters, or features that ACTUALLY EXIST in ${gameTitle}
@@ -437,8 +486,14 @@ ${uniqueTopics.length > 0 ? `- AVOID these specific topics that you've already d
 - Think of a completely different aspect of the game: characters, story, items, secrets, different areas, different mechanics, different experiences`;
     }
     
-    previousPostsContext = `\n\nCRITICAL: You have posted about ${gameTitle} before. Here are your previous posts to ensure your new post is UNIQUE and DIFFERENT:
+    // Determine if these are posts from the same user or other automated users
+    const automatedUsers = ['MysteriousMrEnter', 'WaywardJammer', 'InterdimensionalHipster'];
+    const isMultipleUsers = previousPosts.length > 0; // Simplified check
+    
+    previousPostsContext = `\n\nCRITICAL: Here are previous posts about ${gameTitle} (from you and other automated users) to ensure your new post is UNIQUE and DIFFERENT:
 ${previousPosts.map((post, idx) => `${idx + 1}. "${post}"`).join('\n')}
+
+${isMultipleUsers ? 'IMPORTANT: These posts may be from you OR from other automated users (MysteriousMrEnter, WaywardJammer, InterdimensionalHipster). Your post MUST be completely different from ALL of them, not just your own posts.' : ''}
 ${uniquenessGuidance}`;
   }
 
@@ -468,7 +523,8 @@ IMPORTANT:
 - You MUST include the game title "${gameTitle}" in your post.
 - You MUST reference something specific from ${gameTitle} (a character, item, location, mechanic, moment, etc.)
 - FACTUAL ACCURACY is more important than sounding natural - if you're not certain about a fact, don't include it
-- MOST IMPORTANTLY: Your post MUST directly address and stay relevant to the forum topic "${forumTopic || 'General Discussion'}"${previousPostsContext}
+- MOST IMPORTANTLY: Your post MUST directly address and stay relevant to the forum topic "${forumTopic || 'General Discussion'}"
+- CRITICAL: Your post MUST be completely unique and different from ALL previous posts shown above (whether from you or other automated users). Avoid similar topics, characters, experiences, or phrasing.${previousPostsContext}
 
 Game: ${gameTitle}
 Genre: ${genre} (${isSinglePlayerGame ? 'Single-player' : 'Multiplayer'} focus)
@@ -493,7 +549,8 @@ ${topicRequirements ? `\n${topicRequirements}\n` : ''}
 IMPORTANT: 
 - Do NOT use formal language, greetings, conclusion phrases, or AI-related phrases. Write naturally and casually like a real gamer.
 - You MUST include the game title "${gameTitle}" in your post.
-- MOST IMPORTANTLY: Your post MUST directly address and stay relevant to the forum topic "${forumTopic || 'General Discussion'}"${previousPostsContext}
+- MOST IMPORTANTLY: Your post MUST directly address and stay relevant to the forum topic "${forumTopic || 'General Discussion'}"
+- CRITICAL: Your post MUST be completely unique and different from ALL previous posts shown above (whether from you or other automated users). Avoid similar topics, characters, experiences, or phrasing.${previousPostsContext}
 
 Game: ${gameTitle}
 Genre: ${genre} (RPG/Adventure/Simulation/Puzzle/Platformer focus)
@@ -517,7 +574,8 @@ ${topicRequirements ? `\n${topicRequirements}\n` : ''}
 IMPORTANT: 
 - Do NOT use formal language, greetings, conclusion phrases, or AI-related phrases. Write naturally and casually like a real gamer.
 - You MUST include the game title "${gameTitle}" in your post.
-- MOST IMPORTANTLY: Your post MUST directly address and stay relevant to the forum topic "${forumTopic || 'General Discussion'}"${previousPostsContext}
+- MOST IMPORTANTLY: Your post MUST directly address and stay relevant to the forum topic "${forumTopic || 'General Discussion'}"
+- CRITICAL: Your post MUST be completely unique and different from ALL previous posts shown above (whether from you or other automated users). Avoid similar topics, characters, experiences, or phrasing.${previousPostsContext}
 
 Game: ${gameTitle}
 Genre: ${genre} (Racing/Battle Royale/Fighting/FPS/Sandbox focus)
