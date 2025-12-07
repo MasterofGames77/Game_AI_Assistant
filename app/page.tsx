@@ -1656,12 +1656,24 @@ export default function Home() {
     }
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     setIsSigningOut(true);
 
     // Get old values before clearing
     const oldUsername = localStorage.getItem("username");
     const oldUserId = localStorage.getItem("userId");
+
+    try {
+      // Call logout API to blacklist tokens
+      // This ensures tokens are invalidated on the server
+      await axios.post("/api/auth/logout", {}, {
+        withCredentials: true, // Ensure cookies are sent
+      });
+    } catch (error) {
+      // Log error but continue with logout process
+      // Even if API call fails, we still want to clear local state
+      console.error("Error calling logout API:", error);
+    }
 
     // Clear state immediately for better UX
     setUsername(null);

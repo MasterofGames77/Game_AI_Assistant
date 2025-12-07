@@ -26,15 +26,18 @@ export default async function handler(
       });
     }
 
-    // Verify token
+    // Verify token (now includes blacklist check)
     let decoded: any;
     try {
-      decoded = verifyAccessToken(authToken);
+      decoded = await verifyAccessToken(authToken);
     } catch (error) {
-      // Token is invalid or expired
+      // Token is invalid, expired, or revoked
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return res.status(401).json({
         authenticated: false,
-        message: 'Invalid or expired token'
+        message: errorMessage.includes('revoked') 
+          ? 'Token has been revoked' 
+          : 'Invalid or expired token'
       });
     }
 

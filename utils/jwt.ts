@@ -67,21 +67,33 @@ export const generateRefreshToken = (payload: Omit<TokenPayload, 'iat' | 'exp'>)
 
 /**
  * Verify an access token
+ * Checks token signature, expiration, and blacklist
  */
-export const verifyAccessToken = (token: string): TokenPayload => {
+export const verifyAccessToken = async (token: string): Promise<TokenPayload> => {
   if (!JWT_SECRET) {
     throw new Error('JWT_SECRET is not configured');
   }
 
   try {
+    // First verify token signature and expiration
     const decoded = jwt.verify(token, JWT_SECRET, {
       issuer: 'videogamewingman',
       audience: 'videogamewingman-users',
     }) as TokenPayload;
 
+    // Check if token is blacklisted
+    const { isTokenBlacklisted } = await import('./tokenBlacklist');
+    const blacklisted = await isTokenBlacklisted(token);
+    
+    if (blacklisted) {
+      throw new Error('Token has been revoked');
+    }
+
     return decoded;
   } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
+    if (error instanceof Error && error.message === 'Token has been revoked') {
+      throw error; // Re-throw blacklist errors
+    } else if (error instanceof jwt.TokenExpiredError) {
       throw new Error('Token expired');
     } else if (error instanceof jwt.JsonWebTokenError) {
       throw new Error('Invalid token');
@@ -92,13 +104,15 @@ export const verifyAccessToken = (token: string): TokenPayload => {
 
 /**
  * Verify a refresh token
+ * Checks token signature, expiration, type, and blacklist
  */
-export const verifyRefreshToken = (token: string): TokenPayload => {
+export const verifyRefreshToken = async (token: string): Promise<TokenPayload> => {
   if (!JWT_REFRESH_SECRET) {
     throw new Error('JWT_REFRESH_SECRET is not configured');
   }
 
   try {
+    // First verify token signature and expiration
     const decoded = jwt.verify(token, JWT_REFRESH_SECRET, {
       issuer: 'videogamewingman',
       audience: 'videogamewingman-users',
@@ -109,9 +123,19 @@ export const verifyRefreshToken = (token: string): TokenPayload => {
       throw new Error('Invalid token type');
     }
 
+    // Check if token is blacklisted
+    const { isTokenBlacklisted } = await import('./tokenBlacklist');
+    const blacklisted = await isTokenBlacklisted(token);
+    
+    if (blacklisted) {
+      throw new Error('Refresh token has been revoked');
+    }
+
     return decoded;
   } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
+    if (error instanceof Error && error.message === 'Refresh token has been revoked') {
+      throw error; // Re-throw blacklist errors
+    } else if (error instanceof jwt.TokenExpiredError) {
       throw new Error('Refresh token expired');
     } else if (error instanceof jwt.JsonWebTokenError) {
       throw new Error('Invalid refresh token');

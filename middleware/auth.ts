@@ -35,8 +35,8 @@ export const requireAuth = async (
       return { authenticated: false };
     }
 
-    // Verify the token
-    const decoded = verifyAccessToken(token);
+    // Verify the token (now includes blacklist check)
+    const decoded = await verifyAccessToken(token);
 
     // Attach user info to request object
     req.userId = decoded.userId;
