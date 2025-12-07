@@ -84,7 +84,8 @@ export function getSecurityHeaders(request: NextRequest): Record<string, string>
     
     // Connect: allow same-origin and API endpoints
     // Include Google Analytics and Cloudflare Insights for data collection
-    "connect-src 'self' https://api.openai.com https://*.openai.com https://api.igdb.com https://api.rawg.io https://api.stripe.com https://checkout.stripe.com https://www.google-analytics.com https://www.googletagmanager.com https://cloudflareinsights.com https://*.cloudflareinsights.com wss: ws:",
+    // Include Heroku backend for splash page API calls
+    "connect-src 'self' https://api.openai.com https://*.openai.com https://api.igdb.com https://api.rawg.io https://api.stripe.com https://checkout.stripe.com https://www.google-analytics.com https://www.googletagmanager.com https://cloudflareinsights.com https://*.cloudflareinsights.com https://*.herokuapp.com wss: ws:",
     
     // Media: allow same-origin
     "media-src 'self' blob:",

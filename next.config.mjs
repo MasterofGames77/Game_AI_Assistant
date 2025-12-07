@@ -16,6 +16,9 @@ const nextConfig = {
     RAWG_API_KEY: process.env.RAWG_API_KEY,
     MONGODB_URI: process.env.MONGODB_URI,
     GOOGLE_CREDENTIALS: process.env.GOOGLE_CREDENTIALS,
+    DISCORD_APPLICATION_ID: process.env.DISCORD_APPLICATION_ID,
+    DISCORD_CLIENT_SECRET: process.env.DISCORD_CLIENT_SECRET,
+    DISCORD_REDIRECT_URI: process.env.DISCORD_REDIRECT_URI,
   },
   // Security headers (fallback - middleware.ts is primary)
   // These are applied to static files and pages that middleware might miss
@@ -32,7 +35,7 @@ const nextConfig = {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' https://api.openai.com https://*.openai.com https://api.igdb.com https://api.rawg.io https://api.stripe.com https://checkout.stripe.com https://www.google-analytics.com https://www.googletagmanager.com https://cloudflareinsights.com https://*.cloudflareinsights.com wss: ws:",
+      "connect-src 'self' https://api.openai.com https://*.openai.com https://api.igdb.com https://api.rawg.io https://api.stripe.com https://checkout.stripe.com https://www.google-analytics.com https://www.googletagmanager.com https://cloudflareinsights.com https://*.cloudflareinsights.com https://*.herokuapp.com wss: ws:",
       "media-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",
