@@ -4,6 +4,11 @@ import User from '../../../models/User';
 import { comparePassword } from '../../../utils/passwordUtils';
 import { setAuthCookies } from '../../../utils/session';
 import mongoose from 'mongoose';
+import {
+  checkAccountLocked,
+  trackFailedLoginAttempt,
+  resetFailedLoginAttempts,
+} from '../../../utils/accountLockout';
 
 // Simple in-memory rate limiting for Next.js (no Express dependency)
 const loginAttempts = new Map<string, { count: number; resetTime: number }>();
@@ -73,8 +78,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!user) {
       // Return generic error to prevent user enumeration
+      // Still increment rate limit counter
+      const rateLimitRecord = loginAttempts.get(ip);
+      if (rateLimitRecord) {
+        rateLimitRecord.count++;
+      }
       return res.status(401).json({ 
         message: 'Invalid username/email or password' 
+      });
+    }
+
+    // Check if account is locked BEFORE checking password
+    const lockStatus = checkAccountLocked(user);
+    if (lockStatus.isLocked) {
+      // Return generic error to prevent user enumeration
+      // Still increment rate limit counter
+      const rateLimitRecord = loginAttempts.get(ip);
+      if (rateLimitRecord) {
+        rateLimitRecord.count++;
+      }
+      return res.status(403).json({
+        message: lockStatus.message || 'Account is locked. Please check your email for unlock instructions.',
+        accountLocked: true,
+        lockedUntil: lockStatus.lockedUntil,
+        requiresUnlock: lockStatus.requiresUnlock,
       });
     }
 
@@ -108,11 +135,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const isPasswordValid = await comparePassword(password, user.password);
     
     if (!isPasswordValid) {
+      // Track failed login attempt (this may lock the account)
+      await trackFailedLoginAttempt(user, ip);
+      
       // Return generic error to prevent user enumeration
+      // Check if account was just locked
+      const updatedUser = await User.findById(user._id);
+      if (updatedUser && updatedUser.isLocked) {
+        const lockStatus = checkAccountLocked(updatedUser);
+        return res.status(403).json({
+          message: lockStatus.message || 'Account has been locked due to multiple failed login attempts. Please check your email for unlock instructions.',
+          accountLocked: true,
+          lockedUntil: lockStatus.lockedUntil,
+          requiresUnlock: lockStatus.requiresUnlock,
+        });
+      }
+      
       return res.status(401).json({ 
         message: 'Invalid username/email or password' 
       });
     }
+
+    // Successful login - reset failed attempts
+    await resetFailedLoginAttempts(user);
 
     // Successful authentication - set secure cookies with JWT tokens
     if (!user.userId || !user.username) {

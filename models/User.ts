@@ -13,6 +13,13 @@ export interface IUser extends Document {
   passwordResetCode?: string; // 6-digit verification code
   passwordResetCodeExpires?: Date; // Code expiration time
   lastPasswordResetRequest?: Date; // For rate limiting
+  // Account lockout fields
+  isLocked?: boolean; // Whether account is currently locked
+  failedLoginAttempts?: number; // Number of consecutive failed login attempts
+  lockedUntil?: Date; // Temporary lockout expiration (if null, requires unlock)
+  unlockToken?: string; // Token for email-based unlock
+  unlockTokenExpires?: Date; // Unlock token expiration
+  lastFailedLoginAttempt?: Date; // Timestamp of last failed login attempt
   conversationCount: number;
   hasProAccess: boolean;
   achievements: Achievement[];
@@ -122,6 +129,13 @@ const UserSchema = new Schema<IUser>({
   passwordResetCode: { type: String, required: false },
   passwordResetCodeExpires: { type: Date, required: false },
   lastPasswordResetRequest: { type: Date, required: false },
+  // Account lockout fields
+  isLocked: { type: Boolean, default: false },
+  failedLoginAttempts: { type: Number, default: 0 },
+  lockedUntil: { type: Date, required: false },
+  unlockToken: { type: String, required: false },
+  unlockTokenExpires: { type: Date, required: false },
+  lastFailedLoginAttempt: { type: Date, required: false },
   conversationCount: { type: Number, required: true, default: 0 },
   hasProAccess: { type: Boolean, default: false },
   achievements: [

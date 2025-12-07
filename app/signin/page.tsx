@@ -16,6 +16,10 @@ const SignInPage: React.FC = () => {
   const [isLegacyUser, setIsLegacyUser] = useState(false);
   const [username, setUsername] = useState("");
   const [userId, setUserId] = useState("");
+  const [accountLocked, setAccountLocked] = useState(false);
+  const [lockoutMessage, setLockoutMessage] = useState("");
+  const [lockedUntil, setLockedUntil] = useState<Date | null>(null);
+  const [requiresUnlock, setRequiresUnlock] = useState(false);
   const router = useRouter();
 
   // Check if user is already logged in
@@ -125,10 +129,23 @@ const SignInPage: React.FC = () => {
         }
       }
     } catch (err: any) {
-      if (err.response?.data?.message) {
-        setUsernameError(err.response.data.message);
+      // Check if account is locked
+      if (err.response?.status === 403 && err.response?.data?.accountLocked) {
+        setAccountLocked(true);
+        setLockoutMessage(err.response.data.message || "Account is locked. Please check your email for unlock instructions.");
+        setRequiresUnlock(err.response.data.requiresUnlock || false);
+        if (err.response.data.lockedUntil) {
+          setLockedUntil(new Date(err.response.data.lockedUntil));
+        }
+        setUsernameError(""); // Clear regular error, show lockout message instead
       } else {
-        setUsernameError("Failed to sign in. Please try again.");
+        // Regular error (not account locked)
+        setAccountLocked(false);
+        if (err.response?.data?.message) {
+          setUsernameError(err.response.data.message);
+        } else {
+          setUsernameError("Failed to sign in. Please try again.");
+        }
       }
     } finally {
       setIsSigningIn(false);
@@ -273,7 +290,57 @@ const SignInPage: React.FC = () => {
             </div>
           </div>
 
-          {usernameError && (
+          {/* Account Lockout Message */}
+          {accountLocked && (
+            <div className="p-4 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-400 dark:border-yellow-700 rounded-lg">
+              <div className="flex items-start">
+                <svg
+                  className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-3 mt-0.5 flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-yellow-800 dark:text-yellow-200 text-sm font-medium mb-1">
+                    Account Locked
+                  </p>
+                  <p className="text-yellow-700 dark:text-yellow-300 text-sm mb-2">
+                    {lockoutMessage}
+                  </p>
+                  {lockedUntil && !requiresUnlock && (
+                    <p className="text-yellow-600 dark:text-yellow-400 text-xs">
+                      You can try again in {Math.ceil((lockedUntil.getTime() - Date.now()) / (60 * 1000))} minute(s).
+                    </p>
+                  )}
+                  {requiresUnlock && (
+                    <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-200 dark:border-yellow-800">
+                      <p className="text-yellow-800 dark:text-yellow-200 text-xs font-medium mb-1">
+                        To unlock your account:
+                      </p>
+                      <ol className="text-yellow-700 dark:text-yellow-300 text-xs list-decimal list-inside space-y-1">
+                        <li>Check your email for the unlock link</li>
+                        <li>Click the unlock link in the email</li>
+                        <li>Or visit the unlock page with your token</li>
+                      </ol>
+                      <p className="text-yellow-600 dark:text-yellow-400 text-xs mt-2">
+                        Didn&apos;t receive an email? Check your spam folder or contact support.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Regular Error Message */}
+          {usernameError && !accountLocked && (
             <div className="p-3 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 rounded-lg">
               <p className="text-red-700 dark:text-red-300 text-sm">
                 {usernameError}

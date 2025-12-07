@@ -69,6 +69,10 @@ export default function Home() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [showPasswordSetupModal, setShowPasswordSetupModal] = useState(false);
   const [isLegacyUser, setIsLegacyUser] = useState(false);
+  const [accountLocked, setAccountLocked] = useState(false);
+  const [lockoutMessage, setLockoutMessage] = useState("");
+  const [lockedUntil, setLockedUntil] = useState<Date | null>(null);
+  const [requiresUnlock, setRequiresUnlock] = useState(false);
   const [savingGuide, setSavingGuide] = useState(false);
   const [guideSaved, setGuideSaved] = useState(false);
   const [showGuidesModal, setShowGuidesModal] = useState(false);
@@ -1594,10 +1598,23 @@ export default function Home() {
         }
       }
     } catch (err: any) {
-      if (err.response?.data?.message) {
-        setUsernameError(err.response.data.message);
+      // Check if account is locked
+      if (err.response?.status === 403 && err.response?.data?.accountLocked) {
+        setAccountLocked(true);
+        setLockoutMessage(err.response.data.message || "Account is locked. Please check your email for unlock instructions.");
+        setRequiresUnlock(err.response.data.requiresUnlock || false);
+        if (err.response.data.lockedUntil) {
+          setLockedUntil(new Date(err.response.data.lockedUntil));
+        }
+        setUsernameError(""); // Clear regular error, show lockout message instead
       } else {
-        setUsernameError("Failed to sign in. Please try again.");
+        // Regular error (not account locked)
+        setAccountLocked(false);
+        if (err.response?.data?.message) {
+          setUsernameError(err.response.data.message);
+        } else {
+          setUsernameError("Failed to sign in. Please try again.");
+        }
       }
     } finally {
       setIsSigningIn(false);
@@ -1798,7 +1815,13 @@ export default function Home() {
       {showUsernameModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60"
-          onClick={() => setShowUsernameModal(false)}
+          onClick={() => {
+            setShowUsernameModal(false);
+            setAccountLocked(false);
+            setLockoutMessage("");
+            setLockedUntil(null);
+            setRequiresUnlock(false);
+          }}
         >
           <div
             className="bg-white dark:bg-gray-900 p-8 rounded-lg shadow-lg w-full max-w-md flex flex-col items-center relative"
@@ -1806,7 +1829,13 @@ export default function Home() {
           >
             {/* Close Button */}
             <button
-              onClick={() => setShowUsernameModal(false)}
+              onClick={() => {
+                setShowUsernameModal(false);
+                setAccountLocked(false);
+                setLockoutMessage("");
+                setLockedUntil(null);
+                setRequiresUnlock(false);
+              }}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
               aria-label="Close sign in modal"
             >
@@ -1900,7 +1929,47 @@ export default function Home() {
                   )}
                 </button>
               </div>
-              {usernameError && (
+              {/* Account Lockout Message */}
+              {accountLocked && (
+                <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-400 dark:border-yellow-700 rounded-lg mb-3">
+                  <div className="flex items-start">
+                    <svg
+                      className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-2 mt-0.5 flex-shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                      />
+                    </svg>
+                    <div className="flex-1">
+                      <p className="text-yellow-800 dark:text-yellow-200 text-sm font-medium mb-1">
+                        Account Locked
+                      </p>
+                      <p className="text-yellow-700 dark:text-yellow-300 text-xs mb-1">
+                        {lockoutMessage}
+                      </p>
+                      {lockedUntil && !requiresUnlock && (
+                        <p className="text-yellow-600 dark:text-yellow-400 text-xs">
+                          Try again in {Math.ceil((lockedUntil.getTime() - Date.now()) / (60 * 1000))} minute(s).
+                        </p>
+                      )}
+                      {requiresUnlock && (
+                        <p className="text-yellow-600 dark:text-yellow-400 text-xs mt-1">
+                          Check your email for unlock instructions.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Regular Error Message */}
+              {usernameError && !accountLocked && (
                 <p className="text-red-500 text-sm">{usernameError}</p>
               )}
               <button

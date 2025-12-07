@@ -11,7 +11,30 @@ if (RESEND_FROM_EMAIL) {
   RESEND_FROM_EMAIL = RESEND_FROM_EMAIL.trim().replace(/^["']|["']$/g, '');
 }
 
-const APP_URL = process.env.APP_URL || 'http://localhost:3000';
+// Get app URL from environment variables
+// Priority: APP_URL > NEXT_PUBLIC_APP_URL > VERCEL_URL > localhost
+const getAppUrl = (): string => {
+  // Check for explicit APP_URL first
+  if (process.env.APP_URL) {
+    return process.env.APP_URL;
+  }
+  
+  // Check for NEXT_PUBLIC_APP_URL (available in both client and server)
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL;
+  }
+  
+  // Check for production environment
+  if (process.env.NODE_ENV === 'production') {
+    // Default production URL (update this to your actual production domain)
+    return 'https://assistant.videogamewingman.com';
+  }
+  
+  // Default to localhost for development
+  return 'http://localhost:3000';
+};
+
+const APP_URL = getAppUrl();
 
 // Function to load logo as base64 (for local development when APP_URL is localhost)
 function getLogoBase64(): string | null {
@@ -634,6 +657,111 @@ ${recommendationsHtml}
     return true;
   } catch (error) {
     console.error('Error sending weekly digest email:', error);
+    return false;
+  }
+};
+
+/**
+ * Send account unlock email
+ * @param email - User's email address
+ * @param username - User's username
+ * @param unlockToken - Unlock token for account unlock
+ */
+export const sendAccountUnlockEmail = async (
+  email: string,
+  username: string,
+  unlockToken: string
+): Promise<boolean> => {
+  const resend = getResendClient();
+  if (!resend) {
+    console.error('Email service not configured');
+    return false;
+  }
+
+  const unlockUrl = `${APP_URL}/unlock-account?token=${unlockToken}`;
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: RESEND_FROM_EMAIL!,
+      to: email,
+      subject: 'Account Locked - Unlock Required - Video Game Wingman',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #4F46E5;">Video Game Wingman</h1>
+          </div>
+          
+          <div style="background-color: #fff3cd; border: 1px solid #ffc107; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h2 style="color: #856404; margin-top: 0;">⚠️ Account Security Alert</h2>
+            <p style="color: #856404; margin-bottom: 0;"><strong>Your account has been temporarily locked due to multiple failed login attempts.</strong></p>
+          </div>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h2 style="color: #333; margin-top: 0;">Account Unlock Required</h2>
+            <p>Hello ${username},</p>
+            <p>We detected multiple failed login attempts on your account. For your security, we've temporarily locked your account.</p>
+            <p>To unlock your account, please click the button below:</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${unlockUrl}" 
+                 style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Unlock My Account
+              </a>
+            </div>
+            
+            <p style="font-size: 14px; color: #666;">
+              If the button doesn't work, copy and paste this link into your browser:<br>
+              <a href="${unlockUrl}" style="color: #4F46E5;">${unlockUrl}</a>
+            </p>
+          </div>
+          
+          <div style="background-color: #e7f3ff; border: 1px solid #b3d9ff; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+            <p style="margin: 0; color: #004085;"><strong>Security Tips:</strong></p>
+            <ul style="color: #004085; margin: 10px 0 0 0; padding-left: 20px;">
+              <li>Use a strong, unique password</li>
+              <li>Never share your password with anyone</li>
+              <li>If you didn't attempt to log in, please contact support immediately</li>
+            </ul>
+          </div>
+          
+          <div style="font-size: 12px; color: #666; text-align: center;">
+            <p>This unlock link will expire in 24 hours for security reasons.</p>
+            <p>If you didn't attempt to log in, please contact support immediately.</p>
+            <p>© 2024 Video Game Wingman. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+      text: `
+        Account Locked - Unlock Required - Video Game Wingman
+        
+        Hello ${username},
+        
+        We detected multiple failed login attempts on your account. For your security, we've temporarily locked your account.
+        
+        To unlock your account, please click this link: ${unlockUrl}
+        
+        This unlock link will expire in 24 hours for security reasons.
+        
+        Security Tips:
+        - Use a strong, unique password
+        - Never share your password with anyone
+        - If you didn't attempt to log in, please contact support immediately
+        
+        If you didn't attempt to log in, please contact support immediately.
+        
+        © 2024 Video Game Wingman. All rights reserved.
+      `
+    });
+
+    if (error) {
+      console.error('Error sending account unlock email:', error);
+      return false;
+    }
+
+    console.log(`Account unlock email sent to ${email}`);
+    return true;
+  } catch (error) {
+    console.error('Error sending account unlock email:', error);
     return false;
   }
 };
