@@ -68,10 +68,10 @@ export function getSecurityHeaders(request: NextRequest): Record<string, string>
     "default-src 'self'",
     
     // Scripts: allow same-origin, inline scripts (Next.js requires this), and eval (for development)
-    // Include Google Tag Manager and Stripe for production
+    // Include Google Tag Manager, Stripe, and Cloudflare Insights for production
     process.env.NODE_ENV === 'production'
-      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://js.stripe.com https://checkout.stripe.com"
-      : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com",
+      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://js.stripe.com https://checkout.stripe.com https://static.cloudflareinsights.com"
+      : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://static.cloudflareinsights.com",
     
     // Styles: allow same-origin and inline styles (required for CSS-in-JS)
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
@@ -83,8 +83,8 @@ export function getSecurityHeaders(request: NextRequest): Record<string, string>
     "img-src 'self' data: blob: https:",
     
     // Connect: allow same-origin and API endpoints
-    // Include Google Analytics for data collection
-    "connect-src 'self' https://api.openai.com https://*.openai.com https://api.igdb.com https://api.rawg.io https://api.stripe.com https://checkout.stripe.com https://www.google-analytics.com https://www.googletagmanager.com wss: ws:",
+    // Include Google Analytics and Cloudflare Insights for data collection
+    "connect-src 'self' https://api.openai.com https://*.openai.com https://api.igdb.com https://api.rawg.io https://api.stripe.com https://checkout.stripe.com https://www.google-analytics.com https://www.googletagmanager.com https://cloudflareinsights.com https://*.cloudflareinsights.com wss: ws:",
     
     // Media: allow same-origin
     "media-src 'self' blob:",
