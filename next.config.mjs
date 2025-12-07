@@ -17,6 +17,71 @@ const nextConfig = {
     MONGODB_URI: process.env.MONGODB_URI,
     GOOGLE_CREDENTIALS: process.env.GOOGLE_CREDENTIALS,
   },
+  // Security headers (fallback - middleware.ts is primary)
+  // These are applied to static files and pages that middleware might miss
+  // IMPORTANT: This is a fallback. Middleware.ts should be the primary source.
+  async headers() {
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    // Build CSP directive
+    const cspDirectives = [
+      "default-src 'self'",
+      isProduction
+        ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://js.stripe.com https://checkout.stripe.com"
+        : "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com data:",
+      "img-src 'self' data: blob: https:",
+      "connect-src 'self' https://api.openai.com https://*.openai.com https://api.igdb.com https://api.rawg.io https://api.stripe.com https://checkout.stripe.com https://www.google-analytics.com https://www.googletagmanager.com wss: ws:",
+      "media-src 'self' blob:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+      ...(isProduction ? ["upgrade-insecure-requests", "block-all-mixed-content"] : []),
+    ].filter(Boolean);
+    
+    return [
+      {
+        // Apply to all routes
+        source: '/:path*',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(), usb=()',
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: cspDirectives.join('; '),
+          },
+          // HSTS only in production
+          ...(isProduction ? [{
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains; preload',
+          }, {
+            key: 'Expect-CT',
+            value: 'max-age=86400, enforce',
+          }] : []),
+        ],
+      },
+    ];
+  },
   images: {
     // Allow images from cloud storage providers
     remotePatterns: [
