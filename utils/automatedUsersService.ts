@@ -1,12 +1,14 @@
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
-import { generateQuestion, generateForumPost, generatePostReply, UserPreferences } from './automatedContentGenerator';
+import { generateQuestion, generateForumPost, generatePostReply, generateCommonGamerPost, generateExpertGamerReply, UserPreferences } from './automatedContentGenerator';
 import { getRandomGameImage, recordImageUsage } from './automatedImageService';
 import { containsOffensiveContent } from './contentModeration';
 import { GameList, ActivityResult } from '../types';
 import connectToMongoDB from './mongodb';
+import { connectToWingmanDB } from './databaseConnections';
 import Forum from '../models/Forum';
+import User from '../models/User';
 import mongoose from 'mongoose';
 
 /**
@@ -785,14 +787,30 @@ export async function createForumPost(
     // Try to generate a unique post (retry if it's too similar to previous posts)
     while (attempts < maxAttempts) {
       attempts++;
-      postContent = await generateForumPost({
-        gameTitle: actualGameTitle,
-        genre: actualGenre,
-        userPreferences,
-        forumTopic: forumTitle,
-        forumCategory: forumCategory,
-        previousPosts: previousPosts
-      });
+      
+      // Check if this is a COMMON gamer - use specialized function for issue posts
+      if (userPreferences.gamerProfile && userPreferences.gamerProfile.type === 'common') {
+        postContent = await generateCommonGamerPost({
+          gameTitle: actualGameTitle,
+          genre: actualGenre,
+          userPreferences,
+          forumTopic: forumTitle,
+          forumCategory: forumCategory,
+          previousPosts: previousPosts,
+          gamerProfile: userPreferences.gamerProfile,
+          username: username
+        });
+      } else {
+        // Use standard forum post generation for other users
+        postContent = await generateForumPost({
+          gameTitle: actualGameTitle,
+          genre: actualGenre,
+          userPreferences,
+          forumTopic: forumTitle,
+          forumCategory: forumCategory,
+          previousPosts: previousPosts
+        });
+      }
       
       // Check if the generated post is too similar to any previous post
       // Use stricter similarity checking - check both word overlap and topic similarity
@@ -1004,17 +1022,48 @@ export async function likePost(
 
 /**
  * Find a post to respond to in forums
- * Prioritizes posts from other automated users (MysteriousMrEnter, WaywardJammer) and other users (including real users)
+ * Prioritizes posts from COMMON gamers when EXPERT gamer is responding
+ * Also prioritizes posts from other automated users (MysteriousMrEnter, WaywardJammer) and other users (including real users)
  * Excludes posts from the responding user
  */
-function findPostToRespondTo(
+async function findPostToRespondTo(
   forums: any[],
   respondingUsername: string
-): { forum: any; post: any; gameTitle: string; genre: string } | null {
+): Promise<{ forum: any; post: any; gameTitle: string; genre: string } | null> {
+  // Check if responding user is an EXPERT gamer
+  let isExpertGamer = false;
+  let expertHelpsCommonGamer: string | null = null;
+  try {
+    await connectToWingmanDB();
+    const respondingUser = await User.findOne({ username: respondingUsername });
+    if (respondingUser?.gamerProfile?.type === 'expert') {
+      isExpertGamer = true;
+      expertHelpsCommonGamer = respondingUser.gamerProfile.helpsCommonGamer || null;
+    }
+  } catch (error) {
+    console.error('[POST REPLY] Error checking if user is EXPERT gamer:', error);
+  }
+
   // Priority users to respond to (automated users)
   const priorityUsers = ['MysteriousMrEnter', 'WaywardJammer'];
   // Automated users list (to identify but not exclude real users)
   const automatedUsers = ['MysteriousMrEnter', 'WaywardJammer', 'InterdimensionalHipster'];
+  
+  // Get list of COMMON gamers if responding user is EXPERT
+  let commonGamers: string[] = [];
+  if (isExpertGamer) {
+    try {
+      await connectToWingmanDB();
+      const commonGamerUsers = await User.find({ 'gamerProfile.type': 'common' })
+        .select('username')
+        .lean();
+      commonGamers = commonGamerUsers.map((user: any) => user.username);
+      // Add original automated users that might be COMMON-like
+      commonGamers.push('MysteriousMrEnter', 'WaywardJammer');
+    } catch (error) {
+      console.error('[POST REPLY] Error getting COMMON gamers:', error);
+    }
+  }
   
   // Filter forums that have posts
   const forumsWithPosts = forums.filter((f: any) => 
@@ -1026,7 +1075,60 @@ function findPostToRespondTo(
     return null;
   }
   
-  // Priority 1: Find posts from priority users (MysteriousMrEnter, WaywardJammer)
+  // Priority 1 (for EXPERT gamers): Find posts from COMMON gamers
+  // This ensures EXPERT gamers help COMMON gamers with their issues
+  if (isExpertGamer && commonGamers.length > 0) {
+    for (const forum of forumsWithPosts) {
+      const posts = forum.posts || [];
+      
+      // Prioritize the COMMON gamer this EXPERT is mapped to help
+      const priorityCommonGamers = expertHelpsCommonGamer 
+        ? [expertHelpsCommonGamer, ...commonGamers.filter(g => g !== expertHelpsCommonGamer)]
+        : commonGamers;
+      
+      for (const commonGamer of priorityCommonGamers) {
+        // Find recent posts from this COMMON gamer
+        const commonGamerPosts = posts
+          .filter((p: any) => 
+            p.username === commonGamer &&
+            p.username !== respondingUsername &&
+            p.metadata?.status === 'active'
+          )
+          .sort((a: any, b: any) => {
+            const aTime = new Date(a.timestamp || 0).getTime();
+            const bTime = new Date(b.timestamp || 0).getTime();
+            return bTime - aTime; // Most recent first
+          });
+        
+        for (const post of commonGamerPosts) {
+          // Check if responding user has already replied to this post
+          const hasReplied = posts.some((p: any) => 
+            p.username === respondingUsername && 
+            p.replyTo && p.replyTo.toString() === post._id?.toString()
+          );
+          
+          if (!hasReplied) {
+            // Check if post is recent (within last 7 days)
+            const postTime = new Date(post.timestamp);
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            
+            if (postTime > sevenDaysAgo) {
+              const genre = determineGenreFromGame(forum.gameTitle || forum.title);
+              console.log(`[POST REPLY] EXPERT ${respondingUsername} found COMMON gamer post from ${commonGamer}`);
+              return {
+                forum,
+                post,
+                gameTitle: forum.gameTitle || 'Unknown Game',
+                genre
+              };
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Priority 2: Find posts from priority users (MysteriousMrEnter, WaywardJammer)
   // that haven't been responded to by the responding user
   for (const forum of forumsWithPosts) {
     const posts = forum.posts || [];
@@ -1343,7 +1445,7 @@ export async function respondToForumPost(
     }
     
     // Find a post to respond to
-    const postToRespondTo = findPostToRespondTo(forumsWithFullPosts, username);
+    const postToRespondTo = await findPostToRespondTo(forumsWithFullPosts, username);
     
     if (!postToRespondTo) {
       return {
@@ -1362,15 +1464,47 @@ export async function respondToForumPost(
     
     console.log(`Responding to post by ${originalPostAuthor} in forum: ${forumTitle} (${gameTitle})`);
     
+    // Check if original post author is a COMMON gamer
+    let isReplyingToCommonGamer = false;
+    let commonGamerUsername = originalPostAuthor;
+    try {
+      await connectToWingmanDB();
+      const originalAuthor = await User.findOne({ username: originalPostAuthor });
+      if (originalAuthor?.gamerProfile?.type === 'common') {
+        isReplyingToCommonGamer = true;
+        commonGamerUsername = originalPostAuthor;
+      }
+    } catch (error) {
+      console.error('[POST REPLY] Error checking original author:', error);
+    }
+    
     // Generate relevant reply
-    let replyContent = await generatePostReply({
-      gameTitle,
-      genre,
-      originalPost: originalPostContent,
-      originalPostAuthor,
-      forumTopic: forumTitle,
-      forumCategory: forumCategory
-    });
+    let replyContent: string;
+    
+    // If this is an EXPERT gamer replying to a COMMON gamer, use specialized function
+    if (userPreferences.gamerProfile?.type === 'expert' && isReplyingToCommonGamer) {
+      replyContent = await generateExpertGamerReply({
+        gameTitle,
+        genre,
+        originalPost: originalPostContent,
+        originalPostAuthor,
+        forumTopic: forumTitle,
+        forumCategory: forumCategory,
+        gamerProfile: userPreferences.gamerProfile,
+        username: username,
+        commonGamerUsername: commonGamerUsername
+      });
+    } else {
+      // Use standard reply generation for other cases
+      replyContent = await generatePostReply({
+        gameTitle,
+        genre,
+        originalPost: originalPostContent,
+        originalPostAuthor,
+        forumTopic: forumTitle,
+        forumCategory: forumCategory
+      });
+    }
     
     // Prepend @mention if not already present (same logic as manual replies)
     const mentionPattern = new RegExp(`^@${originalPostAuthor}\\s+`, "i");
@@ -1506,12 +1640,173 @@ export async function respondToForumPost(
 }
 
 /**
+ * Get all COMMON gamers from database
+ * Returns list of usernames
+ */
+export async function getCommonGamers(): Promise<string[]> {
+  try {
+    await connectToWingmanDB();
+    const commonGamers = await User.find({ 'gamerProfile.type': 'common' })
+      .select('username')
+      .lean();
+    return commonGamers.map((user: any) => user.username);
+  } catch (error) {
+    console.error('[SERVICE] Error getting COMMON gamers:', error);
+    return [];
+  }
+}
+
+/**
+ * Get all EXPERT gamers from database
+ * Returns list of usernames
+ */
+export async function getExpertGamers(): Promise<string[]> {
+  try {
+    await connectToWingmanDB();
+    const expertGamers = await User.find({ 'gamerProfile.type': 'expert' })
+      .select('username')
+      .lean();
+    return expertGamers.map((user: any) => user.username);
+  } catch (error) {
+    console.error('[SERVICE] Error getting EXPERT gamers:', error);
+    return [];
+  }
+}
+
+/**
+ * Find the best EXPERT gamer to reply to a COMMON gamer's post
+ * Uses the gamer matching utility for consistent matching logic
+ * 
+ * @param commonGamerUsername - Username of the COMMON gamer who created the post
+ * @param gameTitle - Game title from the post
+ * @param genre - Genre of the game
+ * @returns Username of the best matching EXPERT gamer, or null if none found
+ */
+export async function findMatchingExpert(
+  commonGamerUsername: string,
+  gameTitle?: string,
+  genre?: string
+): Promise<string | null> {
+  // Use the dedicated gamer matching utility
+  const { findMatchingExpert: findMatch } = await import('./gamerMatching');
+  const result = await findMatch(commonGamerUsername, gameTitle, genre);
+  return result ? result.expertUsername : null;
+}
+
+/**
+ * Create a forum post for a COMMON gamer
+ * This is a convenience wrapper around createForumPost that ensures
+ * COMMON gamer-specific content generation is used
+ * 
+ * @param username - Username of the COMMON gamer
+ * @param preferences - User preferences (should include gamerProfile)
+ * @returns ActivityResult with post details
+ */
+export async function createCommonGamerPost(
+  username: string,
+  preferences: UserPreferences
+): Promise<ActivityResult> {
+  // Verify this is a COMMON gamer
+  if (!preferences.gamerProfile || preferences.gamerProfile.type !== 'common') {
+    return {
+      success: false,
+      message: 'User is not a COMMON gamer',
+      error: 'Invalid gamer type'
+    };
+  }
+
+  // Use the existing createForumPost function
+  // It will automatically use generateCommonGamerPost for COMMON gamers
+  return await createForumPost(username, preferences);
+}
+
+/**
+ * Create a reply for an EXPERT gamer to a COMMON gamer's post
+ * This is a convenience wrapper around respondToForumPost that ensures
+ * EXPERT gamer-specific content generation is used
+ * 
+ * @param username - Username of the EXPERT gamer
+ * @param preferences - User preferences (should include gamerProfile)
+ * @returns ActivityResult with reply details
+ */
+export async function createExpertGamerReply(
+  username: string,
+  preferences: UserPreferences
+): Promise<ActivityResult> {
+  // Verify this is an EXPERT gamer
+  if (!preferences.gamerProfile || preferences.gamerProfile.type !== 'expert') {
+    return {
+      success: false,
+      message: 'User is not an EXPERT gamer',
+      error: 'Invalid gamer type'
+    };
+  }
+
+  // Use the existing respondToForumPost function
+  // It will automatically use generateExpertGamerReply for EXPERT gamers replying to COMMON gamers
+  return await respondToForumPost(username, preferences);
+}
+
+/**
  * Get user preferences from database
+ * Checks for gamerProfile first, then falls back to hardcoded preferences for original automated users
  */
 export async function getUserPreferences(username: string): Promise<UserPreferences | null> {
   try {
-    // For now, return hardcoded preferences based on username
-    // In the future, this could be stored in the database
+    // Connect to database
+    await connectToWingmanDB();
+    
+    // Try to find user in database
+    const user = await User.findOne({ username });
+    
+    if (user && user.gamerProfile) {
+      // User has a gamer profile - extract genres and focus from favorite games
+      const genres: string[] = user.gamerProfile.favoriteGames.map((game: any) => String(game.genre));
+      const uniqueGenresSet = new Set<string>(genres);
+      const uniqueGenres: string[] = Array.from(uniqueGenresSet);
+      
+      // Determine focus based on genres (single-player genres vs multiplayer genres)
+      const singlePlayerGenres = ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer', 'Metroidvania'];
+      const multiplayerGenres = ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox', 'First-Person Shooter'];
+      
+      const hasSinglePlayer = uniqueGenres.some((g: string) => singlePlayerGenres.includes(g));
+      const hasMultiplayer = uniqueGenres.some((g: string) => multiplayerGenres.includes(g));
+      
+      const focus = hasSinglePlayer && !hasMultiplayer 
+        ? 'single-player' 
+        : hasMultiplayer && !hasSinglePlayer 
+        ? 'multiplayer' 
+        : 'single-player'; // Default to single-player if mixed
+      
+      return {
+        genres: uniqueGenres,
+        focus: focus as 'single-player' | 'multiplayer',
+        gamerProfile: {
+          type: user.gamerProfile.type,
+          skillLevel: user.gamerProfile.skillLevel,
+          favoriteGames: user.gamerProfile.favoriteGames.map((game: any) => ({
+            gameTitle: game.gameTitle,
+            genre: game.genre,
+            hoursPlayed: game.hoursPlayed,
+            achievements: game.achievements || [],
+            ...(user.gamerProfile.type === 'common' 
+              ? { currentStruggles: game.currentStruggles || [] }
+              : { expertise: game.expertise || [] }
+            )
+          })),
+          personality: {
+            traits: user.gamerProfile.personality.traits,
+            communicationStyle: user.gamerProfile.personality.communicationStyle
+          },
+          ...(user.gamerProfile.helpsCommonGamer 
+            ? { helpsCommonGamer: user.gamerProfile.helpsCommonGamer }
+            : {}
+          )
+        }
+      };
+    }
+    
+    // Fallback to hardcoded preferences for original automated users
     if (username === 'MysteriousMrEnter') {
       return {
         genres: ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer'],

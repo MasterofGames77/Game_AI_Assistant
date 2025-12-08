@@ -2,6 +2,8 @@ import { askQuestion, createForumPost, respondToForumPost, getUserPreferences } 
 import { CronTask } from '../types';
 // @ts-ignore - node-schedule types may not be perfect with ES modules
 import { scheduleJob } from 'node-schedule';
+import { connectToWingmanDB } from './databaseConnections';
+import User from '../models/User';
 
 // Helper to convert cron expression to node-schedule format
 // node-schedule uses: second minute hour day month dayOfWeek
@@ -201,6 +203,70 @@ class AutomatedUsersScheduler {
         }
       });
     }
+
+    // COMMON Gamer Post 1: 9:00 AM EST (13:00 UTC)
+    // In test mode: runs every 10 minutes
+    this.addTask({
+      name: 'CommonGamer-Post1',
+      cronExpression: isTestMode
+        ? '*/10 * * * *' // Every 10 minutes in test mode
+        : this.cleanCronExpression(
+            process.env.AUTOMATED_USERS_COMMON_POST_1,
+            '0 13 * * *'
+          ), // 9:00 AM EST
+      isRunning: false,
+      task: async () => {
+        await this.executeCommonGamerPost();
+      }
+    });
+
+    // EXPERT Gamer Reply 1: 10:00 AM EST (14:00 UTC)
+    // In test mode: runs every 11 minutes
+    this.addTask({
+      name: 'ExpertGamer-Reply1',
+      cronExpression: isTestMode
+        ? '*/11 * * * *' // Every 11 minutes in test mode
+        : this.cleanCronExpression(
+            process.env.AUTOMATED_USERS_EXPERT_REPLY_1,
+            '0 14 * * *'
+          ), // 10:00 AM EST
+      isRunning: false,
+      task: async () => {
+        await this.executeExpertGamerReply();
+      }
+    });
+
+    // COMMON Gamer Post 2: 2:00 PM EST (18:00 UTC)
+    // In test mode: runs every 12 minutes
+    this.addTask({
+      name: 'CommonGamer-Post2',
+      cronExpression: isTestMode
+        ? '*/12 * * * *' // Every 12 minutes in test mode
+        : this.cleanCronExpression(
+            process.env.AUTOMATED_USERS_COMMON_POST_2,
+            '0 18 * * *'
+          ), // 2:00 PM EST
+      isRunning: false,
+      task: async () => {
+        await this.executeCommonGamerPost();
+      }
+    });
+
+    // EXPERT Gamer Reply 2: 3:00 PM EST (19:00 UTC)
+    // In test mode: runs every 13 minutes
+    this.addTask({
+      name: 'ExpertGamer-Reply2',
+      cronExpression: isTestMode
+        ? '*/13 * * * *' // Every 13 minutes in test mode
+        : this.cleanCronExpression(
+            process.env.AUTOMATED_USERS_EXPERT_REPLY_2,
+            '0 19 * * *'
+          ), // 3:00 PM EST
+      isRunning: false,
+      task: async () => {
+        await this.executeExpertGamerReply();
+      }
+    });
 
     console.log('✅ Using node-schedule (simpler and more reliable)');
     
@@ -486,6 +552,153 @@ class AutomatedUsersScheduler {
   }
 
   /**
+   * Get all COMMON gamers from database
+   */
+  private async getCommonGamers(): Promise<string[]> {
+    try {
+      await connectToWingmanDB();
+      const commonGamers = await User.find({ 'gamerProfile.type': 'common' })
+        .select('username')
+        .lean();
+      return commonGamers.map((user: any) => user.username);
+    } catch (error) {
+      console.error('[SCHEDULER] Error getting COMMON gamers:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get all EXPERT gamers from database
+   */
+  private async getExpertGamers(): Promise<string[]> {
+    try {
+      await connectToWingmanDB();
+      const expertGamers = await User.find({ 'gamerProfile.type': 'expert' })
+        .select('username')
+        .lean();
+      return expertGamers.map((user: any) => user.username);
+    } catch (error) {
+      console.error('[SCHEDULER] Error getting EXPERT gamers:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Randomly select N gamers from a list, ensuring variety
+   * Tracks last selected to avoid immediate repetition
+   */
+  private lastSelectedCommon: string[] = [];
+  private lastSelectedExpert: string[] = [];
+
+  private selectRandomGamers(gamers: string[], count: number, lastSelected: string[]): string[] {
+    if (gamers.length === 0) return [];
+    
+    // Filter out recently selected gamers (last 2 selections)
+    const availableGamers = gamers.filter(g => !lastSelected.includes(g));
+    
+    // If we don't have enough available, use all gamers
+    const pool = availableGamers.length >= count ? availableGamers : gamers;
+    
+    // Randomly select
+    const selected: string[] = [];
+    const poolCopy = [...pool];
+    
+    for (let i = 0; i < count && poolCopy.length > 0; i++) {
+      const randomIndex = Math.floor(Math.random() * poolCopy.length);
+      selected.push(poolCopy.splice(randomIndex, 1)[0]);
+    }
+    
+    return selected;
+  }
+
+  /**
+   * Execute COMMON gamer post (randomly select 2 COMMON gamers)
+   */
+  private async executeCommonGamerPost(): Promise<void> {
+    try {
+      const commonGamers = await this.getCommonGamers();
+      if (commonGamers.length === 0) {
+        console.warn('[COMMON GAMER POST] No COMMON gamers found in database');
+        return;
+      }
+
+      // Select 2 random COMMON gamers (avoiding recently selected)
+      const selectedGamers = this.selectRandomGamers(commonGamers, 2, this.lastSelectedCommon);
+      this.lastSelectedCommon = selectedGamers; // Track for next time
+
+      console.log(`[COMMON GAMER POST] Selected gamers: ${selectedGamers.join(', ')}`);
+
+      // Execute posts for both selected gamers
+      for (const username of selectedGamers) {
+        try {
+          const preferences = await getUserPreferences(username);
+          if (!preferences) {
+            console.error(`[COMMON GAMER POST] No preferences found for ${username}`);
+            continue;
+          }
+
+          console.log(`[COMMON GAMER POST] Creating post for ${username}...`);
+          const result = await createForumPost(username, preferences);
+
+          if (result.success) {
+            console.log(`✅ ${username} created COMMON gamer post successfully`);
+          } else {
+            console.error(`❌ ${username} failed to create COMMON gamer post:`, result.error);
+          }
+        } catch (error) {
+          console.error(`[COMMON GAMER POST] Error for ${username}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error('[COMMON GAMER POST] Error executing COMMON gamer posts:', error);
+    }
+  }
+
+  /**
+   * Execute EXPERT gamer reply (randomly select 2 EXPERT gamers, find COMMON gamer posts to reply to)
+   */
+  private async executeExpertGamerReply(): Promise<void> {
+    try {
+      const expertGamers = await this.getExpertGamers();
+      if (expertGamers.length === 0) {
+        console.warn('[EXPERT GAMER REPLY] No EXPERT gamers found in database');
+        return;
+      }
+
+      // Select 2 random EXPERT gamers (avoiding recently selected)
+      const selectedExperts = this.selectRandomGamers(expertGamers, 2, this.lastSelectedExpert);
+      this.lastSelectedExpert = selectedExperts; // Track for next time
+
+      console.log(`[EXPERT GAMER REPLY] Selected experts: ${selectedExperts.join(', ')}`);
+
+      // Execute replies for both selected EXPERT gamers
+      for (const username of selectedExperts) {
+        try {
+          const preferences = await getUserPreferences(username);
+          if (!preferences) {
+            console.error(`[EXPERT GAMER REPLY] No preferences found for ${username}`);
+            continue;
+          }
+
+          console.log(`[EXPERT GAMER REPLY] Creating reply for ${username}...`);
+          const result = await respondToForumPost(username, preferences);
+
+          if (result.success) {
+            console.log(`✅ ${username} created EXPERT gamer reply successfully`);
+            console.log(`   Replied to: ${result.details?.repliedToAuthor}`);
+          } else {
+            console.error(`❌ ${username} failed to create EXPERT gamer reply:`, result.error);
+          }
+        } catch (error) {
+          console.error(`[EXPERT GAMER REPLY] Error for ${username}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error('[EXPERT GAMER REPLY] Error executing EXPERT gamer replies:', error);
+    }
+  }
+
+  /**
    * Execute question activity for a user
    */
   private async executeQuestion(username: string): Promise<void> {
@@ -579,7 +792,7 @@ class AutomatedUsersScheduler {
     const getTaskType = (name: string): 'question' | 'forumPost' | 'postReply' => {
       if (name.includes('Question')) {
         return 'question';
-      } else if (name.includes('Reply')) {
+      } else if (name.includes('Reply') || name.includes('ExpertGamer')) {
         return 'postReply';
       } else {
         return 'forumPost';
@@ -589,6 +802,10 @@ class AutomatedUsersScheduler {
     const getDescription = (name: string): string => {
       if (name.includes('Question')) {
         return 'Asks Video Game Wingman a question about a game';
+      } else if (name.includes('CommonGamer')) {
+        return 'COMMON gamer creates a forum post about an issue/challenge they are facing';
+      } else if (name.includes('ExpertGamer')) {
+        return 'EXPERT gamer replies with solutions to COMMON gamer posts';
       } else if (name.includes('Reply')) {
         return 'Responds to forum posts from other users';
       } else {

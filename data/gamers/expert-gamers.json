@@ -1,0 +1,355 @@
+{
+  "expertGamers": [
+    {
+      "username": "PuzzleMaster",
+      "email": "puzzle-master@wingman.internal",
+      "skillLevel": 9,
+      "helpsCommonGamer": "PixelPuzzler",
+      "favoriteGames": [
+        {
+          "gameTitle": "Portal 2",
+          "genre": "Puzzle",
+          "hoursPlayed": 500,
+          "achievements": ["All achievements", "Speedrun expert"],
+          "expertise": ["Advanced puzzle solving", "Speedrunning", "Mechanic mastery"]
+        },
+        {
+          "gameTitle": "The Witness",
+          "genre": "Puzzle",
+          "hoursPlayed": 400,
+          "achievements": ["100% completion", "All environmental puzzles"],
+          "expertise": ["Pattern recognition", "Environmental puzzles", "Logical thinking"]
+        },
+        {
+          "gameTitle": "Celeste",
+          "genre": "Platformer",
+          "hoursPlayed": 300,
+          "achievements": ["All C-sides", "Farewell completed", "Golden strawberries"],
+          "expertise": ["Advanced platforming", "Precision movement", "Pattern memorization"]
+        }
+      ],
+      "genres": ["Puzzle", "Platformer", "Adventure"],
+      "focus": "single-player",
+      "personality": {
+        "traits": ["patient", "analytical", "helpful teacher"],
+        "communicationStyle": "step-by-step explanations, breaks down complex problems"
+      }
+    },
+    {
+      "username": "RPGVeteran",
+      "email": "rpg-veteran@wingman.internal",
+      "skillLevel": 10,
+      "helpsCommonGamer": "RisingRaider",
+      "favoriteGames": [
+        {
+          "gameTitle": "The Elder Scrolls V: Skyrim",
+          "genre": "RPG",
+          "hoursPlayed": 2000,
+          "achievements": ["All achievements", "Mod expert", "Every quest completed"],
+          "expertise": ["Build optimization", "Quest knowledge", "Modding", "Combat strategies"]
+        },
+        {
+          "gameTitle": "Fallout 4",
+          "genre": "RPG",
+          "hoursPlayed": 1500,
+          "achievements": ["Survival mode master", "All endings", "Settlement expert"],
+          "expertise": ["Survival strategies", "Resource management", "Build crafting"]
+        },
+        {
+          "gameTitle": "The Witcher 3",
+          "genre": "RPG",
+          "hoursPlayed": 800,
+          "achievements": ["Death March completed", "All quests", "All achievements"],
+          "expertise": ["Combat mechanics", "Alchemy system", "Build optimization", "Quest strategies"]
+        }
+      ],
+      "genres": ["RPG", "Adventure"],
+      "focus": "single-player",
+      "personality": {
+        "traits": ["knowledgeable", "detailed", "shares strategies"],
+        "communicationStyle": "comprehensive guides, references specific mechanics"
+      }
+    },
+    {
+      "username": "SimulationSavant",
+      "email": "simulation-savant@wingman.internal",
+      "skillLevel": 8,
+      "helpsCommonGamer": "CasualCrusher",
+      "favoriteGames": [
+        {
+          "gameTitle": "Stardew Valley",
+          "genre": "Simulation",
+          "hoursPlayed": 800,
+          "achievements": ["Perfection achieved", "All achievements", "Speedrun records"],
+          "expertise": ["Optimization", "Skull Cavern strategies", "Efficiency guides", "Min-maxing"]
+        },
+        {
+          "gameTitle": "Animal Crossing: New Horizons",
+          "genre": "Simulation",
+          "hoursPlayed": 1000,
+          "achievements": ["5-star island", "All villagers", "Complete museum"],
+          "expertise": ["Island design", "Villager management", "Optimization strategies"]
+        },
+        {
+          "gameTitle": "Minecraft",
+          "genre": "Sandbox",
+          "hoursPlayed": 2000,
+          "achievements": ["Redstone expert", "Builder", "Speedrun records"],
+          "expertise": ["Redstone mechanics", "Building techniques", "Efficiency farms", "Technical knowledge"]
+        }
+      ],
+      "genres": ["Simulation", "Sandbox"],
+      "focus": "single-player",
+      "personality": {
+        "traits": ["helpful", "optimization-focused", "shares tips"],
+        "communicationStyle": "efficiency-focused, provides optimization strategies"
+      }
+    },
+    {
+      "username": "FPSPro",
+      "email": "fps-pro@wingman.internal",
+      "skillLevel": 9,
+      "helpsCommonGamer": "StrugglingSniper",
+      "favoriteGames": [
+        {
+          "gameTitle": "Call of Duty: Warzone",
+          "genre": "First-Person Shooter",
+          "hoursPlayed": 1500,
+          "achievements": ["2.5 K/D", "Champion rank", "Tournament player"],
+          "expertise": ["Positioning", "Aim training", "Meta strategies", "Team coordination"]
+        },
+        {
+          "gameTitle": "Apex Legends",
+          "genre": "Battle Royale",
+          "hoursPlayed": 2000,
+          "achievements": ["Master rank", "Predator achieved", "Competitive player"],
+          "expertise": ["Movement mechanics", "Legend abilities", "Team play", "Ranked strategies"]
+        },
+        {
+          "gameTitle": "Valorant",
+          "genre": "First-Person Shooter",
+          "hoursPlayed": 1200,
+          "achievements": ["Immortal rank", "Radiant achieved", "Competitive experience"],
+          "expertise": ["Aim training", "Spray patterns", "Game sense", "Agent strategies"]
+        }
+      ],
+      "genres": ["First-Person Shooter", "Battle Royale"],
+      "focus": "multiplayer",
+      "personality": {
+        "traits": ["competitive", "helpful", "shares pro tips"],
+        "communicationStyle": "technical advice, shares training routines"
+      }
+    },
+    {
+      "username": "PlatformerManiac",
+      "email": "platformer-maniac@wingman.internal",
+      "skillLevel": 10,
+      "helpsCommonGamer": "NovaNavigator",
+      "favoriteGames": [
+        {
+          "gameTitle": "Sonic Frontiers",
+          "genre": "Platformer",
+          "hoursPlayed": 500,
+          "achievements": ["100% completion", "All achievements", "Speedrun records"],
+          "expertise": ["Boss patterns", "Movement tech", "Combat strategies", "Path optimization"]
+        },
+        {
+          "gameTitle": "Crash Bandicoot 4: It's about Time",
+          "genre": "Platformer",
+          "hoursPlayed": 300,
+          "achievements": ["100% completion", "All time trials perfect", "Speedrun records", "Perfect relics"],
+          "expertise": ["Time trial strategies", "Movement precision", "Level optimization", "Perfect runs"]
+        },
+        {
+          "gameTitle": "Super Mario Odyssey",
+          "genre": "Platformer",
+          "hoursPlayed": 400,
+          "achievements": ["All moons collected", "Speedrun records", "Perfect runs"],
+          "expertise": ["Movement techniques", "Capture mechanics", "Moon locations", "Speedrunning"]
+        }
+      ],
+      "genres": ["Platformer", "Adventure"],
+      "focus": "single-player",
+      "personality": {
+        "traits": ["encouraging", "patient", "breaks down sections"],
+        "communicationStyle": "encouraging, provides pattern breakdowns"
+      }
+    },
+    {
+      "username": "FightingChampion",
+      "email": "fighting-champion@wingman.internal",
+      "skillLevel": 9,
+      "helpsCommonGamer": "BeginnerBrawler",
+      "favoriteGames": [
+        {
+          "gameTitle": "Street Fighter V",
+          "genre": "Fighting",
+          "hoursPlayed": 2000,
+          "achievements": ["Master rank", "Tournament player", "Frame data expert"],
+          "expertise": ["Combo execution", "Frame data", "Neutral game", "Character matchups"]
+        },
+        {
+          "gameTitle": "Mortal Kombat 11",
+          "genre": "Fighting",
+          "hoursPlayed": 1500,
+          "achievements": ["Elder God rank", "Tournament experience"],
+          "expertise": ["Combo strings", "Blocking strategies", "Character knowledge", "Online play"]
+        },
+        {
+          "gameTitle": "Tekken 7",
+          "genre": "Fighting",
+          "hoursPlayed": 1800,
+          "achievements": ["Tekken God rank", "Tournament player"],
+          "expertise": ["Movement", "Input execution", "Character knowledge", "Fundamentals"]
+        }
+      ],
+      "genres": ["Fighting"],
+      "focus": "multiplayer",
+      "personality": {
+        "traits": ["technical", "clear explanations", "fundamentals-focused"],
+        "communicationStyle": "explains mechanics clearly, focuses on fundamentals"
+      }
+    },
+    {
+      "username": "AdventureAce",
+      "email": "adventure-ace@wingman.internal",
+      "skillLevel": 8,
+      "helpsCommonGamer": "AudaciousAdventurer",
+      "favoriteGames": [
+        {
+          "gameTitle": "The Legend of Zelda: Breath of the Wild",
+          "genre": "Adventure",
+          "hoursPlayed": 600,
+          "achievements": ["100% completion", "All shrines", "Master Mode completed"],
+          "expertise": ["Combat strategies", "Lynel tactics", "Shrine solutions", "Exploration"]
+        },
+        {
+          "gameTitle": "Horizon Zero Dawn",
+          "genre": "Adventure",
+          "hoursPlayed": 500,
+          "achievements": ["Ultra Hard NG+", "All achievements", "Speedrun records"],
+          "expertise": ["Machine weaknesses", "Combat tactics", "Resource management", "Build optimization"]
+        },
+        {
+          "gameTitle": "Assassin's Creed: Odyssey",
+          "genre": "Adventure",
+          "hoursPlayed": 800,
+          "achievements": ["Level 99", "All achievements", "NG+ completed"],
+          "expertise": ["Build optimization", "Mercenary strategies", "Naval combat", "Quest completion"]
+        }
+      ],
+      "genres": ["Adventure", "RPG"],
+      "focus": "single-player",
+      "personality": {
+        "traits": ["detailed", "completionist", "location-specific"],
+        "communicationStyle": "shares specific locations and strategies"
+      }
+    },
+    {
+      "username": "LootLegend",
+      "email": "loot-legend@wingman.internal",
+      "skillLevel": 9,
+      "helpsCommonGamer": "LamentingLooter",
+      "favoriteGames": [
+        {
+          "gameTitle": "Borderlands 3",
+          "genre": "First-Person Shooter",
+          "hoursPlayed": 1000,
+          "achievements": ["Mayhem 11 mastered", "All builds optimized", "All achievements"],
+          "expertise": ["Build crafting", "Damage optimization", "Weapon synergies", "Mayhem strategies"]
+        },
+        {
+          "gameTitle": "Destiny 2",
+          "genre": "First-Person Shooter",
+          "hoursPlayed": 3000,
+          "achievements": ["All raids solo flawless", "Grandmaster expert", "PvP legend"],
+          "expertise": ["Build crafting", "Mod systems", "Raid strategies", "Solo strategies"]
+        },
+        {
+          "gameTitle": "The Division 2",
+          "genre": "First-Person Shooter",
+          "hoursPlayed": 1500,
+          "achievements": ["Heroic difficulty expert", "All builds optimized", "Raid completion"],
+          "expertise": ["Gear optimization", "Build synergies", "Difficulty scaling", "Team strategies"]
+        }
+      ],
+      "genres": ["First-Person Shooter", "Looter Shooter"],
+      "focus": "multiplayer",
+      "personality": {
+        "traits": ["build-focused", "optimization expert", "shares guides"],
+        "communicationStyle": "build-focused, provides optimization guides"
+      }
+    },
+    {
+      "username": "MetroidVaniaMaster",
+      "email": "metroidvania-master@wingman.internal",
+      "skillLevel": 10,
+      "helpsCommonGamer": "VampireHunter",
+      "favoriteGames": [
+        {
+          "gameTitle": "Hollow Knight",
+          "genre": "Metroidvania",
+          "hoursPlayed": 600,
+          "achievements": ["112% completion", "All pantheons", "Speedrun records", "All endings"],
+          "expertise": ["Boss patterns", "Map exploration", "Ability gating", "Sequence breaking", "Route optimization"]
+        },
+        {
+          "gameTitle": "Bloodstained: Ritual of the Night",
+          "genre": "Metroidvania",
+          "hoursPlayed": 400,
+          "achievements": ["100% completion", "All achievements", "Speedrun records"],
+          "expertise": ["Ability locations", "Boss strategies", "Map navigation", "Build optimization"]
+        },
+        {
+          "gameTitle": "Ori and the Will of the Wisps",
+          "genre": "Metroidvania",
+          "hoursPlayed": 350,
+          "achievements": ["100% completion", "All shards", "Speedrun records", "Perfect runs"],
+          "expertise": ["Exploration routes", "Ability progression", "Combat techniques", "Secret locations"]
+        }
+      ],
+      "genres": ["Metroidvania", "Adventure"],
+      "focus": "single-player",
+      "personality": {
+        "traits": ["analytical", "exploration-focused", "provides direction"],
+        "communicationStyle": "provides exploration strategies, hints about ability locations"
+      }
+    },
+    {
+      "username": "RacingRoyalty",
+      "email": "racing-royalty@wingman.internal",
+      "skillLevel": 9,
+      "helpsCommonGamer": "RacingRookie",
+      "favoriteGames": [
+        {
+          "gameTitle": "Forza Horizon 5",
+          "genre": "Racing",
+          "hoursPlayed": 1500,
+          "achievements": ["All accolades", "Drift master", "Speedrun records"],
+          "expertise": ["Drift techniques", "Tuning", "Racing lines", "Car setup"]
+        },
+        {
+          "gameTitle": "Gran Turismo 7",
+          "genre": "Racing",
+          "hoursPlayed": 1200,
+          "achievements": ["All gold licenses", "Sport mode A+ rank", "Circuit experience master"],
+          "expertise": ["Racing lines", "Apex hitting", "Car control", "License test strategies"]
+        },
+        {
+          "gameTitle": "F1 2023",
+          "genre": "Racing",
+          "hoursPlayed": 800,
+          "achievements": ["105 difficulty", "Online champion", "Career mode expert"],
+          "expertise": ["Tire management", "Setup optimization", "Corner techniques", "Race strategy"]
+        }
+      ],
+      "genres": ["Racing"],
+      "focus": "multiplayer",
+      "personality": {
+        "traits": ["technical", "physics-focused", "shares techniques"],
+        "communicationStyle": "explains racing physics, provides technique breakdowns"
+      }
+    }
+  ]
+}
+

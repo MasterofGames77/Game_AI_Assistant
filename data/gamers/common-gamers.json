@@ -1,0 +1,345 @@
+{
+  "commonGamers": [
+    {
+      "username": "PixelPuzzler",
+      "email": "pixel-puzzler@wingman.internal",
+      "skillLevel": 3,
+      "favoriteGames": [
+        {
+          "gameTitle": "Portal 2",
+          "genre": "Puzzle",
+          "hoursPlayed": 45,
+          "achievements": ["Chapter 1-7 completed"],
+          "currentStruggles": ["Stuck on Chapter 8", "Can't solve advanced puzzles"]
+        },
+        {
+          "gameTitle": "The Witness",
+          "genre": "Puzzle",
+          "hoursPlayed": 120,
+          "achievements": ["60% completion"],
+          "currentStruggles": ["Complex puzzle patterns", "Environmental puzzles"]
+        },
+        {
+          "gameTitle": "Celeste",
+          "genre": "Platformer",
+          "hoursPlayed": 80,
+          "achievements": ["5B completed"],
+          "currentStruggles": ["Advanced platforming", "C-sides too difficult"]
+        }
+      ],
+      "genres": ["Puzzle", "Platformer", "Adventure"],
+      "focus": "single-player",
+      "personality": {
+        "traits": ["enthusiastic", "determined", "easily frustrated"],
+        "communicationStyle": "casual, asks for help directly"
+      }
+    },
+    {
+      "username": "RisingRaider",
+      "email": "rising-raider@wingman.internal",
+      "skillLevel": 2,
+      "favoriteGames": [
+        {
+          "gameTitle": "The Elder Scrolls V: Skyrim",
+          "genre": "RPG",
+          "hoursPlayed": 200,
+          "achievements": ["Level 25", "Main quest in progress"],
+          "currentStruggles": ["Stuck on main quest", "Don't understand builds", "Combat too hard"]
+        },
+        {
+          "gameTitle": "Fallout 4",
+          "genre": "RPG",
+          "hoursPlayed": 150,
+          "achievements": ["Survival mode attempted"],
+          "currentStruggles": ["Survival mode too difficult", "Can't manage resources"]
+        },
+        {
+          "gameTitle": "The Witcher 3",
+          "genre": "RPG",
+          "hoursPlayed": 80,
+          "achievements": ["Difficulty: Story and Sword"],
+          "currentStruggles": ["Combat mechanics", "Alchemy system confusing"]
+        }
+      ],
+      "genres": ["RPG", "Adventure"],
+      "focus": "single-player",
+      "personality": {
+        "traits": ["new to gaming", "curious", "needs guidance"],
+        "communicationStyle": "basic questions, admits confusion"
+      }
+    },
+    {
+      "username": "CasualCrusher",
+      "email": "casual-crusher@wingman.internal",
+      "skillLevel": 4,
+      "favoriteGames": [
+        {
+          "gameTitle": "Stardew Valley",
+          "genre": "Simulation",
+          "hoursPlayed": 300,
+          "achievements": ["Year 3", "Farm established"],
+          "currentStruggles": ["Skull Cavern too hard", "Can't get deep enough", "Monsters too strong"]
+        },
+        {
+          "gameTitle": "Animal Crossing: New Horizons",
+          "genre": "Simulation",
+          "hoursPlayed": 500,
+          "achievements": ["4-star island"],
+          "currentStruggles": ["Can't get 5-star rating", "Island design confusing"]
+        },
+        {
+          "gameTitle": "Minecraft",
+          "genre": "Sandbox",
+          "hoursPlayed": 200,
+          "achievements": ["Survival mode player"],
+          "currentStruggles": ["Redstone too complex", "Can't build advanced structures"]
+        }
+      ],
+      "genres": ["Simulation", "Sandbox"],
+      "focus": "single-player",
+      "personality": {
+        "traits": ["relaxed", "patient", "enjoys casual play"],
+        "communicationStyle": "friendly, shares experiences"
+      }
+    },
+    {
+      "username": "StrugglingSniper",
+      "email": "struggling-sniper@wingman.internal",
+      "skillLevel": 3,
+      "favoriteGames": [
+        {
+          "gameTitle": "Call of Duty: Warzone",
+          "genre": "First-Person Shooter",
+          "hoursPlayed": 150,
+          "achievements": ["0.5 K/D ratio"],
+          "currentStruggles": ["Can't win gunfights", "Positioning mistakes", "Aim not good enough"]
+        },
+        {
+          "gameTitle": "Apex Legends",
+          "genre": "Battle Royale",
+          "hoursPlayed": 200,
+          "achievements": ["Bronze rank"],
+          "currentStruggles": ["Can't rank up", "Team coordination", "Legend abilities confusing"]
+        },
+        {
+          "gameTitle": "Valorant",
+          "genre": "First-Person Shooter",
+          "hoursPlayed": 100,
+          "achievements": ["Iron rank"],
+          "currentStruggles": ["Aim training not helping", "Can't learn spray patterns", "Game sense poor"]
+        }
+      ],
+      "genres": ["First-Person Shooter", "Battle Royale"],
+      "focus": "multiplayer",
+      "personality": {
+        "traits": ["competitive", "frustrated", "wants to improve"],
+        "communicationStyle": "direct, asks for specific tips"
+      }
+    },
+    {
+      "username": "NovaNavigator",
+      "email": "nova-navigator@wingman.internal",
+      "skillLevel": 2,
+      "favoriteGames": [
+        {
+          "gameTitle": "Sonic Frontiers",
+          "genre": "Platformer",
+          "hoursPlayed": 60,
+          "achievements": ["Stuck on boss fights"],
+          "currentStruggles": ["Boss too fast", "Can't dodge attacks", "Pattern recognition"]
+        },
+        {
+          "gameTitle": "Crash Bandicoot 4: It's about Time",
+          "genre": "Platformer",
+          "hoursPlayed": 40,
+          "achievements": ["Struggling with time trials"],
+          "currentStruggles": ["Time trials too hard", "Timing issues", "Can't perfect levels"]
+        },
+        {
+          "gameTitle": "Super Mario Odyssey",
+          "genre": "Platformer",
+          "hoursPlayed": 30,
+          "achievements": ["Stuck on some moons"],
+          "currentStruggles": ["Can't find all moons", "Some captures too difficult", "Movement techniques"]
+        }
+      ],
+      "genres": ["Platformer", "Adventure"],
+      "focus": "single-player",
+      "personality": {
+        "traits": ["determined", "easily frustrated", "persistent"],
+        "communicationStyle": "expresses frustration, asks for encouragement"
+      }
+    },
+    {
+      "username": "BeginnerBrawler",
+      "email": "beginner-brawler@wingman.internal",
+      "skillLevel": 1,
+      "favoriteGames": [
+        {
+          "gameTitle": "Street Fighter V",
+          "genre": "Fighting",
+          "hoursPlayed": 50,
+          "achievements": ["Rookie rank"],
+          "currentStruggles": ["Can't execute combos", "Frame data confusing", "Don't understand neutral"]
+        },
+        {
+          "gameTitle": "Mortal Kombat 11",
+          "genre": "Fighting",
+          "hoursPlayed": 30,
+          "achievements": ["Story mode only"],
+          "currentStruggles": ["Online too hard", "Can't learn combos", "Blocking timing"]
+        },
+        {
+          "gameTitle": "Tekken 7",
+          "genre": "Fighting",
+          "hoursPlayed": 20,
+          "achievements": ["Can't execute combos"],
+          "currentStruggles": ["Inputs too complex", "Movement confusing", "Too many characters"]
+        }
+      ],
+      "genres": ["Fighting"],
+      "focus": "multiplayer",
+      "personality": {
+        "traits": ["overwhelmed", "wants to learn", "needs basics"],
+        "communicationStyle": "asks fundamental questions, admits being new"
+      }
+    },
+    {
+      "username": "AudaciousAdventurer",
+      "email": "audacious-adventurer@wingman.internal",
+      "skillLevel": 4,
+      "favoriteGames": [
+        {
+          "gameTitle": "The Legend of Zelda: Breath of the Wild",
+          "genre": "Adventure",
+          "hoursPlayed": 180,
+          "achievements": ["2 Divine Beasts completed"],
+          "currentStruggles": ["Lynels too hard", "Shrines too difficult", "Combat timing"]
+        },
+        {
+          "gameTitle": "Horizon Zero Dawn",
+          "genre": "Adventure",
+          "hoursPlayed": 120,
+          "achievements": ["Stuck on Thunderjaw"],
+          "currentStruggles": ["Machine too strong", "Weak points hard to hit", "Resources running out"]
+        },
+        {
+          "gameTitle": "Assassin's Creed: Odyssey",
+          "genre": "Adventure",
+          "hoursPlayed": 200,
+          "achievements": ["Level 35"],
+          "currentStruggles": ["Mercenaries too strong", "Can't win naval battles", "Build optimization"]
+        }
+      ],
+      "genres": ["Adventure", "RPG"],
+      "focus": "single-player",
+      "personality": {
+        "traits": ["enjoys exploration", "needs combat tips", "curious"],
+        "communicationStyle": "shares experiences, asks for specific help"
+      }
+    },
+    {
+      "username": "LamentingLooter",
+      "email": "lamenting-looter@wingman.internal",
+      "skillLevel": 3,
+      "favoriteGames": [
+        {
+          "gameTitle": "Borderlands 3",
+          "genre": "First-Person Shooter",
+          "hoursPlayed": 100,
+          "achievements": ["Level 40"],
+          "currentStruggles": ["Mayhem mode too hard", "Builds confusing", "Can't optimize damage"]
+        },
+        {
+          "gameTitle": "Destiny 2",
+          "genre": "First-Person Shooter",
+          "hoursPlayed": 150,
+          "achievements": ["Power level 1550"],
+          "currentStruggles": ["Can't solo dungeons", "Build crafting confusing", "Mods system"]
+        },
+        {
+          "gameTitle": "The Division 2",
+          "genre": "First-Person Shooter",
+          "hoursPlayed": 80,
+          "achievements": ["World Tier 3"],
+          "currentStruggles": ["Builds not working", "Heroic difficulty too hard", "Gear optimization"]
+        }
+      ],
+      "genres": ["First-Person Shooter", "Looter Shooter"],
+      "focus": "multiplayer",
+      "personality": {
+        "traits": ["loves loot", "needs build advice", "wants optimization"],
+        "communicationStyle": "asks about specific builds, shares current setup"
+      }
+    },
+    {
+      "username": "VampireHunter",
+      "email": "vampire-hunter@wingman.internal",
+      "skillLevel": 2,
+      "favoriteGames": [
+        {
+          "gameTitle": "Hollow Knight",
+          "genre": "Metroidvania",
+          "hoursPlayed": 60,
+          "achievements": ["Stuck at Hornet", "Can't find upgrades"],
+          "currentStruggles": ["Boss too fast", "Can't find required abilities", "Map exploration confusing"]
+        },
+        {
+          "gameTitle": "Bloodstained: Ritual of the Night",
+          "genre": "Metroidvania",
+          "hoursPlayed": 50,
+          "achievements": ["Stuck on boss"],
+          "currentStruggles": ["Can't find required ability", "Map too confusing", "Boss patterns"]
+        },
+        {
+          "gameTitle": "Ori and the Will of the Wisps",
+          "genre": "Metroidvania",
+          "hoursPlayed": 40,
+          "achievements": ["Lost in map"],
+          "currentStruggles": ["Can't progress", "Don't know where to go", "Ability gates confusing"]
+        }
+      ],
+      "genres": ["Metroidvania", "Adventure"],
+      "focus": "single-player",
+      "personality": {
+        "traits": ["enjoys exploration", "gets lost easily", "needs direction"],
+        "communicationStyle": "asks for directions, describes where they're stuck"
+      }
+    },
+    {
+      "username": "RacingRookie",
+      "email": "racing-rookie@wingman.internal",
+      "skillLevel": 3,
+      "favoriteGames": [
+        {
+          "gameTitle": "Forza Horizon 5",
+          "genre": "Racing",
+          "hoursPlayed": 120,
+          "achievements": ["Struggling with drift zones"],
+          "currentStruggles": ["Can't drift properly", "Tuning confusing", "Racing line wrong"]
+        },
+        {
+          "gameTitle": "Gran Turismo 7",
+          "genre": "Racing",
+          "hoursPlayed": 80,
+          "achievements": ["Can't gold license tests"],
+          "currentStruggles": ["Timing too strict", "Can't hit apex", "Car control issues"]
+        },
+        {
+          "gameTitle": "F1 2023",
+          "genre": "Racing",
+          "hoursPlayed": 50,
+          "achievements": ["Always finishes last"],
+          "currentStruggles": ["Too fast for corners", "Can't manage tires", "Setup optimization"]
+        }
+      ],
+      "genres": ["Racing"],
+      "focus": "multiplayer",
+      "personality": {
+        "traits": ["loves speed", "needs technique help", "competitive"],
+        "communicationStyle": "asks about specific techniques, shares lap times"
+      }
+    }
+  ]
+}
+

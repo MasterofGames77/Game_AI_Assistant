@@ -61,6 +61,31 @@ export interface IUser extends Document {
     lastEmailSentAt?: Date; // Track when last weekly digest was sent
     enabled?: boolean; // User preference: whether to receive weekly digest emails (default: true for opt-in)
   };
+  // Gamer profile for automated COMMON/EXPERT gamers
+  gamerProfile?: {
+    type: 'common' | 'expert';
+    skillLevel: number; // 0-10
+    favoriteGames: Array<{
+      gameTitle: string;
+      genre: string;
+      hoursPlayed: number;
+      achievements: string[];
+      currentStruggles?: string[]; // For COMMON gamers
+      expertise?: string[]; // For EXPERT gamers
+    }>;
+    gameHistory: Array<{
+      gameTitle: string;
+      totalHours: number;
+      completion: number; // 0-100
+      achievements: number;
+      notes?: string;
+    }>;
+    personality: {
+      traits: string[];
+      communicationStyle: string;
+    };
+    helpsCommonGamer?: string; // For EXPERT gamers - username of COMMON gamer they help
+  };
   createdAt?: Date; // Mongoose timestamp
   updatedAt?: Date; // Mongoose timestamp
   // Methods
@@ -332,6 +357,40 @@ const UserSchema = new Schema<IUser>({
     firstEmailSentAt: { type: Date }, // Track when first weekly digest was sent
     lastEmailSentAt: { type: Date }, // Track when last weekly digest was sent
     enabled: { type: Boolean, default: true } // User preference: whether to receive weekly digest emails (default: true for opt-in)
+  },
+  // Gamer profile for automated COMMON/EXPERT gamers
+  gamerProfile: {
+    type: { 
+      type: String, 
+      enum: ['common', 'expert'],
+      required: false
+    },
+    skillLevel: { 
+      type: Number, 
+      min: 0, 
+      max: 10,
+      required: false
+    },
+    favoriteGames: [{
+      gameTitle: { type: String, required: false },
+      genre: { type: String, required: false },
+      hoursPlayed: { type: Number, required: false },
+      achievements: [{ type: String }],
+      currentStruggles: [{ type: String }], // For COMMON gamers
+      expertise: [{ type: String }] // For EXPERT gamers
+    }],
+    gameHistory: [{
+      gameTitle: { type: String, required: false },
+      totalHours: { type: Number, required: false },
+      completion: { type: Number, min: 0, max: 100, required: false },
+      achievements: { type: Number, required: false },
+      notes: { type: String }
+    }],
+    personality: {
+      traits: [{ type: String }],
+      communicationStyle: { type: String }
+    },
+    helpsCommonGamer: { type: String } // For EXPERT gamers - username of COMMON gamer they help
   }
 }, { collection: 'users' });
 
@@ -345,6 +404,10 @@ UserSchema.index({ 'subscription.currentPeriodEnd': 1 });
 // Create indexes for usage limit queries
 UserSchema.index({ 'usageLimit.windowStartTime': 1 });
 UserSchema.index({ 'usageLimit.cooldownUntil': 1 });
+
+// Create indexes for gamer profile queries
+UserSchema.index({ 'gamerProfile.type': 1 });
+UserSchema.index({ 'gamerProfile.favoriteGames.gameTitle': 1 });
 
 // Create indexes for authentication queries
 UserSchema.index({ 'passwordResetToken': 1 });

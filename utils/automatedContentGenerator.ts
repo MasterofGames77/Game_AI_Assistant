@@ -10,6 +10,23 @@ const openai = new OpenAI({
 export interface UserPreferences {
   genres: string[];
   focus: 'single-player' | 'multiplayer';
+  gamerProfile?: {
+    type: 'common' | 'expert';
+    skillLevel: number;
+    favoriteGames: Array<{
+      gameTitle: string;
+      genre: string;
+      hoursPlayed: number;
+      achievements: string[];
+      currentStruggles?: string[];
+      expertise?: string[];
+    }>;
+    personality: {
+      traits: string[];
+      communicationStyle: string;
+    };
+    helpsCommonGamer?: string;
+  };
 }
 
 export interface ContentGenerationOptions {
@@ -711,6 +728,217 @@ Generate ONLY the reply content, nothing else:`;
   } catch (error) {
     console.error('Error generating post reply:', error);
     throw new Error(`Failed to generate post reply: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Generate a forum post for a COMMON gamer about an issue/challenge they're facing
+ */
+export async function generateCommonGamerPost(
+  options: ContentGenerationOptions & {
+    gamerProfile: UserPreferences['gamerProfile'];
+    username: string;
+  }
+): Promise<string> {
+  const { gameTitle, genre, gamerProfile, username, forumTopic, forumCategory, previousPosts = [] } = options;
+  
+  if (!gamerProfile || gamerProfile.type !== 'common') {
+    throw new Error('Invalid gamer profile for COMMON gamer post');
+  }
+
+  // Find a struggle from their favorite games that matches the current game
+  const gameStruggles = gamerProfile.favoriteGames
+    .find(g => g.gameTitle.toLowerCase() === gameTitle.toLowerCase())?.currentStruggles || [];
+  
+  const specificIssue = gameStruggles.length > 0 
+    ? gameStruggles[Math.floor(Math.random() * gameStruggles.length)]
+    : 'having trouble with a specific part';
+
+  // Build context about their skill level and struggles
+  const skillContext = `You have a skill level of ${gamerProfile.skillLevel}/10, which means you're still learning and often struggle with ${gamerProfile.skillLevel <= 2 ? 'basic mechanics and understanding game systems' : gamerProfile.skillLevel <= 4 ? 'intermediate challenges and optimization' : 'advanced techniques'}.`;
+
+  const personalityContext = `Your personality traits: ${gamerProfile.personality.traits.join(', ')}. Your communication style: ${gamerProfile.personality.communicationStyle}.`;
+
+  // Build previous posts context
+  let previousPostsContext = '';
+  if (previousPosts.length > 0) {
+    previousPostsContext = `\n\nCRITICAL: Here are previous posts you've made to ensure your new post is UNIQUE:
+${previousPosts.map((post, idx) => `${idx + 1}. "${post}"`).join('\n')}
+
+Your new post MUST be completely different from all previous posts above.`;
+  }
+
+  const systemPrompt = `You are ${username}, a COMMON gamer with skill level ${gamerProfile.skillLevel}/10.
+${skillContext}
+${personalityContext}
+
+You're playing ${gameTitle} and ${specificIssue}.
+
+Generate a forum post that:
+- Describes your specific problem or challenge in ${gameTitle}
+- Mentions what you've tried (even if it didn't work)
+- Asks for help in a genuine, relatable way that matches your skill level
+- References your struggles naturally (don't over-explain your skill level, just show it through your language)
+- Is 2-4 sentences long
+- Sounds like a real person struggling with the game
+- Uses casual gaming language that matches your communication style
+- Shows you're genuinely stuck and need help
+
+CRITICAL ACCURACY REQUIREMENTS:
+- Spell character names, locations, and game terms CORRECTLY
+- Only mention features that actually exist in ${gameTitle}
+- If you're unsure about a fact, don't include it
+
+IMPORTANT:
+- Do NOT use formal language or AI-related phrases
+- You MUST include the game title "${gameTitle}" in your post
+- Your post should reflect your skill level naturally (skill ${gamerProfile.skillLevel}/10)
+- Be genuine and relatable - you're asking for help because you're stuck${previousPostsContext}
+
+Game: ${gameTitle}
+Genre: ${genre}
+Forum Topic: ${forumTopic || 'General Discussion'}
+Forum Category: ${forumCategory || 'general'}
+
+Generate ONLY the post content, nothing else:`;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt
+        },
+        {
+          role: 'user',
+          content: `Generate a forum post about struggling with ${gameTitle}.`
+        }
+      ],
+      temperature: 0.9,
+      max_tokens: 250
+    });
+
+    const generatedPost = completion.choices[0]?.message?.content?.trim();
+    
+    if (!generatedPost) {
+      throw new Error('Failed to generate COMMON gamer post');
+    }
+
+    let cleanedPost = generatedPost
+      .replace(/^["']|["']$/g, '')
+      .replace(/^(Post:|Message:)\s*/i, '')
+      .trim();
+
+    return cleanedPost;
+  } catch (error) {
+    console.error('Error generating COMMON gamer post:', error);
+    throw new Error(`Failed to generate COMMON gamer post: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Generate a solution reply from an EXPERT gamer to a COMMON gamer's post
+ */
+export async function generateExpertGamerReply(
+  options: PostReplyOptions & {
+    gamerProfile: UserPreferences['gamerProfile'];
+    username: string;
+    commonGamerUsername: string;
+  }
+): Promise<string> {
+  const { gameTitle, genre, originalPost, originalPostAuthor, gamerProfile, username, commonGamerUsername, forumTopic, forumCategory } = options;
+  
+  if (!gamerProfile || gamerProfile.type !== 'expert') {
+    throw new Error('Invalid gamer profile for EXPERT gamer reply');
+  }
+
+  // Find expertise from their favorite games
+  const gameExpertise = gamerProfile.favoriteGames
+    .find(g => g.gameTitle.toLowerCase() === gameTitle.toLowerCase())?.expertise || [];
+  
+  const expertiseContext = gameExpertise.length > 0
+    ? `Your areas of expertise in ${gameTitle}: ${gameExpertise.join(', ')}.`
+    : `You've mastered ${gameTitle} with extensive experience.`;
+
+  const personalityContext = `Your personality traits: ${gamerProfile.personality.traits.join(', ')}. Your communication style: ${gamerProfile.personality.communicationStyle}.`;
+
+  // Determine if this is a single-player or multiplayer game
+  const singlePlayerGenres = ['rpg', 'adventure', 'simulation', 'puzzle', 'platformer', 'metroidvania'];
+  const isSinglePlayerGame = singlePlayerGenres.includes(genre.toLowerCase());
+
+  const systemPrompt = `You are ${username}, an EXPERT gamer with skill level ${gamerProfile.skillLevel}/10.
+${expertiseContext}
+${personalityContext}
+
+A COMMON gamer (${commonGamerUsername}, skill level lower than yours) posted about struggling with ${gameTitle}. Their post: "${originalPost}"
+
+Generate a helpful, detailed solution reply that:
+- Directly addresses their specific problem
+- Provides step-by-step guidance that's clear for someone with lower skill
+- Shares your expertise naturally without being condescending
+- Is encouraging and supportive (they're struggling, be patient)
+- References specific game mechanics, items, locations, or strategies from ${gameTitle}
+- Is 3-5 sentences long
+- Sounds like an experienced player helping a friend
+- Matches your communication style
+
+CRITICAL ACCURACY REQUIREMENTS:
+- ${isSinglePlayerGame ? 'This is a SINGLE-PLAYER game - do NOT mention multiplayer features' : 'This is a MULTIPLAYER game - focus on online/competitive features'}
+- Spell character names, locations, and game terms CORRECTLY
+- Only mention features that actually exist in ${gameTitle}
+- Provide accurate, actionable advice
+
+IMPORTANT:
+- Do NOT use formal language or AI-related phrases
+- You MUST include the game title "${gameTitle}" in your reply
+- Be encouraging - they're struggling and need help
+- Break down complex solutions into simple steps
+- Reference your expertise naturally (e.g., "I've found that...", "When I play...")
+
+Game: ${gameTitle}
+Genre: ${genre} (${isSinglePlayerGame ? 'Single-player' : 'Multiplayer'} focus)
+Forum Topic: ${forumTopic || 'General Discussion'}
+Forum Category: ${forumCategory || 'general'}
+Original Post Author: ${originalPostAuthor} (COMMON gamer)
+
+Original Post:
+"${originalPost}"
+
+Generate ONLY the reply content, nothing else:`;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt
+        },
+        {
+          role: 'user',
+          content: `Generate a helpful solution reply to ${originalPostAuthor}'s post about struggling with ${gameTitle}.`
+        }
+      ],
+      temperature: 0.8,
+      max_tokens: 350
+    });
+
+    const generatedReply = completion.choices[0]?.message?.content?.trim();
+    
+    if (!generatedReply) {
+      throw new Error('Failed to generate EXPERT gamer reply');
+    }
+
+    let cleanedReply = generatedReply
+      .replace(/^["']|["']$/g, '')
+      .replace(/^(Reply:|Response:)\s*/i, '')
+      .trim();
+
+    return cleanedReply;
+  } catch (error) {
+    console.error('Error generating EXPERT gamer reply:', error);
+    throw new Error(`Failed to generate EXPERT gamer reply: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
