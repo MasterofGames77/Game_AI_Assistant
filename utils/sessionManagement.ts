@@ -147,6 +147,15 @@ export async function getUserSessions(
       .sort({ lastActivity: -1 })
       .lean();
 
+    // Debug logging (development only)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[getUserSessions]', {
+        userId,
+        sessionsFound: sessions.length,
+        sessionIds: sessions.map((s: any) => s.sessionId?.substring(0, 8) + '...'),
+      });
+    }
+
     // Mark current session if provided
     // Note: currentRefreshTokenHash is already hashed when passed from API endpoint
     if (currentRefreshTokenHash) {

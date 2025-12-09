@@ -20,6 +20,13 @@ export default async function handler(req: AuthenticatedRequest, res: NextApiRes
     const authResult = await requireAuth(req, res);
     
     if (!authResult.authenticated || !authResult.userId) {
+      // Log for debugging (production-safe - no sensitive data)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Sessions API] Auth failed:', {
+          hasCookie: !!req.headers.cookie,
+          cookieHeader: req.headers.cookie ? 'present' : 'missing',
+        });
+      }
       return res.status(401).json({
         error: 'Authentication required',
         message: 'Please sign in to view sessions',
@@ -35,6 +42,15 @@ export default async function handler(req: AuthenticatedRequest, res: NextApiRes
 
       // Get all active sessions
       const sessions = await getUserSessions(userId, currentRefreshTokenHash);
+
+      // Debug logging (development only)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Sessions API]', {
+          userId,
+          hasRefreshToken: !!currentRefreshToken,
+          sessionsFound: sessions.length,
+        });
+      }
 
       // Format sessions for response
       const formattedSessions = sessions.map((session: any) => ({

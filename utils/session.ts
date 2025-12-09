@@ -7,7 +7,9 @@ import { createOrUpdateSession } from './sessionManagement';
 const COOKIE_OPTIONS = {
   httpOnly: true, // Prevents JavaScript access (XSS protection)
   secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-  sameSite: 'strict' as const, // CSRF protection
+  // Use 'lax' in production for better compatibility with proxies/redirects
+  // 'strict' can cause issues when behind Cloudflare or other proxies
+  sameSite: (process.env.NODE_ENV === 'production' ? 'lax' : 'strict') as 'lax' | 'strict',
   path: '/',
 };
 

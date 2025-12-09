@@ -96,12 +96,16 @@ export default function AccountPage() {
             // Token refreshed successfully, retry the sessions request (only once)
             return fetchSessions(1);
           } else {
-            // Refresh failed - check if it's a session revocation or expired token
+            // Refresh failed - get error details
             const refreshData = await refreshResponse.json().catch(() => ({}));
-            if (refreshData.message?.includes('revoked') || refreshData.message?.includes('Session has been revoked')) {
+            const refreshErrorMsg = refreshData.message || refreshData.error || "Token refresh failed";
+            
+            if (refreshErrorMsg.includes('revoked') || refreshErrorMsg.includes('Session has been revoked')) {
               throw new Error("Your session has been revoked. Please sign in again.");
+            } else if (refreshErrorMsg.includes('expired') || refreshErrorMsg.includes('not found')) {
+              throw new Error("Session expired. Please sign in again.");
             } else {
-              // Token expired or invalid
+              // Other refresh error - still throw to show user needs to sign in
               throw new Error("Session expired. Please sign in again.");
             }
           }
@@ -113,7 +117,10 @@ export default function AccountPage() {
       }
 
       if (!response.ok) {
-        throw new Error("Failed to fetch sessions");
+        // Get error details for better debugging
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.message || errorData.error || "Failed to fetch sessions";
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
