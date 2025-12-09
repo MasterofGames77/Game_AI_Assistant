@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { HealthMonitoring, AccountData } from "@/types";
 import axios from "axios";
@@ -61,6 +61,84 @@ export default function AccountPage() {
   // Game tracking state
   const [gameTracking, setGameTracking] = useState<GameTracking | null>(null);
 
+  // Session management state
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsError, setSessionsError] = useState("");
+  const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null);
+
+  // Fetch active sessions
+  const fetchSessions = useCallback(async (retryCount = 0) => {
+    try {
+      setSessionsLoading(true);
+      setSessionsError("");
+      
+      // Prevent infinite retry loops
+      if (retryCount > 1) {
+        throw new Error("Session expired. Please sign in again.");
+      }
+      
+      let response = await fetch("/api/auth/sessions", {
+        method: "GET",
+        credentials: "include",
+      });
+
+      // If we get a 401, try to refresh the token and retry (only once)
+      if (response.status === 401 && retryCount === 0) {
+        try {
+          // Attempt to refresh the token
+          const refreshResponse = await fetch("/api/auth/refresh", {
+            method: "POST",
+            credentials: "include",
+          });
+
+          if (refreshResponse.ok) {
+            // Token refreshed successfully, retry the sessions request (only once)
+            return fetchSessions(1);
+          } else {
+            // Refresh failed - check if it's a session revocation or expired token
+            const refreshData = await refreshResponse.json().catch(() => ({}));
+            if (refreshData.message?.includes('revoked') || refreshData.message?.includes('Session has been revoked')) {
+              throw new Error("Your session has been revoked. Please sign in again.");
+            } else {
+              // Token expired or invalid
+              throw new Error("Session expired. Please sign in again.");
+            }
+          }
+        } catch (refreshError) {
+          // Refresh failed - don't retry again
+          const errorMessage = refreshError instanceof Error ? refreshError.message : "Session expired. Please sign in again.";
+          throw new Error(errorMessage);
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch sessions");
+      }
+
+      const data = await response.json();
+      setSessions(data.sessions || []);
+    } catch (error) {
+      console.error("Error fetching sessions:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to load active sessions";
+      setSessionsError(errorMessage);
+      
+      // If session expired or revoked, redirect to signin (only once, not in a loop)
+      if (errorMessage.includes("Session expired") || errorMessage.includes("revoked")) {
+        // Use a flag to prevent multiple redirects
+        const redirectKey = 'session_expired_redirected';
+        if (!sessionStorage.getItem(redirectKey)) {
+          sessionStorage.setItem(redirectKey, 'true');
+          setTimeout(() => {
+            window.location.href = "/signin";
+          }, 2000);
+        }
+      }
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const fetchAccountData = async () => {
       try {
@@ -98,11 +176,13 @@ export default function AccountPage() {
 
         const subscriptionData = await subscriptionResponse.json();
 
-        // Debug logging
-        console.log(
-          "Account page - subscription data received:",
-          subscriptionData
-        );
+        // Debug logging (development only)
+        if (process.env.NODE_ENV === 'development') {
+          console.log(
+            "Account page - subscription data received:",
+            subscriptionData
+          );
+        }
 
         setAccountData({
           username: userData.user.username,
@@ -156,6 +236,9 @@ export default function AccountPage() {
         } catch (error) {
           console.error("Error fetching game tracking:", error);
         }
+
+        // Fetch active sessions
+        fetchSessions();
       } catch (err) {
         console.error("Error fetching account data:", err);
         setError("Failed to load account data");
@@ -165,7 +248,114 @@ export default function AccountPage() {
     };
 
     fetchAccountData();
-  }, []);
+  }, [fetchSessions]);
+
+  // Revoke a specific session
+  const revokeSession = async (sessionId: string) => {
+    try {
+      setRevokingSessionId(sessionId);
+      const response = await fetch(`/api/auth/sessions/${sessionId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to revoke session");
+      }
+
+      // Refresh sessions list
+      await fetchSessions();
+    } catch (error) {
+      console.error("Error revoking session:", error);
+      setSessionsError("Failed to revoke session");
+    } finally {
+      setRevokingSessionId(null);
+    }
+  };
+
+  // Revoke all other sessions
+  const revokeAllOtherSessions = async () => {
+    if (!confirm("Are you sure you want to revoke all other sessions? You will be logged out on all other devices.")) {
+      return;
+    }
+
+    try {
+      setSessionsLoading(true);
+      const response = await fetch("/api/auth/sessions", {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to revoke sessions");
+      }
+
+      // Refresh sessions list
+      await fetchSessions();
+    } catch (error) {
+      console.error("Error revoking all sessions:", error);
+      setSessionsError("Failed to revoke sessions");
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  // Format date for display (relative time for sessions)
+  const formatRelativeDate = (dateString: string | Date) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) {
+      return "Just now";
+    } else if (diffMins < 60) {
+      return `${diffMins} minute${diffMins !== 1 ? "s" : ""} ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours} hour${diffHours !== 1 ? "s" : ""} ago`;
+    } else if (diffDays < 7) {
+      return `${diffDays} day${diffDays !== 1 ? "s" : ""} ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
+  };
+
+  // Format IP address for display
+  const formatIpAddress = (ip: string) => {
+    if (!ip || ip === 'unknown') {
+      return 'Unknown';
+    }
+    
+    // Check if it's localhost (development)
+    const cleanIp = ip.replace(/^\[|\]$/g, '');
+    if (cleanIp === '::1' || cleanIp === '127.0.0.1' || cleanIp === 'localhost') {
+      return `${ip} (Localhost - Access via network IP to see real IP)`;
+    }
+    
+    // Check if it's a private IP
+    if (cleanIp.startsWith('192.168.') || cleanIp.startsWith('10.') || 
+        (cleanIp.startsWith('172.') && parseInt(cleanIp.split('.')[1] || '0') >= 16 && parseInt(cleanIp.split('.')[1] || '0') <= 31)) {
+      return `${ip} (Private Network)`;
+    }
+    
+    return ip;
+  };
+
+  // Get device display name
+  const getDeviceDisplayName = (session: any) => {
+    const { deviceInfo } = session;
+    if (deviceInfo.browser && deviceInfo.os) {
+      return `${deviceInfo.browser} on ${deviceInfo.os}`;
+    } else if (deviceInfo.browser) {
+      return deviceInfo.browser;
+    } else if (deviceInfo.os) {
+      return deviceInfo.os;
+    } else {
+      return "Unknown Device";
+    }
+  };
 
   const handleUpgradeClick = () => {
     router.push("/upgrade");
@@ -891,6 +1081,137 @@ export default function AccountPage() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Active Sessions */}
+            <div className="bg-[#252642]/50 backdrop-blur-sm rounded-2xl p-6 shadow-[0_0_15px_rgba(0,255,255,0.1)] border border-[#00ffff]/20 mt-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-[#00ffff]">
+                  Active Sessions
+                </h2>
+                <button
+                  onClick={() => fetchSessions()}
+                  disabled={sessionsLoading}
+                  className="px-3 py-1 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm rounded transition-colors duration-200"
+                  title="Refresh sessions"
+                >
+                  <svg
+                    className={`w-4 h-4 ${sessionsLoading ? "animate-spin" : ""}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              {sessionsError && (
+                <div className="bg-red-500/20 border border-red-500/40 rounded-lg p-3 mb-4">
+                  <p className="text-red-200 text-sm">{sessionsError}</p>
+                </div>
+              )}
+
+              {sessionsLoading && sessions.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#00ffff]"></div>
+                  <p className="text-gray-400 mt-2">Loading sessions...</p>
+                </div>
+              ) : sessions.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-400">No active sessions found</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {sessions.map((session) => (
+                    <div
+                      key={session.sessionId}
+                      className={`bg-[#1a1b2e]/50 rounded-lg p-4 border ${
+                        session.isCurrentSession
+                          ? "border-[#00ffff]/50"
+                          : "border-gray-700/50"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="text-white font-semibold">
+                              {getDeviceDisplayName(session)}
+                            </h3>
+                            {session.isCurrentSession && (
+                              <span className="px-2 py-0.5 bg-[#00ffff]/20 text-[#00ffff] text-xs rounded-full font-semibold">
+                                Current Session
+                              </span>
+                            )}
+                          </div>
+                          <div className="space-y-1 text-sm text-gray-400">
+                            {session.deviceInfo.device && (
+                              <p>
+                                <span className="text-gray-500">Device:</span>{" "}
+                                {session.deviceInfo.device}
+                              </p>
+                            )}
+                            {session.deviceInfo.platform && (
+                              <p>
+                                <span className="text-gray-500">Platform:</span>{" "}
+                                {session.deviceInfo.platform}
+                              </p>
+                            )}
+                            <p>
+                              <span className="text-gray-500">IP Address:</span>{" "}
+                              {formatIpAddress(session.ipAddress)}
+                            </p>
+                            <p>
+                              <span className="text-gray-500">Last Activity:</span>{" "}
+                              {formatRelativeDate(session.lastActivity)}
+                            </p>
+                            {session.createdAt && (
+                              <p>
+                                <span className="text-gray-500">Created:</span>{" "}
+                                {formatRelativeDate(session.createdAt)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        {!session.isCurrentSession && (
+                          <button
+                            onClick={() => revokeSession(session.sessionId)}
+                            disabled={revokingSessionId === session.sessionId}
+                            className="ml-4 px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm rounded transition-colors duration-200"
+                            title="Revoke this session"
+                          >
+                            {revokingSessionId === session.sessionId ? (
+                              "Revoking..."
+                            ) : (
+                              "Revoke"
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {sessions.length > 1 && (
+                <div className="mt-4 pt-4 border-t border-gray-700">
+                  <button
+                    onClick={revokeAllOtherSessions}
+                    disabled={sessionsLoading}
+                    className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors duration-200 text-sm font-semibold"
+                  >
+                    Revoke All Other Sessions
+                  </button>
+                  <p className="text-gray-400 text-xs mt-2 text-center">
+                    This will log you out on all devices except this one
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

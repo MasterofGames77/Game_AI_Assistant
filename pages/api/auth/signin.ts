@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { connectToWingmanDB } from '../../../utils/databaseConnections';
 import User from '../../../models/User';
 import { comparePassword } from '../../../utils/passwordUtils';
-import { setAuthCookies } from '../../../utils/session';
+import { setAuthCookies, setAuthCookiesWithSession } from '../../../utils/session';
 import mongoose from 'mongoose';
 import {
   checkAccountLocked,
@@ -113,7 +113,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       // Set authentication cookies even for legacy users
       if (user.userId && user.username) {
-        setAuthCookies(res, user.userId, user.username, user.email);
+        await setAuthCookiesWithSession(req, res, user.userId, user.username, user.email);
       }
       
       return res.status(200).json({
@@ -166,8 +166,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Set authentication cookies (HTTP-only, secure)
-    setAuthCookies(res, user.userId, user.username, user.email);
+    // Set authentication cookies (HTTP-only, secure) and create session record
+    await setAuthCookiesWithSession(req, res, user.userId, user.username, user.email);
 
     // Debug: Log cookie headers in development
     // Commented out for production

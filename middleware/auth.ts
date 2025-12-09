@@ -38,6 +38,13 @@ export const requireAuth = async (
     // Verify the token (now includes blacklist check)
     const decoded = await verifyAccessToken(token);
 
+    // NOTE: Session check temporarily disabled in auth middleware to prevent blocking valid requests
+    // Session validation is still performed in the refresh endpoint where it's most critical
+    // This ensures revoked sessions can't refresh tokens, while not blocking normal API requests
+    // 
+    // TODO: Re-enable with better error handling if needed for immediate revocation
+    // For now, revoked sessions will be invalidated on next token refresh (within 15 minutes)
+
     // Attach user info to request object
     req.userId = decoded.userId;
     req.username = decoded.username;

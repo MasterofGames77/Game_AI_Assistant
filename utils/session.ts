@@ -1,6 +1,7 @@
-import type { NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { serialize } from 'cookie';
 import { generateAccessToken, generateRefreshToken } from './jwt';
+import { createOrUpdateSession } from './sessionManagement';
 
 // Cookie configuration
 const COOKIE_OPTIONS = {
@@ -159,6 +160,60 @@ export const setAuthCookiesWithDomain = (
     res.setHeader('Set-Cookie', accessTokenCookie);
     (res as any).appendHeader('Set-Cookie', refreshTokenCookie);
   } else {
+    res.setHeader('Set-Cookie', [accessTokenCookie, refreshTokenCookie]);
+  }
+};
+
+/**
+ * Set authentication cookies and create/update session record
+ * This is the preferred method for new logins and token refreshes
+ */
+export const setAuthCookiesWithSession = async (
+  req: NextApiRequest,
+  res: NextApiResponse,
+  userId: string,
+  username: string,
+  email?: string
+): Promise<void> => {
+  // Generate tokens
+  const accessToken = generateAccessToken({ userId, username, email });
+  const refreshToken = generateRefreshToken({ userId, username, email });
+
+  // Create or update session record (non-blocking - don't fail if this errors)
+  try {
+    await createOrUpdateSession(req, userId, username, refreshToken);
+  } catch (error) {
+    // Log error but don't fail authentication
+    console.error('Error creating session record:', error);
+  }
+
+  // Calculate expiration times
+  const accessTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+  const refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+  // Use cookie library's serialize function for proper formatting
+  const accessTokenCookie = serialize(ACCESS_TOKEN_COOKIE, accessToken, {
+    httpOnly: COOKIE_OPTIONS.httpOnly,
+    secure: COOKIE_OPTIONS.secure,
+    sameSite: COOKIE_OPTIONS.sameSite,
+    path: COOKIE_OPTIONS.path,
+    expires: accessTokenExpiry,
+  });
+
+  const refreshTokenCookie = serialize(REFRESH_TOKEN_COOKIE, refreshToken, {
+    httpOnly: COOKIE_OPTIONS.httpOnly,
+    secure: COOKIE_OPTIONS.secure,
+    sameSite: COOKIE_OPTIONS.sameSite,
+    path: COOKIE_OPTIONS.path,
+    expires: refreshTokenExpiry,
+  });
+
+  // Set both cookies as an array
+  if (typeof (res as any).appendHeader === 'function') {
+    res.setHeader('Set-Cookie', accessTokenCookie);
+    (res as any).appendHeader('Set-Cookie', refreshTokenCookie);
+  } else {
+    // Standard approach: set both as array
     res.setHeader('Set-Cookie', [accessTokenCookie, refreshTokenCookie]);
   }
 };
