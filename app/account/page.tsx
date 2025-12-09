@@ -101,12 +101,12 @@ export default function AccountPage() {
             const refreshErrorMsg = refreshData.message || refreshData.error || "Token refresh failed";
             
             if (refreshErrorMsg.includes('revoked') || refreshErrorMsg.includes('Session has been revoked')) {
-              throw new Error("Your session has been revoked. Please sign in again.");
+              throw new Error("Unable to refresh session. Please try signing out and back in.");
             } else if (refreshErrorMsg.includes('expired') || refreshErrorMsg.includes('not found')) {
-              throw new Error("Session expired. Please sign in again.");
+              throw new Error("Session expired. Please try signing out and back in.");
             } else {
-              // Other refresh error - still throw to show user needs to sign in
-              throw new Error("Session expired. Please sign in again.");
+              // Other refresh error - show generic message
+              throw new Error("Unable to load sessions. Please try refreshing the page.");
             }
           }
         } catch (refreshError) {
@@ -130,17 +130,9 @@ export default function AccountPage() {
       const errorMessage = error instanceof Error ? error.message : "Failed to load active sessions";
       setSessionsError(errorMessage);
       
-      // If session expired or revoked, redirect to signin (only once, not in a loop)
-      if (errorMessage.includes("Session expired") || errorMessage.includes("revoked")) {
-        // Use a flag to prevent multiple redirects
-        const redirectKey = 'session_expired_redirected';
-        if (!sessionStorage.getItem(redirectKey)) {
-          sessionStorage.setItem(redirectKey, 'true');
-          setTimeout(() => {
-            window.location.href = "/signin";
-          }, 2000);
-        }
-      }
+      // Don't auto-redirect - just show the error message
+      // User can manually sign out if needed
+      // Auto-redirect was causing loops when combined with auto-login logic
     } finally {
       setSessionsLoading(false);
     }
@@ -1120,7 +1112,18 @@ export default function AccountPage() {
 
               {sessionsError && (
                 <div className="bg-red-500/20 border border-red-500/40 rounded-lg p-3 mb-4">
-                  <p className="text-red-200 text-sm">{sessionsError}</p>
+                  <p className="text-red-200 text-sm mb-2">{sessionsError}</p>
+                  <button
+                    onClick={() => {
+                      // Clear session storage to prevent loops
+                      sessionStorage.clear();
+                      // Redirect to sign out
+                      window.location.href = "/api/auth/logout";
+                    }}
+                    className="text-red-300 hover:text-red-200 text-xs underline"
+                  >
+                    Sign out and sign back in
+                  </button>
                 </div>
               )}
 

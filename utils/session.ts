@@ -222,18 +222,33 @@ export const setAuthCookiesWithSession = async (
 
 /**
  * Extract token from cookies
+ * Handles cases where multiple cookies with the same name exist (e.g., root domain and subdomain)
+ * Prefers the most specific cookie (exact domain match)
  */
 export const getTokenFromCookies = (cookieHeader: string | undefined, cookieName: string): string | null => {
   if (!cookieHeader) {
     return null;
   }
 
+  // Split cookies - they're separated by semicolons
   const cookies = cookieHeader.split(';').map(c => c.trim());
-  const tokenCookie = cookies.find(c => c.startsWith(`${cookieName}=`));
-
-  if (!tokenCookie) {
+  
+  // Find all cookies matching the name
+  const matchingCookies = cookies.filter(c => c.startsWith(`${cookieName}=`));
+  
+  if (matchingCookies.length === 0) {
     return null;
   }
-
-  return tokenCookie.substring(cookieName.length + 1);
+  
+  // If multiple cookies exist, prefer the first one (browsers typically send most specific first)
+  // Extract value from the first matching cookie
+  const tokenCookie = matchingCookies[0];
+  const value = tokenCookie.substring(cookieName.length + 1);
+  
+  // If there are multiple cookies, log a warning in development
+  if (process.env.NODE_ENV === 'development' && matchingCookies.length > 1) {
+    console.warn(`[getTokenFromCookies] Multiple ${cookieName} cookies found, using first one`);
+  }
+  
+  return value;
 };
