@@ -17,7 +17,8 @@
     "test:sync": "ts-node tests/testUserSync.ts",
     "test:all": "npm run test:db && npm run test:sync",
     "test:achievement-cache": "node tests/testAchievementCaching.js",
-    "test:achievement-cache:quick": "node tests/runAchievementCacheTests.js"
+    "test:achievement-cache:quick": "node tests/runAchievementCacheTests.js",
+    "test:webhook": "npx tsx tests/testWebhookFix.ts"
   },
   "dependencies": {
     "@fortawesome/free-solid-svg-icons": "^6.6.0",

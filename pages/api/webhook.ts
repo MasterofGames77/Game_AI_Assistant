@@ -14,6 +14,20 @@ export const config = {
   },
 };
 
+// Helper function to read raw body from request stream
+function getRawBody(req: NextApiRequest): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => {
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      resolve(Buffer.concat(chunks));
+    });
+    req.on('error', reject);
+  });
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -33,18 +47,30 @@ export default async function handler(
 
   try {
     // Get raw body for signature verification
-    const rawBody = JSON.stringify(req.body);
+    const rawBody = await getRawBody(req);
     event = stripe.webhooks.constructEvent(rawBody, sig, endpointSecret);
   } catch (err) {
-    console.error('Webhook signature verification failed:', err);
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    console.error('Webhook signature verification failed:', errorMessage);
+    
+    // Log more details in debug mode
+    if (process.env.WEBHOOK_DEBUG === 'true') {
+      console.error('[WEBHOOK DEBUG] Signature header:', sig);
+      console.error('[WEBHOOK DEBUG] Has endpoint secret:', !!endpointSecret);
+    }
+    
     return res.status(400).json({ message: 'Invalid signature' });
   }
 
   try {
     await connectToWingmanDB();
 
-    // console.log(`Processing webhook event: ${event.type}`); // Commented out for production
-    // console.log('Event data:', JSON.stringify(event.data, null, 2)); // Commented out for production
+    // Enable logging for testing - set WEBHOOK_DEBUG=true in .env to enable
+    const isDebugMode = process.env.WEBHOOK_DEBUG === 'true';
+    if (isDebugMode) {
+      console.log(`[WEBHOOK DEBUG] Processing webhook event: ${event.type}`);
+      console.log(`[WEBHOOK DEBUG] Event ID: ${event.id}`);
+    }
 
     switch (event.type) {
       case 'customer.subscription.created':
@@ -74,12 +100,22 @@ export default async function handler(
         break;
       
       default:
-        // console.log(`Unhandled event type: ${event.type}`); // Commented out for production
+        const isDebugMode = process.env.WEBHOOK_DEBUG === 'true';
+        if (isDebugMode) {
+          console.log(`[WEBHOOK DEBUG] Unhandled event type: ${event.type}`);
+        }
     }
 
     res.status(200).json({ received: true });
   } catch (error) {
-    console.error('Webhook error:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    console.error('Webhook processing error:', errorMessage);
+    if (process.env.WEBHOOK_DEBUG === 'true' && errorStack) {
+      console.error('[WEBHOOK DEBUG] Stack trace:', errorStack);
+    }
+    
     res.status(500).json({ message: 'Webhook processing failed' });
   }
 }
