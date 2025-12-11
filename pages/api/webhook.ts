@@ -126,20 +126,46 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   const username = subscription.metadata?.username;
   const transitionFromFree = subscription.metadata?.transitionFromFree === 'true';
   const transitionFromExpired = subscription.metadata?.transitionFromExpired === 'true';
+  const customerId = subscription.customer as string;
 
-  if (!userId || !username) {
-    console.error('Missing user metadata in subscription:', subscription.id);
+  let user = null;
+
+  // Try to find user by metadata first (preferred method)
+  if (userId || username) {
+    user = await User.findOne({
+      $or: [{ userId }, { username }]
+    });
+  }
+
+  // Fallback: Try to find user by customer ID if metadata is missing
+  // This can happen if subscription was created outside normal flow
+  if (!user && customerId) {
+    user = await User.findOne({
+      'subscription.stripeCustomerId': customerId
+    });
+  }
+
+  if (!user) {
+    const isDebugMode = process.env.WEBHOOK_DEBUG === 'true';
+    if (isDebugMode) {
+      console.warn(`[WEBHOOK DEBUG] User not found for subscription created: ${subscription.id}`, {
+        hasMetadata: !!(userId || username),
+        customerId,
+        subscriptionId: subscription.id
+      });
+    } else {
+      console.warn('User not found for subscription created:', subscription.id);
+    }
     return;
   }
 
-  // Find user
-  const user = await User.findOne({
-    $or: [{ userId }, { username }]
-  });
-
-  if (!user) {
-    console.error('User not found for subscription:', subscription.id);
-    return;
+  // Warn if metadata is missing but we found user by customer ID
+  if ((!userId || !username) && user) {
+    console.warn(`Subscription created without metadata, found user by customer ID: ${subscription.id}`, {
+      customerId,
+      userId: user.userId,
+      username: user.username
+    });
   }
 
   // Check if user is in early access period and shouldn't be charged
@@ -190,19 +216,38 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const userId = subscription.metadata?.userId;
   const username = subscription.metadata?.username;
+  const customerId = subscription.customer as string;
 
-  if (!userId || !username) {
-    console.error('Missing user metadata in subscription update:', subscription.id);
-    return;
+  let user = null;
+
+  // Try to find user by metadata first (preferred method)
+  if (userId || username) {
+    user = await User.findOne({
+      $or: [{ userId }, { username }]
+    });
   }
 
-  // Find user
-  const user = await User.findOne({
-    $or: [{ userId }, { username }]
-  });
+  // Fallback: Try to find user by subscription ID or customer ID
+  if (!user) {
+    user = await User.findOne({
+      $or: [
+        { 'subscription.stripeSubscriptionId': subscription.id },
+        { 'subscription.stripeCustomerId': customerId }
+      ]
+    });
+  }
 
   if (!user) {
-    console.error('User not found for subscription update:', subscription.id);
+    const isDebugMode = process.env.WEBHOOK_DEBUG === 'true';
+    if (isDebugMode) {
+      console.warn(`[WEBHOOK DEBUG] User not found for subscription update: ${subscription.id}`, {
+        hasMetadata: !!(userId || username),
+        customerId,
+        subscriptionId: subscription.id
+      });
+    } else {
+      console.warn('User not found for subscription update:', subscription.id);
+    }
     return;
   }
 
@@ -225,19 +270,38 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const userId = subscription.metadata?.userId;
   const username = subscription.metadata?.username;
+  const customerId = subscription.customer as string;
 
-  if (!userId || !username) {
-    console.error('Missing user metadata in subscription deletion:', subscription.id);
-    return;
+  let user = null;
+
+  // Try to find user by metadata first (preferred method)
+  if (userId || username) {
+    user = await User.findOne({
+      $or: [{ userId }, { username }]
+    });
   }
 
-  // Find user
-  const user = await User.findOne({
-    $or: [{ userId }, { username }]
-  });
+  // Fallback: Try to find user by subscription ID or customer ID
+  if (!user) {
+    user = await User.findOne({
+      $or: [
+        { 'subscription.stripeSubscriptionId': subscription.id },
+        { 'subscription.stripeCustomerId': customerId }
+      ]
+    });
+  }
 
   if (!user) {
-    console.error('User not found for subscription deletion:', subscription.id);
+    const isDebugMode = process.env.WEBHOOK_DEBUG === 'true';
+    if (isDebugMode) {
+      console.warn(`[WEBHOOK DEBUG] User not found for subscription deletion: ${subscription.id}`, {
+        hasMetadata: !!(userId || username),
+        customerId,
+        subscriptionId: subscription.id
+      });
+    } else {
+      console.warn('User not found for subscription deletion:', subscription.id);
+    }
     return;
   }
 
@@ -258,16 +322,28 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
   const subscriptionId = (invoice as any).subscription as string;
   const customerId = (invoice as any).customer as string;
   
-  if (!subscriptionId) {
-    console.error('No subscription ID in payment succeeded event');
+  // Handle both subscription invoices and one-time payments
+  // If no subscription ID, this might be a one-time payment - try customer ID only
+  if (!subscriptionId && !customerId) {
+    const isDebugMode = process.env.WEBHOOK_DEBUG === 'true';
+    if (isDebugMode) {
+      console.warn('[WEBHOOK DEBUG] Payment succeeded event has no subscription ID or customer ID');
+    } else {
+      console.warn('Payment succeeded event missing both subscription ID and customer ID');
+    }
     return;
   }
 
-  // Find user by subscription ID first, then by customer ID
-  let user = await User.findOne({
-    'subscription.stripeSubscriptionId': subscriptionId
-  });
+  let user = null;
 
+  // Find user by subscription ID first (for subscription invoices)
+  if (subscriptionId) {
+    user = await User.findOne({
+      'subscription.stripeSubscriptionId': subscriptionId
+    });
+  }
+
+  // Fallback: Try to find user by customer ID (works for both subscription and one-time payments)
   if (!user && customerId) {
     user = await User.findOne({
       'subscription.stripeCustomerId': customerId
@@ -275,25 +351,49 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
   }
 
   if (!user) {
-    console.error('User not found for payment succeeded:', { subscriptionId, customerId });
+    const isDebugMode = process.env.WEBHOOK_DEBUG === 'true';
+    if (isDebugMode) {
+      console.warn('[WEBHOOK DEBUG] User not found for payment succeeded:', {
+        subscriptionId,
+        customerId,
+        invoiceId: invoice.id
+      });
+    } else {
+      console.warn('User not found for payment succeeded:', { subscriptionId, customerId });
+    }
     return;
   }
 
   // Update payment information
+  // Only update subscription fields if this is a subscription invoice
+  const updateData: any = {
+    'subscription.stripeCustomerId': customerId,
+    hasProAccess: true
+  };
+
+  // Add subscription-specific fields only if subscription ID exists
+  if (subscriptionId) {
+    updateData['subscription.stripeSubscriptionId'] = subscriptionId;
+    updateData['subscription.status'] = 'active';
+    updateData['subscription.currentPeriodStart'] = new Date((invoice as any).period_start * 1000);
+    updateData['subscription.currentPeriodEnd'] = new Date((invoice as any).period_end * 1000);
+    updateData['subscription.billingCycle'] = 'monthly';
+  }
+
+  // Add payment method and amount if available
+  if ((invoice as any).payment_method) {
+    updateData['subscription.paymentMethod'] = (invoice as any).payment_method;
+  }
+  if ((invoice as any).amount_paid) {
+    updateData['subscription.amount'] = (invoice as any).amount_paid;
+  }
+  if ((invoice as any).currency) {
+    updateData['subscription.currency'] = (invoice as any).currency;
+  }
+
   await User.findOneAndUpdate(
     { _id: user._id },
-    {
-      'subscription.stripeSubscriptionId': subscriptionId,
-      'subscription.stripeCustomerId': customerId,
-      'subscription.paymentMethod': (invoice as any).payment_method as string,
-      'subscription.status': 'active',
-      'subscription.currentPeriodStart': new Date((invoice as any).period_start * 1000),
-      'subscription.currentPeriodEnd': new Date((invoice as any).period_end * 1000),
-      'subscription.amount': (invoice as any).amount_paid || 99,
-      'subscription.currency': (invoice as any).currency || 'usd',
-      'subscription.billingCycle': 'monthly',
-      hasProAccess: true
-    }
+    updateData
   );
 
   // console.log(`Payment succeeded for subscription ${subscriptionId}, user ${user.username}`); // Commented out for production
