@@ -9,6 +9,7 @@ import {
   trackFailedLoginAttempt,
   resetFailedLoginAttempts,
 } from '../../../utils/accountLockout';
+import { withRequestSizeLimit } from '../../../middleware/requestSizeLimit';
 
 // Simple in-memory rate limiting for Next.js (no Express dependency)
 const loginAttempts = new Map<string, { count: number; resetTime: number }>();
@@ -34,7 +35,7 @@ function checkRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
   return { allowed: true };
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -202,3 +203,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+// Apply request size limiting middleware to prevent DoS attacks
+export default withRequestSizeLimit(handler);

@@ -19,6 +19,7 @@ import { Metrics } from '../../types';
 import fs from 'fs';
 import { clearUserCache } from './getConversation';
 import { requireAuth, AuthenticatedRequest } from '../../middleware/auth';
+import { withRequestSizeLimit } from '../../middleware/requestSizeLimit';
 
 // Optimized performance monitoring with conditional logging
 const measureLatency = async (operation: string, callback: () => Promise<any>, enableLogging: boolean = false) => {
@@ -2134,4 +2135,5 @@ CRITICAL INSTRUCTIONS:
   }
 };
 
-export default assistantHandler;
+// Apply request size limiting middleware to prevent DoS attacks
+export default withRequestSizeLimit(assistantHandler);

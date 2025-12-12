@@ -6,11 +6,12 @@ import { sendWelcomeEmail } from '../../../utils/emailService';
 import { containsOffensiveContent } from '../../../utils/contentModeration';
 import { handleContentViolation } from '../../../utils/violationHandler';
 import mongoose from 'mongoose';
+import { withRequestSizeLimit } from '../../../middleware/requestSizeLimit';
 
 // Email validation regex
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -206,3 +207,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+// Apply request size limiting middleware to prevent DoS attacks
+export default withRequestSizeLimit(handler);
