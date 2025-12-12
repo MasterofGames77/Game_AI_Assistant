@@ -160,7 +160,7 @@ const initializeGenreCache = () => {
     "Fire Emblem: Awakening": "Tactical Role-Playing Game",
     "Bloons TD 6": "Tower Defense",
     "Forza Horizon 5": "Racing",
-    "Mario Kart 8": "Kart Racing",
+    "Mario Kart 8 Deluxe": "Kart Racing",
     "Star Fox": "Rail Shooter",
     "Metal Gear Solid": "Stealth",
     "Gunstar Heroes": "Run and Gun",
