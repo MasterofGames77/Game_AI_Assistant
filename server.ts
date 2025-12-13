@@ -4,6 +4,8 @@ import next, { NextApiRequest, NextApiResponse } from "next";
 import { initSocket } from "./middleware/realtime";
 import { initializeScheduler } from "./utils/automatedUsersScheduler";
 import { initializeDiscordBot, shutdownDiscordBot } from "./utils/discordBot";
+import { initializeTwitchBot, shutdownTwitchBot } from "./utils/twitchBot";
+import { startTokenRefreshScheduler } from "./utils/twitchBotTokenRefresh";
 import fs from "fs";
 import path from "path";
 
@@ -112,6 +114,43 @@ app.prepare().then(async () => {
     // Server continues even if bot fails to initialize
   }
 
+  // Initialize Twitch bot
+  // Note: This is optional - server will continue even if bot fails to initialize
+  try {
+    const twitchBotInitialized = await initializeTwitchBot();
+    if (twitchBotInitialized) {
+      console.log('✅ Twitch bot initialized successfully');
+    } else {
+      // Bot initialization was skipped (likely missing configuration or invalid token)
+      // This is expected behavior and not an error
+      console.warn('⚠️ Twitch bot initialization skipped (Twitch bot features will be unavailable)');
+    }
+    
+    // Start automatic token refresh scheduler regardless of initialization status
+    // This allows the scheduler to refresh tokens and retry initialization later
+    // This will check and refresh the bot token every hour
+    try {
+      startTokenRefreshScheduler();
+      console.log('✅ Twitch bot token refresh scheduler started');
+    } catch (schedulerError) {
+      console.warn('⚠️ Failed to start token refresh scheduler:', schedulerError);
+      // Non-fatal - bot will still work, just won't auto-refresh
+    }
+  } catch (error) {
+    // Unexpected error during initialization - log but don't crash server
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('❌ Unexpected error during Twitch bot initialization:', errorMessage);
+    
+    // Still try to start the scheduler - it might help refresh tokens
+    try {
+      startTokenRefreshScheduler();
+      console.log('✅ Twitch bot token refresh scheduler started (despite initialization error)');
+    } catch (schedulerError) {
+      console.warn('⚠️ Failed to start token refresh scheduler:', schedulerError);
+    }
+    // Server continues even if bot fails to initialize
+  }
+
   // Start the server
   server.listen(port, () => {
     console.log(`> Ready on http://localhost:${port}`);
@@ -129,6 +168,9 @@ app.prepare().then(async () => {
     // Shutdown Discord bot
     await shutdownDiscordBot();
 
+    // Shutdown Twitch bot
+    await shutdownTwitchBot();
+
     // Give processes time to finish
     setTimeout(() => {
       console.log('Graceful shutdown complete');
@@ -139,4 +181,50 @@ app.prepare().then(async () => {
   // Handle shutdown signals
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+  // Handle connection errors gracefully (client disconnects, aborted requests, etc.)
+  // These are common and non-critical - just log them without crashing
+  process.on('uncaughtException', (error: Error) => {
+    // Check if it's a Node.js error with a code property
+    const nodeError = error as Error & { code?: string };
+    
+    // Ignore connection reset errors (ECONNRESET, EPIPE) - these happen when clients close connections
+    if (nodeError.code === 'ECONNRESET' || nodeError.code === 'EPIPE' || error.message === 'aborted') {
+      // Silently ignore - these are expected when clients close connections mid-request
+      if (dev) {
+        console.debug('Client connection closed:', nodeError.code || error.message);
+      }
+      return;
+    }
+    
+    // Log other uncaught exceptions
+    console.error('❌ Uncaught Exception:', error.message);
+    if (dev && error.stack) {
+      console.error('Stack:', error.stack);
+    }
+    
+    // In production, exit on uncaught exceptions (except connection errors)
+    if (!dev) {
+      process.exit(1);
+    }
+  });
+
+  // Handle unhandled promise rejections
+  process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+    // Check if it's a Node.js error with a code property
+    const nodeError = reason as Error & { code?: string };
+    
+    // Ignore connection-related rejections
+    if (reason && (nodeError.code === 'ECONNRESET' || nodeError.code === 'EPIPE' || (reason instanceof Error && reason.message === 'aborted'))) {
+      if (dev) {
+        console.debug('Unhandled rejection (connection closed):', nodeError.code || (reason instanceof Error ? reason.message : String(reason)));
+      }
+      return;
+    }
+    
+    console.error('❌ Unhandled Rejection:', reason);
+    if (dev && reason instanceof Error && reason.stack) {
+      console.error('Stack:', reason.stack);
+    }
+  });
 });

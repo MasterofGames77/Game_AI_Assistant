@@ -1168,3 +1168,17 @@ export interface LeaderboardResponse {
   cached: boolean;
   genre?: string; // For genre specialists
 }
+
+// Twitch Bot Token Refresh
+export interface TokenRefreshResult {
+  accessToken: string;
+  refreshToken?: string;
+  expiresIn: number;
+  scope?: string;
+}
+
+// Twitch Bot Handler Rate limiting configuration
+export interface RateLimit {
+  timestamp: number;
+  count: number;
+}

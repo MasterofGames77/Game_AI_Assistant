@@ -1,15 +1,22 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  const domain = process.env.NODE_ENV === 'production'
-    ? 'https://assistant.videogamewingman.com'
-    : 'http://localhost:3000';
-
   const clientId = process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID || '';
-  let redirectUri = `${domain}/api/twitchCallback`;
+  
+  // Use TWITCH_REDIRECT_URI from environment variables to ensure consistency
+  // This should match exactly what's registered in Twitch Developer Console
+  let redirectUri = process.env.TWITCH_REDIRECT_URI || '';
+  
+  // Fallback to localhost if not set (for development)
+  if (!redirectUri) {
+    const domain = process.env.NODE_ENV === 'production'
+      ? 'https://assistant.videogamewingman.com'
+      : 'http://localhost:3000';
+    redirectUri = `${domain}/api/twitchCallback`;
+  }
 
-  // Ensure no double slashes in the URI (except after "https://")
-  redirectUri = redirectUri.replace(/([^:]\/)\/+/g, "$1");
+  // Ensure no trailing slash and no double slashes (except after "https://")
+  redirectUri = redirectUri.replace(/\/$/, '').replace(/([^:]\/)\/+/g, "$1");
 
   // Log the redirect URI before encoding
   // console.log("Redirect URI before encoding:", redirectUri); // Commented out for production

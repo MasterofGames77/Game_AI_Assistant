@@ -4,11 +4,34 @@ import axios from 'axios';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     console.log('Twitch callback received with query:', req.query);
 
-    const { code } = req.query;
+    const { code, error, error_description } = req.query;
 
-    if (!code) {
+    // Handle OAuth errors from Twitch (redirect mismatch, user cancelled, etc.)
+    if (error) {
+        console.error('Twitch OAuth error:', error, error_description);
+        return res.status(400).json({ 
+            error: 'OAuth authorization failed',
+            errorCode: error,
+            errorDescription: error_description || 'Unknown error',
+            message: error === 'access_denied' 
+                ? 'User cancelled the authorization'
+                : error === 'redirect_uri_mismatch'
+                ? 'Redirect URI mismatch. Check your Twitch Developer Console settings.'
+                : 'Authorization failed. Please try again.'
+        });
+    }
+
+    // Validate authorization code
+    if (!code || Array.isArray(code)) {
         console.error("No code provided in the Twitch callback.");
-        return res.status(400).json({ error: 'No code provided' });
+        console.error("Query parameters:", req.query);
+        console.error("Full URL:", req.url);
+        return res.status(400).json({ 
+            error: 'No code provided',
+            message: 'The authorization code was not provided by Twitch. This may indicate a redirect URI mismatch or the authorization was cancelled.',
+            queryParams: Object.keys(req.query),
+            hasError: !!error
+        });
     }
 
     // get twitch client id and secret
