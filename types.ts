@@ -1182,3 +1182,17 @@ export interface RateLimit {
   timestamp: number;
   count: number;
 }
+
+// Twitch Bot Channel Manager Types
+export interface TwitchChannel {
+  channelName: string;
+  isActive: boolean;
+  addedAt: string;
+  messageCount: number;
+  lastJoinedAt?: string;
+  lastLeftAt?: string;
+}
+
+export interface TwitchBotChannelManagerProps {
+  className?: string;
+}

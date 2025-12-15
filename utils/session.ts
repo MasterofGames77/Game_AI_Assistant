@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { serialize } from 'cookie';
-import { generateAccessToken, generateRefreshToken } from './jwt';
+import { generateAccessToken, generateRefreshToken, verifyAccessToken, extractTokenFromHeader } from './jwt';
 import { createOrUpdateSession } from './sessionManagement';
 
 // Cookie configuration
@@ -251,4 +251,39 @@ export const getTokenFromCookies = (cookieHeader: string | undefined, cookieName
   }
   
   return value;
+};
+
+/**
+ * Get session information from request
+ * Extracts and verifies JWT token from cookies or Authorization header
+ * Returns session object with userId, username, and email, or null if not authenticated
+ */
+export const getSession = async (
+  req: NextApiRequest
+): Promise<{ userId: string; username: string; email?: string } | null> => {
+  try {
+    // Try to get token from cookies first (preferred method)
+    let token = getTokenFromCookies(req.headers.cookie, ACCESS_TOKEN_COOKIE);
+
+    // Fallback to Authorization header if no cookie
+    if (!token) {
+      token = extractTokenFromHeader(req.headers.authorization);
+    }
+
+    if (!token) {
+      return null;
+    }
+
+    // Verify the token
+    const decoded = await verifyAccessToken(token);
+
+    return {
+      userId: decoded.userId,
+      username: decoded.username,
+      email: decoded.email,
+    };
+  } catch (error) {
+    // Token is invalid or expired
+    return null;
+  }
 };

@@ -1,8 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
+import { getSession } from '../../utils/session';
+import connectToMongoDB from '../../utils/mongodb';
+import User from '../../models/User';
+import { logger } from '../../utils/logger';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-    console.log('Twitch callback received with query:', req.query);
+    logger.info('Twitch callback received', { query: Object.keys(req.query) });
 
     const { code, error, error_description } = req.query;
 
@@ -85,7 +89,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             },
         });
 
-        console.log("Twitch user data response:", userResponse.data);
+        const twitchUserData = userResponse.data.data?.[0];
+        logger.info("Twitch user data fetched", {
+            hasData: !!twitchUserData,
+            twitchUsername: twitchUserData?.login
+        });
+
+        // If user is logged in, save Twitch info to their account
+        const session = await getSession(req);
+        if (session && session.username && twitchUserData) {
+            try {
+                await connectToMongoDB();
+                await User.findOneAndUpdate(
+                    { username: session.username },
+                    {
+                        twitchUsername: twitchUserData.login.toLowerCase(),
+                        twitchId: twitchUserData.id
+                    },
+                    { new: true }
+                );
+                logger.info('Twitch account linked to user', {
+                    username: session.username,
+                    twitchUsername: twitchUserData.login
+                });
+            } catch (dbError) {
+                logger.error('Failed to save Twitch info to user account', {
+                    error: dbError instanceof Error ? dbError.message : String(dbError),
+                    username: session.username
+                });
+                // Don't fail the whole flow if DB save fails
+            }
+        }
 
         // Return the user data as JSON to the frontend
         res.status(200).json(userResponse.data);

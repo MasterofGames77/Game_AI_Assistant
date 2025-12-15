@@ -659,7 +659,7 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
         </button>
       </div>
 
-      {/* Login with Twitch Button */}
+      {/* Login with Twitch Button (for viewers to link accounts) */}
       <div className="mb-4">
         <button
           className="w-full px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg flex items-center justify-center space-x-2"
@@ -670,6 +670,20 @@ const Sidebar: React.FC<SideBarProps & { className?: string }> = ({
             <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428H12l-3 3v-3H4.714V1.714h15.143Z" />
           </svg>
           <span>Login with Twitch</span>
+        </button>
+      </div>
+
+      {/* Add Bot to Twitch Channel Button (for streamers) */}
+      <div className="mb-4">
+        <button
+          className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg flex items-center justify-center space-x-2"
+          onClick={() => window.open("/twitch-landing", "_blank")}
+          aria-label="Add Bot to Twitch Channel"
+        >
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428H12l-3 3v-3H4.714V1.714h15.143Z" />
+          </svg>
+          <span>Add Bot to Channel</span>
         </button>
       </div>
 

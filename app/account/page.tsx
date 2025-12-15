@@ -8,6 +8,7 @@ import ProfileShareModal from "@/components/ProfileShareModal";
 import Avatar from "@/components/Avatar";
 import AvatarSelector from "@/components/AvatarSelector";
 import GameTracker from "@/components/GameTracker";
+import TwitchBotChannelManager from "@/components/TwitchBotChannelManager";
 import { GameTracking } from "@/types";
 
 export default function AccountPage() {
@@ -1618,6 +1619,11 @@ export default function AccountPage() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Twitch Bot Channel Management */}
+            <div className="mt-6">
+              <TwitchBotChannelManager />
             </div>
           </div>
         </div>

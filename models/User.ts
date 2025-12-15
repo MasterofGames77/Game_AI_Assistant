@@ -86,6 +86,9 @@ export interface IUser extends Document {
     };
     helpsCommonGamer?: string; // For EXPERT gamers - username of COMMON gamer they help
   };
+  // Twitch account linking (for viewers to link their Twitch accounts)
+  twitchUsername?: string; // Twitch username (login)
+  twitchId?: string; // Twitch user ID
   createdAt?: Date; // Mongoose timestamp
   updatedAt?: Date; // Mongoose timestamp
   // Methods
@@ -391,7 +394,10 @@ const UserSchema = new Schema<IUser>({
       communicationStyle: { type: String }
     },
     helpsCommonGamer: { type: String } // For EXPERT gamers - username of COMMON gamer they help
-  }
+  },
+  // Twitch account linking (for viewers to link their Twitch accounts)
+  twitchUsername: { type: String, required: false, sparse: true, index: true },
+  twitchId: { type: String, required: false, sparse: true, index: true }
 }, { collection: 'users' });
 
 // Create indexes for subscription-related queries
