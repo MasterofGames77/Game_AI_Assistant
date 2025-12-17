@@ -5,6 +5,11 @@ import connectToMongoDB from '../../utils/mongodb';
 import User from '../../models/User';
 import { logger } from '../../utils/logger';
 
+/**
+ * Legacy Twitch OAuth callback
+ * NOTE: For linking Twitch accounts for bot usage, use /api/twitchViewerLogin instead
+ * This endpoint is kept for backward compatibility
+ */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     logger.info('Twitch callback received', { query: Object.keys(req.query) });
 

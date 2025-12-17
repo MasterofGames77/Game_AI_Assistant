@@ -23,18 +23,21 @@ export class TwitchBotHandler {
   private rateLimits: Map<string, RateLimit>;
   private responseCache: Map<string, { response: string; timestamp: number }>;
   private messageQueue: Map<string, Promise<void>>;
+  private processedMessages: Map<string, number>; // Track processed messages to prevent duplicates
   private readonly RATE_LIMIT_WINDOW = 60000; // 1 minute
   private readonly MAX_MESSAGES_PER_WINDOW = 10;
   private readonly CACHE_TTL = 300000; // 5 minutes
   private readonly MAX_RETRIES = 3;
   private readonly MAX_MESSAGE_LENGTH = 500; // Twitch chat limit
   private readonly BOT_USERNAME: string;
+  private readonly MESSAGE_DEDUP_WINDOW = 10000; // 10 seconds - prevent processing same message twice
 
   constructor(client: tmi.Client) {
     this.client = client;
     this.rateLimits = new Map();
     this.responseCache = new Map();
     this.messageQueue = new Map();
+    this.processedMessages = new Map();
     this.BOT_USERNAME = process.env.TWITCH_BOT_USERNAME?.toLowerCase() || 'herogamewingman';
     this.setupEventHandlers();
     this.startMaintenanceTasks();
@@ -74,6 +77,27 @@ export class TwitchBotHandler {
         await this.sendMessage(channel, `@${displayName} Hi! Ask me anything about video games. Use !wingman <your question> or @${this.BOT_USERNAME} <your question>`);
         return;
       }
+
+      // Create a unique message ID to prevent duplicate processing
+      // Use channel + username + message content + timestamp (rounded to nearest second)
+      // This prevents the same message from being processed twice within the dedup window
+      const timestamp = Math.floor(Date.now() / 1000); // Round to nearest second
+      const messageId = `${channel}:${username}:${timestamp}:${message.substring(0, 100)}`;
+      
+      // Check if we've already processed this message recently
+      const lastProcessed = this.processedMessages.get(messageId);
+      const now = Date.now();
+      if (lastProcessed && (now - lastProcessed) < this.MESSAGE_DEDUP_WINDOW) {
+        logger.debug('Duplicate message detected, ignoring', {
+          username,
+          channel,
+          messageId: messageId.substring(0, 80)
+        });
+        return; // Already processed this message recently
+      }
+
+      // Mark message as being processed
+      this.processedMessages.set(messageId, now);
 
       // Log message received for debugging
       logger.info('Twitch message received', {
@@ -150,23 +174,20 @@ export class TwitchBotHandler {
         
         // If not channel owner, try to find user by Twitch username
         if (!isChannelOwner) {
-          // Check if user has linked their Twitch account
-          // For now, we'll search by username match (can be enhanced later with dedicated Twitch username field)
+          // Check if user has linked their Twitch account using the twitchUsername field
+          const twitchUsernameLower = username.toLowerCase();
           const user = await User.findOne({ 
-            $or: [
-              { username: username.toLowerCase() },
-              { email: { $regex: new RegExp(`^${username}@`, 'i') } }
-            ]
-          });
+            twitchUsername: twitchUsernameLower
+          }).select('username twitchUsername').lean();
           
-          if (user) {
+          if (user && !Array.isArray(user)) {
             wingmanUsername = user.username;
             logger.info('Found Video Game Wingman user by Twitch username', {
               twitchUsername: username,
               wingmanUsername: wingmanUsername
             });
           } else {
-            logger.info('User not found by Twitch username', {
+            logger.info('User not found by Twitch username (account not linked)', {
               twitchUsername: username,
               displayName: displayName
             });
@@ -483,6 +504,16 @@ Keep responses concise for Twitch chat (under 500 characters when possible).`;
         }
       });
     }, 60000);
+
+    // Clean up processed messages map periodically (remove entries older than dedup window)
+    setInterval(() => {
+      const now = Date.now();
+      Array.from(this.processedMessages.entries()).forEach(([messageId, timestamp]) => {
+        if (now - timestamp > this.MESSAGE_DEDUP_WINDOW) {
+          this.processedMessages.delete(messageId);
+        }
+      });
+    }, this.MESSAGE_DEDUP_WINDOW);
   }
 }
 

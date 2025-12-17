@@ -1154,20 +1154,17 @@ export default function Home() {
     }
   };
 
-  // handle twitch authentication
+  // handle twitch authentication (for linking viewer accounts)
   const handleTwitchAuth = () => {
-    const domain =
-      process.env.NODE_ENV === "production"
-        ? "https://assistant.videogamewingman.com"
-        : "http://localhost:3000";
-
-    const redirectUri = `${domain}/api/twitchCallback`;
-
-    const twitchLoginUrl = `https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${
-      process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID
-    }&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:read:email`;
-
-    window.open(twitchLoginUrl, "_blank");
+    // Get username from localStorage
+    const username = localStorage.getItem("username");
+    
+    // Use the new dedicated viewer OAuth flow
+    const loginUrl = username
+      ? `/api/twitchViewerLogin?username=${encodeURIComponent(username)}`
+      : "/api/twitchViewerLogin";
+    
+    window.location.href = loginUrl;
   };
 
   const handleDiscordAuth = async () => {
