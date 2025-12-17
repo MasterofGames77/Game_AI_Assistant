@@ -556,6 +556,8 @@ export interface AccountData {
   };
   hasPassword?: boolean;
   healthMonitoring?: HealthMonitoring;
+  twitchUsername?: string | null;
+  twitchId?: string | null;
 }
 
 

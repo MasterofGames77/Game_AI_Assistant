@@ -54,6 +54,19 @@ export class TwitchBotHandler {
       const username = userstate.username || 'unknown';
       const displayName = userstate['display-name'] || username;
 
+      // Check for dedicated commands first (!help, !commands)
+      const messageLower = message.toLowerCase().trim();
+      
+      if (messageLower === '!help' || messageLower.startsWith('!help ')) {
+        await this.handleHelpCommand(channel, displayName);
+        return;
+      }
+      
+      if (messageLower === '!commands' || messageLower.startsWith('!commands ')) {
+        await this.handleCommandsCommand(channel, displayName);
+        return;
+      }
+
       // Check if message is directed at the bot
       // Patterns: !wingman <question>, @HeroGameWingman <question>, or just @HeroGameWingman
       const botMentioned = message.toLowerCase().includes(`@${this.BOT_USERNAME}`) ||
@@ -74,7 +87,7 @@ export class TwitchBotHandler {
 
       // If no question after mention/command, show help
       if (!question || question.length === 0) {
-        await this.sendMessage(channel, `@${displayName} Hi! Ask me anything about video games. Use !wingman <your question> or @${this.BOT_USERNAME} <your question>`);
+        await this.handleHelpCommand(channel, displayName);
         return;
       }
 
@@ -125,6 +138,61 @@ export class TwitchBotHandler {
         this.handleError(error, channel, displayName);
       }
     });
+  }
+
+  /**
+   * Handle !help command - Show comprehensive help information
+   */
+  private async handleHelpCommand(channel: string, displayName: string): Promise<void> {
+    const helpMessage = `@${displayName} 📚 ${botConfig.name} Help — I'm an AI assistant for video game discussions! ` +
+      `Ask me anything about games, strategies, walkthroughs, or recommendations. ` +
+      `Commands: !wingman <question>, !hgwm <question>, or @${this.BOT_USERNAME} <question>. ` +
+      `Use !commands to see all commands. ` +
+      `Requires Video Game Wingman Pro — link your Twitch account on our website!`;
+    
+    await this.sendMessage(channel, helpMessage);
+    
+    logger.info('Help command executed', { channel, displayName });
+  }
+
+  /**
+   * Handle !commands command - List all available commands
+   */
+  private async handleCommandsCommand(channel: string, displayName: string): Promise<void> {
+    const commandsList = [
+      `@${displayName} 📋 Available Commands:`,
+      `• !help — Show this help message`,
+      `• !commands — List all commands`,
+      `• !wingman <question> — Ask a gaming question`,
+      `• !hgwm <question> — Alternative command (same as !wingman)`,
+      `• @${this.BOT_USERNAME} <question> — Mention me with a question`,
+      ``,
+      `💡 Tip: Link your Twitch account on our website for Pro access!`
+    ];
+    
+    // Send commands in chunks if needed (respecting 500 char limit)
+    let currentMessage = '';
+    for (const line of commandsList) {
+      const potentialMessage = currentMessage ? `${currentMessage}\n${line}` : line;
+      
+      if (potentialMessage.length > this.MAX_MESSAGE_LENGTH) {
+        // Send current message if it has content
+        if (currentMessage) {
+          await this.sendMessage(channel, currentMessage);
+          await new Promise(resolve => setTimeout(resolve, 500)); // Small delay between messages
+        }
+        currentMessage = line;
+      } else {
+        currentMessage = potentialMessage;
+      }
+    }
+    
+    // Send remaining message
+    if (currentMessage) {
+      await this.sendMessage(channel, currentMessage);
+    }
+    
+    logger.info('Commands command executed', { channel, displayName });
   }
 
   private async handleMessage(
@@ -191,6 +259,8 @@ export class TwitchBotHandler {
               twitchUsername: username,
               displayName: displayName
             });
+            // Store that account is not linked for better messaging
+            // This will be used when Pro access is denied
           }
         }
       } catch (error) {
@@ -221,10 +291,18 @@ export class TwitchBotHandler {
 
       if (!hasAccess) {
         logger.warn('Pro access denied', { username });
-        await this.sendMessage(
-          channel,
-          `@${displayName} This feature requires Video Game Wingman Pro. Visit our website to learn more!`
-        );
+        
+        // Provide more helpful message if account is not linked
+        const isAccountLinked = !!wingmanUsername;
+        let message = `@${displayName} This feature requires Video Game Wingman Pro.`;
+        
+        if (!isAccountLinked) {
+          message += ` Link your Twitch account (@${username}) on our website to use your Pro access! Use !help for more info.`;
+        } else {
+          message += ` Visit our website to learn more!`;
+        }
+        
+        await this.sendMessage(channel, message);
         return;
       }
 

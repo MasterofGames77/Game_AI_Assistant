@@ -9,6 +9,7 @@ import Avatar from "@/components/Avatar";
 import AvatarSelector from "@/components/AvatarSelector";
 import GameTracker from "@/components/GameTracker";
 import TwitchBotChannelManager from "@/components/TwitchBotChannelManager";
+import TwitchAccountLinker from "@/components/TwitchAccountLinker";
 import { GameTracking } from "@/types";
 
 export default function AccountPage() {
@@ -195,6 +196,8 @@ export default function AccountPage() {
           progress: userData.user.progress || { totalQuestions: 0 },
           hasPassword: !!userData.user.password,
           healthMonitoring: userData.user.healthMonitoring,
+          twitchUsername: userData.user.twitchUsername || null,
+          twitchId: userData.user.twitchId || null,
         });
 
         // Initialize email preferences
@@ -1621,7 +1624,15 @@ export default function AccountPage() {
               </div>
             </div>
 
-            {/* Twitch Bot Channel Management */}
+            {/* Twitch Account Linking (for viewers) */}
+            <div className="mt-6">
+              <TwitchAccountLinker 
+                twitchUsername={accountData.twitchUsername}
+                twitchId={accountData.twitchId}
+              />
+            </div>
+
+            {/* Twitch Bot Channel Management (for streamers) */}
             <div className="mt-6">
               <TwitchBotChannelManager />
             </div>

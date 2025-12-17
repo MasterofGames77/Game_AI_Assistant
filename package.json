@@ -18,7 +18,9 @@
     "test:all": "npm run test:db && npm run test:sync",
     "test:achievement-cache": "node tests/testAchievementCaching.js",
     "test:achievement-cache:quick": "node tests/runAchievementCacheTests.js",
-    "test:webhook": "npx tsx tests/testWebhookFix.ts"
+    "test:webhook": "npx tsx tests/testWebhookFix.ts",
+    "clean": "node scripts/clean-next-build.js",
+    "clean:restart": "node scripts/clean-next-build.js && npm run dev:full"
   },
   "dependencies": {
     "@fortawesome/free-solid-svg-icons": "^6.6.0",

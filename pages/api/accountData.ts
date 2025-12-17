@@ -41,6 +41,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         healthMonitoring: user.healthMonitoring || null,
         gameTracking: user.gameTracking || { wishlist: [], currentlyPlaying: [] },
         weeklyDigest: user.weeklyDigest || { enabled: true },
+        twitchUsername: user.twitchUsername || null,
+        twitchId: user.twitchId || null,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
       }
