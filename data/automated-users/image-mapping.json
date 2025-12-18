@@ -99,9 +99,9 @@
     },
     "Planet Coaster": {
       "images": [
-        "/uploads/automated-images/planet-coaster-1.png"
+        "https://ik.imagekit.io/q37npn1m5/automated-images/automated-images/planet-coaster-1_ix72m90X2.png"
       ],
-      "primary": "/uploads/automated-images/planet-coaster-1.png"
+      "primary": "https://ik.imagekit.io/q37npn1m5/automated-images/automated-images/planet-coaster-1_ix72m90X2.png"
     },
     "Two Point Museum": {
       "images": [

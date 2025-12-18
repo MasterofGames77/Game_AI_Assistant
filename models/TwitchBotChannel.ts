@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
+import { TwitchModerationConfig } from '../config/twitchModerationConfig';
 
 export interface ITwitchBotChannel extends Document {
   channelName: string; // Twitch channel name (lowercase, no #)
@@ -11,6 +12,7 @@ export interface ITwitchBotChannel extends Document {
   lastJoinedAt?: Date; // Last time bot successfully joined the channel
   lastLeftAt?: Date; // Last time bot left the channel
   messageCount?: number; // Total messages processed in this channel
+  moderationConfig?: TwitchModerationConfig; // Per-channel moderation settings
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -62,6 +64,22 @@ const TwitchBotChannelSchema = new Schema<ITwitchBotChannel>(
     messageCount: {
       type: Number,
       default: 0,
+    },
+    moderationConfig: {
+      type: {
+        enabled: { type: Boolean, default: true },
+        strictMode: { type: Boolean, default: false },
+        timeoutDurations: {
+          first: { type: Number, default: 0 },
+          second: { type: Number, default: 300 },
+          third: { type: Number, default: 1800 },
+          fourth: { type: Number, default: 3600 },
+        },
+        maxViolationsBeforeBan: { type: Number, default: 5 },
+        checkAIResponses: { type: Boolean, default: true },
+        logAllActions: { type: Boolean, default: true },
+      },
+      required: false,
     },
   },
   {

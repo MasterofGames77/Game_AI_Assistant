@@ -8,6 +8,7 @@ import connectToMongoDB from '../mongodb';
 import User from '../../models/User';
 import TwitchBotChannel from '../../models/TwitchBotChannel';
 import { RateLimit } from '../../types';
+import { checkMessageContent, checkAIResponse, getSafeFallbackResponse, handleModerationViolation, checkTwitchUserBanStatus } from './twitchModeration';
 
 // Twitch message types from tmi.js
 type ChatUserstate = tmi.ChatUserstate;
@@ -211,6 +212,35 @@ export class TwitchBotHandler {
         contentLength: question.length
       });
 
+      // Check if user is banned in this channel (using Twitch-specific ban tracking)
+      const banStatus = await checkTwitchUserBanStatus(username, channel);
+      if (banStatus.isBanned) {
+        // User is banned - silently reject (don't respond)
+        logger.info('Rejecting message from banned user', {
+          username,
+          channel,
+          bannedAt: banStatus.bannedAt,
+          reason: banStatus.reason
+        });
+        return; // Silently reject - don't process with AI
+      }
+
+      // Pre-processing: Check message for offensive content before AI processing
+      const normalizedChannel = channel.replace('#', '').toLowerCase().trim();
+      const moderationCheck = await checkMessageContent(question, username, normalizedChannel);
+      
+      if (!moderationCheck.shouldProcess) {
+        // Offensive content detected - handle moderation violation
+        await handleModerationViolation(
+          channel,
+          username,
+          displayName,
+          moderationCheck,
+          question // Pass original message for logging
+        );
+        return; // Don't process offensive messages with AI
+      }
+
       // Map Twitch username to Video Game Wingman username
       // First, check if this user is the channel owner (streamer)
       let wingmanUsername: string | null = null;
@@ -315,7 +345,8 @@ export class TwitchBotHandler {
 
       // Process the message
       logger.info('Generating AI response', { username });
-      const response = await this.processMessage(question);
+      const channelName = channel.replace('#', '').toLowerCase();
+      const response = await this.processMessage(question, username, channelName);
       if (response) {
         // Cache the response
         this.cacheResponse(question, response);
@@ -343,7 +374,7 @@ export class TwitchBotHandler {
     }
   }
 
-  private async processMessage(question: string): Promise<string> {
+  private async processMessage(question: string, twitchUsername: string, channelName?: string): Promise<string> {
     try {
       // Create a system message using botConfig
       const systemMessage = this.createSystemMessage();
@@ -353,7 +384,27 @@ export class TwitchBotHandler {
         getChatCompletion(question, systemMessage)
       );
 
-      return response || this.createFallbackResponse();
+      const aiResponse = response || this.createFallbackResponse();
+
+      // Post-processing: Check AI response for inappropriate content
+      const responseCheck = await checkAIResponse(aiResponse, twitchUsername, channelName);
+      
+      if (!responseCheck.shouldProcess) {
+        // AI generated inappropriate content - replace with safe fallback
+        logger.warn('AI generated inappropriate response - replacing with safe fallback', {
+          twitchUsername,
+          offendingWords: responseCheck.offendingWords,
+          responsePreview: aiResponse.substring(0, 200), // Log first 200 chars for review
+          reason: responseCheck.reason,
+          note: 'This is AI-generated content, not user-generated. User should not be penalized.'
+        });
+        
+        // Return safe fallback instead of inappropriate response
+        return getSafeFallbackResponse();
+      }
+
+      // Response is clean - return original AI response
+      return aiResponse;
     } catch (error) {
       logger.error('Error getting chat completion:', error);
       throw error;

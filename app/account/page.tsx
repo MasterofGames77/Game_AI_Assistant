@@ -10,6 +10,7 @@ import AvatarSelector from "@/components/AvatarSelector";
 import GameTracker from "@/components/GameTracker";
 import TwitchBotChannelManager from "@/components/TwitchBotChannelManager";
 import TwitchAccountLinker from "@/components/TwitchAccountLinker";
+import TwitchModerationSettings from "@/components/TwitchModerationSettings";
 import { GameTracking } from "@/types";
 
 export default function AccountPage() {
@@ -1636,6 +1637,13 @@ export default function AccountPage() {
             <div className="mt-6">
               <TwitchBotChannelManager />
             </div>
+
+            {/* Twitch Bot Moderation Settings (only show when Twitch account is linked) */}
+            {accountData.twitchUsername && (
+              <div className="mt-6">
+                <TwitchModerationSettings />
+              </div>
+            )}
           </div>
         </div>
 
