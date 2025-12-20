@@ -1,11 +1,27 @@
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
+import path from 'path';
 
-dotenv.config();
+// Load environment variables from both .env and .env.local
+dotenv.config(); // Loads .env by default
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') }); // Also load .env.local if it exists
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy initialization of OpenAI client to avoid errors on server startup
+// Only initializes when actually needed
+let openaiInstance: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!openaiInstance) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY environment variable is missing or empty. Please set it in your .env or .env.local file.');
+    }
+    openaiInstance = new OpenAI({
+      apiKey: apiKey,
+    });
+  }
+  return openaiInstance;
+}
 
 export interface UserPreferences {
   genres: string[];
@@ -203,7 +219,7 @@ Genre: ${genre} (Racing/Battle Royale/Fighting/FPS/Sandbox focus)
 Generate ONLY the direct question, nothing else:`;
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o-mini', // Using mini for cost efficiency
       messages: [
         {
@@ -602,7 +618,7 @@ Forum Category: ${forumCategory || 'general'}
 Generate ONLY the post content, nothing else:`;
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o-mini', // Using mini for cost efficiency
       messages: [
         {
@@ -696,7 +712,7 @@ Original Post:
 Generate ONLY the reply content, nothing else:`;
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o-mini', // Using mini for cost efficiency
       messages: [
         {
@@ -803,7 +819,7 @@ Forum Category: ${forumCategory || 'general'}
 Generate ONLY the post content, nothing else:`;
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
@@ -908,7 +924,7 @@ Original Post:
 Generate ONLY the reply content, nothing else:`;
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {

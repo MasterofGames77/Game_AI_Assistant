@@ -72,8 +72,26 @@ export async function initializeDiscordBot(): Promise<boolean> {
       ]
     });
 
+    // Check if bot handler already exists (prevent duplicate initialization)
+    if (botHandler) {
+      console.warn('⚠️ Bot handler already exists! Destroying old handler to prevent duplicates.');
+      // Try to clean up old handler if possible
+      try {
+        const oldClient = botHandler['client'];
+        if (oldClient && oldClient !== client) {
+          console.warn('⚠️ Multiple Discord clients detected! This may cause duplicate responses.');
+        }
+      } catch (e) {
+        // Ignore errors during cleanup check
+      }
+    }
+
     // Initialize bot handler
     botHandler = new DiscordBotHandler(client);
+    console.log('✅ Discord bot handler created', {
+      timestamp: new Date().toISOString(),
+      clientReady: client.isReady()
+    });
 
     // Set up event handlers
     client.once('ready', async () => {

@@ -511,6 +511,8 @@ class AutomatedUsersScheduler {
 
   /**
    * Calculate the next run time for a cron expression
+   * Note: JavaScript Date objects store time internally as UTC milliseconds since epoch.
+   * We use UTC methods to work directly with UTC time.
    */
   private calculateNextRun(cronExpression: string): Date | null {
     try {
@@ -519,11 +521,11 @@ class AutomatedUsersScheduler {
       if (parts.length !== 5) return null;
 
       const now = new Date();
-      const utcNow = new Date(now.getTime() + (now.getTimezoneOffset() * 60000));
       
-      let nextRun = new Date(utcNow);
-      nextRun.setSeconds(0);
-      nextRun.setMilliseconds(0);
+      // Create a new date for the next run, starting from current UTC time
+      let nextRun = new Date();
+      nextRun.setUTCSeconds(0);
+      nextRun.setUTCMilliseconds(0);
       
       // For daily tasks, set to the next occurrence of the specified time
       const targetMinute = parts[0] === '*' ? 0 : parseInt(parts[0]);
@@ -533,7 +535,7 @@ class AutomatedUsersScheduler {
       nextRun.setUTCHours(targetHour);
       
       // If the time has already passed today, set for tomorrow
-      if (nextRun <= utcNow) {
+      if (nextRun <= now) {
         nextRun.setUTCDate(nextRun.getUTCDate() + 1);
       }
       

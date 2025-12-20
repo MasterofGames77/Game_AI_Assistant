@@ -1,13 +1,29 @@
 import axios from 'axios';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
+import path from 'path';
 import { getClientCredentialsAccessToken } from './twitchAuth';
 
-dotenv.config();
+// Load environment variables from both .env and .env.local
+dotenv.config(); // Loads .env by default
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') }); // Also load .env.local if it exists
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy initialization of OpenAI client to avoid errors on server startup
+// Only initializes when actually needed
+let openaiInstance: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!openaiInstance) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY environment variable is missing or empty. Please set it in your .env or .env.local file.');
+    }
+    openaiInstance = new OpenAI({
+      apiKey: apiKey,
+    });
+  }
+  return openaiInstance;
+}
 
 // Cache implementation for API responses
 export class AICacheMetrics {
@@ -459,7 +475,7 @@ Provide only the game title. If you cannot identify it with confidence, respond 
 
     try {
       // Use OpenAI to identify the game from the image description
-      const completion = await openai.chat.completions.create({
+      const completion = await getOpenAIClient().chat.completions.create({
         model: 'gpt-4o-search-preview',
         messages: [
           {
@@ -816,7 +832,7 @@ export const getChatCompletionWithVision = async (
       text: question
     });
 
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o-search-preview',
       messages: messages as any,
       max_completion_tokens: 1000,
@@ -1185,7 +1201,7 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
 - Pay special attention to remakes, remasters, and sequels - make sure you're answering about the EXACT version specified
 ${gameTitleForContext ? `\n⚠️ IMPORTANT: The user is asking about "${gameTitleForContext}" - you MUST answer about this exact game, not any other game with a similar name ⚠️` : ''}`;
       
-      const completion = await openai.chat.completions.create({
+      const completion = await getOpenAIClient().chat.completions.create({
         model: 'gpt-4o-search-preview',
         messages: [
           { 
@@ -1502,7 +1518,7 @@ Format: ["Game 1", "Game 2", "Game 3", ...]
 ONLY include games where ${genre} is clearly the primary genre. If unsure, EXCLUDE the game.`;
 
         try {
-          const aiResponse = await openai.chat.completions.create({
+          const aiResponse = await getOpenAIClient().chat.completions.create({
             model: 'gpt-4o-search-preview',
             messages: [
               {
@@ -1622,7 +1638,7 @@ Format: ["Game 1", "Game 2", "Game 3", ...]
 ONLY include games where ${genre} is clearly the primary genre. If unsure, EXCLUDE the game.`;
 
         try {
-          const aiResponse = await openai.chat.completions.create({
+          const aiResponse = await getOpenAIClient().chat.completions.create({
             model: 'gpt-4o-search-preview',
             messages: [
               {
