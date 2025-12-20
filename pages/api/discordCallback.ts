@@ -145,7 +145,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // After successful authentication, redirect to Discord bot invite URL
-    const botInviteUrl = `https://discord.com/oauth2/authorize?client_id=${process.env.DISCORD_APPLICATION_ID}&permissions=2252332390017024&scope=bot%20applications.commands`;
+    const botInviteUrl = `https://discord.com/oauth2/authorize?client_id=${process.env.DISCORD_APPLICATION_ID}&permissions=1617525337286&scope=bot%20applications.commands`;
     
     // Create a landing page URL that will show options to either add bot or start DM
     const landingUrl = new URL('/discord-landing', process.env.NODE_ENV === 'production'

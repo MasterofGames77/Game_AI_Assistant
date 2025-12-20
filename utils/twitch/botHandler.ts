@@ -9,6 +9,7 @@ import User from '../../models/User';
 import TwitchBotChannel from '../../models/TwitchBotChannel';
 import { RateLimit } from '../../types';
 import { checkMessageContent, checkAIResponse, getSafeFallbackResponse, handleModerationViolation, checkTwitchUserBanStatus } from './twitchModeration';
+import { logMessageEvent } from './analytics';
 
 // Twitch message types from tmi.js
 type ChatUserstate = tmi.ChatUserstate;
@@ -59,12 +60,12 @@ export class TwitchBotHandler {
       const messageLower = message.toLowerCase().trim();
       
       if (messageLower === '!help' || messageLower.startsWith('!help ')) {
-        await this.handleHelpCommand(channel, displayName);
+        await this.handleHelpCommand(channel, displayName, userstate);
         return;
       }
       
       if (messageLower === '!commands' || messageLower.startsWith('!commands ')) {
-        await this.handleCommandsCommand(channel, displayName);
+        await this.handleCommandsCommand(channel, displayName, userstate);
         return;
       }
 
@@ -88,7 +89,7 @@ export class TwitchBotHandler {
 
       // If no question after mention/command, show help
       if (!question || question.length === 0) {
-        await this.handleHelpCommand(channel, displayName);
+        await this.handleHelpCommand(channel, displayName, userstate);
         return;
       }
 
@@ -144,56 +145,173 @@ export class TwitchBotHandler {
   /**
    * Handle !help command - Show comprehensive help information
    */
-  private async handleHelpCommand(channel: string, displayName: string): Promise<void> {
-    const helpMessage = `@${displayName} 📚 ${botConfig.name} Help — I'm an AI assistant for video game discussions! ` +
-      `Ask me anything about games, strategies, walkthroughs, or recommendations. ` +
-      `Commands: !wingman <question>, !hgwm <question>, or @${this.BOT_USERNAME} <question>. ` +
-      `Use !commands to see all commands. ` +
-      `Requires Video Game Wingman Pro — link your Twitch account on our website!`;
+  private async handleHelpCommand(channel: string, displayName: string, userstate?: ChatUserstate): Promise<void> {
+    const receivedAt = new Date();
+    const processedAt = new Date();
+    const username = userstate?.username || 'unknown';
+    const normalizedChannel = channel.replace('#', '').toLowerCase();
     
-    await this.sendMessage(channel, helpMessage);
-    
-    logger.info('Help command executed', { channel, displayName });
+    try {
+      const helpMessage = `@${displayName} 📚 ${botConfig.name} Help — I'm an AI assistant for video game discussions! ` +
+        `Ask me anything about games, strategies, walkthroughs, or recommendations. ` +
+        `Commands: !wingman <question>, !hgwm <question>, or @${this.BOT_USERNAME} <question>. ` +
+        `Use !commands to see all commands. ` +
+        `Requires Video Game Wingman Pro — link your Twitch account on our website!`;
+      
+      const respondedAt = new Date();
+      await this.sendMessage(channel, helpMessage);
+      
+      const totalTimeMs = respondedAt.getTime() - receivedAt.getTime();
+      const processingTimeMs = processedAt.getTime() - receivedAt.getTime();
+      
+      // Log analytics for command
+      await logMessageEvent({
+        channelName: normalizedChannel,
+        twitchUsername: username,
+        displayName: displayName,
+        messageType: 'command',
+        command: '!help',
+        questionLength: 0,
+        responseLength: helpMessage.length,
+        processingTimeMs,
+        aiResponseTimeMs: 0, // Commands don't use AI
+        totalTimeMs,
+        cacheHit: false,
+        success: true,
+        receivedAt,
+        processedAt,
+        respondedAt
+      });
+      
+      logger.info('Help command executed', { channel, displayName });
+    } catch (error) {
+      const respondedAt = new Date();
+      const totalTimeMs = respondedAt.getTime() - receivedAt.getTime();
+      const processingTimeMs = processedAt.getTime() - receivedAt.getTime();
+      
+      // Log analytics for failed command
+      await logMessageEvent({
+        channelName: normalizedChannel,
+        twitchUsername: username,
+        displayName: displayName,
+        messageType: 'command',
+        command: '!help',
+        questionLength: 0,
+        responseLength: 0,
+        processingTimeMs,
+        aiResponseTimeMs: 0,
+        totalTimeMs,
+        cacheHit: false,
+        success: false,
+        errorType: 'api_error',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        receivedAt,
+        processedAt,
+        respondedAt
+      });
+      
+      throw error;
+    }
   }
 
   /**
    * Handle !commands command - List all available commands
    */
-  private async handleCommandsCommand(channel: string, displayName: string): Promise<void> {
-    const commandsList = [
-      `@${displayName} 📋 Available Commands:`,
-      `• !help — Show this help message`,
-      `• !commands — List all commands`,
-      `• !wingman <question> — Ask a gaming question`,
-      `• !hgwm <question> — Alternative command (same as !wingman)`,
-      `• @${this.BOT_USERNAME} <question> — Mention me with a question`,
-      ``,
-      `💡 Tip: Link your Twitch account on our website for Pro access!`
-    ];
+  private async handleCommandsCommand(channel: string, displayName: string, userstate?: ChatUserstate): Promise<void> {
+    const receivedAt = new Date();
+    const processedAt = new Date();
+    const username = userstate?.username || 'unknown';
+    const normalizedChannel = channel.replace('#', '').toLowerCase();
     
-    // Send commands in chunks if needed (respecting 500 char limit)
-    let currentMessage = '';
-    for (const line of commandsList) {
-      const potentialMessage = currentMessage ? `${currentMessage}\n${line}` : line;
+    try {
+      const commandsList = [
+        `@${displayName} 📋 Available Commands:`,
+        `• !help — Show this help message`,
+        `• !commands — List all commands`,
+        `• !wingman <question> — Ask a gaming question`,
+        `• !hgwm <question> — Alternative command (same as !wingman)`,
+        `• @${this.BOT_USERNAME} <question> — Mention me with a question`,
+        ``,
+        `💡 Tip: Link your Twitch account on our website for Pro access!`
+      ];
       
-      if (potentialMessage.length > this.MAX_MESSAGE_LENGTH) {
-        // Send current message if it has content
-        if (currentMessage) {
-          await this.sendMessage(channel, currentMessage);
-          await new Promise(resolve => setTimeout(resolve, 500)); // Small delay between messages
+      // Send commands in chunks if needed (respecting 500 char limit)
+      let currentMessage = '';
+      let totalResponseLength = 0;
+      for (const line of commandsList) {
+        const potentialMessage = currentMessage ? `${currentMessage}\n${line}` : line;
+        
+        if (potentialMessage.length > this.MAX_MESSAGE_LENGTH) {
+          // Send current message if it has content
+          if (currentMessage) {
+            await this.sendMessage(channel, currentMessage);
+            totalResponseLength += currentMessage.length;
+            await new Promise(resolve => setTimeout(resolve, 500)); // Small delay between messages
+          }
+          currentMessage = line;
+        } else {
+          currentMessage = potentialMessage;
         }
-        currentMessage = line;
-      } else {
-        currentMessage = potentialMessage;
       }
+      
+      // Send remaining message
+      if (currentMessage) {
+        await this.sendMessage(channel, currentMessage);
+        totalResponseLength += currentMessage.length;
+      }
+      
+      const respondedAt = new Date();
+      const totalTimeMs = respondedAt.getTime() - receivedAt.getTime();
+      const processingTimeMs = processedAt.getTime() - receivedAt.getTime();
+      
+      // Log analytics for command
+      await logMessageEvent({
+        channelName: normalizedChannel,
+        twitchUsername: username,
+        displayName: displayName,
+        messageType: 'command',
+        command: '!commands',
+        questionLength: 0,
+        responseLength: totalResponseLength,
+        processingTimeMs,
+        aiResponseTimeMs: 0, // Commands don't use AI
+        totalTimeMs,
+        cacheHit: false,
+        success: true,
+        receivedAt,
+        processedAt,
+        respondedAt
+      });
+      
+      logger.info('Commands command executed', { channel, displayName });
+    } catch (error) {
+      const respondedAt = new Date();
+      const totalTimeMs = respondedAt.getTime() - receivedAt.getTime();
+      const processingTimeMs = processedAt.getTime() - receivedAt.getTime();
+      
+      // Log analytics for failed command
+      await logMessageEvent({
+        channelName: normalizedChannel,
+        twitchUsername: username,
+        displayName: displayName,
+        messageType: 'command',
+        command: '!commands',
+        questionLength: 0,
+        responseLength: 0,
+        processingTimeMs,
+        aiResponseTimeMs: 0,
+        totalTimeMs,
+        cacheHit: false,
+        success: false,
+        errorType: 'api_error',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        receivedAt,
+        processedAt,
+        respondedAt
+      });
+      
+      throw error;
     }
-    
-    // Send remaining message
-    if (currentMessage) {
-      await this.sendMessage(channel, currentMessage);
-    }
-    
-    logger.info('Commands command executed', { channel, displayName });
   }
 
   private async handleMessage(
@@ -203,8 +321,29 @@ export class TwitchBotHandler {
     displayName: string
   ): Promise<void> {
     const username = userstate.username || 'unknown';
+    const normalizedChannel = channel.replace('#', '').toLowerCase().trim();
+    
+    // Analytics tracking variables
+    const receivedAt = new Date();
+    let processedAt: Date | null = null;
+    let respondedAt: Date | null = null;
+    let processingTimeMs = 0;
+    let aiResponseTimeMs = 0;
+    let totalTimeMs = 0;
+    let cacheHit = false;
+    let success = false;
+    let errorType: string | undefined;
+    let errorMessage: string | undefined;
+    let wasModerated = false;
+    let moderationAction: string | undefined;
+    let responseLength = 0;
+    let messageType: 'command' | 'question' | 'other' = 'question';
+    let command: string | undefined;
     
     try {
+      processedAt = new Date();
+      processingTimeMs = processedAt.getTime() - receivedAt.getTime();
+      
       logger.info('Processing Twitch message', {
         username: username,
         displayName: displayName,
@@ -222,15 +361,41 @@ export class TwitchBotHandler {
           bannedAt: banStatus.bannedAt,
           reason: banStatus.reason
         });
+        
+        // Log analytics for banned user
+        respondedAt = new Date();
+        totalTimeMs = respondedAt.getTime() - receivedAt.getTime();
+        await logMessageEvent({
+          channelName: normalizedChannel,
+          twitchUsername: username,
+          displayName: displayName,
+          messageType: 'other',
+          questionLength: question.length,
+          responseLength: 0,
+          processingTimeMs,
+          aiResponseTimeMs: 0,
+          totalTimeMs,
+          cacheHit: false,
+          success: false,
+          errorType: 'moderation',
+          errorMessage: 'User is banned',
+          wasModerated: true,
+          moderationAction: 'banned',
+          receivedAt,
+          processedAt,
+          respondedAt
+        });
         return; // Silently reject - don't process with AI
       }
 
       // Pre-processing: Check message for offensive content before AI processing
-      const normalizedChannel = channel.replace('#', '').toLowerCase().trim();
       const moderationCheck = await checkMessageContent(question, username, normalizedChannel);
       
       if (!moderationCheck.shouldProcess) {
         // Offensive content detected - handle moderation violation
+        wasModerated = true;
+        moderationAction = moderationCheck.violationResult?.action || 'warning';
+        
         await handleModerationViolation(
           channel,
           username,
@@ -238,6 +403,30 @@ export class TwitchBotHandler {
           moderationCheck,
           question // Pass original message for logging
         );
+        
+        // Log analytics for moderated message
+        respondedAt = new Date();
+        totalTimeMs = respondedAt.getTime() - receivedAt.getTime();
+        await logMessageEvent({
+          channelName: normalizedChannel,
+          twitchUsername: username,
+          displayName: displayName,
+          messageType: 'other',
+          questionLength: question.length,
+          responseLength: 0,
+          processingTimeMs,
+          aiResponseTimeMs: 0,
+          totalTimeMs,
+          cacheHit: false,
+          success: false,
+          errorType: 'moderation',
+          errorMessage: moderationCheck.reason,
+          wasModerated: true,
+          moderationAction,
+          receivedAt,
+          processedAt,
+          respondedAt
+        });
         return; // Don't process offensive messages with AI
       }
 
@@ -332,22 +521,74 @@ export class TwitchBotHandler {
           message += ` Visit our website to learn more!`;
         }
         
+        respondedAt = new Date();
+        totalTimeMs = respondedAt.getTime() - receivedAt.getTime();
+        responseLength = message.length;
+        
         await this.sendMessage(channel, message);
+        
+        // Log analytics for Pro access denied
+        await logMessageEvent({
+          channelName: normalizedChannel,
+          twitchUsername: username,
+          displayName: displayName,
+          messageType: 'question',
+          questionLength: question.length,
+          responseLength,
+          processingTimeMs,
+          aiResponseTimeMs: 0,
+          totalTimeMs,
+          cacheHit: false,
+          success: false,
+          errorType: 'pro_access_denied',
+          errorMessage: 'Pro access required',
+          receivedAt,
+          processedAt: processedAt || receivedAt,
+          respondedAt
+        });
         return;
       }
 
       // Check cache first
       const cachedResponse = this.getCachedResponse(question);
       if (cachedResponse) {
+        cacheHit = true;
+        responseLength = cachedResponse.length;
+        respondedAt = new Date();
+        totalTimeMs = respondedAt.getTime() - receivedAt.getTime();
+        
         await this.sendLongMessage(channel, displayName, cachedResponse);
+        
+        // Log analytics for cached response
+        await logMessageEvent({
+          channelName: normalizedChannel,
+          twitchUsername: username,
+          displayName: displayName,
+          messageType: 'question',
+          questionLength: question.length,
+          responseLength,
+          processingTimeMs,
+          aiResponseTimeMs: 0, // Cache hit - no AI processing
+          totalTimeMs,
+          cacheHit: true,
+          success: true,
+          receivedAt,
+          processedAt: processedAt || receivedAt,
+          respondedAt
+        });
         return;
       }
 
-      // Process the message
+      // Process the message with AI
       logger.info('Generating AI response', { username });
-      const channelName = channel.replace('#', '').toLowerCase();
-      const response = await this.processMessage(question, username, channelName);
+      const aiStartTime = Date.now();
+      const response = await this.processMessage(question, username, normalizedChannel);
+      const aiEndTime = Date.now();
+      aiResponseTimeMs = aiEndTime - aiStartTime;
+      
       if (response) {
+        responseLength = response.length;
+        
         // Cache the response
         this.cacheResponse(question, response);
         logger.info('Sending response to user', {
@@ -356,13 +597,59 @@ export class TwitchBotHandler {
         });
 
         // Split long messages into chunks (Twitch has 500 character limit)
+        respondedAt = new Date();
         await this.sendLongMessage(channel, displayName, response);
+        totalTimeMs = respondedAt.getTime() - receivedAt.getTime();
+        success = true;
+        
         logger.info('Response sent successfully', { username });
 
         // Update message count for this channel
         await this.updateChannelMessageCount(channel);
+        
+        // Log analytics for successful message processing
+        await logMessageEvent({
+          channelName: normalizedChannel,
+          twitchUsername: username,
+          displayName: displayName,
+          messageType: 'question',
+          questionLength: question.length,
+          responseLength,
+          processingTimeMs,
+          aiResponseTimeMs,
+          totalTimeMs,
+          cacheHit: false,
+          success: true,
+          receivedAt,
+          processedAt: processedAt || receivedAt,
+          respondedAt
+        });
       } else {
         logger.warn('No response generated', { username });
+        respondedAt = new Date();
+        totalTimeMs = respondedAt.getTime() - receivedAt.getTime();
+        errorType = 'no_response';
+        errorMessage = 'AI did not generate a response';
+        
+        // Log analytics for no response
+        await logMessageEvent({
+          channelName: normalizedChannel,
+          twitchUsername: username,
+          displayName: displayName,
+          messageType: 'question',
+          questionLength: question.length,
+          responseLength: 0,
+          processingTimeMs,
+          aiResponseTimeMs,
+          totalTimeMs,
+          cacheHit: false,
+          success: false,
+          errorType,
+          errorMessage,
+          receivedAt,
+          processedAt: processedAt || receivedAt,
+          respondedAt
+        });
       }
     } catch (error) {
       logger.error('Error in handleMessage', {
@@ -370,6 +657,43 @@ export class TwitchBotHandler {
         username,
         errorMessage: error instanceof Error ? error.message : String(error)
       });
+      
+      // Determine error type
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMsg.includes('rate limit') || errorMsg.includes('rate_limit')) {
+        errorType = 'rate_limit';
+      } else if (errorMsg.includes('API') || errorMsg.includes('api')) {
+        errorType = 'api_error';
+      } else {
+        errorType = 'other';
+      }
+      errorMessage = errorMsg;
+      
+      respondedAt = new Date();
+      totalTimeMs = respondedAt.getTime() - receivedAt.getTime();
+      
+      // Log analytics for error
+      await logMessageEvent({
+        channelName: normalizedChannel,
+        twitchUsername: username,
+        displayName: displayName,
+        messageType: 'question',
+        questionLength: question.length,
+        responseLength: 0,
+        processingTimeMs,
+        aiResponseTimeMs,
+        totalTimeMs,
+        cacheHit: false,
+        success: false,
+        errorType,
+        errorMessage,
+        wasModerated,
+        moderationAction,
+        receivedAt,
+        processedAt: processedAt || receivedAt,
+        respondedAt
+      });
+      
       this.handleError(error, channel, displayName);
     }
   }
@@ -391,6 +715,7 @@ export class TwitchBotHandler {
       
       if (!responseCheck.shouldProcess) {
         // AI generated inappropriate content - replace with safe fallback
+        // Note: This is tracked in analytics but wasModerated is false because it's AI-generated, not user-generated
         logger.warn('AI generated inappropriate response - replacing with safe fallback', {
           twitchUsername,
           offendingWords: responseCheck.offendingWords,

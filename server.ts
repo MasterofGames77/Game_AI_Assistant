@@ -188,13 +188,21 @@ app.prepare().then(async () => {
     // Check if it's a Node.js error with a code property
     const nodeError = error as Error & { code?: string };
     
-    // Ignore connection reset errors (ECONNRESET, EPIPE) - these happen when clients close connections
-    if (nodeError.code === 'ECONNRESET' || nodeError.code === 'EPIPE' || error.message === 'aborted') {
+    // Ignore connection reset errors (ECONNRESET, EPIPE, aborted) - these happen when clients close connections
+    const isConnectionError = 
+      nodeError.code === 'ECONNRESET' || 
+      nodeError.code === 'EPIPE' || 
+      error.message === 'aborted' ||
+      error.message?.toLowerCase().includes('aborted') ||
+      error.message?.toLowerCase().includes('econnreset');
+    
+    if (isConnectionError) {
       // Silently ignore - these are expected when clients close connections mid-request
+      // Only log in development for debugging
       if (dev) {
-        console.debug('Client connection closed:', nodeError.code || error.message);
+        console.debug('Client connection closed (ignored):', nodeError.code || error.message);
       }
-      return;
+      return; // Don't crash or log as error
     }
     
     // Log other uncaught exceptions

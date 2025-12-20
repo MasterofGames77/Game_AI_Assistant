@@ -5,6 +5,13 @@ import { checkProAccess } from '../proAccessUtil';
 import { logger } from '../logger';
 import { connectToWingmanDB } from '../databaseConnections';
 import User from '../../models/User';
+import {
+  checkMessageContent,
+  checkAIResponse,
+  checkDiscordUserBanStatus,
+  handleModerationViolation,
+  getSafeFallbackResponse
+} from './discordModeration';
 
 // Rate limiting configuration
 interface RateLimit {
@@ -21,6 +28,7 @@ export class DiscordBotHandler {
   private readonly MAX_MESSAGES_PER_WINDOW = 10;
   private readonly CACHE_TTL = 300000; // 5 minutes
   private readonly MAX_RETRIES = 3;
+  private messageHandler: ((message: Message) => Promise<void>) | null = null;
 
   constructor(client: Client) {
     this.client = client;
@@ -32,7 +40,13 @@ export class DiscordBotHandler {
   }
 
   private setupEventHandlers() {
-    this.client.on('messageCreate', async (message: Message) => {
+    // Remove existing listener if it exists (prevents duplicates during hot-reload)
+    if (this.messageHandler) {
+      this.client.removeListener('messageCreate', this.messageHandler);
+    }
+    
+    // Create the handler function
+    this.messageHandler = async (message: Message) => {
       if (message.author.bot) return;
       
       // Determine if message is a DM or in a server channel
@@ -85,7 +99,10 @@ export class DiscordBotHandler {
       } catch (error) {
         this.handleError(error, message);
       }
-    });
+    };
+    
+    // Register the handler (only once, prevents duplicates during hot-reload)
+    this.client.on('messageCreate', this.messageHandler);
   }
 
   private async handleMessage(message: Message): Promise<void> {
@@ -149,9 +166,62 @@ export class DiscordBotHandler {
         return;
       }
 
+      // MODERATION: Check if user is banned (only for server messages, not DMs)
+      if (message.guild) {
+        const banStatus = await checkDiscordUserBanStatus(message.author.id, message.guild.id);
+        if (banStatus.isBanned) {
+          logger.info('Banned user attempted to use bot', {
+            userId: message.author.id,
+            username: message.author.username,
+            guildId: message.guild.id,
+            isPermanent: banStatus.isPermanent
+          });
+          // Silently reject - don't respond to banned users
+          return;
+        }
+      }
+
+      // MODERATION: Check message content for offensive content BEFORE processing
+      const guildId = message.guild?.id;
+      const moderationCheck = await checkMessageContent(
+        message.content,
+        message.author.id,
+        guildId
+      );
+
+      if (moderationCheck.isOffensive) {
+        logger.warn('Offensive content detected, handling violation', {
+          userId: message.author.id,
+          username: message.author.username,
+          guildId: guildId || 'DM',
+          offendingWords: moderationCheck.offendingWords
+        });
+
+        // Handle the violation (warn, timeout, or ban based on violation count)
+        await handleModerationViolation(message, moderationCheck);
+
+        // Don't process the message with AI - stop here
+        return;
+      }
+
       // Check cache first
       const cachedResponse = this.getCachedResponse(message.content);
       if (cachedResponse) {
+        // MODERATION: Check cached response for inappropriate content
+        const cachedResponseCheck = await checkAIResponse(
+          cachedResponse,
+          message.author.id,
+          guildId
+        );
+        
+        if (cachedResponseCheck.isOffensive) {
+          logger.warn('Cached response contains inappropriate content, using safe fallback', {
+            userId: message.author.id
+          });
+          await this.sendLongMessage(message, getSafeFallbackResponse());
+          return;
+        }
+        
         await this.sendLongMessage(message, cachedResponse);
         return;
       }
@@ -160,6 +230,25 @@ export class DiscordBotHandler {
       logger.info('Generating AI response', { userId: message.author.id });
       const response = await this.processMessage(message);
       if (response) {
+        // MODERATION: Check AI response for inappropriate content BEFORE sending
+        const responseCheck = await checkAIResponse(
+          response,
+          message.author.id,
+          guildId
+        );
+
+        if (responseCheck.isOffensive) {
+          logger.warn('AI generated inappropriate response, using safe fallback', {
+            userId: message.author.id,
+            offendingWords: responseCheck.offendingWords
+          });
+          // Replace with safe fallback instead of inappropriate content
+          const safeResponse = getSafeFallbackResponse();
+          this.cacheResponse(message.content, safeResponse);
+          await this.sendLongMessage(message, safeResponse);
+          return;
+        }
+
         // Cache the response
         this.cacheResponse(message.content, response);
         logger.info('Sending response to user', {

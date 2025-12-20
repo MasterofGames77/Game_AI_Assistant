@@ -24,7 +24,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const BOT_INVITE_URL = `https://discord.com/oauth2/authorize?client_id=${process.env.DISCORD_APPLICATION_ID}&permissions=2252332390017024&scope=bot%20applications.commands`;
+const BOT_INVITE_URL = `https://discord.com/oauth2/authorize?client_id=${process.env.DISCORD_APPLICATION_ID}&permissions=1617525337286&scope=bot%20applications.commands`;
 const WEBSITE_URL = process.env.NODE_ENV === 'production' 
   ? 'https://assistant.videogamewingman.com'
   : 'http://localhost:3000';
