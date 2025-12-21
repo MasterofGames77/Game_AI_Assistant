@@ -32,6 +32,36 @@ const TwitchModerationSettings: React.FC<TwitchModerationSettingsProps> = ({
     checkAIResponses: true,
     logAllActions: true,
   });
+  // Initialize collapsed state from localStorage if available
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("twitchModerationCollapsed");
+        if (saved !== null) {
+          const parsed = JSON.parse(saved);
+          return parsed === true;
+        }
+      } catch (e) {
+        console.error("Error loading moderation collapsed state from localStorage:", e);
+      }
+    }
+    return false;
+  });
+
+  // Sync with localStorage on mount (in case of SSR/hydration issues)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("twitchModerationCollapsed");
+        if (saved !== null) {
+          const parsed = JSON.parse(saved);
+          setIsCollapsed(parsed === true);
+        }
+      } catch (e) {
+        console.error("Error syncing moderation collapsed state from localStorage:", e);
+      }
+    }
+  }, []);
 
   const fetchChannels = useCallback(async () => {
     try {
@@ -213,45 +243,74 @@ const TwitchModerationSettings: React.FC<TwitchModerationSettingsProps> = ({
 
   return (
     <div
-      className={`bg-[#252642]/50 backdrop-blur-sm rounded-2xl p-6 shadow-[0_0_15px_rgba(0,255,255,0.1)] border border-[#00ffff]/20 ${className}`}
+      className={`bg-[#252642]/50 backdrop-blur-sm rounded-2xl shadow-[0_0_15px_rgba(0,255,255,0.1)] border border-[#00ffff]/20 transition-all ${className} ${isCollapsed ? "p-3" : "p-6"}`}
     >
-      <h2 className="text-2xl font-bold mb-6 text-[#00ffff]">
-        Twitch Bot Moderation Settings
-      </h2>
-
-      {error && (
-        <div className="mb-4 p-3 bg-red-500/20 border border-red-500/40 rounded-lg">
-          <p className="text-red-200 text-sm">{error}</p>
-        </div>
-      )}
-
-      {success && (
-        <div className="mb-4 p-3 bg-green-500/20 border border-green-500/40 rounded-lg">
-          <p className="text-green-200 text-sm">{success}</p>
-        </div>
-      )}
-
-      {/* Channel Selector */}
-      <div className="mb-6">
-        <label className="block text-gray-300 text-sm font-semibold mb-2">
-          Select Channel
-        </label>
-        <select
-          value={selectedChannel || ""}
-          onChange={(e) => setSelectedChannel(e.target.value)}
-          className="w-full px-4 py-2 bg-[#1a1b2e]/50 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-[#00ffff] focus:border-transparent"
+      <div className={`flex items-center justify-between ${isCollapsed ? "mb-0" : "mb-6"}`}>
+        <h2 className="text-2xl font-bold text-[#00ffff]">
+          Twitch Bot Moderation Settings
+        </h2>
+        <button
+          onClick={() => {
+            const newState = !isCollapsed;
+            setIsCollapsed(newState);
+            // Save to localStorage immediately
+            try {
+              if (typeof window !== "undefined") {
+                localStorage.setItem("twitchModerationCollapsed", JSON.stringify(newState));
+              }
+            } catch (e) {
+              console.error("Error saving moderation collapsed state to localStorage:", e);
+            }
+          }}
+          className="text-[#00ffff] hover:text-[#00ffff]/80 transition-colors"
+          aria-label={isCollapsed ? "Expand section" : "Collapse section"}
         >
-          {channels.map((channel) => (
-            <option key={channel.channelName} value={channel.channelName}>
-              #{channel.channelName}{" "}
-              {channel.isActive ? "(Active)" : "(Inactive)"}
-            </option>
-          ))}
-        </select>
+          <svg
+            className={`w-5 h-5 transition-transform ${isCollapsed ? "rotate-180" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
       </div>
 
-      {selectedChannel && (
-        <div className="space-y-6">
+      {!isCollapsed && (
+        <>
+          {error && (
+            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/40 rounded-lg">
+              <p className="text-red-200 text-sm">{error}</p>
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-4 p-3 bg-green-500/20 border border-green-500/40 rounded-lg">
+              <p className="text-green-200 text-sm">{success}</p>
+            </div>
+          )}
+
+          {/* Channel Selector */}
+          <div className="mb-6">
+            <label className="block text-gray-300 text-sm font-semibold mb-2">
+              Select Channel
+            </label>
+            <select
+              value={selectedChannel || ""}
+              onChange={(e) => setSelectedChannel(e.target.value)}
+              className="w-full px-4 py-2 bg-[#1a1b2e]/50 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-[#00ffff] focus:border-transparent"
+            >
+              {channels.map((channel) => (
+                <option key={channel.channelName} value={channel.channelName}>
+                  #{channel.channelName}{" "}
+                  {channel.isActive ? "(Active)" : "(Inactive)"}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedChannel && (
+            <div className="space-y-6">
           {/* Enable Moderation */}
           <div className="flex items-center justify-between p-4 bg-[#1a1b2e]/50 rounded-lg">
             <div>
@@ -531,6 +590,8 @@ const TwitchModerationSettings: React.FC<TwitchModerationSettingsProps> = ({
             </button>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

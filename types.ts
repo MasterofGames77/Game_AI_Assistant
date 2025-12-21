@@ -1198,3 +1198,57 @@ export interface TwitchChannel {
 export interface TwitchBotChannelManagerProps {
   className?: string;
 }
+
+// Twitch Bot Analytics Types
+export interface TwitchBotAnalyticsProps {
+  className?: string;
+}
+
+export interface AggregatedAnalytics {
+  channelName: string;
+  date: Date;
+  hour?: number;
+  totalMessages: number;
+  successfulMessages: number;
+  failedMessages: number;
+  uniqueUsers: number;
+  helpCommandCount: number;
+  commandsCommandCount: number;
+  questionCount: number;
+  avgProcessingTimeMs: number;
+  avgResponseTimeMs: number;
+  cacheHitRate: number;
+  rateLimitHits: number;
+  apiErrors: number;
+  moderationActions: number;
+  newUsers: number;
+  returningUsers: number;
+}
+
+export interface ChannelStatistics {
+  channelName: string;
+  totalMessages: number;
+  successfulMessages: number;
+  failedMessages: number;
+  uniqueUsers: number;
+  avgProcessingTimeMs: number;
+  avgResponseTimeMs: number;
+  cacheHitRate: number;
+  commandUsage: {
+    help: number;
+    commands: number;
+    questions: number;
+  };
+  errorBreakdown: {
+    rateLimit: number;
+    apiError: number;
+    moderation: number;
+    other: number;
+  };
+  moderationActions: number;
+  newUsers: number;
+  returningUsers: number;
+  days?: number;
+  startDate: Date;
+  endDate: Date;
+}

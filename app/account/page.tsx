@@ -11,6 +11,7 @@ import GameTracker from "@/components/GameTracker";
 import TwitchBotChannelManager from "@/components/TwitchBotChannelManager";
 import TwitchAccountLinker from "@/components/TwitchAccountLinker";
 import TwitchModerationSettings from "@/components/TwitchModerationSettings";
+import TwitchBotAnalytics from "@/components/TwitchBotAnalytics";
 import { GameTracking } from "@/types";
 
 export default function AccountPage() {
@@ -1644,6 +1645,11 @@ export default function AccountPage() {
                 <TwitchModerationSettings />
               </div>
             )}
+
+            {/* Twitch Bot Analytics */}
+            <div className="mt-6">
+              <TwitchBotAnalytics />
+            </div>
           </div>
         </div>
 
