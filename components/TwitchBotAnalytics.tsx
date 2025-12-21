@@ -563,7 +563,10 @@ const TwitchBotAnalytics: React.FC<TwitchBotAnalyticsProps> = ({ className = "" 
                   <Tooltip
                     contentStyle={{ backgroundColor: "#1a1b2e", border: "1px solid #00ffff", borderRadius: "8px" }}
                     labelStyle={{ color: "#00ffff" }}
-                    formatter={(value: number | undefined) => value !== undefined ? `${value}ms` : "0ms"}
+                    formatter={(value: any) => {
+                      const numValue = typeof value === 'number' ? value : undefined;
+                      return numValue !== undefined ? `${numValue}ms` : "0ms";
+                    }}
                   />
                   <Legend />
                   <Line type="monotone" dataKey="processing" stroke={COLORS.warning} strokeWidth={2} name="Processing Time" />
@@ -654,9 +657,9 @@ const TwitchBotAnalytics: React.FC<TwitchBotAnalyticsProps> = ({ className = "" 
                     <Tooltip
                       contentStyle={{ backgroundColor: "#1a1b2e", border: "1px solid #00ffff", borderRadius: "8px" }}
                       labelStyle={{ color: "#00ffff" }}
-                      formatter={(value: number | undefined, name: string | undefined) => {
-                        const val = value ?? 0;
-                        const label = name ?? "";
+                      formatter={(value: any, name: any) => {
+                        const val = typeof value === 'number' ? value : 0;
+                        const label = typeof name === 'string' ? name : "";
                         const total = commandUsageData.reduce((sum, item) => sum + item.value, 0);
                         const percent = total > 0 ? ((val / total) * 100).toFixed(1) : "0";
                         return [`${val} (${percent}%)`, label];
@@ -706,7 +709,10 @@ const TwitchBotAnalytics: React.FC<TwitchBotAnalyticsProps> = ({ className = "" 
                   <Tooltip
                     contentStyle={{ backgroundColor: "#1a1b2e", border: "1px solid #00ffff", borderRadius: "8px" }}
                     labelStyle={{ color: "#00ffff" }}
-                    formatter={(value: number | undefined) => value !== undefined ? `${value.toFixed(1)}%` : "0%"}
+                    formatter={(value: any) => {
+                      const numValue = typeof value === 'number' ? value : 0;
+                      return `${numValue.toFixed(1)}%`;
+                    }}
                   />
                   <Area
                     type="monotone"
@@ -764,9 +770,9 @@ const TwitchBotAnalytics: React.FC<TwitchBotAnalyticsProps> = ({ className = "" 
                     <Tooltip
                       contentStyle={{ backgroundColor: "#1a1b2e", border: "1px solid #00ffff", borderRadius: "8px" }}
                       labelStyle={{ color: "#00ffff" }}
-                      formatter={(value: number | undefined, name: string | undefined) => {
-                        const val = value ?? 0;
-                        const label = name ?? "";
+                      formatter={(value: any, name: any) => {
+                        const val = typeof value === 'number' ? value : 0;
+                        const label = typeof name === 'string' ? name : "";
                         const total = errorBreakdownData.reduce((sum, item) => sum + item.value, 0);
                         const percent = total > 0 ? ((val / total) * 100).toFixed(1) : "0";
                         return [`${val} (${percent}%)`, label];
