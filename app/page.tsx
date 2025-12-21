@@ -224,7 +224,7 @@ export default function Home() {
         if (token) {
           try {
             console.log("Token detected in URL, exchanging for session...");
-            
+
             // Exchange token for session cookies
             const exchangeRes = await axios.post(
               "/api/auth/exchange-token",
@@ -238,7 +238,11 @@ export default function Home() {
               }
             );
 
-            if (exchangeRes.data && exchangeRes.data.success && exchangeRes.data.user) {
+            if (
+              exchangeRes.data &&
+              exchangeRes.data.success &&
+              exchangeRes.data.user
+            ) {
               const userData = exchangeRes.data.user;
               const newUsername = userData.username || tokenUserId || "";
 
@@ -250,11 +254,14 @@ export default function Home() {
               localStorage.removeItem("userEmail");
 
               // Store user data
-              console.log("Token exchange successful, setting localStorage for user:", {
-                username: newUsername,
-                userId: userData.userId,
-                email: userData.email,
-              });
+              console.log(
+                "Token exchange successful, setting localStorage for user:",
+                {
+                  username: newUsername,
+                  userId: userData.userId,
+                  email: userData.email,
+                }
+              );
 
               localStorage.setItem("username", newUsername);
               localStorage.setItem("userId", userData.userId);
@@ -296,7 +303,7 @@ export default function Home() {
             }
           } catch (err: any) {
             console.error("Error exchanging token:", err);
-            
+
             // If token exchange fails, show error and fall through to normal flow
             if (err.response?.status === 401 || err.response?.status === 403) {
               const errorMessage =
@@ -305,12 +312,12 @@ export default function Home() {
               console.error("Token exchange failed:", errorMessage);
               // Don't show alert - let user proceed to normal login flow
             }
-            
+
             // Clean up URL parameters even on error
             if (typeof window !== "undefined") {
               window.history.replaceState({}, "", window.location.pathname);
             }
-            
+
             // Fall through to normal flow
           }
         }
@@ -980,10 +987,12 @@ export default function Home() {
       } catch (error: any) {
         // Handle authentication errors gracefully
         if (error.response?.status === 401) {
-          setResponse("Please sign in to use the assistant. Redirecting to sign-in page...");
+          setResponse(
+            "Please sign in to use the assistant. Redirecting to sign-in page..."
+          );
           // Small delay before redirect to show message
           setTimeout(() => {
-            window.location.href = '/signin';
+            window.location.href = "/signin";
           }, 1500);
           return;
         }
@@ -1158,12 +1167,12 @@ export default function Home() {
   const handleTwitchAuth = () => {
     // Get username from localStorage
     const username = localStorage.getItem("username");
-    
+
     // Use the new dedicated viewer OAuth flow
     const loginUrl = username
       ? `/api/twitchViewerLogin?username=${encodeURIComponent(username)}`
       : "/api/twitchViewerLogin";
-    
+
     window.location.href = loginUrl;
   };
 
@@ -1210,9 +1219,11 @@ export default function Home() {
         "wikipedia.org": "Wikipedia",
         "en.wikipedia.org": "Wikipedia",
         "gamesradar.com": "GamesRadar+",
+        "gameinformer.com": "GameInformer",
         "tomsguide.com": "Tom's Guide",
         "techradar.com": "TechRadar",
         "gamespot.com": "GameSpot",
+        "pcgamer.com": "PC Gamer",
         "ign.com": "IGN",
         "polygon.com": "Polygon",
         "kotaku.com": "Kotaku",
@@ -1224,6 +1235,7 @@ export default function Home() {
         "steamdeck.com": "Steam Deck",
         "popularmechanics.com": "Popular Mechanics",
         "nintendolife.com": "Nintendo Life",
+        "nintendoeverything.com": "Nintendo Everything",
         "gamerant.com": "Gamerant",
         "videogamechronicles.com": "VGC",
         "thegamer.com": "The Gamer",
@@ -1235,6 +1247,8 @@ export default function Home() {
         "store.steampowered.com": "Steam",
         "epicgames.com": "Epic Games",
         "currently.att.yahoo.com": "Yahoo",
+        "pushsquare.com": "Push Square",
+        "powerpyx.com": "PowerPyx",
       };
 
       // Check for exact match first
@@ -1544,12 +1558,16 @@ export default function Home() {
     try {
       setIsSigningIn(true);
       // Use new authentication system
-      const res = await axios.post("/api/auth/signin", {
-        identifier: usernameInput.trim(),
-        password: passwordInput,
-      }, {
-        withCredentials: true, // Ensure cookies are sent and received
-      });
+      const res = await axios.post(
+        "/api/auth/signin",
+        {
+          identifier: usernameInput.trim(),
+          password: passwordInput,
+        },
+        {
+          withCredentials: true, // Ensure cookies are sent and received
+        }
+      );
 
       if (res.data && res.data.user) {
         // Get old values before updating
@@ -1598,7 +1616,10 @@ export default function Home() {
       // Check if account is locked
       if (err.response?.status === 403 && err.response?.data?.accountLocked) {
         setAccountLocked(true);
-        setLockoutMessage(err.response.data.message || "Account is locked. Please check your email for unlock instructions.");
+        setLockoutMessage(
+          err.response.data.message ||
+            "Account is locked. Please check your email for unlock instructions."
+        );
         setRequiresUnlock(err.response.data.requiresUnlock || false);
         if (err.response.data.lockedUntil) {
           setLockedUntil(new Date(err.response.data.lockedUntil));
@@ -1680,9 +1701,13 @@ export default function Home() {
     try {
       // Call logout API to blacklist tokens
       // This ensures tokens are invalidated on the server
-      await axios.post("/api/auth/logout", {}, {
-        withCredentials: true, // Ensure cookies are sent
-      });
+      await axios.post(
+        "/api/auth/logout",
+        {},
+        {
+          withCredentials: true, // Ensure cookies are sent
+        }
+      );
     } catch (error) {
       // Log error but continue with logout process
       // Even if API call fails, we still want to clear local state
@@ -1952,7 +1977,11 @@ export default function Home() {
                       </p>
                       {lockedUntil && !requiresUnlock && (
                         <p className="text-yellow-600 dark:text-yellow-400 text-xs">
-                          Try again in {Math.ceil((lockedUntil.getTime() - Date.now()) / (60 * 1000))} minute(s).
+                          Try again in{" "}
+                          {Math.ceil(
+                            (lockedUntil.getTime() - Date.now()) / (60 * 1000)
+                          )}{" "}
+                          minute(s).
                         </p>
                       )}
                       {requiresUnlock && (

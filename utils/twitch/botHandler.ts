@@ -10,6 +10,8 @@ import TwitchBotChannel from '../../models/TwitchBotChannel';
 import { RateLimit } from '../../types';
 import { checkMessageContent, checkAIResponse, getSafeFallbackResponse, handleModerationViolation, checkTwitchUserBanStatus } from './twitchModeration';
 import { logMessageEvent } from './analytics';
+import { getPerformanceMonitor, measureOperation, measureDBQuery, measureAPICall } from './performanceMonitor';
+import { shortenMarkdownLinks } from '../linkShortener';
 
 // Twitch message types from tmi.js
 type ChatUserstate = tmi.ChatUserstate;
@@ -352,7 +354,12 @@ export class TwitchBotHandler {
       });
 
       // Check if user is banned in this channel (using Twitch-specific ban tracking)
-      const banStatus = await checkTwitchUserBanStatus(username, channel);
+      const banStatus = await measureDBQuery(
+        'check_twitch_user_ban_status',
+        () => checkTwitchUserBanStatus(username, channel),
+        normalizedChannel,
+        { username }
+      );
       if (banStatus.isBanned) {
         // User is banned - silently reject (don't respond)
         logger.info('Rejecting message from banned user', {
@@ -389,7 +396,12 @@ export class TwitchBotHandler {
       }
 
       // Pre-processing: Check message for offensive content before AI processing
-      const moderationCheck = await checkMessageContent(question, username, normalizedChannel);
+      const moderationCheck = await measureOperation(
+        'check_message_content',
+        () => checkMessageContent(question, username, normalizedChannel),
+        normalizedChannel,
+        { username, messageLength: question.length }
+      );
       
       if (!moderationCheck.shouldProcess) {
         // Offensive content detected - handle moderation violation
@@ -440,9 +452,14 @@ export class TwitchBotHandler {
         const channelName = channel.replace('#', '').toLowerCase();
         
         // Check if user is the channel owner
-        const channelData = await TwitchBotChannel.findOne({ 
-          channelName: channelName 
-        });
+        const channelData = await measureDBQuery(
+          'find_twitch_bot_channel',
+          () => TwitchBotChannel.findOne({ 
+            channelName: channelName 
+          }),
+          normalizedChannel,
+          { channelName }
+        );
         
         if (channelData && channelData.streamerTwitchId) {
           // Check if the user's Twitch ID matches the streamer's Twitch ID
@@ -463,9 +480,14 @@ export class TwitchBotHandler {
         if (!isChannelOwner) {
           // Check if user has linked their Twitch account using the twitchUsername field
           const twitchUsernameLower = username.toLowerCase();
-          const user = await User.findOne({ 
-            twitchUsername: twitchUsernameLower
-          }).select('username twitchUsername').lean();
+          const user = await measureDBQuery(
+            'find_user_by_twitch_username',
+            () => User.findOne({ 
+              twitchUsername: twitchUsernameLower
+            }).select('username twitchUsername').lean(),
+            normalizedChannel,
+            { twitchUsername: twitchUsernameLower }
+          );
           
           if (user && !Array.isArray(user)) {
             wingmanUsername = user.username;
@@ -500,7 +522,12 @@ export class TwitchBotHandler {
         usingWingmanUsername: !!wingmanUsername
       });
 
-      const hasAccess = await this.retryOperation(() => checkProAccess(identifier));
+      const hasAccess = await measureAPICall(
+        'check_pro_access',
+        () => this.retryOperation(() => checkProAccess(identifier)),
+        normalizedChannel,
+        { identifier, username }
+      );
       
       logger.info('Pro access check result', {
         username: username,
@@ -549,7 +576,7 @@ export class TwitchBotHandler {
         return;
       }
 
-      // Check cache first
+        // Check cache first
       const cachedResponse = this.getCachedResponse(question);
       if (cachedResponse) {
         cacheHit = true;
@@ -557,7 +584,21 @@ export class TwitchBotHandler {
         respondedAt = new Date();
         totalTimeMs = respondedAt.getTime() - receivedAt.getTime();
         
-        await this.sendLongMessage(channel, displayName, cachedResponse);
+        // Record cache hit performance
+        const monitor = getPerformanceMonitor();
+        monitor.recordCacheHitRate('cache_check', 1.0, normalizedChannel, {
+          username,
+          questionLength: question.length
+        });
+        monitor.recordResponseTime('cached_response', totalTimeMs, normalizedChannel, {
+          username,
+          cacheHit: true
+        });
+        
+        // Shorten markdown links in the cached response before sending
+        const formattedCachedResponse = shortenMarkdownLinks(cachedResponse);
+        
+        await this.sendLongMessage(channel, displayName, formattedCachedResponse);
         
         // Log analytics for cached response
         await logMessageEvent({
@@ -578,27 +619,50 @@ export class TwitchBotHandler {
         });
         return;
       }
+      
+      // Record cache miss
+      const monitor = getPerformanceMonitor();
+      monitor.recordCacheHitRate('cache_check', 0.0, normalizedChannel, {
+        username,
+        questionLength: question.length
+      });
 
       // Process the message with AI
       logger.info('Generating AI response', { username });
       const aiStartTime = Date.now();
-      const response = await this.processMessage(question, username, normalizedChannel);
+      const response = await measureOperation(
+        'process_message_ai',
+        () => this.processMessage(question, username, normalizedChannel),
+        normalizedChannel,
+        { username, questionLength: question.length }
+      );
       const aiEndTime = Date.now();
       aiResponseTimeMs = aiEndTime - aiStartTime;
+      
+      // Record AI response time separately
+      monitor.recordAIResponseTime(
+        'ai_response_generation',
+        aiResponseTimeMs,
+        normalizedChannel,
+        { username, questionLength: question.length, responseLength: response?.length || 0 }
+      );
       
       if (response) {
         responseLength = response.length;
         
-        // Cache the response
+        // Cache the response (cache original, not shortened)
         this.cacheResponse(question, response);
         logger.info('Sending response to user', {
           username,
           responseLength: response.length
         });
 
+        // Shorten markdown links in the response before sending
+        const formattedResponse = shortenMarkdownLinks(response);
+
         // Split long messages into chunks (Twitch has 500 character limit)
         respondedAt = new Date();
-        await this.sendLongMessage(channel, displayName, response);
+        await this.sendLongMessage(channel, displayName, formattedResponse);
         totalTimeMs = respondedAt.getTime() - receivedAt.getTime();
         success = true;
         
@@ -606,6 +670,13 @@ export class TwitchBotHandler {
 
         // Update message count for this channel
         await this.updateChannelMessageCount(channel);
+        
+        // Record successful response performance
+        monitor.recordResponseTime('message_processing', totalTimeMs, normalizedChannel, {
+          username,
+          success: true,
+          cacheHit: false
+        });
         
         // Log analytics for successful message processing
         await logMessageEvent({
@@ -630,6 +701,17 @@ export class TwitchBotHandler {
         totalTimeMs = respondedAt.getTime() - receivedAt.getTime();
         errorType = 'no_response';
         errorMessage = 'AI did not generate a response';
+        
+        // Record error performance
+        monitor.recordResponseTime('message_processing', totalTimeMs, normalizedChannel, {
+          username,
+          success: false,
+          errorType
+        });
+        monitor.recordErrorRate('message_processing', 1.0, normalizedChannel, {
+          username,
+          errorType
+        });
         
         // Log analytics for no response
         await logMessageEvent({
@@ -672,6 +754,20 @@ export class TwitchBotHandler {
       respondedAt = new Date();
       totalTimeMs = respondedAt.getTime() - receivedAt.getTime();
       
+      // Record error performance
+      const monitor = getPerformanceMonitor();
+      monitor.recordResponseTime('message_processing', totalTimeMs, normalizedChannel, {
+        username,
+        success: false,
+        errorType,
+        errorMessage: errorMsg
+      });
+      monitor.recordErrorRate('message_processing', 1.0, normalizedChannel, {
+        username,
+        errorType,
+        errorMessage: errorMsg
+      });
+      
       // Log analytics for error
       await logMessageEvent({
         channelName: normalizedChannel,
@@ -704,14 +800,24 @@ export class TwitchBotHandler {
       const systemMessage = this.createSystemMessage();
 
       // Get AI response with retry mechanism
-      const response = await this.retryOperation(() =>
-        getChatCompletion(question, systemMessage)
+      const response = await measureAPICall(
+        'get_chat_completion',
+        () => this.retryOperation(() =>
+          getChatCompletion(question, systemMessage)
+        ),
+        channelName,
+        { twitchUsername, questionLength: question.length }
       );
 
       const aiResponse = response || this.createFallbackResponse();
 
       // Post-processing: Check AI response for inappropriate content
-      const responseCheck = await checkAIResponse(aiResponse, twitchUsername, channelName);
+      const responseCheck = await measureOperation(
+        'check_ai_response',
+        () => checkAIResponse(aiResponse, twitchUsername, channelName),
+        channelName,
+        { twitchUsername, responseLength: aiResponse.length }
+      );
       
       if (!responseCheck.shouldProcess) {
         // AI generated inappropriate content - replace with safe fallback
