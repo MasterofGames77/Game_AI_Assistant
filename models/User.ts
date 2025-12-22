@@ -60,6 +60,7 @@ export interface IUser extends Document {
     firstEmailSentAt?: Date; // Track when first weekly digest was sent
     lastEmailSentAt?: Date; // Track when last weekly digest was sent
     enabled?: boolean; // User preference: whether to receive weekly digest emails (default: true for opt-in)
+    previouslyRecommendedGames?: string[]; // Track games recommended in previous emails to avoid repeats
   };
   // Gamer profile for automated COMMON/EXPERT gamers
   gamerProfile?: {
@@ -359,7 +360,8 @@ const UserSchema = new Schema<IUser>({
   weeklyDigest: {
     firstEmailSentAt: { type: Date }, // Track when first weekly digest was sent
     lastEmailSentAt: { type: Date }, // Track when last weekly digest was sent
-    enabled: { type: Boolean, default: true } // User preference: whether to receive weekly digest emails (default: true for opt-in)
+    enabled: { type: Boolean, default: true }, // User preference: whether to receive weekly digest emails (default: true for opt-in)
+    previouslyRecommendedGames: [{ type: String }] // Track games recommended in previous emails to avoid repeats (keeps last 20-30 games)
   },
   // Gamer profile for automated COMMON/EXPERT gamers
   gamerProfile: {

@@ -116,21 +116,47 @@ export async function getWeeklyForumActivity(
 
 /**
  * Get game recommendations for the weekly digest
- * Uses user's question history to provide personalized recommendations
- * Recommendations vary each week based on user's recent questions
+ * Prioritizes weekly activity (forum posts, questions, achievements) and uses
+ * the 5 most recent questions as fallback when weekly activity is sparse
  */
 export async function getWeeklyGameRecommendations(
   username: string
 ): Promise<string[]> {
   try {
-    // Get user's recent questions (last 50) to understand their interests
-    const recentQuestionsRaw = await Question.find({ username })
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    // Step 1: Get weekly forum activity
+    const weeklyForumActivity = await getWeeklyForumActivity(username);
+    
+    // Step 2: Get weekly questions (past 7 days)
+    const weeklyQuestionsRaw = await Question.find({
+      username,
+      timestamp: { $gte: oneWeekAgo }
+    })
       .sort({ timestamp: -1 })
-      .limit(50)
       .select('detectedGame detectedGenre question timestamp')
       .lean();
     
-    // Type guard and mapping to ensure proper types
+    const weeklyQuestions = weeklyQuestionsRaw
+      .filter((q: any) => q && q.timestamp)
+      .map((q: any) => ({
+        detectedGame: q.detectedGame || undefined,
+        detectedGenre: Array.isArray(q.detectedGenre) ? q.detectedGenre : undefined,
+        question: q.question || undefined,
+        timestamp: new Date(q.timestamp)
+      }));
+
+    // Step 3: Get weekly achievements
+    const weeklyAchievements = await getWeeklyAchievements(username, false);
+
+    // Step 4: Get the 5 most recent questions (for fallback)
+    const recentQuestionsRaw = await Question.find({ username })
+      .sort({ timestamp: -1 })
+      .limit(5)
+      .select('detectedGame detectedGenre question timestamp')
+      .lean();
+    
     const recentQuestions = recentQuestionsRaw
       .filter((q: any) => q && q.timestamp)
       .map((q: any) => ({
@@ -140,25 +166,97 @@ export async function getWeeklyGameRecommendations(
         timestamp: new Date(q.timestamp)
       }));
 
-    // Extract unique games and genres from user's questions
-    const gamesAskedAbout = new Set<string>();
-    const genreCounts: { [key: string]: number } = {};
-
-    for (const q of recentQuestions) {
-      // Collect games they've asked about
-      if (q.detectedGame) {
-        gamesAskedAbout.add(q.detectedGame);
+    // Step 5: Extract games and genres from weekly activity
+    const weeklyGames = new Set<string>();
+    const weeklyGenreCounts: { [key: string]: number } = {};
+    
+    // From weekly forum posts
+    for (const activity of weeklyForumActivity) {
+      if (activity.gameTitle) {
+        weeklyGames.add(activity.gameTitle);
       }
-
-      // Count genres from their questions
+    }
+    
+    // From weekly questions
+    for (const q of weeklyQuestions) {
+      if (q.detectedGame) {
+        weeklyGames.add(q.detectedGame);
+      }
       if (q.detectedGenre && Array.isArray(q.detectedGenre)) {
         for (const genre of q.detectedGenre) {
-          genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+          weeklyGenreCounts[genre] = (weeklyGenreCounts[genre] || 0) + 1;
         }
       }
     }
 
-    // Map achievement names to actual genre names that fetchRecommendations expects
+    // Step 6: Map genre names to standardized genre names
+    const normalizeGenre = (genre: string): string => {
+      const genreLower = genre.toLowerCase();
+      
+      // Map specific genre variations to standard names
+      const genreMap: { [key: string]: string } = {
+        // Shooter variations
+        'third person shooter': 'Shooter',
+        'third-person shooter': 'Shooter',
+        'first person shooter': 'Shooter',
+        'first-person shooter': 'Shooter',
+        'fps': 'Shooter',
+        'tps': 'Shooter',
+        'shoot em up': 'Shooter',
+        'shoot-em-up': 'Shooter',
+        'run-and-gun': 'Shooter',
+        'run and gun': 'Shooter',
+        
+        // Action variations
+        'action-adventure': 'Action',
+        'action adventure': 'Action',
+        'action rpg': 'Action',
+        'action-rpg': 'Action',
+        
+        // RPG variations
+        'role-playing': 'RPG',
+        'role playing': 'RPG',
+        'jrpg': 'RPG',
+        'wrpg': 'RPG',
+        'mmorpg': "MMORPG",
+        
+        // Platformer variations
+        'platform': 'Platformer',
+        'platform game': 'Platformer',
+        'puzzle-platformer': 'Puzzle-Platformer',
+        
+        // Other variations
+        'puzzle game': 'Puzzle',
+        'racing game': 'Racing',
+        'fighting game': 'Fighting',
+        'sports game': 'Sports',
+        'horror game': 'Horror',
+        'stealth game': 'Stealth',
+        'simulation game': 'Simulation',
+        'survival game': 'Survival',
+        'battle royale': 'Battle Royale',
+        'moba': 'Multiplayer Online Battle Arena',
+      };
+      
+      // Check exact match first
+      if (genreMap[genreLower]) {
+        return genreMap[genreLower];
+      }
+      
+      // Check if genre contains any of the mapped terms
+      for (const [key, value] of Object.entries(genreMap)) {
+        if (genreLower.includes(key)) {
+          return value;
+        }
+      }
+      
+      // Capitalize first letter of each word for standard genres
+      return genre.split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+    };
+
+    // Map achievement names to genre names
     const achievementToGenreMap: { [key: string]: string } = {
       'actionAficionado': 'Action',
       'adventureAddict': 'Adventure',
@@ -175,31 +273,83 @@ export async function getWeeklyGameRecommendations(
       'stealthExpert': 'Stealth',
       'simulationSpecialist': 'Simulation',
       'survivalSpecialist': 'Survival',
-      'sandboxBuilder': 'Simulation', // Sandbox games often fall under Simulation
-      'shootemUpSniper': 'Shoot em Up',
-      'bossBuster': 'Action', // Boss battles are typically action games
-      'rhythmMaster': 'Indie', // Rhythm games often indie
+      'sandboxBuilder': 'Simulation',
+      'shootemUpSniper': 'Shooter',
+      'bossBuster': 'Action',
+      'rhythmMaster': 'Rhythm',
     };
 
-    // Convert achievement names to genre names
-    const genreNameCounts: { [key: string]: number } = {};
-    for (const [achievementName, count] of Object.entries(genreCounts)) {
-      const genreName = achievementToGenreMap[achievementName] || achievementName;
-      genreNameCounts[genreName] = (genreNameCounts[genreName] || 0) + count;
+    // Normalize and count genres from weekly activity
+    const normalizedGenreCounts: { [key: string]: number } = {};
+    for (const [genre, count] of Object.entries(weeklyGenreCounts)) {
+      const normalized = normalizeGenre(genre);
+      normalizedGenreCounts[normalized] = (normalizedGenreCounts[normalized] || 0) + count;
     }
 
-    // Determine primary genre(s) from question history
-    const sortedGenres = Object.entries(genreNameCounts)
+    // Extract genres from weekly achievements
+    for (const achievement of weeklyAchievements) {
+      const achievementName = achievement.name;
+      const genre = achievementToGenreMap[achievementName];
+      if (genre) {
+        normalizedGenreCounts[genre] = (normalizedGenreCounts[genre] || 0) + 1;
+      }
+    }
+
+    // Step 7: Determine if we have enough weekly activity
+    const hasForumActivity = weeklyForumActivity.length > 0;
+    const hasWeeklyQuestions = weeklyQuestions.length > 0;
+    const hasEnoughGenres = Object.keys(normalizedGenreCounts).length >= 2;
+    
+    // If weekly activity is sparse, use the 5 most recent questions
+    const useRecentQuestions = !hasForumActivity && 
+                                (!hasWeeklyQuestions || weeklyQuestions.length < 3) && 
+                                (!hasEnoughGenres || weeklyAchievements.length < 2);
+
+    // Step 8: Extract data from the appropriate source
+    let sourceGames = new Set<string>(weeklyGames);
+    let sourceGenreCounts: { [key: string]: number } = { ...normalizedGenreCounts };
+    
+    if (useRecentQuestions) {
+      // Use 5 most recent questions
+      console.log(`[Weekly Digest] Using 5 most recent questions for ${username} (insufficient weekly activity)`);
+      for (const q of recentQuestions) {
+        if (q.detectedGame) {
+          sourceGames.add(q.detectedGame);
+        }
+        if (q.detectedGenre && Array.isArray(q.detectedGenre)) {
+          for (const genre of q.detectedGenre) {
+            const normalized = normalizeGenre(genre);
+            sourceGenreCounts[normalized] = (sourceGenreCounts[normalized] || 0) + 1;
+          }
+        }
+      }
+    } else if (!hasEnoughGenres && recentQuestions.length > 0) {
+      // Supplement with recent questions if we don't have enough genres
+      console.log(`[Weekly Digest] Supplementing weekly activity with recent questions for ${username}`);
+      for (const q of recentQuestions) {
+        if (q.detectedGame) {
+          sourceGames.add(q.detectedGame);
+        }
+        if (q.detectedGenre && Array.isArray(q.detectedGenre)) {
+          for (const genre of q.detectedGenre) {
+            const normalized = normalizeGenre(genre);
+            sourceGenreCounts[normalized] = (sourceGenreCounts[normalized] || 0) + 0.5; // Lower weight for supplement
+          }
+        }
+      }
+    }
+
+    // Step 9: Determine primary genres
+    const sortedGenres = Object.entries(sourceGenreCounts)
       .sort(([, a], [, b]) => b - a)
       .map(([genre]) => genre);
 
-    // Use the top 2-3 genres for variety, or default to Action-Adventure if no history
     let primaryGenres: string[] = [];
     if (sortedGenres.length > 0) {
       // Take top 2-3 genres for variety
       primaryGenres = sortedGenres.slice(0, 3);
     } else {
-      // No genre data - try to infer from progress achievements
+      // Final fallback: try to infer from user progress
       const user = await User.findOne({ username });
       if (user?.progress) {
         const progress = user.progress;
@@ -209,6 +359,22 @@ export async function getWeeklyGameRecommendations(
           'Adventure': progress.adventureAddict || 0,
           'Strategy': progress.strategySpecialist || 0,
           'Racing': progress.racingRenegade || 0,
+          'Shooter': progress.shooterSpecialist || 0,
+          'Platformer': progress.platformerPro || 0,
+          'Puzzle': progress.puzzlePro || 0,
+          'Fighting': progress.fightingFanatic || 0,
+          'Sports': progress.sportsChampion || 0,
+          'Horror': progress.horrorHero || 0,
+          'Stealth': progress.stealthExpert || 0,
+          'Simulation': progress.simulationSpecialist || 0,
+          'Survival': progress.survivalSpecialist || 0,
+          'Rhythm': progress.rhythmMaster || 0,
+          'Sandbox': progress.sandboxBuilder || 0,
+          'Shoot em Up': progress.shootemUpSniper || 0,
+          'Battle Royale': progress.battleRoyaleMaster || 0,
+          'Story': progress.storySeeker || 0,
+          'Beat Em Up': progress.beatEmUpBrawler || 0,
+          'Trivia': progress.triviaMaster || 0,
         };
         const topProgressGenre = Object.entries(progressGenreCounts)
           .sort(([, a], [, b]) => b - a)
@@ -218,17 +384,31 @@ export async function getWeeklyGameRecommendations(
         }
       }
       
-      // Final fallback
+      // Absolute fallback
       if (primaryGenres.length === 0) {
-        primaryGenres = ['Action-Adventure'];
+        primaryGenres = ['Action-Adventure', 'RPG', 'Action', 'Adventure', 'Shooter', 
+          'Platformer', 'Puzzle', 'Fighting', 'Sports', 'Horror', 'Stealth', 'Simulation', 
+          'Survival', 'Rhythm', 'Sandbox', 'Shoot em Up', 'Battle Royale', 
+          'Visual Novel', 'Beat Em Up', 'Trivia'];
       }
     }
 
-    // Helper function to extract base game series name dynamically
-    // Distinguishes between different games in a series (e.g., "Final Fantasy IX" vs "Final Fantasy VII")
-    // But groups obvious sequels/episodes together (e.g., "Half-Life 2: Episode One" and "Half-Life 2: Episode Two")
+    // Step 10: Helper function to extract base game series name for duplicate checking
+    // IMPORTANT: This is ONLY used to prevent multiple games from the same series in one email.
+    // The full game name (e.g., "Final Fantasy IX") is still shown in recommendations.
+    // This function extracts the series name to check: "Have we already recommended a game from this series?"
+    // Examples of series extraction (used for duplicate checking):
+    // - "Final Fantasy IX" -> "Final Fantasy" (removes Roman numerals for duplicate checking)
+    // - "Final Fantasy VII" -> "Final Fantasy" (same series, so only one can appear per email)
+    // - "The Legend of Zelda: Breath of the Wild" -> "The Legend of Zelda" (removes subtitle for duplicate checking)
+    // - "The Legend of Zelda: Ocarina of Time" -> "The Legend of Zelda" (same series)
+    // - "Half-Life 2: Episode One" -> "Half-Life 2" (removes colon content, keeps number)
+    // - "Half-Life 2: Episode Two" -> "Half-Life 2" (same series)
+    // - "Super Mario Galaxy 2" -> "Super Mario Galaxy" (removes trailing number for duplicate checking)
+    // - "Super Mario Galaxy" -> "Super Mario Galaxy" (same series)
+    // - "Ori and the Will of the Wisps" -> "Ori" (removes "and the [subtitle]" pattern)
+    // - "Ori and the Blind Forest" -> "Ori" (same series)
     const extractSeriesName = (gameName: string): string => {
-      // Step 1: Remove edition/remaster indicators (these don't make it a different game)
       let series = gameName
         .replace(/\s*\([^)]*\)/g, '') // Remove parenthetical content (years, subtitles)
         .replace(/\s*Game\s+of\s+the\s+Year\s+Edition/gi, '')
@@ -241,59 +421,82 @@ export async function getWeeklyGameRecommendations(
         .replace(/\s*Complete\s+Edition/gi, '')
         .trim();
       
-      // Step 2: Handle colons (usually separate main title from subtitle)
-      // "The Legend of Zelda: Breath of the Wild" -> keep "The Legend of Zelda" + subtitle
-      // "Half-Life 2: Episode One" -> group episodes together
-      const colonIndex = series.indexOf(':');
-      if (colonIndex > 0) {
-        const beforeColon = series.substring(0, colonIndex).trim();
-        const afterColon = series.substring(colonIndex + 1).trim();
-        
-        // Check if after colon is an episode/season/part (group these together)
-        const episodePattern = /^(Episode|Season|Part|Chapter)\s+/i;
-        if (episodePattern.test(afterColon)) {
-          // Episodes/Seasons/Parts: group by the main title
-          // "Half-Life 2: Episode One" -> "Half-Life 2"
-          // "Half-Life 2: Episode Two" -> "Half-Life 2" (same series)
-          series = beforeColon;
-        } else {
-          // Subtitle: keep both to distinguish different games
-          // "The Legend of Zelda: Breath of the Wild" -> "The Legend of Zelda: Breath of the Wild"
-          // "The Legend of Zelda: Ocarina of Time" -> "The Legend of Zelda: Ocarina of Time" (different)
-          series = `${beforeColon}: ${afterColon}`;
+      // Handle "and the [subtitle]" pattern: extract series name before " and the "
+      // Examples: "Ori and the Will of the Wisps" -> "Ori", "Ori and the Blind Forest" -> "Ori"
+      const andThePattern = /\s+and\s+the\s+/i;
+      if (andThePattern.test(series)) {
+        const match = series.match(/^(.+?)\s+and\s+the\s+/i);
+        if (match && match[1]) {
+          series = match[1].trim();
         }
       }
       
-      // Step 3: Keep numbers and Roman numerals - they distinguish different games in a series
-      // "Final Fantasy IX" -> "Final Fantasy IX" (distinct from "Final Fantasy VII")
-      // "Super Mario Galaxy 2" -> "Super Mario Galaxy 2" (distinct from "Super Mario Galaxy")
-      // "Half-Life 2" -> "Half-Life 2" (distinct from "Half-Life")
-      // Numbers and Roman numerals are kept as part of the series identifier
+      // Handle colons: remove everything after colon to group by main series name
+      // This groups "The Legend of Zelda: Breath of the Wild" and "The Legend of Zelda: Ocarina of Time" together
+      // For "Half-Life 2: Episode One", we keep "Half-Life 2" (the number is part of the series identifier)
+      const colonIndex = series.indexOf(':');
+      if (colonIndex > 0) {
+        series = series.substring(0, colonIndex).trim();
+        // After removing colon content, we keep the number (e.g., "Half-Life 2" stays "Half-Life 2")
+        // This groups episodes of the same numbered game together
+      }
       
-      // Step 4: Clean up and normalize
+      // Remove trailing numbers and Roman numerals ONLY if there's no colon (pure sequels)
+      // This groups "Final Fantasy IX" and "Final Fantasy VII" together as "Final Fantasy"
+      // Also handles "Super Mario Galaxy 2" -> "Super Mario Galaxy"
+      // But keeps "Half-Life 2" as "Half-Life 2" (since it had a colon, we already processed it)
+      // Pattern matches: space followed by digits, or Roman numerals at the very end
+      if (colonIndex === -1) {
+        // Only remove trailing numbers/Roman numerals if there was no colon
+        series = series.replace(/\s+\d+$/, ''); // Remove trailing numbers like " 2", " 3", etc.
+        // Remove trailing Roman numerals (handles I, II, III, IV, V, VI, VII, VIII, IX, X, XI, XII, etc.)
+        series = series.replace(/\s+[IVXLCDM]+$/i, ''); // Expanded to include L, C, D, M for larger numbers
+      }
+      
       let result = series.trim();
       result = result.replace(/\s+/g, ' '); // Multiple spaces to single space
-      result = result.replace(/\s*-\s*/g, '-'); // Keep hyphens but normalize spacing
+      result = result.replace(/\s*-\s*/g, '-'); // Normalize hyphens
       
       return result || gameName; // Fallback to original if empty
     };
 
-    // Fetch recommendations for each primary genre
+    // Step 11: Get all games user has asked about (for exclusion)
+    const allUserQuestions = await Question.find({ username })
+      .select('detectedGame')
+      .lean();
+    const gamesAskedAbout = new Set<string>();
+    for (const q of allUserQuestions) {
+      if ((q as any).detectedGame) {
+        gamesAskedAbout.add((q as any).detectedGame.toLowerCase());
+      }
+    }
+
+    // Step 11b: Get previously recommended games (to avoid repeats)
+    const userDoc = await User.findOne({ username }).select('weeklyDigest').lean();
+    const previouslyRecommended = new Set<string>();
+    if (userDoc && !Array.isArray(userDoc) && (userDoc as any).weeklyDigest?.previouslyRecommendedGames) {
+      // Limit to last 25 games to prevent the list from growing too large
+      const recentRecommendations = (userDoc as any).weeklyDigest.previouslyRecommendedGames.slice(-25);
+      for (const game of recentRecommendations) {
+        if (game) {
+          previouslyRecommended.add(game.toLowerCase());
+        }
+      }
+    }
+
+    // Step 12: Fetch recommendations for each primary genre
     const allRecommendations: string[] = [];
-    const seenGames = new Set<string>(); // Track specific games user has asked about (exclude these)
-    const seenSeries = new Set<string>(); // Track series within THIS email only (prevents duplicates in same email)
+    // Combine exclusion sets: games asked about + previously recommended
+    const seenGames = new Set<string>();
+    gamesAskedAbout.forEach(game => seenGames.add(game));
+    previouslyRecommended.forEach(game => seenGames.add(game));
+    const seenSeries = new Set<string>(); // Series already in this email
 
-    // Add games user has already asked about to exclusion list
-    // Note: We only exclude the specific games, NOT the entire series
-    // This allows different games from the same series to appear in future weekly emails
-    gamesAskedAbout.forEach(game => {
-      seenGames.add(game.toLowerCase());
-      // We do NOT add series to seenSeries here - this allows series to appear in different weekly emails
-      // seenSeries is only populated as we add recommendations to prevent duplicates within the same email
-    });
-
-    // Get recommendations for each genre (with weekly variation)
-    const weekNumber = Math.floor(Date.now() / (1000 * 60 * 60 * 24 * 7)); // Week number for variation
+    // Get recommendations for each genre with enhanced randomization
+    const weekNumber = Math.floor(Date.now() / (1000 * 60 * 60 * 24 * 7));
+    // Add extra randomization factor based on username hash for more variation
+    const usernameHash = username.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const randomSeed = (weekNumber * 7 + usernameHash) % 1000; // Creates variation per user per week
     
     for (let i = 0; i < primaryGenres.length && allRecommendations.length < 8; i++) {
       const genre = primaryGenres[i];
@@ -302,36 +505,44 @@ export async function getWeeklyGameRecommendations(
           currentPopular: true
         });
 
-        // Filter out games user has already asked about
-        // Note: We allow series to appear even if user asked about a different game in that series
-        // (e.g., if user asked about "Half-Life", we can still recommend "Half-Life 2" in a future email)
+        // Filter out games user has already asked about or previously recommended
         const filteredRecs = genreRecs.filter(game => {
           const gameLower = game.toLowerCase();
-          
-          // Only exclude if this specific game was asked about
-          // Don't exclude entire series - allows series to appear in different weekly emails
           return !seenGames.has(gameLower);
         });
 
-        // Add variation: use week number to offset which recommendations we pick
-        const startIndex = (weekNumber + i) % Math.max(1, filteredRecs.length);
+        // Enhanced variation: combine week number, genre index, and random seed
+        // Increased rotation offset for more variety
+        const rotationMultiplier = 3; // Rotate by 3x the week number for more variation
+        const baseOffset = (weekNumber * rotationMultiplier + i * 2 + randomSeed) % Math.max(1, filteredRecs.length);
+        
+        // Add additional randomization: shuffle a portion of the list
+        const shuffleSize = Math.min(10, Math.floor(filteredRecs.length * 0.3)); // Shuffle top 30% or 10 games, whichever is smaller
+        const shuffledPortion = [...filteredRecs.slice(0, shuffleSize)].sort(() => Math.random() - 0.5);
+        const restOfList = filteredRecs.slice(shuffleSize);
+        
+        // Combine shuffled portion with rest, then rotate
+        const combinedRecs = [...shuffledPortion, ...restOfList];
+        const startIndex = baseOffset % Math.max(1, combinedRecs.length);
         const rotatedRecs = [
-          ...filteredRecs.slice(startIndex),
-          ...filteredRecs.slice(0, startIndex)
+          ...combinedRecs.slice(startIndex),
+          ...combinedRecs.slice(0, startIndex)
         ];
 
         // Add unique recommendations (ensuring each is from a different series)
+        // Note: We push the full game name (rec) to recommendations, but use series name for duplicate checking
+        // Example: "Final Fantasy IX" is added to recommendations, but we track "Final Fantasy" in seenSeries
+        // This prevents "Final Fantasy VII" from being added in the same email, but shows the specific game name
         for (const rec of rotatedRecs) {
           if (allRecommendations.length >= 8) break;
           const recLower = rec.toLowerCase();
-          const series = extractSeriesName(rec);
+          const series = extractSeriesName(rec); // Extract series name for duplicate checking
           const seriesLower = series.toLowerCase();
           
-          // Only add if we haven't seen this game or this series
           if (!seenGames.has(recLower) && !seenSeries.has(seriesLower)) {
-            allRecommendations.push(rec);
-            seenGames.add(recLower);
-            seenSeries.add(seriesLower);
+            allRecommendations.push(rec); // Push FULL game name (e.g., "Final Fantasy IX")
+            seenGames.add(recLower); // Track specific game to avoid exact duplicates
+            seenSeries.add(seriesLower); // Track series to prevent multiple games from same series
           }
         }
       } catch (error) {
@@ -339,28 +550,37 @@ export async function getWeeklyGameRecommendations(
       }
     }
 
-    // If we don't have enough recommendations, try a different genre
-    if (allRecommendations.length < 4) {
-      const fallbackGenres = ['Action-Adventure', 'RPG', 'Action', 'Adventure'];
+    // Step 13: If we don't have enough recommendations, try additional genres
+    if (allRecommendations.length < 5) {
+      const fallbackGenres = ['Action-Adventure', 'RPG', 'Action', 'Adventure', 'Shooter', 'Platformer'];
       for (const genre of fallbackGenres) {
-        if (allRecommendations.length >= 4) break;
-        if (primaryGenres.includes(genre)) continue; // Skip if already tried
+        if (allRecommendations.length >= 5) break;
+        if (primaryGenres.includes(genre)) continue;
 
         try {
           const fallbackRecs = await fetchRecommendations(genre, {
             currentPopular: true
           });
-          for (const rec of fallbackRecs) {
-            if (allRecommendations.length >= 4) break;
+          
+          // Filter and shuffle fallback recommendations for variety
+          const filteredFallback = fallbackRecs.filter(game => {
+            const gameLower = game.toLowerCase();
+            return !seenGames.has(gameLower);
+          });
+          
+          // Shuffle fallback recommendations for more randomization
+          const shuffledFallback = [...filteredFallback].sort(() => Math.random() - 0.5);
+          
+          for (const rec of shuffledFallback) {
+            if (allRecommendations.length >= 5) break;
             const recLower = rec.toLowerCase();
-            const series = extractSeriesName(rec);
+            const series = extractSeriesName(rec); // Extract series name for duplicate checking
             const seriesLower = series.toLowerCase();
             
-            // Only add if we haven't seen this game or this series
             if (!seenGames.has(recLower) && !seenSeries.has(seriesLower)) {
-              allRecommendations.push(rec);
-              seenGames.add(recLower);
-              seenSeries.add(seriesLower);
+              allRecommendations.push(rec); // Push FULL game name (e.g., "Final Fantasy IX")
+              seenGames.add(recLower); // Track specific game to avoid exact duplicates
+              seenSeries.add(seriesLower); // Track series to prevent multiple games from same series
             }
           }
         } catch (error) {
@@ -369,8 +589,47 @@ export async function getWeeklyGameRecommendations(
       }
     }
 
-    // Return 4-5 recommendations (varied each week)
-    return allRecommendations.slice(0, 5);
+    // Log what we're using for recommendations
+    console.log(`[Weekly Digest] Recommendations for ${username}:`, {
+      weeklyForumPosts: weeklyForumActivity.length,
+      weeklyQuestions: weeklyQuestions.length,
+      weeklyAchievements: weeklyAchievements.length,
+      primaryGenres,
+      gamesExcluded: gamesAskedAbout.size,
+      previouslyRecommendedExcluded: previouslyRecommended.size,
+      recommendationsCount: allRecommendations.length,
+      usedRecentQuestions: useRecentQuestions
+    });
+
+    // Return 5 recommendations
+    const finalRecommendations = allRecommendations.slice(0, 5);
+    
+    // Save recommended games to user's weeklyDigest for future exclusion
+    // This ensures we don't recommend the same games in consecutive weeks
+    if (finalRecommendations.length > 0) {
+      try {
+        const currentUser = await User.findOne({ username });
+        if (currentUser) {
+          const currentRecommended = (currentUser.weeklyDigest?.previouslyRecommendedGames as string[]) || [];
+          // Add new recommendations and keep only last 25 to prevent list from growing too large
+          const updatedRecommended = [...currentRecommended, ...finalRecommendations].slice(-25);
+          
+          await User.findOneAndUpdate(
+            { username },
+            {
+              $set: {
+                'weeklyDigest.previouslyRecommendedGames': updatedRecommended
+              }
+            }
+          );
+        }
+      } catch (error) {
+        console.error(`[Weekly Digest] Error saving recommended games for ${username}:`, error);
+        // Don't fail the whole process if saving fails
+      }
+    }
+    
+    return finalRecommendations;
   } catch (error) {
     console.error(`[Weekly Digest] Error getting game recommendations for ${username}:`, error);
     // Fallback to default recommendations
