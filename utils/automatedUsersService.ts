@@ -374,40 +374,68 @@ export async function askQuestion(
 
 /**
  * Create a forum for a game
+ * @param username - The user creating the forum
+ * @param gameTitle - The game title
+ * @param preferredCategory - Optional category. If not provided, will be randomly selected
+ * @returns Forum info or null if a forum with same game and category already exists
  */
 async function createForumForGame(
   username: string,
-  gameTitle: string
-): Promise<{ forumId: string; forumTitle: string } | null> {
+  gameTitle: string,
+  preferredCategory?: string
+): Promise<{ forumId: string; forumTitle: string; category: string } | null> {
   try {
     await connectToMongoDB();
     
     // Available categories: speedruns, gameplay, mods, general, help
-    // Select category randomly but intelligently based on context
     const allCategories = ['speedruns', 'gameplay', 'mods', 'general', 'help'];
     
-    // Weight categories based on what makes sense
-    // Most posts will be gameplay or general discussion
-    // Occasionally use speedruns, mods, or help
-    const categoryWeights: { [key: string]: number } = {
-      'gameplay': 0.35,      // 35% - most common
-      'general': 0.30,       // 30% - also common
-      'speedruns': 0.15,     // 15% - for competitive/speedrun-friendly games
-      'help': 0.12,          // 12% - for questions/help
-      'mods': 0.08           // 8% - less common, mainly for PC games
-    };
-    
-    // Select category based on weighted random
-    const random = Math.random();
-    let cumulative = 0;
-    let selectedCategory = 'gameplay'; // default
-    
-    for (const [cat, weight] of Object.entries(categoryWeights)) {
-      cumulative += weight;
-      if (random <= cumulative) {
-        selectedCategory = cat;
-        break;
+    // Determine category: use preferredCategory if provided, otherwise select randomly
+    let selectedCategory: string;
+    if (preferredCategory && allCategories.includes(preferredCategory.toLowerCase())) {
+      selectedCategory = preferredCategory.toLowerCase();
+    } else {
+      // Weight categories based on what makes sense
+      // Most posts will be gameplay or general discussion
+      // Occasionally use speedruns, mods, or help
+      const categoryWeights: { [key: string]: number } = {
+        'gameplay': 0.35,      // 35% - most common
+        'general': 0.30,       // 30% - also common
+        'speedruns': 0.15,     // 15% - for competitive/speedrun-friendly games
+        'help': 0.12,          // 12% - for questions/help
+        'mods': 0.08           // 8% - less common, mainly for PC games
+      };
+      
+      // Select category based on weighted random
+      const random = Math.random();
+      let cumulative = 0;
+      selectedCategory = 'gameplay'; // default
+      
+      for (const [cat, weight] of Object.entries(categoryWeights)) {
+        cumulative += weight;
+        if (random <= cumulative) {
+          selectedCategory = cat;
+          break;
+        }
       }
+    }
+    
+    // CRITICAL: Check if a forum with the same game AND category already exists
+    // This prevents duplicate forums like "Story of Seasons - General Discussion" being created multiple times
+    const existingForum = await Forum.findOne({
+      gameTitle: { $regex: new RegExp(`^${gameTitle}$`, 'i') }, // Case-insensitive match
+      category: selectedCategory,
+      'metadata.status': 'active'
+    }).lean() as any;
+    
+    if (existingForum) {
+      console.log(`[FORUM CREATION] Forum already exists for ${gameTitle} with category ${selectedCategory}. Forum ID: ${existingForum.forumId}`);
+      // Return the existing forum info instead of creating a duplicate
+      return {
+        forumId: existingForum.forumId || (existingForum._id as any).toString(),
+        forumTitle: existingForum.title || `${gameTitle} - General Discussion`,
+        category: selectedCategory
+      };
     }
     
     // Generate forum title based on category
@@ -420,9 +448,8 @@ async function createForumForGame(
     };
     
     const forumTitle = categoryTitles[selectedCategory] || `${gameTitle} - General Discussion`;
-    const category = selectedCategory;
     
-    console.log(`[FORUM CREATION] Creating forum for ${gameTitle} with category: ${category}, title: ${forumTitle}`);
+    console.log(`[FORUM CREATION] Creating forum for ${gameTitle} with category: ${selectedCategory}, title: ${forumTitle}`);
     
     // Create forum directly in database (more reliable than HTTP)
     const forumId = `forum_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
@@ -431,7 +458,7 @@ async function createForumForGame(
       forumId,
       gameTitle,
       title: forumTitle,
-      category,
+      category: selectedCategory,
       isPrivate: false,
       allowedUsers: [],
       createdBy: username,
@@ -451,7 +478,8 @@ async function createForumForGame(
     
     return {
       forumId,
-      forumTitle
+      forumTitle,
+      category: selectedCategory
     };
   } catch (error) {
     console.error('[FORUM CREATION] Error creating forum:', error);
@@ -466,40 +494,78 @@ async function createForumForGame(
 /**
  * Find a suitable forum for posting
  * Prioritizes forums created by the user, then forums for games in their preferred genres
+ * Now also checks for category matching to prevent duplicate forums
  */
 function findSuitableForum(
   forums: any[],
   username: string,
-  preferredGameTitle?: string
+  preferredGameTitle?: string,
+  preferredCategory?: string
 ): any | null {
   if (forums.length === 0) {
     return null;
   }
 
-  // Priority 1: Forums created by this user for the preferred game
+  // Helper function to check if game titles match (case-insensitive)
+  const gameTitleMatches = (forumGameTitle: string | undefined, targetGameTitle: string): boolean => {
+    if (!forumGameTitle) return false;
+    return forumGameTitle.toLowerCase() === targetGameTitle.toLowerCase() ||
+           forumGameTitle.toLowerCase().includes(targetGameTitle.toLowerCase()) ||
+           targetGameTitle.toLowerCase().includes(forumGameTitle.toLowerCase());
+  };
+
+  // Helper function to check if categories match
+  const categoryMatches = (forumCategory: string | undefined, targetCategory: string | undefined): boolean => {
+    if (!targetCategory) return true; // If no category specified, match any
+    if (!forumCategory) return false;
+    return forumCategory.toLowerCase() === targetCategory.toLowerCase();
+  };
+
+  // Priority 1: Forums created by this user for the preferred game AND category
+  if (preferredGameTitle) {
+    const userCreatedForumForGameAndCategory = forums.find((f: any) => 
+      f.createdBy === username &&
+      gameTitleMatches(f.gameTitle, preferredGameTitle) &&
+      categoryMatches(f.category, preferredCategory)
+    );
+    if (userCreatedForumForGameAndCategory) {
+      return userCreatedForumForGameAndCategory;
+    }
+  }
+
+  // Priority 2: Any forum for the preferred game AND category (created by anyone)
+  if (preferredGameTitle) {
+    const forumForGameAndCategory = forums.find((f: any) => 
+      gameTitleMatches(f.gameTitle, preferredGameTitle) &&
+      categoryMatches(f.category, preferredCategory)
+    );
+    if (forumForGameAndCategory) {
+      return forumForGameAndCategory;
+    }
+  }
+
+  // Priority 3: Forums created by this user for the preferred game (any category)
   if (preferredGameTitle) {
     const userCreatedForumForGame = forums.find((f: any) => 
       f.createdBy === username &&
-      (f.gameTitle?.toLowerCase() === preferredGameTitle.toLowerCase() ||
-       f.title?.toLowerCase().includes(preferredGameTitle.toLowerCase()))
+      gameTitleMatches(f.gameTitle, preferredGameTitle)
     );
     if (userCreatedForumForGame) {
       return userCreatedForumForGame;
     }
   }
 
-  // Priority 2: Any forum for the preferred game (created by anyone)
+  // Priority 4: Any forum for the preferred game (any category, created by anyone)
   if (preferredGameTitle) {
     const forumForGame = forums.find((f: any) => 
-      f.gameTitle?.toLowerCase() === preferredGameTitle.toLowerCase() ||
-      f.title?.toLowerCase().includes(preferredGameTitle.toLowerCase())
+      gameTitleMatches(f.gameTitle, preferredGameTitle)
     );
     if (forumForGame) {
       return forumForGame;
     }
   }
 
-  // Priority 3: Any active forum (to encourage participation in existing discussions)
+  // Priority 5: Any active forum (to encourage participation in existing discussions)
   // This includes forums created by others, promoting diversity
   // Filter to only include forums that are active and have some activity
   const activeForums = forums.filter((f: any) => 
@@ -515,7 +581,7 @@ function findSuitableForum(
     return forumsToChooseFrom[Math.floor(Math.random() * forumsToChooseFrom.length)];
   }
 
-  // Priority 4: Forums created by this user (any game in their preferred genres)
+  // Priority 6: Forums created by this user (any game in their preferred genres)
   // Only if no active forums exist
   const userCreatedForums = forums.filter((f: any) => f.createdBy === username);
   if (userCreatedForums.length > 0) {
@@ -523,7 +589,7 @@ function findSuitableForum(
     return userCreatedForums[Math.floor(Math.random() * userCreatedForums.length)];
   }
 
-  // Priority 5: Any forum at all
+  // Priority 7: Any forum at all
   return forums[Math.floor(Math.random() * forums.length)];
 }
 
@@ -652,20 +718,67 @@ export async function createForumPost(
     
     const { gameTitle, genre } = gameSelection;
     
-    // If we should create a new forum, skip finding existing forum
-    // Otherwise, try to find a suitable existing forum
+    // CRITICAL: Determine the category FIRST before checking for existing forums
+    // This ensures we check for forums with the same game AND category
+    // Available categories: speedruns, gameplay, mods, general, help
+    const allCategories = ['speedruns', 'gameplay', 'mods', 'general', 'help'];
+    const categoryWeights: { [key: string]: number } = {
+      'gameplay': 0.35,      // 35% - most common
+      'general': 0.30,       // 30% - also common
+      'speedruns': 0.15,     // 15% - for competitive/speedrun-friendly games
+      'help': 0.12,          // 12% - for questions/help
+      'mods': 0.08           // 8% - less common, mainly for PC games
+    };
+    
+    // Select category based on weighted random
+    const random = Math.random();
+    let cumulative = 0;
+    let selectedCategory = 'gameplay'; // default
+    
+    for (const [cat, weight] of Object.entries(categoryWeights)) {
+      cumulative += weight;
+      if (random <= cumulative) {
+        selectedCategory = cat;
+        break;
+      }
+    }
+    
+    console.log(`[FORUM POST] Selected category: ${selectedCategory} for game: ${gameTitle}`);
+    
+    // Now check if a forum exists for this game AND category
+    // This prevents duplicate forums like "Story of Seasons - General Discussion" being created multiple times
     let targetForum: any | null = null;
-    if (!shouldCreateNewForum) {
-      targetForum = findSuitableForum(forums, username, gameTitle);
-      
-      // Even if a forum exists, sometimes create a new one for diversity (20% chance)
-      // But only if the game doesn't already have too many forums
+    
+    // First, try to find an existing forum with the same game AND category
+    targetForum = findSuitableForum(forums, username, gameTitle, selectedCategory);
+    
+    if (targetForum) {
+      // Found an existing forum with matching game and category
+      console.log(`[FORUM POST] Found existing forum for ${gameTitle} with category ${selectedCategory}: ${targetForum.title} (created by: ${targetForum.createdBy || 'unknown'})`);
+      shouldCreateNewForum = false;
+    } else {
+      // No forum found with matching game and category
+      // Check if we should create a new one or post to a different category forum
       const gameLower = gameTitle.toLowerCase();
       const forumCount = forumCountsByGame[gameLower] || 0;
-      if (targetForum && forumCount < 3 && Math.random() < 0.2) {
-        console.log(`[FORUM POST] Creating additional forum for ${gameTitle} to increase diversity (has ${forumCount} forums)`);
-        targetForum = null; // Force creation of new forum
+      
+      // If the game already has many forums (3+), try to find any forum for this game (different category)
+      // Otherwise, create a new forum with the selected category
+      if (forumCount >= 3) {
+        // Game has many forums, try to find any forum for this game (any category)
+        targetForum = findSuitableForum(forums, username, gameTitle);
+        if (targetForum) {
+          console.log(`[FORUM POST] Game has ${forumCount} forums, posting to existing forum with different category: ${targetForum.title}`);
+          shouldCreateNewForum = false;
+        } else {
+          // Still create a new one even if game has many forums (but with the selected category)
+          shouldCreateNewForum = true;
+          console.log(`[FORUM POST] Game has ${forumCount} forums but no suitable forum found, will create new forum with category ${selectedCategory}`);
+        }
+      } else {
+        // Game doesn't have many forums, create a new one with the selected category
         shouldCreateNewForum = true;
+        console.log(`[FORUM POST] No forum found for ${gameTitle} with category ${selectedCategory}, will create new forum`);
       }
     }
     
@@ -673,9 +786,9 @@ export async function createForumPost(
     let forumTitle: string;
     let actualGameTitle: string;
     let actualGenre: string;
-    let forumCategory = 'general'; // Initialize with default value
+    let forumCategory = selectedCategory; // Use the selected category
     
-    if (targetForum) {
+    if (targetForum && !shouldCreateNewForum) {
       // Use existing forum
       forumId = targetForum.forumId || targetForum._id;
       forumTitle = targetForum.title || targetForum.gameTitle || 'General Discussion';
@@ -684,14 +797,14 @@ export async function createForumPost(
       // IMPORTANT: Determine genre from the actual game title in the forum, not the randomly selected game
       // This ensures we use the correct genre for the game that's actually being discussed
       actualGenre = determineGenreFromGame(actualGameTitle);
-      // Get category from existing forum
-      forumCategory = targetForum.category || 'general';
+      // Get category from existing forum (may be different from selectedCategory if we're posting to a different category forum)
+      forumCategory = targetForum.category || selectedCategory;
       console.log(`Posting to existing forum: ${forumTitle} (created by: ${targetForum.createdBy || 'unknown'})`);
       console.log(`Using game title: ${actualGameTitle}, genre: ${actualGenre}, category: ${forumCategory}`);
     } else {
-      // No suitable forum found, create a new one
-      console.log(`No suitable forum found for ${gameTitle}, creating new forum...`);
-      const newForum = await createForumForGame(username, gameTitle);
+      // Create a new forum with the selected category
+      console.log(`Creating new forum for ${gameTitle} with category ${selectedCategory}...`);
+      const newForum = await createForumForGame(username, gameTitle, selectedCategory);
       
       if (!newForum) {
         console.error(`[FORUM POST] Failed to create forum for ${gameTitle}. Check logs above for details.`);
@@ -702,19 +815,13 @@ export async function createForumPost(
         };
       }
       
+      // If createForumForGame returned an existing forum (duplicate prevention), use that
       forumId = newForum.forumId;
       forumTitle = newForum.forumTitle;
+      forumCategory = newForum.category;
       actualGameTitle = gameTitle;
       actualGenre = genre;
-      // Fetch the category for the newly created forum
-      try {
-        const newForumDoc = await Forum.findOne({ forumId }).lean() as any;
-        if (newForumDoc && newForumDoc.category) {
-          forumCategory = newForumDoc.category;
-        }
-      } catch (error) {
-        console.warn(`[FORUM POST] Could not fetch category for newly created forum ${forumId}, using 'general'`);
-      }
+      
       console.log(`Created new forum: ${forumTitle} (category: ${forumCategory})`);
     }
     

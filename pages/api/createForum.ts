@@ -71,6 +71,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Content contains offensive language' });
     }
 
+    // Check if a public forum with the same game and category already exists
+    // This prevents duplicate forums like "Story of Seasons - General Discussion" being created multiple times
+    // Note: Private forums are allowed to have duplicates since they're user-specific
+    if (!isPrivate && gameTitle && category) {
+      const existingForum = await Forum.findOne({
+        gameTitle: { $regex: new RegExp(`^${gameTitle}$`, 'i') }, // Case-insensitive match
+        category: category,
+        isPrivate: false,
+        'metadata.status': 'active'
+      }).lean() as any;
+
+      if (existingForum) {
+        return res.status(409).json({ 
+          error: `A public forum for "${gameTitle}" with category "${category}" already exists. Please post in the existing forum or choose a different category.`,
+          existingForum: {
+            forumId: existingForum.forumId,
+            title: existingForum.title,
+            createdBy: existingForum.createdBy
+          }
+        });
+      }
+    }
+
     // Generate a unique forum ID
     const forumId = `forum_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
