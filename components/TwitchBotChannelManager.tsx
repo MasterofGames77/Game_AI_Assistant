@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { TwitchBotChannelManagerProps, TwitchChannel } from "../types";
+import TwitchChannelSettings from "./TwitchChannelSettings";
 
 const TwitchBotChannelManager: React.FC<TwitchBotChannelManagerProps> = ({
   className = "",
@@ -12,6 +13,7 @@ const TwitchBotChannelManager: React.FC<TwitchBotChannelManagerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [updatingChannel, setUpdatingChannel] = useState<string | null>(null);
+  const [settingsChannel, setSettingsChannel] = useState<string | null>(null);
 
   // Check URL params for success/error messages
   useEffect(() => {
@@ -218,6 +220,13 @@ const TwitchBotChannelManager: React.FC<TwitchBotChannelManagerProps> = ({
                 </div>
                 <div className="flex items-center gap-2 ml-4">
                   <button
+                    onClick={() => setSettingsChannel(channel.channelName)}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors"
+                    title="Channel Settings"
+                  >
+                    Settings
+                  </button>
+                  <button
                     onClick={() =>
                       handleToggleChannel(channel.channelName, channel.isActive)
                     }
@@ -267,6 +276,18 @@ const TwitchBotChannelManager: React.FC<TwitchBotChannelManagerProps> = ({
               Removing a channel will permanently delete it from your account
             </li>
           </ul>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {settingsChannel && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <TwitchChannelSettings
+              channelName={settingsChannel}
+              onClose={() => setSettingsChannel(null)}
+            />
+          </div>
         </div>
       )}
     </div>

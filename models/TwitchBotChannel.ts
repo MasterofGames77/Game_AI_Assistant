@@ -1,5 +1,6 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import { TwitchModerationConfig } from '../config/twitchModerationConfig';
+import { TwitchChannelSettings } from '../config/twitchChannelSettings';
 
 export interface ITwitchBotChannel extends Document {
   channelName: string; // Twitch channel name (lowercase, no #)
@@ -13,6 +14,7 @@ export interface ITwitchBotChannel extends Document {
   lastLeftAt?: Date; // Last time bot left the channel
   messageCount?: number; // Total messages processed in this channel
   moderationConfig?: TwitchModerationConfig; // Per-channel moderation settings
+  channelSettings?: TwitchChannelSettings; // Per-channel bot settings (command prefixes, rate limits, response styles)
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -81,6 +83,38 @@ const TwitchBotChannelSchema = new Schema<ITwitchBotChannel>(
       },
       required: false,
     },
+    channelSettings: {
+      type: {
+        // Command prefixes
+        commandPrefixes: {
+          type: [String],
+          default: ['!wingman', '!hgwm'],
+        },
+        botMentionEnabled: { type: Boolean, default: true },
+        botMentionName: { type: String, default: 'herogamewingman' },
+        
+        // Rate limiting
+        rateLimitWindowMs: { type: Number, default: 60000 }, // 1 minute
+        maxMessagesPerWindow: { type: Number, default: 10 },
+        
+        // Response style
+        responseStyle: {
+          type: String,
+          enum: ['mention', 'no-mention', 'compact'],
+          default: 'mention',
+        },
+        mentionUserInFirstMessage: { type: Boolean, default: true },
+        maxMessageLength: { type: Number, default: 500 }, // Twitch limit
+        
+        // Cache settings
+        cacheEnabled: { type: Boolean, default: true },
+        cacheTTLMs: { type: Number, default: 300000 }, // 5 minutes
+        
+        // System message customization
+        customSystemMessage: { type: String, required: false },
+      },
+      required: false,
+    },
   },
   {
     collection: 'twitchbotchannels',
@@ -98,4 +132,3 @@ const TwitchBotChannel =
   mongoose.model<ITwitchBotChannel>('TwitchBotChannel', TwitchBotChannelSchema);
 
 export default TwitchBotChannel;
-

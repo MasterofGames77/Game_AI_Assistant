@@ -1252,3 +1252,22 @@ export interface ChannelStatistics {
   startDate: Date;
   endDate: Date;
 }
+
+export interface TwitchChannelSettings {
+  commandPrefixes: string[];
+  botMentionEnabled: boolean;
+  botMentionName: string;
+  rateLimitWindowMs: number;
+  maxMessagesPerWindow: number;
+  responseStyle: "mention" | "no-mention" | "compact";
+  mentionUserInFirstMessage: boolean;
+  maxMessageLength: number;
+  cacheEnabled: boolean;
+  cacheTTLMs: number;
+  customSystemMessage?: string;
+}
+
+export interface TwitchChannelSettingsProps {
+  channelName: string;
+  onClose?: () => void;
+}

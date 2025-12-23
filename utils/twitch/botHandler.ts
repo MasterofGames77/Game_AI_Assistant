@@ -12,6 +12,7 @@ import { checkMessageContent, checkAIResponse, getSafeFallbackResponse, handleMo
 import { logMessageEvent } from './analytics';
 import { getPerformanceMonitor, measureOperation, measureDBQuery, measureAPICall } from './performanceMonitor';
 import { shortenMarkdownLinks } from '../linkShortener';
+import { getChannelSettings, TwitchChannelSettings, defaultChannelSettings } from '../../config/twitchChannelSettings';
 
 // Twitch message types from tmi.js
 type ChatUserstate = tmi.ChatUserstate;
@@ -28,13 +29,11 @@ export class TwitchBotHandler {
   private responseCache: Map<string, { response: string; timestamp: number }>;
   private messageQueue: Map<string, Promise<void>>;
   private processedMessages: Map<string, number>; // Track processed messages to prevent duplicates
-  private readonly RATE_LIMIT_WINDOW = 60000; // 1 minute
-  private readonly MAX_MESSAGES_PER_WINDOW = 10;
-  private readonly CACHE_TTL = 300000; // 5 minutes
+  private channelSettingsCache: Map<string, { settings: TwitchChannelSettings; timestamp: number }>; // Cache channel settings
   private readonly MAX_RETRIES = 3;
-  private readonly MAX_MESSAGE_LENGTH = 500; // Twitch chat limit
-  private readonly BOT_USERNAME: string;
   private readonly MESSAGE_DEDUP_WINDOW = 10000; // 10 seconds - prevent processing same message twice
+  private readonly CHANNEL_SETTINGS_CACHE_TTL = 300000; // 5 minutes - cache channel settings
+  private readonly BOT_USERNAME: string; // Default bot username (can be overridden per channel)
 
   constructor(client: tmi.Client) {
     this.client = client;
@@ -42,6 +41,7 @@ export class TwitchBotHandler {
     this.responseCache = new Map();
     this.messageQueue = new Map();
     this.processedMessages = new Map();
+    this.channelSettingsCache = new Map();
     this.BOT_USERNAME = process.env.TWITCH_BOT_USERNAME?.toLowerCase() || 'herogamewingman';
     this.setupEventHandlers();
     this.startMaintenanceTasks();
@@ -57,37 +57,34 @@ export class TwitchBotHandler {
 
       const username = userstate.username || 'unknown';
       const displayName = userstate['display-name'] || username;
+      const normalizedChannel = channel.replace('#', '').toLowerCase();
+
+      // Load channel settings (cached)
+      const channelSettings = await this.getChannelSettings(normalizedChannel);
 
       // Check for dedicated commands first (!help, !commands)
       const messageLower = message.toLowerCase().trim();
       
       if (messageLower === '!help' || messageLower.startsWith('!help ')) {
-        await this.handleHelpCommand(channel, displayName, userstate);
+        await this.handleHelpCommand(channel, displayName, userstate, channelSettings);
         return;
       }
       
       if (messageLower === '!commands' || messageLower.startsWith('!commands ')) {
-        await this.handleCommandsCommand(channel, displayName, userstate);
+        await this.handleCommandsCommand(channel, displayName, userstate, channelSettings);
         return;
       }
 
-      // Check if message is directed at the bot
-      // Patterns: !wingman <question>, @HeroGameWingman <question>, or just @HeroGameWingman
-      const botMentioned = message.toLowerCase().includes(`@${this.BOT_USERNAME}`) ||
-                          message.toLowerCase().startsWith('!wingman') ||
-                          message.toLowerCase().startsWith('!hgwm');
+      // Check if message is directed at the bot using channel-specific settings
+      const botMentioned = this.isBotMentioned(message, channelSettings);
 
       if (!botMentioned) {
         // Bot not mentioned - ignore message
         return;
       }
 
-      // Extract the question (remove command/mention)
-      let question = message
-        .replace(new RegExp(`@${this.BOT_USERNAME}`, 'gi'), '')
-        .replace(/^!wingman\s*/i, '')
-        .replace(/^!hgwm\s*/i, '')
-        .trim();
+      // Extract the question (remove command/mention) using channel-specific prefixes
+      let question = this.extractQuestion(message, channelSettings);
 
       // If no question after mention/command, show help
       if (!question || question.length === 0) {
@@ -126,16 +123,16 @@ export class TwitchBotHandler {
       });
 
       try {
-        // Check rate limits
-        if (!this.checkRateLimit(username)) {
-          logger.warn('Rate limit exceeded', { username });
+        // Check rate limits using channel-specific settings
+        if (!this.checkRateLimit(username, normalizedChannel, channelSettings)) {
+          logger.warn('Rate limit exceeded', { username, channel: normalizedChannel });
           await this.sendMessage(channel, `@${displayName} You're sending messages too quickly. Please wait a moment.`);
           return;
         }
 
         // Queue message processing
         const processing = this.messageQueue.get(username) || Promise.resolve();
-        const newProcessing = processing.then(() => this.handleMessage(channel, userstate, question, displayName));
+        const newProcessing = processing.then(() => this.handleMessage(channel, userstate, question, displayName, channelSettings));
         this.messageQueue.set(username, newProcessing);
 
       } catch (error) {
@@ -145,18 +142,95 @@ export class TwitchBotHandler {
   }
 
   /**
+   * Get channel settings (with caching)
+   */
+  private async getChannelSettings(channelName: string): Promise<TwitchChannelSettings> {
+    const now = Date.now();
+    const cached = this.channelSettingsCache.get(channelName);
+    
+    // Return cached settings if still valid
+    if (cached && (now - cached.timestamp) < this.CHANNEL_SETTINGS_CACHE_TTL) {
+      return cached.settings;
+    }
+    
+    // Load settings from database or use defaults
+    const settings = await getChannelSettings(channelName);
+    
+    // Cache the settings
+    this.channelSettingsCache.set(channelName, {
+      settings,
+      timestamp: now
+    });
+    
+    return settings;
+  }
+
+  /**
+   * Check if bot is mentioned in message using channel-specific settings
+   */
+  private isBotMentioned(message: string, settings: TwitchChannelSettings): boolean {
+    const messageLower = message.toLowerCase();
+    
+    // Check bot mention if enabled
+    if (settings.botMentionEnabled) {
+      const mentionPattern = `@${settings.botMentionName}`;
+      if (messageLower.includes(mentionPattern)) {
+        return true;
+      }
+    }
+    
+    // Check command prefixes
+    for (const prefix of settings.commandPrefixes) {
+      if (messageLower.startsWith(prefix.toLowerCase())) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Extract question from message using channel-specific settings
+   */
+  private extractQuestion(message: string, settings: TwitchChannelSettings): string {
+    let question = message;
+    
+    // Remove bot mention if enabled
+    if (settings.botMentionEnabled) {
+      question = question.replace(new RegExp(`@${settings.botMentionName}`, 'gi'), '');
+    }
+    
+    // Remove command prefixes
+    for (const prefix of settings.commandPrefixes) {
+      const prefixRegex = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*`, 'i');
+      question = question.replace(prefixRegex, '');
+    }
+    
+    return question.trim();
+  }
+
+  /**
    * Handle !help command - Show comprehensive help information
    */
-  private async handleHelpCommand(channel: string, displayName: string, userstate?: ChatUserstate): Promise<void> {
+  private async handleHelpCommand(channel: string, displayName: string, userstate?: ChatUserstate, settings?: TwitchChannelSettings): Promise<void> {
     const receivedAt = new Date();
     const processedAt = new Date();
     const username = userstate?.username || 'unknown';
     const normalizedChannel = channel.replace('#', '').toLowerCase();
     
+    // Load settings if not provided
+    if (!settings) {
+      settings = await this.getChannelSettings(normalizedChannel);
+    }
+    
     try {
+      // Build command list from channel settings
+      const commandList = settings.commandPrefixes.map(p => `${p} <question>`).join(', ');
+      const mentionText = settings.botMentionEnabled ? `, or @${settings.botMentionName} <question>` : '';
+      
       const helpMessage = `@${displayName} 📚 ${botConfig.name} Help — I'm an AI assistant for video game discussions! ` +
         `Ask me anything about games, strategies, walkthroughs, or recommendations. ` +
-        `Commands: !wingman <question>, !hgwm <question>, or @${this.BOT_USERNAME} <question>. ` +
+        `Commands: ${commandList}${mentionText}. ` +
         `Use !commands to see all commands. ` +
         `Requires Video Game Wingman Pro — link your Twitch account on our website!`;
       
@@ -219,31 +293,42 @@ export class TwitchBotHandler {
   /**
    * Handle !commands command - List all available commands
    */
-  private async handleCommandsCommand(channel: string, displayName: string, userstate?: ChatUserstate): Promise<void> {
+  private async handleCommandsCommand(channel: string, displayName: string, userstate?: ChatUserstate, settings?: TwitchChannelSettings): Promise<void> {
     const receivedAt = new Date();
     const processedAt = new Date();
     const username = userstate?.username || 'unknown';
     const normalizedChannel = channel.replace('#', '').toLowerCase();
     
+    // Load settings if not provided
+    if (!settings) {
+      settings = await this.getChannelSettings(normalizedChannel);
+    }
+    
     try {
+      // Build command list from channel settings
+      const commandEntries = settings.commandPrefixes.map(p => `• ${p} <question> — Ask a gaming question`);
+      const mentionEntry = settings.botMentionEnabled 
+        ? [`• @${settings.botMentionName} <question> — Mention me with a question`]
+        : [];
+      
       const commandsList = [
         `@${displayName} 📋 Available Commands:`,
         `• !help — Show this help message`,
         `• !commands — List all commands`,
-        `• !wingman <question> — Ask a gaming question`,
-        `• !hgwm <question> — Alternative command (same as !wingman)`,
-        `• @${this.BOT_USERNAME} <question> — Mention me with a question`,
+        ...commandEntries,
+        ...mentionEntry,
         ``,
         `💡 Tip: Link your Twitch account on our website for Pro access!`
       ];
       
-      // Send commands in chunks if needed (respecting 500 char limit)
+      // Send commands in chunks if needed (respecting channel-specific message length limit)
+      const maxLength = settings.maxMessageLength;
       let currentMessage = '';
       let totalResponseLength = 0;
       for (const line of commandsList) {
         const potentialMessage = currentMessage ? `${currentMessage}\n${line}` : line;
         
-        if (potentialMessage.length > this.MAX_MESSAGE_LENGTH) {
+        if (potentialMessage.length > maxLength) {
           // Send current message if it has content
           if (currentMessage) {
             await this.sendMessage(channel, currentMessage);
@@ -320,10 +405,16 @@ export class TwitchBotHandler {
     channel: string,
     userstate: ChatUserstate,
     question: string,
-    displayName: string
+    displayName: string,
+    settings?: TwitchChannelSettings
   ): Promise<void> {
     const username = userstate.username || 'unknown';
     const normalizedChannel = channel.replace('#', '').toLowerCase().trim();
+    
+    // Load settings if not provided
+    if (!settings) {
+      settings = await this.getChannelSettings(normalizedChannel);
+    }
     
     // Analytics tracking variables
     const receivedAt = new Date();
@@ -576,8 +667,8 @@ export class TwitchBotHandler {
         return;
       }
 
-        // Check cache first
-      const cachedResponse = this.getCachedResponse(question);
+        // Check cache first (if enabled)
+      const cachedResponse = settings.cacheEnabled ? this.getCachedResponse(question, settings) : null;
       if (cachedResponse) {
         cacheHit = true;
         responseLength = cachedResponse.length;
@@ -598,7 +689,7 @@ export class TwitchBotHandler {
         // Shorten markdown links in the cached response before sending
         const formattedCachedResponse = shortenMarkdownLinks(cachedResponse);
         
-        await this.sendLongMessage(channel, displayName, formattedCachedResponse);
+        await this.sendLongMessage(channel, displayName, formattedCachedResponse, settings);
         
         // Log analytics for cached response
         await logMessageEvent({
@@ -632,7 +723,7 @@ export class TwitchBotHandler {
       const aiStartTime = Date.now();
       const response = await measureOperation(
         'process_message_ai',
-        () => this.processMessage(question, username, normalizedChannel),
+        () => this.processMessage(question, username, normalizedChannel, settings),
         normalizedChannel,
         { username, questionLength: question.length }
       );
@@ -650,8 +741,10 @@ export class TwitchBotHandler {
       if (response) {
         responseLength = response.length;
         
-        // Cache the response (cache original, not shortened)
-        this.cacheResponse(question, response);
+        // Cache the response (cache original, not shortened) if caching is enabled
+        if (settings.cacheEnabled) {
+          this.cacheResponse(question, response, settings);
+        }
         logger.info('Sending response to user', {
           username,
           responseLength: response.length
@@ -660,9 +753,9 @@ export class TwitchBotHandler {
         // Shorten markdown links in the response before sending
         const formattedResponse = shortenMarkdownLinks(response);
 
-        // Split long messages into chunks (Twitch has 500 character limit)
+        // Split long messages into chunks using channel-specific message length limit
         respondedAt = new Date();
-        await this.sendLongMessage(channel, displayName, formattedResponse);
+        await this.sendLongMessage(channel, displayName, formattedResponse, settings);
         totalTimeMs = respondedAt.getTime() - receivedAt.getTime();
         success = true;
         
@@ -794,10 +887,15 @@ export class TwitchBotHandler {
     }
   }
 
-  private async processMessage(question: string, twitchUsername: string, channelName?: string): Promise<string> {
+  private async processMessage(question: string, twitchUsername: string, channelName?: string, settings?: TwitchChannelSettings): Promise<string> {
     try {
-      // Create a system message using botConfig
-      const systemMessage = this.createSystemMessage();
+      // Load settings if not provided
+      if (!settings && channelName) {
+        settings = await this.getChannelSettings(channelName);
+      }
+      
+      // Create a system message using botConfig and channel settings
+      const systemMessage = this.createSystemMessage(settings);
 
       // Get AI response with retry mechanism
       const response = await measureAPICall(
@@ -842,12 +940,18 @@ export class TwitchBotHandler {
     }
   }
 
-  private createSystemMessage(): string {
+  private createSystemMessage(settings?: TwitchChannelSettings): string {
+    // Use custom system message if provided, otherwise use default
+    if (settings?.customSystemMessage) {
+      return settings.customSystemMessage;
+    }
+    
+    const maxLength = settings?.maxMessageLength || 500;
     return `You are ${botConfig.name}, ${botConfig.description}. 
 Your expertise includes: ${botConfig.knowledge.join(', ')}. 
 Character: ${botConfig.bio[0]}
 
-Keep responses concise for Twitch chat (under 500 characters when possible).`;
+Keep responses concise for Twitch chat (under ${maxLength} characters when possible).`;
   }
 
   private createFallbackResponse(): string {
@@ -855,15 +959,16 @@ Keep responses concise for Twitch chat (under 500 characters when possible).`;
   }
 
   /**
-   * Split and send long messages that exceed Twitch's 500 character limit
+   * Split and send long messages that exceed channel-specific message length limit
    * Attempts to split at sentence boundaries when possible
    */
-  private async sendLongMessage(channel: string, displayName: string, text: string): Promise<void> {
-    const MAX_LENGTH = this.MAX_MESSAGE_LENGTH;
+  private async sendLongMessage(channel: string, displayName: string, text: string, settings: TwitchChannelSettings): Promise<void> {
+    const MAX_LENGTH = settings.maxMessageLength;
     
-    // If message fits, send it directly
+    // If message fits, send it directly with appropriate formatting based on response style
     if (text.length <= MAX_LENGTH) {
-      await this.sendMessage(channel, `@${displayName} ${text}`);
+      const formattedMessage = this.formatMessage(text, displayName, settings, true);
+      await this.sendMessage(channel, formattedMessage);
       return;
     }
 
@@ -921,15 +1026,11 @@ Keep responses concise for Twitch chat (under 500 characters when possible).`;
       }
     }
 
-    // Send all chunks
+    // Send all chunks with appropriate formatting
     for (let i = 0; i < finalChunks.length; i++) {
-      if (i === 0) {
-        // First chunk mentions user
-        await this.sendMessage(channel, `@${displayName} ${finalChunks[i]}`);
-      } else {
-        // Subsequent chunks as follow-up messages
-        await this.sendMessage(channel, finalChunks[i]);
-      }
+      const isFirst = i === 0;
+      const formattedMessage = this.formatMessage(finalChunks[i], displayName, settings, isFirst);
+      await this.sendMessage(channel, formattedMessage);
 
       // Small delay between messages to avoid rate limits (Twitch: 20 messages per 30 seconds)
       if (i < finalChunks.length - 1) {
@@ -977,16 +1078,21 @@ Keep responses concise for Twitch chat (under 500 characters when possible).`;
     }
   }
 
-  private checkRateLimit(username: string): boolean {
+  private checkRateLimit(username: string, channelName: string, settings: TwitchChannelSettings): boolean {
     const now = Date.now();
-    const userLimit = this.rateLimits.get(username);
+    // Use channel-specific key to allow different rate limits per channel
+    const rateLimitKey = `${channelName}:${username}`;
+    const userLimit = this.rateLimits.get(rateLimitKey);
 
-    if (!userLimit || (now - userLimit.timestamp) > this.RATE_LIMIT_WINDOW) {
-      this.rateLimits.set(username, { timestamp: now, count: 1 });
+    const windowMs = settings.rateLimitWindowMs;
+    const maxMessages = settings.maxMessagesPerWindow;
+
+    if (!userLimit || (now - userLimit.timestamp) > windowMs) {
+      this.rateLimits.set(rateLimitKey, { timestamp: now, count: 1 });
       return true;
     }
 
-    if (userLimit.count >= this.MAX_MESSAGES_PER_WINDOW) {
+    if (userLimit.count >= maxMessages) {
       return false;
     }
 
@@ -994,19 +1100,57 @@ Keep responses concise for Twitch chat (under 500 characters when possible).`;
     return true;
   }
 
-  private getCachedResponse(question: string): string | null {
+  private getCachedResponse(question: string, settings: TwitchChannelSettings): string | null {
+    if (!settings.cacheEnabled) {
+      return null;
+    }
+    
     const cached = this.responseCache.get(question);
-    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+    if (cached && Date.now() - cached.timestamp < settings.cacheTTLMs) {
       return cached.response;
     }
     return null;
   }
 
-  private cacheResponse(question: string, response: string): void {
+  private cacheResponse(question: string, response: string, settings: TwitchChannelSettings): void {
+    if (!settings.cacheEnabled) {
+      return;
+    }
+    
     this.responseCache.set(question, {
       response,
       timestamp: Date.now()
     });
+  }
+
+  /**
+   * Format message based on channel response style settings
+   */
+  private formatMessage(text: string, displayName: string, settings: TwitchChannelSettings, isFirst: boolean): string {
+    switch (settings.responseStyle) {
+      case 'no-mention':
+        // Never mention user
+        return text;
+      
+      case 'compact':
+        // Minimal formatting, only mention in first message if enabled
+        if (isFirst && settings.mentionUserInFirstMessage) {
+          return `@${displayName} ${text}`;
+        }
+        return text;
+      
+      case 'mention':
+      default:
+        // Always mention user in first message, optionally in others
+        if (isFirst && settings.mentionUserInFirstMessage) {
+          return `@${displayName} ${text}`;
+        }
+        // For subsequent messages, only mention if mentionUserInFirstMessage is false (then mention all)
+        if (!settings.mentionUserInFirstMessage) {
+          return `@${displayName} ${text}`;
+        }
+        return text;
+    }
   }
 
   private async retryOperation<T>(operation: () => Promise<T>, retries = this.MAX_RETRIES): Promise<T> {
@@ -1036,25 +1180,38 @@ Keep responses concise for Twitch chat (under 500 characters when possible).`;
   }
 
   private startMaintenanceTasks(): void {
-    // Clean up rate limits periodically
+    // Clean up rate limits periodically (use default window for cleanup)
+    const defaultWindow = 60000; // 1 minute default
     setInterval(() => {
       const now = Date.now();
-      Array.from(this.rateLimits.entries()).forEach(([username, limit]) => {
-        if (now - limit.timestamp > this.RATE_LIMIT_WINDOW) {
-          this.rateLimits.delete(username);
+      Array.from(this.rateLimits.entries()).forEach(([key, limit]) => {
+        // Use a reasonable default window for cleanup (rate limits are per-channel anyway)
+        if (now - limit.timestamp > defaultWindow * 2) {
+          this.rateLimits.delete(key);
         }
       });
-    }, this.RATE_LIMIT_WINDOW);
+    }, defaultWindow);
 
-    // Clean up response cache periodically
+    // Clean up response cache periodically (use default TTL for cleanup)
+    const defaultCacheTTL = 300000; // 5 minutes default
     setInterval(() => {
       const now = Date.now();
       Array.from(this.responseCache.entries()).forEach(([question, cached]) => {
-        if (now - cached.timestamp > this.CACHE_TTL) {
+        if (now - cached.timestamp > defaultCacheTTL * 2) {
           this.responseCache.delete(question);
         }
       });
-    }, this.CACHE_TTL);
+    }, defaultCacheTTL);
+
+    // Clean up channel settings cache periodically
+    setInterval(() => {
+      const now = Date.now();
+      Array.from(this.channelSettingsCache.entries()).forEach(([channelName, cached]) => {
+        if (now - cached.timestamp > this.CHANNEL_SETTINGS_CACHE_TTL) {
+          this.channelSettingsCache.delete(channelName);
+        }
+      });
+    }, this.CHANNEL_SETTINGS_CACHE_TTL);
 
     // Clean up message queue periodically
     setInterval(() => {

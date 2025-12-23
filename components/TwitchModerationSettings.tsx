@@ -42,7 +42,10 @@ const TwitchModerationSettings: React.FC<TwitchModerationSettingsProps> = ({
           return parsed === true;
         }
       } catch (e) {
-        console.error("Error loading moderation collapsed state from localStorage:", e);
+        console.error(
+          "Error loading moderation collapsed state from localStorage:",
+          e
+        );
       }
     }
     return false;
@@ -58,7 +61,10 @@ const TwitchModerationSettings: React.FC<TwitchModerationSettingsProps> = ({
           setIsCollapsed(parsed === true);
         }
       } catch (e) {
-        console.error("Error syncing moderation collapsed state from localStorage:", e);
+        console.error(
+          "Error syncing moderation collapsed state from localStorage:",
+          e
+        );
       }
     }
   }, []);
@@ -243,9 +249,15 @@ const TwitchModerationSettings: React.FC<TwitchModerationSettingsProps> = ({
 
   return (
     <div
-      className={`bg-[#252642]/50 backdrop-blur-sm rounded-2xl shadow-[0_0_15px_rgba(0,255,255,0.1)] border border-[#00ffff]/20 transition-all ${className} ${isCollapsed ? "p-3" : "p-6"}`}
+      className={`bg-[#252642]/50 backdrop-blur-sm rounded-2xl shadow-[0_0_15px_rgba(0,255,255,0.1)] border border-[#00ffff]/20 transition-all ${className} ${
+        isCollapsed ? "p-3" : "p-6"
+      }`}
     >
-      <div className={`flex items-center justify-between ${isCollapsed ? "mb-0" : "mb-6"}`}>
+      <div
+        className={`flex items-center justify-between ${
+          isCollapsed ? "mb-0" : "mb-6"
+        }`}
+      >
         <h2 className="text-2xl font-bold text-[#00ffff]">
           Twitch Bot Moderation Settings
         </h2>
@@ -256,22 +268,35 @@ const TwitchModerationSettings: React.FC<TwitchModerationSettingsProps> = ({
             // Save to localStorage immediately
             try {
               if (typeof window !== "undefined") {
-                localStorage.setItem("twitchModerationCollapsed", JSON.stringify(newState));
+                localStorage.setItem(
+                  "twitchModerationCollapsed",
+                  JSON.stringify(newState)
+                );
               }
             } catch (e) {
-              console.error("Error saving moderation collapsed state to localStorage:", e);
+              console.error(
+                "Error saving moderation collapsed state to localStorage:",
+                e
+              );
             }
           }}
           className="text-[#00ffff] hover:text-[#00ffff]/80 transition-colors"
           aria-label={isCollapsed ? "Expand section" : "Collapse section"}
         >
           <svg
-            className={`w-5 h-5 transition-transform ${isCollapsed ? "rotate-180" : ""}`}
+            className={`w-5 h-5 transition-transform ${
+              isCollapsed ? "rotate-180" : ""
+            }`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
           </svg>
         </button>
       </div>
@@ -311,286 +336,292 @@ const TwitchModerationSettings: React.FC<TwitchModerationSettingsProps> = ({
 
           {selectedChannel && (
             <div className="space-y-6">
-          {/* Enable Moderation */}
-          <div className="flex items-center justify-between p-4 bg-[#1a1b2e]/50 rounded-lg">
-            <div>
-              <label className="text-white font-semibold">
-                Enable Moderation
-              </label>
-              <p className="text-gray-400 text-sm">
-                Enable content moderation for this channel
-              </p>
+              {/* Enable Moderation */}
+              <div className="flex items-center justify-between p-4 bg-[#1a1b2e]/50 rounded-lg">
+                <div>
+                  <label className="text-white font-semibold">
+                    Enable Moderation
+                  </label>
+                  <p className="text-gray-400 text-sm">
+                    Enable content moderation for this channel
+                  </p>
+                </div>
+                <button
+                  onClick={() =>
+                    setConfig({ ...config, enabled: !config.enabled })
+                  }
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    config.enabled ? "bg-[#00ffff]" : "bg-gray-600"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      config.enabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {config.enabled && (
+                <>
+                  {/* Strict Mode */}
+                  <div className="flex items-center justify-between p-4 bg-[#1a1b2e]/50 rounded-lg">
+                    <div>
+                      <label className="text-white font-semibold">
+                        Strict Mode
+                      </label>
+                      <p className="text-gray-400 text-sm">
+                        More aggressive content detection
+                      </p>
+                    </div>
+                    <button
+                      onClick={() =>
+                        setConfig({ ...config, strictMode: !config.strictMode })
+                      }
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        config.strictMode ? "bg-[#00ffff]" : "bg-gray-600"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          config.strictMode ? "translate-x-6" : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Timeout Durations */}
+                  <div className="p-4 bg-[#1a1b2e]/50 rounded-lg">
+                    <label className="text-white font-semibold mb-4 block">
+                      Timeout Durations (Progressive Moderation)
+                    </label>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-gray-300 text-sm">
+                          1st Violation:{" "}
+                          {formatDuration(config.timeoutDurations.first)}
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="300"
+                          step="60"
+                          value={config.timeoutDurations.first}
+                          onChange={(e) =>
+                            setConfig({
+                              ...config,
+                              timeoutDurations: {
+                                ...config.timeoutDurations,
+                                first: parseInt(e.target.value),
+                              },
+                            })
+                          }
+                          className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                        />
+                        <div className="flex justify-between text-xs text-gray-400 mt-1">
+                          <span>Warning</span>
+                          <span>5m</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-gray-300 text-sm">
+                          2nd Violation:{" "}
+                          {formatDuration(config.timeoutDurations.second)}
+                        </label>
+                        <input
+                          type="range"
+                          min="60"
+                          max="600"
+                          step="60"
+                          value={config.timeoutDurations.second}
+                          onChange={(e) =>
+                            setConfig({
+                              ...config,
+                              timeoutDurations: {
+                                ...config.timeoutDurations,
+                                second: parseInt(e.target.value),
+                              },
+                            })
+                          }
+                          className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                        />
+                        <div className="flex justify-between text-xs text-gray-400 mt-1">
+                          <span>1m</span>
+                          <span>10m</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-gray-300 text-sm">
+                          3rd Violation:{" "}
+                          {formatDuration(config.timeoutDurations.third)}
+                        </label>
+                        <input
+                          type="range"
+                          min="300"
+                          max="3600"
+                          step="300"
+                          value={config.timeoutDurations.third}
+                          onChange={(e) =>
+                            setConfig({
+                              ...config,
+                              timeoutDurations: {
+                                ...config.timeoutDurations,
+                                third: parseInt(e.target.value),
+                              },
+                            })
+                          }
+                          className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                        />
+                        <div className="flex justify-between text-xs text-gray-400 mt-1">
+                          <span>5m</span>
+                          <span>1h</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-gray-300 text-sm">
+                          4th Violation:{" "}
+                          {formatDurationMinutes(
+                            config.timeoutDurations.fourth
+                          )}
+                        </label>
+                        <input
+                          type="range"
+                          min="900"
+                          max="7200"
+                          step="900"
+                          value={config.timeoutDurations.fourth}
+                          onChange={(e) =>
+                            setConfig({
+                              ...config,
+                              timeoutDurations: {
+                                ...config.timeoutDurations,
+                                fourth: parseInt(e.target.value),
+                              },
+                            })
+                          }
+                          className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                        />
+                        <div className="flex justify-between text-xs text-gray-400 mt-1">
+                          <span>15m</span>
+                          <span>120m</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Max Violations Before Ban */}
+                  <div className="p-4 bg-[#1a1b2e]/50 rounded-lg">
+                    <label className="text-white font-semibold mb-2 block">
+                      Max Violations Before Ban: {config.maxViolationsBeforeBan}
+                    </label>
+                    <input
+                      type="range"
+                      min="3"
+                      max="10"
+                      step="1"
+                      value={config.maxViolationsBeforeBan}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          maxViolationsBeforeBan: parseInt(e.target.value),
+                        })
+                      }
+                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div className="flex justify-between text-xs text-gray-400 mt-1">
+                      <span>3</span>
+                      <span>10</span>
+                    </div>
+                    <p className="text-gray-400 text-sm mt-2">
+                      User will be permanently banned after this many violations
+                    </p>
+                  </div>
+
+                  {/* Check AI Responses */}
+                  <div className="flex items-center justify-between p-4 bg-[#1a1b2e]/50 rounded-lg">
+                    <div>
+                      <label className="text-white font-semibold">
+                        Check AI Responses
+                      </label>
+                      <p className="text-gray-400 text-sm">
+                        Filter inappropriate AI-generated responses
+                      </p>
+                    </div>
+                    <button
+                      onClick={() =>
+                        setConfig({
+                          ...config,
+                          checkAIResponses: !config.checkAIResponses,
+                        })
+                      }
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        config.checkAIResponses ? "bg-[#00ffff]" : "bg-gray-600"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          config.checkAIResponses
+                            ? "translate-x-6"
+                            : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Log All Actions */}
+                  <div className="flex items-center justify-between p-4 bg-[#1a1b2e]/50 rounded-lg">
+                    <div>
+                      <label className="text-white font-semibold">
+                        Log All Actions
+                      </label>
+                      <p className="text-gray-400 text-sm">
+                        Log all moderation actions to database for audit
+                      </p>
+                    </div>
+                    <button
+                      onClick={() =>
+                        setConfig({
+                          ...config,
+                          logAllActions: !config.logAllActions,
+                        })
+                      }
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        config.logAllActions ? "bg-[#00ffff]" : "bg-gray-600"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          config.logAllActions
+                            ? "translate-x-6"
+                            : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 items-stretch">
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="px-5 py-2 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] text-white rounded-lg hover:opacity-90 transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? "Saving..." : "Save Settings"}
+                </button>
+                <button
+                  onClick={handleReset}
+                  className="px-2 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors font-semibold flex items-center"
+                >
+                  Reset to Defaults
+                </button>
+              </div>
             </div>
-            <button
-              onClick={() => setConfig({ ...config, enabled: !config.enabled })}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                config.enabled ? "bg-[#00ffff]" : "bg-gray-600"
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  config.enabled ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
-          </div>
-
-          {config.enabled && (
-            <>
-              {/* Strict Mode */}
-              <div className="flex items-center justify-between p-4 bg-[#1a1b2e]/50 rounded-lg">
-                <div>
-                  <label className="text-white font-semibold">
-                    Strict Mode
-                  </label>
-                  <p className="text-gray-400 text-sm">
-                    More aggressive content detection
-                  </p>
-                </div>
-                <button
-                  onClick={() =>
-                    setConfig({ ...config, strictMode: !config.strictMode })
-                  }
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    config.strictMode ? "bg-[#00ffff]" : "bg-gray-600"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      config.strictMode ? "translate-x-6" : "translate-x-1"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {/* Timeout Durations */}
-              <div className="p-4 bg-[#1a1b2e]/50 rounded-lg">
-                <label className="text-white font-semibold mb-4 block">
-                  Timeout Durations (Progressive Moderation)
-                </label>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-gray-300 text-sm">
-                      1st Violation:{" "}
-                      {formatDuration(config.timeoutDurations.first)}
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="300"
-                      step="60"
-                      value={config.timeoutDurations.first}
-                      onChange={(e) =>
-                        setConfig({
-                          ...config,
-                          timeoutDurations: {
-                            ...config.timeoutDurations,
-                            first: parseInt(e.target.value),
-                          },
-                        })
-                      }
-                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <div className="flex justify-between text-xs text-gray-400 mt-1">
-                      <span>Warning</span>
-                      <span>5m</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-gray-300 text-sm">
-                      2nd Violation:{" "}
-                      {formatDuration(config.timeoutDurations.second)}
-                    </label>
-                    <input
-                      type="range"
-                      min="60"
-                      max="600"
-                      step="60"
-                      value={config.timeoutDurations.second}
-                      onChange={(e) =>
-                        setConfig({
-                          ...config,
-                          timeoutDurations: {
-                            ...config.timeoutDurations,
-                            second: parseInt(e.target.value),
-                          },
-                        })
-                      }
-                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <div className="flex justify-between text-xs text-gray-400 mt-1">
-                      <span>1m</span>
-                      <span>10m</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-gray-300 text-sm">
-                      3rd Violation:{" "}
-                      {formatDuration(config.timeoutDurations.third)}
-                    </label>
-                    <input
-                      type="range"
-                      min="300"
-                      max="3600"
-                      step="300"
-                      value={config.timeoutDurations.third}
-                      onChange={(e) =>
-                        setConfig({
-                          ...config,
-                          timeoutDurations: {
-                            ...config.timeoutDurations,
-                            third: parseInt(e.target.value),
-                          },
-                        })
-                      }
-                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <div className="flex justify-between text-xs text-gray-400 mt-1">
-                      <span>5m</span>
-                      <span>1h</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-gray-300 text-sm">
-                      4th Violation:{" "}
-                      {formatDurationMinutes(config.timeoutDurations.fourth)}
-                    </label>
-                    <input
-                      type="range"
-                      min="900"
-                      max="7200"
-                      step="900"
-                      value={config.timeoutDurations.fourth}
-                      onChange={(e) =>
-                        setConfig({
-                          ...config,
-                          timeoutDurations: {
-                            ...config.timeoutDurations,
-                            fourth: parseInt(e.target.value),
-                          },
-                        })
-                      }
-                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <div className="flex justify-between text-xs text-gray-400 mt-1">
-                      <span>15m</span>
-                      <span>120m</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Max Violations Before Ban */}
-              <div className="p-4 bg-[#1a1b2e]/50 rounded-lg">
-                <label className="text-white font-semibold mb-2 block">
-                  Max Violations Before Ban: {config.maxViolationsBeforeBan}
-                </label>
-                <input
-                  type="range"
-                  min="3"
-                  max="10"
-                  step="1"
-                  value={config.maxViolationsBeforeBan}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      maxViolationsBeforeBan: parseInt(e.target.value),
-                    })
-                  }
-                  className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                />
-                <div className="flex justify-between text-xs text-gray-400 mt-1">
-                  <span>3</span>
-                  <span>10</span>
-                </div>
-                <p className="text-gray-400 text-sm mt-2">
-                  User will be permanently banned after this many violations
-                </p>
-              </div>
-
-              {/* Check AI Responses */}
-              <div className="flex items-center justify-between p-4 bg-[#1a1b2e]/50 rounded-lg">
-                <div>
-                  <label className="text-white font-semibold">
-                    Check AI Responses
-                  </label>
-                  <p className="text-gray-400 text-sm">
-                    Filter inappropriate AI-generated responses
-                  </p>
-                </div>
-                <button
-                  onClick={() =>
-                    setConfig({
-                      ...config,
-                      checkAIResponses: !config.checkAIResponses,
-                    })
-                  }
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    config.checkAIResponses ? "bg-[#00ffff]" : "bg-gray-600"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      config.checkAIResponses
-                        ? "translate-x-6"
-                        : "translate-x-1"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {/* Log All Actions */}
-              <div className="flex items-center justify-between p-4 bg-[#1a1b2e]/50 rounded-lg">
-                <div>
-                  <label className="text-white font-semibold">
-                    Log All Actions
-                  </label>
-                  <p className="text-gray-400 text-sm">
-                    Log all moderation actions to database for audit
-                  </p>
-                </div>
-                <button
-                  onClick={() =>
-                    setConfig({
-                      ...config,
-                      logAllActions: !config.logAllActions,
-                    })
-                  }
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    config.logAllActions ? "bg-[#00ffff]" : "bg-gray-600"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      config.logAllActions ? "translate-x-6" : "translate-x-1"
-                    }`}
-                  />
-                </button>
-              </div>
-            </>
           )}
-
-          {/* Action Buttons */}
-          <div className="flex gap-3 pt-4 items-stretch">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex-1 px-4 py-2 bg-gradient-to-r from-[#00ffff] to-[#ff69b4] text-white rounded-lg hover:opacity-90 transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? "Saving..." : "Save Settings"}
-            </button>
-            <button
-              onClick={handleReset}
-              className="px-2 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors font-semibold flex items-center"
-            >
-              Reset to Defaults
-            </button>
-          </div>
-        </div>
-      )}
         </>
       )}
     </div>
