@@ -1271,3 +1271,20 @@ export interface TwitchChannelSettingsProps {
   channelName: string;
   onClose?: () => void;
 }
+
+// Twitch Bot Stats
+export interface BotStats {
+  totalChannels: number;
+  activeChannels: number;
+  inactiveChannels: number;
+  totalMessages: number;
+  recentMessages: number;
+  recentSuccessRate: number;
+  recentUniqueUsers: number;
+  status: "online" | "offline";
+  botLaunchDate: string | null;
+  topChannels: Array<{
+    channelName: string;
+    messageCount: number;
+  }>;
+}
