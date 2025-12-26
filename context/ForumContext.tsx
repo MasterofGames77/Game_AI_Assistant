@@ -11,6 +11,12 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
   const [currentForum, setCurrentForum] = useState<Forum | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<{
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+  } | null>(null);
 
   const fetchForums = useCallback(async (page: number, limit: number) => {
     try {
@@ -24,12 +30,29 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
         }
       );
       setForums(response.data.forums);
-      return response.data;
+      setPagination(response.data.pagination || null);
+      return {
+        forums: response.data.forums,
+        pagination: response.data.pagination || {
+          total: 0,
+          page: 1,
+          limit: 10,
+          pages: 0,
+        },
+      };
     } catch (err: any) {
       setError(
         err.response?.data?.error || err.message || "Failed to fetch forums"
       );
-      return [];
+      return {
+        forums: [],
+        pagination: {
+          total: 0,
+          page: 1,
+          limit: 10,
+          pages: 0,
+        },
+      };
     } finally {
       setLoading(false);
     }
@@ -539,6 +562,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
     currentForum,
     loading,
     error,
+    pagination,
     fetchForums,
     createForum,
     deleteForum,

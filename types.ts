@@ -197,7 +197,13 @@ export interface ForumContextType {
   currentForum: Forum | null;
   loading: boolean;
   error: string | null;
-  fetchForums: (page: number, limit: number) => Promise<Forum[]>;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+  } | null;
+  fetchForums: (page: number, limit: number) => Promise<{ forums: Forum[]; pagination: { total: number; page: number; limit: number; pages: number } }>;
   createForum: (forumData: Partial<Forum>) => Promise<Forum | null>;
   deleteForum: (forumId: string) => Promise<void>;
   addPost: (

@@ -15,11 +15,20 @@ const categoryLabels: Record<string, string> = {
 };
 
 export default function ForumList() {
-  const { forums, fetchForums, deleteForum } = useForum();
+  const {
+    forums,
+    fetchForums,
+    deleteForum,
+    pagination,
+    loading: contextLoading,
+  } = useForum();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [hasProAccess, setHasProAccess] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const forumsPerPage = 10;
 
   // Check Pro access on component mount
   useEffect(() => {
@@ -58,31 +67,73 @@ export default function ForumList() {
     checkProAccess();
   }, []);
 
-  useEffect(() => {
-    const loadForums = async () => {
-      try {
-        await fetchForums(1, 10);
-      } catch (err: any) {
-        setError(err.message || "Failed to load forums");
-      } finally {
-        setLoading(false);
-      }
-    };
+  const loadForums = async (page: number) => {
+    try {
+      setLoading(true);
+      setError("");
+      await fetchForums(page, forumsPerPage);
+    } catch (err: any) {
+      setError(err.message || "Failed to load forums");
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  };
 
-    loadForums();
-  }, [fetchForums]);
+  useEffect(() => {
+    loadForums(currentPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
+
+  // Refresh forums when create form is closed (after successful creation)
+  useEffect(() => {
+    if (!showCreateForm) {
+      // Small delay to ensure the forum was created in the database
+      const timer = setTimeout(() => {
+        loadForums(currentPage);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCreateForm]);
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (pagination && currentPage < pagination.pages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handleReload = () => {
+    setIsRefreshing(true);
+    loadForums(currentPage);
+  };
 
   const handleDelete = async (forumId: string) => {
     if (!confirm("Are you sure you want to delete this forum?")) return;
 
     try {
       await deleteForum(forumId);
+      // Refresh the current page after deletion
+      // If we're on the last page and it becomes empty, go to previous page
+      if (pagination && forums.length === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      } else {
+        loadForums(currentPage);
+      }
     } catch (err: any) {
       setError(err.message || "Failed to delete forum");
     }
   };
 
-  if (loading) {
+  const isLoading = loading || contextLoading || isRefreshing;
+
+  if (loading && !isRefreshing) {
     return <div className="text-center">Loading forums...</div>;
   }
 
@@ -94,18 +145,54 @@ export default function ForumList() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Forums</h2>
-        <button
-          onClick={() => setShowCreateForm(!showCreateForm)}
-          disabled={!hasProAccess}
-          className={`px-4 py-2 rounded ${
-            hasProAccess
-              ? "bg-blue-500 text-white hover:bg-blue-600"
-              : "bg-gray-400 text-gray-600 cursor-not-allowed"
-          }`}
-          title={!hasProAccess ? "Pro access required to create forums" : ""}
-        >
-          {showCreateForm ? "Cancel" : "Create Forum"}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleReload}
+            disabled={isLoading}
+            className={`px-4 py-2 rounded flex items-center gap-2 ${
+              isLoading
+                ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                : "bg-green-500 text-white hover:bg-green-600"
+            }`}
+            title="Reload forums"
+          >
+            {isRefreshing ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Reloading...
+              </>
+            ) : (
+              <>
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                Reload
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            disabled={!hasProAccess}
+            className={`px-4 py-2 rounded ${
+              hasProAccess
+                ? "bg-blue-500 text-white hover:bg-blue-600"
+                : "bg-gray-400 text-gray-600 cursor-not-allowed"
+            }`}
+            title={!hasProAccess ? "Pro access required to create forums" : ""}
+          >
+            {showCreateForm ? "Cancel" : "Create Forum"}
+          </button>
+        </div>
       </div>
 
       {!hasProAccess && (
@@ -172,7 +259,7 @@ export default function ForumList() {
           );
         })}
 
-        {forums.length === 0 && (
+        {forums.length === 0 && !isLoading && (
           <div className="text-center text-gray-500 py-8">
             No forums found. Create one to get started!
             {!hasProAccess && (
@@ -183,6 +270,74 @@ export default function ForumList() {
           </div>
         )}
       </div>
+
+      {/* Pagination Controls */}
+      {pagination && pagination.pages > 1 && (
+        <div className="flex items-center justify-between bg-white p-4 rounded-lg shadow">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePreviousPage}
+              disabled={currentPage === 1 || isLoading}
+              className={`px-4 py-2 rounded flex items-center gap-2 ${
+                currentPage === 1 || isLoading
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : "bg-blue-500 text-white hover:bg-blue-600"
+              }`}
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              Previous
+            </button>
+            <span className="px-4 py-2 text-gray-700">
+              Page {currentPage} of {pagination.pages} ({pagination.total} total
+              forums)
+            </span>
+            <button
+              onClick={handleNextPage}
+              disabled={currentPage >= pagination.pages || isLoading}
+              className={`px-4 py-2 rounded flex items-center gap-2 ${
+                currentPage >= pagination.pages || isLoading
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : "bg-blue-500 text-white hover:bg-blue-600"
+              }`}
+            >
+              Next
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Show pagination info even if only one page */}
+      {pagination && pagination.pages === 1 && pagination.total > 0 && (
+        <div className="text-center text-gray-600 text-sm py-2">
+          Showing all {pagination.total} forum
+          {pagination.total !== 1 ? "s" : ""}
+        </div>
+      )}
     </div>
   );
 }
