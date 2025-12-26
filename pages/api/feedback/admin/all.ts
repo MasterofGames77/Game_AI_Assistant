@@ -56,7 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     // Add category filter
     if (category && typeof category === 'string') {
-      const validCategories = ['bug_report', 'feature_request', 'improvement', 'general', 'complaint', 'praise'];
+      const validCategories = ['bug_report', 'feature_request', 'improvement', 'general', 'complaint', 'praise', 'privacy_inquiry', 'data_request', 'legal_matter', 'account_issue', 'subscription_issue'];
       if (validCategories.includes(category)) {
         filter.category = category;
       }

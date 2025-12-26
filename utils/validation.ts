@@ -182,9 +182,9 @@ export const validateFeedbackData = (data: {
   if (!data.category?.trim()) {
     errors.push('Category is required');
   } else {
-    const allowedCategories = ['bug_report', 'feature_request', 'improvement', 'general', 'complaint', 'praise'];
+    const allowedCategories = ['bug_report', 'feature_request', 'improvement', 'general', 'complaint', 'praise', 'privacy_inquiry', 'data_request', 'legal_matter', 'account_issue', 'subscription_issue'];
     if (!allowedCategories.includes(data.category)) {
-      errors.push('Invalid category. Allowed categories are: bug_report, feature_request, improvement, general, complaint, praise');
+      errors.push('Invalid category. Allowed categories are: bug_report, feature_request, improvement, general, complaint, praise, privacy_inquiry, data_request, legal_matter, account_issue, subscription_issue');
     }
   }
 

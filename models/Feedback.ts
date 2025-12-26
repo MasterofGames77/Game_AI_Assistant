@@ -5,7 +5,7 @@ export interface IFeedback extends Document {
   username: string;
   email: string;
   userType: 'free' | 'pro';
-  category: 'bug_report' | 'feature_request' | 'improvement' | 'general' | 'complaint' | 'praise';
+  category: 'bug_report' | 'feature_request' | 'improvement' | 'general' | 'complaint' | 'praise' | 'privacy_inquiry' | 'data_request' | 'legal_matter' | 'account_issue' | 'subscription_issue';
   title: string;
   message: string;
   priority: 'low' | 'medium' | 'high' | 'critical';
@@ -52,7 +52,7 @@ const FeedbackSchema = new Schema<IFeedback>({
   },
   category: { 
     type: String, 
-    enum: ['bug_report', 'feature_request', 'improvement', 'general', 'complaint', 'praise'],
+    enum: ['bug_report', 'feature_request', 'improvement', 'general', 'complaint', 'praise', 'privacy_inquiry', 'data_request', 'legal_matter', 'account_issue', 'subscription_issue'],
     required: true,
     index: true
   },

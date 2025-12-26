@@ -262,6 +262,8 @@ const OFFENSIVE_WORDS = [
   'Felix Barry Moore',
   'Jeanine Pirro',
   'J. K. Rowling',
+  'Nicki Minaj',
+  'Kenneth Petty',
   'Mike Haridopolos',
   'Josh Hawley',
   'Derek Schmidt',

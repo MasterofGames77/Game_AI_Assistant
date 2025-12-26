@@ -78,7 +78,7 @@ function TwitchBotProfileContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+    <div className="docs-page min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
       {/* Background pattern */}
       <div
         className="absolute inset-0 opacity-20"
@@ -197,9 +197,17 @@ function TwitchBotProfileContent() {
           <div className="lg:col-span-2 space-y-6">
             {/* Add Bot Section */}
             <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/20">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">
-                Add {botConfig.name} to Your Channel
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-gray-800">
+                  Add {botConfig.name} to Your Channel
+                </h2>
+                <button
+                  onClick={() => router.push("/twitch-bot/docs")}
+                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors text-sm font-semibold"
+                >
+                  📚 Documentation
+                </button>
+              </div>
               <p className="text-gray-600 mb-6">
                 Join hundreds of streamers who use {botConfig.name} to enhance
                 their Twitch chat experience. Get AI-powered gaming assistance

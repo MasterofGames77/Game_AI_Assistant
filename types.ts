@@ -575,7 +575,12 @@ export interface FeedbackFormData {
     | "improvement"
     | "general"
     | "complaint"
-    | "praise";
+    | "praise"
+    | "privacy_inquiry"
+    | "data_request"
+    | "legal_matter"
+    | "account_issue"
+    | "subscription_issue";
   title: string;
   message: string;
   priority: "low" | "medium" | "high" | "critical";
@@ -590,7 +595,12 @@ export interface Feedback {
     | "improvement"
     | "general"
     | "complaint"
-    | "praise";
+    | "praise"
+    | "privacy_inquiry"
+    | "data_request"
+    | "legal_matter"
+    | "account_issue"
+    | "subscription_issue";
   title: string;
   message: string;
   priority: "low" | "medium" | "high" | "critical";
@@ -658,7 +668,12 @@ export interface Feedback {
     | "improvement"
     | "general"
     | "complaint"
-    | "praise";
+    | "praise"
+    | "privacy_inquiry"
+    | "data_request"
+    | "legal_matter"
+    | "account_issue"
+    | "subscription_issue";
   title: string;
   message: string;
   priority: "low" | "medium" | "high" | "critical";
@@ -692,7 +707,12 @@ export interface Feedback {
     | "improvement"
     | "general"
     | "complaint"
-    | "praise";
+    | "praise"
+    | "privacy_inquiry"
+    | "data_request"
+    | "legal_matter"
+    | "account_issue"
+    | "subscription_issue";
   title: string;
   message: string;
   priority: "low" | "medium" | "high" | "critical";

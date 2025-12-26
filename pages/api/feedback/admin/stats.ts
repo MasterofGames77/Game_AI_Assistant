@@ -96,7 +96,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Get category breakdown - simplified
     // console.log('Getting category breakdown...'); // Commented out for production
     const categoryStats: { [key: string]: number } = {};
-    const categories = ['bug_report', 'feature_request', 'improvement', 'general', 'complaint', 'praise'];
+    const categories = ['bug_report', 'feature_request', 'improvement', 'general', 'complaint', 'praise', 'privacy_inquiry', 'data_request', 'legal_matter', 'account_issue', 'subscription_issue'];
     for (const category of categories) {
       const count = await Feedback.countDocuments({ category });
       if (count > 0) {

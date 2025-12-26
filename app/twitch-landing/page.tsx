@@ -111,10 +111,16 @@ function TwitchLandingContent() {
               <h1 className="text-3xl font-bold text-center bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-2">
                 Add Hero Game Wingman to Your Twitch Channel!
               </h1>
-              <p className="text-gray-600 text-center text-sm">
+              <p className="text-gray-600 text-center text-sm mb-4">
                 Your AI-powered gaming companion is ready to join your Twitch
                 chat
               </p>
+              <button
+                onClick={() => router.push("/twitch-bot/docs")}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors text-sm font-semibold"
+              >
+                📚 View Documentation
+              </button>
             </div>
             <div className="space-y-4">
               <button

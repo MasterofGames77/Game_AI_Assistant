@@ -186,6 +186,16 @@ const FeedbackList: React.FC<FeedbackListProps> = ({
         return "⚡";
       case "general":
         return "💬";
+      case "privacy_inquiry":
+        return "🔒";
+      case "data_request":
+        return "📋";
+      case "legal_matter":
+        return "⚖️";
+      case "account_issue":
+        return "👤";
+      case "subscription_issue":
+        return "💳";
       case "complaint":
         return "😞";
       case "praise":
@@ -352,6 +362,21 @@ const FeedbackList: React.FC<FeedbackListProps> = ({
               </option>
               <option value="general" className="text-gray-900 bg-white">
                 💬 General
+              </option>
+              <option value="privacy_inquiry" className="text-gray-900 bg-white">
+                🔒 Privacy Inquiry
+              </option>
+              <option value="data_request" className="text-gray-900 bg-white">
+                📋 Data Request
+              </option>
+              <option value="legal_matter" className="text-gray-900 bg-white">
+                ⚖️ Legal Matter
+              </option>
+              <option value="account_issue" className="text-gray-900 bg-white">
+                👤 Account Issue
+              </option>
+              <option value="subscription_issue" className="text-gray-900 bg-white">
+                💳 Subscription Issue
               </option>
               <option value="complaint" className="text-gray-900 bg-white">
                 😞 Complaint

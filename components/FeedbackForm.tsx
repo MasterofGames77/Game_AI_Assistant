@@ -126,6 +126,31 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
       description: "General comments or suggestions",
     },
     {
+      value: "privacy_inquiry",
+      label: "🔒 Privacy Inquiry",
+      description: "Questions about privacy policy or data practices",
+    },
+    {
+      value: "data_request",
+      label: "📋 Data Request",
+      description: "Request data deletion, access, or modification",
+    },
+    {
+      value: "legal_matter",
+      label: "⚖️ Legal Matter",
+      description: "Legal questions or formal notices",
+    },
+    {
+      value: "account_issue",
+      label: "👤 Account Issue",
+      description: "Problems with account access or settings",
+    },
+    {
+      value: "subscription_issue",
+      label: "💳 Subscription Issue",
+      description: "Billing, subscription, or payment problems",
+    },
+    {
       value: "complaint",
       label: "😞 Complaint",
       description: "Report a problem or concern",

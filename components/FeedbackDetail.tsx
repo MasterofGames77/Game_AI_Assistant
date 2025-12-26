@@ -55,6 +55,16 @@ const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
         return "⚡";
       case "general":
         return "💬";
+      case "privacy_inquiry":
+        return "🔒";
+      case "data_request":
+        return "📋";
+      case "legal_matter":
+        return "⚖️";
+      case "account_issue":
+        return "👤";
+      case "subscription_issue":
+        return "💳";
       case "complaint":
         return "😞";
       case "praise":
