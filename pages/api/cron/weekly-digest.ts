@@ -168,6 +168,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } else {
       // Normal mode - get all users with email addresses who have opted in
       // Users with weeklyDigest.enabled !== false are included (defaults to true)
+      // Note: We filter out automated users and fake emails in the application code below
       const userDocs = await User.find({
         email: { $exists: true, $ne: '' },
         $or: [
@@ -177,7 +178,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }).select('username email weeklyDigest').lean();
       
       users = userDocs
-        .filter((doc: any) => doc.username && doc.email)
+        .filter((doc: any) => {
+          // Additional safety filter: exclude automated users and fake emails
+          if (!doc.username || !doc.email) return false;
+          
+          const email = doc.email.toLowerCase();
+          // Exclude @wingman.internal emails (automated users)
+          if (email.endsWith('@wingman.internal')) return false;
+          // Exclude fake email domains
+          const fakeDomains = ['@ymail.com', '@smail.com', '@rmail.com', '@dmail.com'];
+          if (fakeDomains.some(domain => email.endsWith(domain))) return false;
+          
+          return true;
+        })
         .map((doc: any): UserForDigest => ({
           username: doc.username,
           email: doc.email,

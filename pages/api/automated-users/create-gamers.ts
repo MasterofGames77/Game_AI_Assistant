@@ -47,6 +47,9 @@ const createGamerUser = async (
     hasProAccess: true, // Grant Pro access
     requiresPasswordSetup: false,
     achievements: [],
+    weeklyDigest: {
+      enabled: false // Disable weekly digest emails for automated users (emails don't exist)
+    },
     progress: {
       firstQuestion: 0,
       frequentAsker: 0,
