@@ -985,19 +985,60 @@ export default function Home() {
           }
         );
       } catch (error: any) {
-        // Handle authentication errors gracefully
+        // Handle authentication errors gracefully - try to refresh token first
         if (error.response?.status === 401) {
-          setResponse(
-            "Please sign in to use the assistant. Redirecting to sign-in page..."
-          );
-          // Small delay before redirect to show message
-          setTimeout(() => {
-            window.location.href = "/signin";
-          }, 1500);
-          return;
+          try {
+            // Attempt to refresh the token
+            const refreshResponse = await fetch("/api/auth/refresh", {
+              method: "POST",
+              credentials: "include", // Include cookies (refresh token)
+            });
+
+            if (refreshResponse.ok) {
+              // Token refreshed successfully, retry the original request
+              res = await axios.post(
+                "/api/assistant",
+                {
+                  question,
+                  imageFilePath: imageFilePath,
+                  imageUrl: imageUrlForAnalysis,
+                },
+                {
+                  timeout: 65000,
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  withCredentials: true,
+                }
+              );
+              // Continue with normal response handling below
+            } else {
+              // Refresh failed - redirect to sign in
+              const refreshData = await refreshResponse.json().catch(() => ({}));
+              const refreshErrorMsg = refreshData.message || refreshData.error || "Token refresh failed";
+              
+              setResponse(
+                "Your session has expired. Redirecting to sign-in page..."
+              );
+              setTimeout(() => {
+                window.location.href = "/signin";
+              }, 1500);
+              return;
+            }
+          } catch (refreshError) {
+            // Refresh attempt failed - redirect to sign in
+            setResponse(
+              "Please sign in to use the assistant. Redirecting to sign-in page..."
+            );
+            setTimeout(() => {
+              window.location.href = "/signin";
+            }, 1500);
+            return;
+          }
+        } else {
+          // Re-throw other errors
+          throw error;
         }
-        // Re-throw other errors
-        throw error;
       }
 
       //const endTime = performance.now();

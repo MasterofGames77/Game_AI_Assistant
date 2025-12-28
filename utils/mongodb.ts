@@ -16,15 +16,21 @@ let errorListenerAttached = false; // Track if error listener has been attached
 const connectToMongoDB = async (): Promise<void> => {
   // Set max listeners to prevent memory leak warnings
   // This is safe since we're reusing the same connection across multiple API routes
+  // Increased to 50 to handle Next.js hot reloading and multiple module instances
   if (mongoose.connection.setMaxListeners) {
-    mongoose.connection.setMaxListeners(20); // Increase from default 10 to 20
+    mongoose.connection.setMaxListeners(50); // Increase from default 10 to 50
   }
   
   // Only attach error listener once, even if module is imported multiple times
-  if (!errorListenerAttached) {
+  // Check if listener already exists by counting existing listeners
+  const existingErrorListeners = mongoose.connection.listenerCount('error');
+  if (existingErrorListeners === 0) {
     mongoose.connection.on('error', (err) => {
       console.error(`MongoDB connection error after initial connect: ${err}`);
     });
+    errorListenerAttached = true;
+  } else if (!errorListenerAttached) {
+    // If listeners exist but flag isn't set, set it to prevent future additions
     errorListenerAttached = true;
   }
   
