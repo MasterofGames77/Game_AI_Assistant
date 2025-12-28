@@ -220,7 +220,7 @@ Generate ONLY the direct question, nothing else:`;
 
   try {
     const completion = await getOpenAIClient().chat.completions.create({
-      model: 'gpt-4o-mini', // Using mini for cost efficiency
+      model: 'gpt-4o-search-preview',
       messages: [
         {
           role: 'system',
@@ -619,7 +619,7 @@ Generate ONLY the post content, nothing else:`;
 
   try {
     const completion = await getOpenAIClient().chat.completions.create({
-      model: 'gpt-4o-mini', // Using mini for cost efficiency
+      model: 'gpt-4o-search-preview',
       messages: [
         {
           role: 'system',
@@ -713,7 +713,7 @@ Generate ONLY the reply content, nothing else:`;
 
   try {
     const completion = await getOpenAIClient().chat.completions.create({
-      model: 'gpt-4o-mini', // Using mini for cost efficiency
+      model: 'gpt-4o-search-preview',
       messages: [
         {
           role: 'system',
@@ -820,7 +820,7 @@ Generate ONLY the post content, nothing else:`;
 
   try {
     const completion = await getOpenAIClient().chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4o-search-preview',
       messages: [
         {
           role: 'system',
@@ -925,7 +925,7 @@ Generate ONLY the reply content, nothing else:`;
 
   try {
     const completion = await getOpenAIClient().chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4o-search-preview',
       messages: [
         {
           role: 'system',

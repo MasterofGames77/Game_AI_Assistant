@@ -1194,7 +1194,11 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
     }
 
     // Connect to MongoDB (required for downstream operations)
-    await connectToMongoDB();
+    // Measure connection latency while connecting
+    const { latency: dbLatency } = await measureLatency('MongoDB Connection', async () => {
+      await connectToMongoDB();
+    }, PERFORMANCE_CONFIG.enableLogging);
+    metrics.dbConnection = dbLatency;
     
     // Load the user to update streak/usage data later
     const user = await User.findOne({ username });
@@ -1206,12 +1210,6 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
     if (PERFORMANCE_CONFIG.enableDetailedMetrics) {
       metrics.initialMemory = measureMemoryUsage();
     }
-    
-    // Existing MongoDB connection measurement
-    const { latency: dbLatency } = await measureLatency('MongoDB Connection', async () => {
-      await connectToMongoDB();
-    }, PERFORMANCE_CONFIG.enableLogging);
-    metrics.dbConnection = dbLatency;
 
     let answer: string | null;
 

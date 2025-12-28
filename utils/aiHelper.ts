@@ -96,6 +96,239 @@ export class AICacheMetrics {
 // Get the singleton instance
 const aiCache = AICacheMetrics.getInstance();
 
+// ============================================================================
+// Model Selection for Smart Multi-Model Usage
+// ============================================================================
+
+/**
+ * Interface for model selection results
+ */
+interface ModelSelectionResult {
+  model: string;
+  reason: string;
+  releaseDate?: Date;
+  releaseYear?: number;
+}
+
+/**
+ * Cache for game release dates to avoid repeated API calls
+ * Key: game title (lowercase), Value: { releaseDate: Date, timestamp: number }
+ */
+const releaseDateCache = new Map<string, { releaseDate: Date; timestamp: number }>();
+const RELEASE_DATE_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+/**
+ * Fetch release date for a game from IGDB (lightweight version)
+ * Returns just the release date, not full game info
+ */
+async function fetchReleaseDateFromIGDB(gameTitle: string): Promise<Date | null> {
+  try {
+    const accessToken = await getClientCredentialsAccessToken();
+    
+    // Limit game title to 255 characters (IGDB API limit)
+    const limitedTitle = gameTitle.length > 255 ? gameTitle.substring(0, 252) + '...' : gameTitle;
+    
+    // Escape special characters and quotes in the game title
+    const sanitizedTitle = limitedTitle.replace(/"/g, '\\"');
+
+    const response = await axios.post(
+      'https://api.igdb.com/v4/games',
+      `search "${sanitizedTitle}";
+       fields name,first_release_date;
+       limit 5;`,
+      {
+        headers: {
+          'Client-ID': process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID!,
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/json'
+        }
+      }
+    );
+
+    if (response.data && response.data.length > 0) {
+      // Try to find exact match first
+      let game = response.data.find((g: any) => cleanAndMatchTitle(gameTitle, g.name));
+      
+      // If exact match found, validate it has distinctive words
+      if (game && !validateGameMatch(gameTitle, game.name)) {
+        game = undefined;
+      }
+      
+      // If no exact match, try to find a match with distinctive words
+      if (!game) {
+        game = response.data.find((g: any) => {
+          const gameNameLower = g.name.toLowerCase();
+          const queryLower = gameTitle.toLowerCase();
+          const hasBasicMatch = gameNameLower.includes(queryLower) || queryLower.includes(gameNameLower);
+          return hasBasicMatch && validateGameMatch(gameTitle, g.name);
+        });
+      }
+      
+      if (game && game.first_release_date) {
+        return new Date(game.first_release_date * 1000);
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('[Model Selection] Error fetching release date from IGDB:', error);
+    return null;
+  }
+}
+
+/**
+ * Fetch release date for a game from RAWG (lightweight version)
+ * Returns just the release date, not full game info
+ */
+async function fetchReleaseDateFromRAWG(gameTitle: string): Promise<Date | null> {
+  try {
+    const sanitizedTitle = gameTitle.toLowerCase().trim();
+    const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&search=${encodeURIComponent(sanitizedTitle)}&search_precise=true&page_size=5`;
+    
+    const response = await axios.get(url);
+
+    if (response.data && response.data.results.length > 0) {
+      // Find exact match or close match
+      const game = response.data.results.find((g: any) => {
+        const normalizedGameName = g.name.toLowerCase().trim();
+        return normalizedGameName === sanitizedTitle || 
+               normalizedGameName.includes(sanitizedTitle);
+      });
+
+      if (game && game.released) {
+        return new Date(game.released);
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('[Model Selection] Error fetching release date from RAWG:', error);
+    return null;
+  }
+}
+
+/**
+ * Get release date for a game with caching
+ * Checks cache first, then tries IGDB, then RAWG
+ */
+async function getGameReleaseDate(gameTitle: string): Promise<Date | null> {
+  const cacheKey = gameTitle.toLowerCase().trim();
+  const now = Date.now();
+  
+  // Check cache first
+  const cached = releaseDateCache.get(cacheKey);
+  if (cached && (now - cached.timestamp) < RELEASE_DATE_CACHE_TTL) {
+    return cached.releaseDate;
+  }
+  
+  // Try IGDB first (more reliable)
+  let releaseDate = await fetchReleaseDateFromIGDB(gameTitle);
+  
+  // Fallback to RAWG if IGDB fails
+  if (!releaseDate) {
+    releaseDate = await fetchReleaseDateFromRAWG(gameTitle);
+  }
+  
+  // Cache the result if we got one
+  if (releaseDate) {
+    releaseDateCache.set(cacheKey, {
+      releaseDate,
+      timestamp: now
+    });
+  }
+  
+  return releaseDate;
+}
+
+/**
+ * Determine which OpenAI model to use based on game release date
+ * - GPT-5.2 for games released 2024+ (better knowledge - cutoff Aug 2025 vs Apr 2024)
+ * - GPT-4o for games released before 2024 (proven quality, cost-effective)
+ * 
+ * Rationale: GPT-5.2 has knowledge through August 2025, making it much better
+ * for newer games, but costs ~24% more with typical 1:2 input/output ratio.
+ *
+ * @param gameTitle - Optional game title to check release date
+ * @param question - Question text (fallback if no game title)
+ * @returns Model selection result
+ */
+export async function selectModelForQuestion(
+  gameTitle?: string,
+  question?: string
+): Promise<ModelSelectionResult> {
+  const CUTOFF_YEAR = 2024; // Games released 2024+ use GPT-5.2 (better knowledge cutoff)
+  const DEFAULT_MODEL = 'gpt-4o-search-preview'; // Safe default
+  
+  // If no game title, try to extract from question
+  let detectedGame = gameTitle;
+  if (!detectedGame && question) {
+    detectedGame = await extractGameTitleFromQuestion(question);
+  }
+  
+  // If still no game, use default model
+  if (!detectedGame) {
+    return {
+      model: DEFAULT_MODEL,
+      reason: 'no_game_detected'
+    };
+  }
+  
+  // Get release date (with caching)
+  try {
+    const releaseDate = await getGameReleaseDate(detectedGame);
+    
+    if (releaseDate) {
+      const releaseYear = releaseDate.getFullYear();
+      
+      // For remakes, the release date will be the remake date (already handled by API)
+      // This ensures "Resident Evil 4 Remake" uses remake date (2023), not original (2005)
+      
+      if (releaseYear >= CUTOFF_YEAR) {
+        return {
+          model: 'gpt-5.2',
+          reason: `game_released_${releaseYear}`,
+          releaseDate: releaseDate,
+          releaseYear: releaseYear
+        };
+      } else {
+        return {
+          model: DEFAULT_MODEL,
+          reason: `game_released_${releaseYear}`,
+          releaseDate: releaseDate,
+          releaseYear: releaseYear
+        };
+      }
+    }
+  } catch (error) {
+    console.error('[Model Selection] Error in selectModelForQuestion:', error);
+  }
+  
+  // Default to 4o if we can't determine release date
+  return {
+    model: DEFAULT_MODEL,
+    reason: 'release_date_unavailable'
+  };
+}
+
+// Track model usage for cost monitoring
+const modelUsageStats: { [key: string]: number } = {
+  'gpt-4o-search-preview': 0,
+  'gpt-5.2': 0
+};
+
+/**
+ * Get model usage statistics
+ */
+export function getModelUsageStats() {
+  return { ...modelUsageStats };
+}
+
+/**
+ * Reset model usage statistics
+ */
+export function resetModelUsageStats() {
+  modelUsageStats['gpt-4o-search-preview'] = 0;
+  modelUsageStats['gpt-5.2'] = 0;
+}
+
 // Utility function to clean and match titles
 function cleanAndMatchTitle(queryTitle: string, recordTitle: string): boolean {
   const cleanQuery = queryTitle.toLowerCase().trim();
@@ -474,9 +707,19 @@ ${imageDescription.join('\n')}
 Provide only the game title. If you cannot identify it with confidence, respond with "UNKNOWN".`;
 
     try {
+      // Select model - for image identification, use default (4o) since we don't know the game yet
+      // This is a lightweight operation, so 4o is sufficient
+      const modelSelection = await selectModelForQuestion(undefined, question);
+      
+      // Log model selection for monitoring
+      console.log(`[Model Selection] Using ${modelSelection.model} for image game identification (reason: ${modelSelection.reason})`);
+      
+      // Track model usage
+      modelUsageStats[modelSelection.model] = (modelUsageStats[modelSelection.model] || 0) + 1;
+      
       // Use OpenAI to identify the game from the image description
       const completion = await getOpenAIClient().chat.completions.create({
-        model: 'gpt-4o-search-preview',
+        model: modelSelection.model,
         messages: [
           {
             role: 'system',
@@ -832,8 +1075,17 @@ export const getChatCompletionWithVision = async (
       text: question
     });
 
+    // Select model based on game release date (extract from question if possible)
+    const modelSelection = await selectModelForQuestion(undefined, question);
+    
+    // Log model selection for monitoring
+    console.log(`[Model Selection] Using ${modelSelection.model} for vision request (reason: ${modelSelection.reason})`);
+    
+    // Track model usage
+    modelUsageStats[modelSelection.model] = (modelUsageStats[modelSelection.model] || 0) + 1;
+
     const completion = await getOpenAIClient().chat.completions.create({
-      model: 'gpt-4o-search-preview',
+      model: modelSelection.model,
       messages: messages as any,
       max_completion_tokens: 1000,
       temperature: 0.7,
@@ -1201,8 +1453,17 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
 - Pay special attention to remakes, remasters, and sequels - make sure you're answering about the EXACT version specified
 ${gameTitleForContext ? `\n⚠️ IMPORTANT: The user is asking about "${gameTitleForContext}" - you MUST answer about this exact game, not any other game with a similar name ⚠️` : ''}`;
       
+      // Select model based on game release date
+      const modelSelection = await selectModelForQuestion(gameTitleForContext, question);
+      
+      // Log model selection for monitoring
+      console.log(`[Model Selection] Using ${modelSelection.model} for "${gameTitleForContext || 'unknown game'}" (reason: ${modelSelection.reason}${modelSelection.releaseYear ? `, released: ${modelSelection.releaseYear}` : ''})`);
+      
+      // Track model usage
+      modelUsageStats[modelSelection.model] = (modelUsageStats[modelSelection.model] || 0) + 1;
+      
       const completion = await getOpenAIClient().chat.completions.create({
-        model: 'gpt-4o-search-preview',
+        model: modelSelection.model,
         messages: [
           { 
             role: 'system', 
@@ -1518,8 +1779,18 @@ Format: ["Game 1", "Game 2", "Game 3", ...]
 ONLY include games where ${genre} is clearly the primary genre. If unsure, EXCLUDE the game.`;
 
         try {
+          // For recommendation filtering, use default model (4o) since we're filtering a list
+          // This is a lightweight operation and doesn't need game-specific knowledge
+          const modelSelection = await selectModelForQuestion(undefined, `best ${genre} games for beginners`);
+          
+          // Log model selection for monitoring
+          console.log(`[Model Selection] Using ${modelSelection.model} for recommendation filtering (beginner) (reason: ${modelSelection.reason})`);
+          
+          // Track model usage
+          modelUsageStats[modelSelection.model] = (modelUsageStats[modelSelection.model] || 0) + 1;
+          
           const aiResponse = await getOpenAIClient().chat.completions.create({
-            model: 'gpt-4o-search-preview',
+            model: modelSelection.model,
             messages: [
               {
                 role: 'system',
@@ -1638,8 +1909,18 @@ Format: ["Game 1", "Game 2", "Game 3", ...]
 ONLY include games where ${genre} is clearly the primary genre. If unsure, EXCLUDE the game.`;
 
         try {
+          // For recommendation filtering, use default model (4o) since we're filtering a list
+          // This is a lightweight operation and doesn't need game-specific knowledge
+          const modelSelection = await selectModelForQuestion(undefined, `currently popular ${genre} games`);
+          
+          // Log model selection for monitoring
+          console.log(`[Model Selection] Using ${modelSelection.model} for recommendation filtering (popular) (reason: ${modelSelection.reason})`);
+          
+          // Track model usage
+          modelUsageStats[modelSelection.model] = (modelUsageStats[modelSelection.model] || 0) + 1;
+          
           const aiResponse = await getOpenAIClient().chat.completions.create({
-            model: 'gpt-4o-search-preview',
+            model: modelSelection.model,
             messages: [
               {
                 role: 'system',
@@ -2122,7 +2403,6 @@ function extractGameTitleCandidates(question: string): string[] {
   if (!question || question.length < 3) return [];
 
   const candidates: string[] = [];
-  const lowerQuestion = question.toLowerCase();
 
   // Strategy 1: Quoted game titles (most reliable)
   const quotedMatch = question.match(/["']([^"']+)["']/i);
@@ -2304,6 +2584,49 @@ function extractGameTitleCandidates(question: string): string[] {
     return [];
   }
   
+  // Identify which candidates came from "in [Game Title]" pattern (highest priority)
+  const inGamePatternCandidates = new Set<string>();
+  // Match "in [Game Title]" pattern - extract the game title part
+  const inGamePatternRegex = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?)(?:\s+(?:Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|2|II|3|III|4|IV|World\s*2|World\s*II))?(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)|$|[?.!])/gi;
+  let inGameMatch: RegExpExecArray | null;
+  while ((inGameMatch = inGamePatternRegex.exec(question)) !== null) {
+    if (inGameMatch[1]) {
+      let candidate = inGameMatch[1].trim();
+      candidate = candidate.replace(/^(?:what|which|where|when|why|how|who|the|a|an)\s+/i, '');
+      candidate = candidate.replace(/\s+(?:has|have|is|are|does|do|can|could|would|should|was|were|will|did)$/i, '');
+      if (candidate.length >= 3) {
+        // Normalize for comparison (case-insensitive)
+        const normalized = candidate.toLowerCase();
+        uniqueCandidates.forEach(c => {
+          if (c.toLowerCase() === normalized || c.toLowerCase().includes(normalized) || normalized.includes(c.toLowerCase())) {
+            inGamePatternCandidates.add(c);
+          }
+        });
+      }
+    }
+  }
+  
+  // Detect candidates that appear BEFORE "in [Game Title]" pattern (likely characters/enemies/locations)
+  const likelyCharacterNames = new Set<string>();
+  const questionLowerForChars = question.toLowerCase();
+  uniqueCandidates.forEach(candidate => {
+    const candidateLower = candidate.toLowerCase();
+    const candidateIndex = questionLowerForChars.indexOf(candidateLower);
+    
+    // Check if this candidate appears before an "in [Game Title]" pattern
+    const inPatternAfter = /\bin\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&-]+)/i;
+    const afterMatch = question.substring(candidateIndex + candidate.length).match(inPatternAfter);
+    
+    if (afterMatch && candidateIndex >= 0) {
+      // This candidate appears before "in [Game Title]" - likely a character/enemy/location
+      // Only mark as likely character if it's short (1-2 words) and not a known game title pattern
+      const wordCount = candidate.split(/\s+/).length;
+      if (wordCount <= 2 && candidate.length < 30) {
+        likelyCharacterNames.add(candidate);
+      }
+    }
+  });
+  
   // Separate candidates into single-word and multi-word
   const singleWordCandidates = uniqueCandidates.filter(c => c.split(/\s+/).length === 1);
   const multiWordCandidates = uniqueCandidates.filter(c => c.split(/\s+/).length > 1);
@@ -2338,26 +2661,87 @@ function extractGameTitleCandidates(question: string): string[] {
     });
   }
   
-  // Prioritize longer, more complete candidates (likely full game titles)
-  // Sort by: 1) word count (more words = better), 2) length (longer = better), 3) position (later = better)
+  // CRITICAL: Filter out candidates that appear BEFORE "in [Game Title]" patterns
+  // These are almost always characters/enemies/locations, not game titles
+  // Only exclude if there's an "in [Game Title]" candidate available
+  const hasInGamePatternCandidate = prioritizedCandidates.some(c => inGamePatternCandidates.has(c));
+  
+  if (hasInGamePatternCandidate) {
+    // If we have an "in [Game Title]" candidate, exclude short candidates that appear before it
+    prioritizedCandidates = prioritizedCandidates.filter(candidate => {
+      // Always keep "in [Game Title]" candidates
+      if (inGamePatternCandidates.has(candidate)) {
+        return true;
+      }
+      
+      // Exclude candidates that appear before "in [Game Title]" patterns if they're short
+      if (likelyCharacterNames.has(candidate)) {
+        return false; // Completely exclude these
+      }
+      
+      // Also check if candidate appears before any "in [Game Title]" pattern
+      const candidateLower = candidate.toLowerCase();
+      const candidateIndex = questionLowerForChars.indexOf(candidateLower);
+      
+      if (candidateIndex >= 0) {
+        const textAfter = question.substring(candidateIndex + candidate.length);
+        const inPatternAfter = /\bin\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&-]{5,})/i;
+        const afterMatch = textAfter.match(inPatternAfter);
+        
+        if (afterMatch) {
+          // Candidate appears before "in [Game Title]" pattern
+          const wordCount = candidate.split(/\s+/).length;
+          // Exclude if short (1-3 words) and not very long
+          if (wordCount <= 3 && candidate.length < 40) {
+            return false; // Exclude short candidates before "in [Game Title]"
+          }
+        }
+      }
+      
+      return true;
+    });
+  }
+  
+  // Prioritize candidates with intelligent scoring
+  // Score based on: 1) Pattern match (in [Game Title] = highest), 2) Not a character name, 3) Word count, 4) Length, 5) Position
   prioritizedCandidates = prioritizedCandidates
-    .map(candidate => ({
-      candidate,
-      wordCount: candidate.split(/\s+/).length,
-      length: candidate.length,
-      position: question.toLowerCase().indexOf(candidate.toLowerCase())
-    }))
+    .map(candidate => {
+      const candidateLower = candidate.toLowerCase();
+      const position = questionLowerForChars.indexOf(candidateLower);
+      const wordCount = candidate.split(/\s+/).length;
+      const length = candidate.length;
+      
+      // Calculate score
+      let score = 0;
+      
+      // Highest priority: Candidates from "in [Game Title]" pattern
+      if (inGamePatternCandidates.has(candidate)) {
+        score += 10000; // Much higher priority to ensure they're tried first
+      }
+      
+      // Penalty: Candidates that are likely character/enemy/location names
+      if (likelyCharacterNames.has(candidate)) {
+        score -= 5000; // Much larger penalty
+      }
+      
+      // Bonus for longer, more complete titles (likely full game titles)
+      score += wordCount * 10; // More words = higher score
+      score += length; // Longer = higher score
+      
+      // Small bonus for appearing later in question (but much less important than pattern match)
+      score += (position / 10);
+      
+      return {
+        candidate,
+        score,
+        wordCount,
+        length,
+        position
+      };
+    })
     .sort((a, b) => {
-      // First sort by word count (more words = more likely to be full title)
-      if (b.wordCount !== a.wordCount) {
-        return b.wordCount - a.wordCount;
-      }
-      // Then by length (longer = better, likely full title)
-      if (b.length !== a.length) {
-        return b.length - a.length;
-      }
-      // Finally by position (later in question = more likely to be game title)
-      return b.position - a.position;
+      // Sort by score (highest first)
+      return b.score - a.score;
     })
     .map(item => item.candidate);
   
@@ -2829,27 +3213,110 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
       return undefined;
     }
 
-    // Sort candidates by position in question (later = more likely to be game title)
-    // This helps prioritize "Deisim" over "Gameplay Mechanics" in questions like
-    // "What are the key differences in gameplay mechanics between the different versions of Deisim?"
-    candidates = candidates.map(candidate => ({
-      candidate,
-      position: question.toLowerCase().indexOf(candidate.toLowerCase())
-    })).sort((a, b) => b.position - a.position).map(item => item.candidate);
-
+    // Candidates are already prioritized by extractGameTitleCandidates
+    // (prioritizes "in [Game Title]" patterns, penalizes character names, etc.)
+    
     // console.log(`[Game Title] Extracted ${candidates.length} candidate(s):`, candidates);
 
     // Try each candidate against IGDB and RAWG APIs
     // Validate candidates before API calls to avoid unnecessary requests
-    const validCandidates = candidates.filter(c => isValidGameTitleCandidate(c));
+    let validCandidates = candidates.filter(c => isValidGameTitleCandidate(c));
+    
+    // CRITICAL: Identify candidates from "in [Game Title]" patterns
+    // These should be tried FIRST, before any other candidates
+    const inGamePatternCandidates = new Set<string>();
+    const inGamePatternRegex = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?)(?:\s+(?:Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|2|II|3|III|4|IV|World\s*2|World\s*II))?(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)|$|[?.!])/gi;
+    let inGameMatch: RegExpExecArray | null;
+    while ((inGameMatch = inGamePatternRegex.exec(question)) !== null) {
+      if (inGameMatch[1]) {
+        let candidate = inGameMatch[1].trim();
+        candidate = candidate.replace(/^(?:what|which|where|when|why|how|who|the|a|an)\s+/i, '');
+        candidate = candidate.replace(/\s+(?:has|have|is|are|does|do|can|could|would|should|was|were|will|did)$/i, '');
+        if (candidate.length >= 3) {
+          const normalized = candidate.toLowerCase();
+          validCandidates.forEach(c => {
+            const cLower = c.toLowerCase();
+            if (cLower === normalized || cLower.includes(normalized) || normalized.includes(cLower)) {
+              inGamePatternCandidates.add(c);
+            }
+          });
+        }
+      }
+    }
+    
+    // Reorder candidates: "in [Game Title]" candidates FIRST
+    if (inGamePatternCandidates.size > 0) {
+      const inGameCandidates = validCandidates.filter(c => inGamePatternCandidates.has(c));
+      const otherCandidates = validCandidates.filter(c => !inGamePatternCandidates.has(c));
+      validCandidates = [...inGameCandidates, ...otherCandidates];
+    }
+    
+    // Additional validation: If we have multiple candidates, check if first candidate
+    // appears before an "in [Game Title]" pattern (likely a character/enemy/location)
+    if (validCandidates.length > 1) {
+      const firstCandidate = validCandidates[0];
+      const lowerQuestion = question.toLowerCase();
+      const firstCandidateLower = firstCandidate.toLowerCase();
+      const firstCandidateIndex = lowerQuestion.indexOf(firstCandidateLower);
+      
+      // Check if there's an "in [Game Title]" pattern after this candidate
+      if (firstCandidateIndex >= 0 && !inGamePatternCandidates.has(firstCandidate)) {
+        const textAfter = question.substring(firstCandidateIndex + firstCandidate.length);
+        const inGamePatternAfter = /\bin\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&-]{5,})/i;
+        const afterMatch = textAfter.match(inGamePatternAfter);
+        
+        // If first candidate is short (1-3 words) and there's a longer candidate after "in",
+        // skip the first candidate entirely (it's likely a character/enemy/location)
+        if (afterMatch) {
+          const wordCount = firstCandidate.split(/\s+/).length;
+          if (wordCount <= 3 && firstCandidate.length < 40) {
+            // Remove this candidate from the list - it's likely not a game title
+            validCandidates = validCandidates.filter(c => c !== firstCandidate);
+          }
+        }
+      }
+    }
     
     for (const candidate of validCandidates) {
       // console.log(`[Game Title] Trying candidate: "${candidate}"`);
+      
+      // CRITICAL: If this candidate appears before an "in [Game Title]" pattern and is short,
+      // and we have an "in [Game Title]" candidate available, skip this candidate entirely
+      if (!inGamePatternCandidates.has(candidate)) {
+        const candidateLower = candidate.toLowerCase();
+        const candidateIndex = question.toLowerCase().indexOf(candidateLower);
+        
+        if (candidateIndex >= 0) {
+          const textAfter = question.substring(candidateIndex + candidate.length);
+          const inGamePatternAfter = /\bin\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&-]{5,})/i;
+          const afterMatch = textAfter.match(inGamePatternAfter);
+          
+          if (afterMatch && inGamePatternCandidates.size > 0) {
+            // This candidate appears before "in [Game Title]" and we have "in [Game Title]" candidates
+            const wordCount = candidate.split(/\s+/).length;
+            if (wordCount <= 3 && candidate.length < 40) {
+              // Skip this candidate - it's likely a character/enemy/location, not a game title
+              continue;
+            }
+          }
+        }
+      }
       
       // Try IGDB first
       try {
         const igdbMatch = await searchGameInIGDB(candidate);
         if (igdbMatch) {
+          // CRITICAL: If this is a short candidate and we have "in [Game Title]" candidates,
+          // validate that the API result is actually a game, not game content
+          if (!inGamePatternCandidates.has(candidate) && inGamePatternCandidates.size > 0) {
+            const wordCount = candidate.split(/\s+/).length;
+            if (wordCount <= 3 && candidate.length < 40) {
+              // This is a short candidate that appears before "in [Game Title]"
+              // The API result might be game content (boss, character, etc.), not a game
+              // Skip this result and try the "in [Game Title]" candidates instead
+              continue;
+            }
+          }
           // STRICT VALIDATION: Check if distinctive words from candidate are in the result
           const candidateLower = candidate.toLowerCase();
           const resultLower = igdbMatch.toLowerCase();
@@ -2954,6 +3421,17 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
       try {
         const rawgMatch = await searchGameInRAWG(candidate);
         if (rawgMatch) {
+          // CRITICAL: If this is a short candidate and we have "in [Game Title]" candidates,
+          // validate that the API result is actually a game, not game content
+          if (!inGamePatternCandidates.has(candidate) && inGamePatternCandidates.size > 0) {
+            const wordCount = candidate.split(/\s+/).length;
+            if (wordCount <= 3 && candidate.length < 40) {
+              // This is a short candidate that appears before "in [Game Title]"
+              // The API result might be game content (boss, character, etc.), not a game
+              // Skip this result and try the "in [Game Title]" candidates instead
+              continue;
+            }
+          }
           // STRICT VALIDATION: Check if distinctive words from candidate are in the result
           const candidateLower = candidate.toLowerCase();
           const resultLower = rawgMatch.toLowerCase();
