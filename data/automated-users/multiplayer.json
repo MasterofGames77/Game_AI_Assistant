@@ -9,7 +9,10 @@
     "Need for Speed",
     "Crash Team Racing Nitro-Fueled",
     "Wipeout Omega Collection",
-    "The Crew Motorfest"
+    "The Crew Motorfest",
+    "Sonic Racing Crossworlds",
+    "F1 2019",
+    "F1 2020"
   ],
   "battle-royale": [
     "Fall Guys",
@@ -33,7 +36,11 @@
     "Soulcalibur II",
     "Skullgirls 2nd Encore",
     "Mortal Kombat 1",
-    "The King of Fighters XV"
+    "The King of Fighters XV",
+    "Super Smash Bros. Melee",
+    "Granblue Fantasy Versus: Rising",
+    "Dead or Alive 3",
+    "Virtua Fighter 5"
   ],
   "sandbox": [
     "Minecraft",
@@ -58,5 +65,43 @@
     "Destiny 2",
     "Titanfall 2",
     "Valorant"
+  ],
+  "moba": [
+    "Dota 2",
+    "League of Legends",
+    "Smite",
+    "Heroes of the Storm",
+    "Arena of Valor",
+    "Pokémon Unite",
+    "Honor of Kings",
+    "SUPERVIVE"
+  ],
+  "sports": [
+    "Wii Sports",
+    "Tony Hawk's Pro Skater 2",
+    "Tiger Woods PGA Tour 2004",
+    "EA Sports College Football 25",
+    "FIFA 13",
+    "FIFA 18",
+    "NBA 2K11",
+    "NBA 2K20",
+    "Madden NFL 2005",
+    "Madden 24",
+    "NHL 94",
+    "NHL 14",
+    "WWE 2K19",
+    "WWE 2K22",
+    "NBA Jam (1993)",
+    "PGA Tour 2K21",
+    "Mario Golf",
+    "Mario Power Tennis",
+    "Super Mario Strikers",
+    "Hot Shots Golf 3",
+    "Pro Evolution Soccer 2008",
+    "MLB Slugfest 2003",
+    "MLB The Show 20",
+    "MLB The Show 15",
+    "Super Mega Baseball 4",
+    "Mario Superstar Baseball"
   ]
 }

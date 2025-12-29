@@ -466,8 +466,9 @@ export async function getWeeklyGameRecommendations(
       .lean();
     const gamesAskedAbout = new Set<string>();
     for (const q of allUserQuestions) {
-      if ((q as any).detectedGame) {
-        gamesAskedAbout.add((q as any).detectedGame.toLowerCase());
+      if ((q as any).detectedGame && typeof (q as any).detectedGame === 'string') {
+        // Normalize: lowercase and trim for consistent comparison
+        gamesAskedAbout.add((q as any).detectedGame.toLowerCase().trim());
       }
     }
 
@@ -478,10 +479,13 @@ export async function getWeeklyGameRecommendations(
       // Limit to last 25 games to prevent the list from growing too large
       const recentRecommendations = (userDoc as any).weeklyDigest.previouslyRecommendedGames.slice(-25);
       for (const game of recentRecommendations) {
-        if (game) {
-          previouslyRecommended.add(game.toLowerCase());
+        if (game && typeof game === 'string') {
+          previouslyRecommended.add(game.toLowerCase().trim());
         }
       }
+      console.log(`[Weekly Digest] Loaded ${previouslyRecommended.size} previously recommended games for ${username}:`, Array.from(previouslyRecommended).slice(0, 5));
+    } else {
+      console.log(`[Weekly Digest] No previously recommended games found for ${username}`);
     }
 
     // Step 12: Fetch recommendations for each primary genre
@@ -491,6 +495,14 @@ export async function getWeeklyGameRecommendations(
     gamesAskedAbout.forEach(game => seenGames.add(game));
     previouslyRecommended.forEach(game => seenGames.add(game));
     const seenSeries = new Set<string>(); // Series already in this email
+    
+    // Log exclusion summary for debugging
+    console.log(`[Weekly Digest] Exclusion summary for ${username}:`, {
+      gamesAskedAbout: gamesAskedAbout.size,
+      previouslyRecommended: previouslyRecommended.size,
+      totalExcluded: seenGames.size,
+      sampleExcluded: Array.from(seenGames).slice(0, 5)
+    });
 
     // Get recommendations for each genre with enhanced randomization
     const weekNumber = Math.floor(Date.now() / (1000 * 60 * 60 * 24 * 7));
@@ -505,11 +517,16 @@ export async function getWeeklyGameRecommendations(
           currentPopular: true
         });
 
-        // Filter out games user has already asked about or previously recommended
-        const filteredRecs = genreRecs.filter(game => {
-          const gameLower = game.toLowerCase();
-          return !seenGames.has(gameLower);
-        });
+          // Filter out games user has already asked about or previously recommended
+          // Normalize game names (trim whitespace, lowercase) for consistent comparison
+          const filteredRecs = genreRecs.filter(game => {
+            const gameLower = game.toLowerCase().trim();
+            const isExcluded = seenGames.has(gameLower);
+            if (isExcluded) {
+              console.log(`[Weekly Digest] Filtered out "${game}" - already in exclusion list`);
+            }
+            return !isExcluded;
+          });
 
         // Enhanced variation: combine week number, genre index, and random seed
         // Increased rotation offset for more variety
@@ -563,8 +580,9 @@ export async function getWeeklyGameRecommendations(
           });
           
           // Filter and shuffle fallback recommendations for variety
+          // Normalize game names (trim whitespace, lowercase) for consistent comparison
           const filteredFallback = fallbackRecs.filter(game => {
-            const gameLower = game.toLowerCase();
+            const gameLower = game.toLowerCase().trim();
             return !seenGames.has(gameLower);
           });
           
@@ -573,14 +591,23 @@ export async function getWeeklyGameRecommendations(
           
           for (const rec of shuffledFallback) {
             if (allRecommendations.length >= 5) break;
-            const recLower = rec.toLowerCase();
+            const recLower = rec.toLowerCase().trim(); // Normalize: lowercase and trim whitespace
             const series = extractSeriesName(rec); // Extract series name for duplicate checking
-            const seriesLower = series.toLowerCase();
+            const seriesLower = series.toLowerCase().trim();
             
+            // Check exclusion: must not be in seenGames (previously recommended or asked about)
+            // AND must not be from a series already in this email
             if (!seenGames.has(recLower) && !seenSeries.has(seriesLower)) {
               allRecommendations.push(rec); // Push FULL game name (e.g., "Final Fantasy IX")
               seenGames.add(recLower); // Track specific game to avoid exact duplicates
               seenSeries.add(seriesLower); // Track series to prevent multiple games from same series
+            } else {
+              // Log why a game was excluded for debugging
+              if (seenGames.has(recLower)) {
+                console.log(`[Weekly Digest] Excluded "${rec}" (fallback) - already recommended or asked about (normalized: "${recLower}")`);
+              } else if (seenSeries.has(seriesLower)) {
+                console.log(`[Weekly Digest] Excluded "${rec}" (fallback) - series "${series}" already in email`);
+              }
             }
           }
         } catch (error) {
@@ -606,27 +633,68 @@ export async function getWeeklyGameRecommendations(
     
     // Save recommended games to user's weeklyDigest for future exclusion
     // This ensures we don't recommend the same games in consecutive weeks
+    // IMPORTANT: Save BEFORE returning to ensure it completes
     if (finalRecommendations.length > 0) {
       try {
+        // Get current user to read existing recommendations
         const currentUser = await User.findOne({ username });
         if (currentUser) {
-          const currentRecommended = (currentUser.weeklyDigest?.previouslyRecommendedGames as string[]) || [];
+          // Ensure weeklyDigest object exists
+          if (!currentUser.weeklyDigest) {
+            currentUser.weeklyDigest = {};
+          }
+          
+          const currentRecommended = (currentUser.weeklyDigest.previouslyRecommendedGames as string[]) || [];
           // Add new recommendations and keep only last 25 to prevent list from growing too large
           const updatedRecommended = [...currentRecommended, ...finalRecommendations].slice(-25);
           
-          await User.findOneAndUpdate(
+          // Save using $set to ensure atomic update
+          // Also ensure weeklyDigest object exists if it doesn't
+          const updateResult = await User.findOneAndUpdate(
             { username },
             {
               $set: {
-                'weeklyDigest.previouslyRecommendedGames': updatedRecommended
+                'weeklyDigest.previouslyRecommendedGames': updatedRecommended,
+                // Ensure weeklyDigest object exists
+                ...(currentUser.weeklyDigest.enabled === undefined && { 'weeklyDigest.enabled': true })
               }
+            },
+            { 
+              new: false // Don't need the updated document
             }
           );
+          
+          if (updateResult) {
+            console.log(`[Weekly Digest] ✅ Saved ${finalRecommendations.length} recommended games for ${username}. Total tracked: ${updatedRecommended.length}`);
+            console.log(`[Weekly Digest] New recommendations saved:`, finalRecommendations);
+            console.log(`[Weekly Digest] Previously recommended (will be excluded next time):`, updatedRecommended.slice(0, 10));
+            
+            // Verify the save worked by reading it back
+            const verifyUser = await User.findOne({ username }).select('weeklyDigest.previouslyRecommendedGames').lean();
+            if (verifyUser && !Array.isArray(verifyUser) && (verifyUser as any).weeklyDigest?.previouslyRecommendedGames) {
+              const savedCount = ((verifyUser as any).weeklyDigest.previouslyRecommendedGames as string[]).length;
+              console.log(`[Weekly Digest] ✅ Verified save: ${savedCount} games now in database for ${username}`);
+            } else {
+              console.error(`[Weekly Digest] ❌ VERIFICATION FAILED: Could not read back saved games for ${username}`);
+            }
+          } else {
+            console.error(`[Weekly Digest] ❌ Failed to save recommended games for ${username} - user not found or update failed`);
+          }
+        } else {
+          console.error(`[Weekly Digest] ❌ User ${username} not found when trying to save recommendations`);
         }
       } catch (error) {
-        console.error(`[Weekly Digest] Error saving recommended games for ${username}:`, error);
-        // Don't fail the whole process if saving fails
+        console.error(`[Weekly Digest] ❌ Error saving recommended games for ${username}:`, error);
+        if (error instanceof Error) {
+          console.error(`[Weekly Digest] Error details:`, error.message);
+          if (error.stack) {
+            console.error(`[Weekly Digest] Error stack:`, error.stack);
+          }
+        }
+        // Don't fail the whole process if saving fails, but log it prominently
       }
+    } else {
+      console.warn(`[Weekly Digest] ⚠️ No recommendations to save for ${username} - allRecommendations was empty`);
     }
     
     return finalRecommendations;

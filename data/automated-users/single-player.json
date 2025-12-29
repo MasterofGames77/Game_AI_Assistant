@@ -9,7 +9,8 @@
     "Donkey Kong Country",
     "Crash Bandicoot N-Sane Trilogy",
     "A Hat in Time",
-    "Jak and Daxter: The Precursor Legacy"
+    "Jak and Daxter: The Precursor Legacy",
+    "Donkey Kong Bananza"
   ],
   "simulation": [
     "The Sims 4",
@@ -21,7 +22,9 @@
     "Story of Seasons",
     "Euro Truck Simulator 2",
     "Planet Coaster",
-    "Two Point Museum"
+    "Two Point Museum",
+    "Football Manager 2024",
+    "PowerWash Simulator"
   ],
   "rpg": [
     "The Elder Scrolls V: Skyrim",
@@ -33,11 +36,16 @@
     "Paper Mario: The Thousand Year Door",
     "Xenoblade Chronicles 3",
     "Cyberpunk 2077",
-    "Pokémon Legends: Arceus"
+    "Pokémon Legends: Arceus",
+    "Final Fantasy VI",
+    "Mario and Luigi: Bowser's Inside Story",
+    "Dragon Quest XI: Echoes of an Elusive Age",
+    "Chrono Trigger"
   ],
   "adventure": [
     "The Legend of Zelda: Breath of the Wild",
     "God of War (2018)",
+    "God of War Ragnarök",
     "Assassin's Creed Valhalla",
     "The Last of Us",
     "Red Dead Redemption 2",
@@ -45,7 +53,9 @@
     "Uncharted 2: Among Thieves",
     "Star Wars Jedi: Survivor",
     "Baldur's Gate 3",
-    "Marvel's Spider-Man"
+    "Marvel's Spider-Man",
+    "The Legend of Zelda: Ocarina of Time",
+    "Death Stranding"
   ],
   "puzzle": [
     "Tetris",
@@ -58,5 +68,54 @@
     "The Room (Game)",
     "Blue Prince",
     "Animal Well"
+  ],
+  "action": [
+    "Sekiro: Shadows Die Twice",
+    "Devil May Cry 5",
+    "Bayonetta 2",
+    "Metal Gear Rising: Revengeance",
+    "NieR: Automata",
+    "Hogwarts Legacy",
+    "The Last of Us Part II",
+    "Clair Obscur: Expedition 33",
+    "Dispatch",
+    "Grand Theft Auto V",
+    "Ghost of Tsushima"
+  ],
+  "horror": [
+    "Resident Evil 4",
+    "Resident Evil 2 Remake",
+    "Dead Space",
+    "Left for Dead",
+    "Silent Hill 2",
+    "Alan Wake 2",
+    "Alien Isolation",
+    "Phasmophobia",
+    "Amnesia: The Bunker",
+    "Until Dawn"
+  ],
+  "stealth": [
+    "Metal Gear Solid",
+    "The Chronicles of Riddick: Escape from Butcher Bay",
+    "Tom Clancy’s Splinter Cell: Chaos Theory",
+    "Thief 2: The Metal Age",
+    "Metal Gear Solid Delta: Snake Eater",
+    "Dishonored 2",
+    "Hitman: World of Assassination",
+    "Tenchu: Stealth Assassins",
+    "Mark of the Ninja",
+    "Shadow Tactics: Blades of the Shogun"
+  ],
+  "metroidvania": [
+    "Castlevania: Symphony of the Night",
+    "Bloodstained: Ritual of the Night",
+    "Hollow Knight",
+    "Dust: An Elysian Tail",
+    "Prince of Persia: The Lost Crown",
+    "Cave Story+",
+    "Ori and the Will of the Wisps",
+    "Ender Magnolia: Bloom in the Mist",
+    "Axiom Verge",
+    "Guacamelee!"
   ]
 }

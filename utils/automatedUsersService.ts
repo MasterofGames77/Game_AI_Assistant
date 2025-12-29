@@ -37,8 +37,8 @@ function getBaseUrl(): string {
 function loadGameList(userPreferences: UserPreferences): { games: string[]; genres: string[] } {
   // Check if this is InterdimensionalHipster (has both single-player and multiplayer genres)
   const isInterdimensionalHipster = userPreferences.genres.length > 5 && 
-    userPreferences.genres.some(g => ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer'].includes(g)) &&
-    userPreferences.genres.some(g => ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox'].includes(g));
+    userPreferences.genres.some(g => ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer', 'Action', 'Horror', 'Stealth', 'Metroidvania'].includes(g)) &&
+    userPreferences.genres.some(g => ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox', 'FPS', 'MOBA', 'Sports'].includes(g));
   
   if (isInterdimensionalHipster) {
     // Load both single-player and multiplayer games
@@ -116,8 +116,8 @@ function selectRandomGame(userPreferences: UserPreferences): { gameTitle: string
   // Find which genre this game belongs to
   // Check if this is InterdimensionalHipster (has both single-player and multiplayer genres)
   const isInterdimensionalHipster = userPreferences.genres.length > 5 && 
-    userPreferences.genres.some(g => ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer'].includes(g)) &&
-    userPreferences.genres.some(g => ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox'].includes(g));
+    userPreferences.genres.some(g => ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer', 'Action', 'Horror', 'Stealth', 'Metroidvania'].includes(g)) &&
+    userPreferences.genres.some(g => ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox', 'FPS', 'MOBA', 'Sports'].includes(g));
   
   if (isInterdimensionalHipster) {
     // Check both game lists
@@ -1873,8 +1873,8 @@ export async function getUserPreferences(username: string): Promise<UserPreferen
       const uniqueGenres: string[] = Array.from(uniqueGenresSet);
       
       // Determine focus based on genres (single-player genres vs multiplayer genres)
-      const singlePlayerGenres = ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer', 'Metroidvania'];
-      const multiplayerGenres = ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox', 'First-Person Shooter'];
+      const singlePlayerGenres = ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer', 'Action', 'Horror', 'Stealth', 'Metroidvania'];
+      const multiplayerGenres = ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox', 'FPS', 'MOBA', 'Sports'];
       
       const hasSinglePlayer = uniqueGenres.some((g: string) => singlePlayerGenres.includes(g));
       const hasMultiplayer = uniqueGenres.some((g: string) => multiplayerGenres.includes(g));
@@ -1916,18 +1916,18 @@ export async function getUserPreferences(username: string): Promise<UserPreferen
     // Fallback to hardcoded preferences for original automated users
     if (username === 'MysteriousMrEnter') {
       return {
-        genres: ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer'],
+        genres: ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer', 'Action', 'Horror', 'Stealth', 'Metroidvania'],
         focus: 'single-player'
       };
     } else if (username === 'WaywardJammer') {
       return {
-        genres: ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox'],
+        genres: ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox', 'FPS', 'MOBA', 'Sports'],
         focus: 'multiplayer'
       };
     } else if (username === 'InterdimensionalHipster') {
       // InterdimensionalHipster can talk about both single-player and multiplayer games
       return {
-        genres: ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer', 'Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox'],
+        genres: ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer', 'Action', 'Horror', 'Stealth', 'Metroidvania', 'Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox', 'FPS', 'MOBA', 'Sports'],
         focus: 'single-player' // Default focus, but can respond to both types
       };
     }
