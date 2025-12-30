@@ -63,7 +63,10 @@ export default function TermsOfServicePage() {
               <li>AI-powered game assistance, walkthroughs, and strategies</li>
               <li>Personalized game recommendations</li>
               <li>Image analysis for game-related questions</li>
-              <li>Community forums for Pro users</li>
+              <li>
+                Community forums (all users can post; Pro users can create and
+                manage forums)
+              </li>
               <li>Discord bot integration for gaming discussions</li>
               <li>Twitch bot integration for streamers and viewers</li>
               <li>Progress tracking and achievement systems</li>
@@ -108,25 +111,36 @@ export default function TermsOfServicePage() {
             </h2>
             <div className="space-y-2 text-gray-700">
               <p>
-                <strong>Free Access:</strong> Free users have limited access to
-                the Service, including:
+                <strong>Free Access:</strong> Free users have access to:
               </p>
               <ul className="list-disc pl-6 space-y-1">
-                <li>
-                  Limited number of questions per hour (subject to rate limits)
-                </li>
-                <li>Basic AI assistance features</li>
-                <li>Access to basic game recommendations</li>
+                <li>Unlimited questions (no rate limits)</li>
+                <li>AI-powered gaming assistance</li>
+                <li>Game recommendations and personalized tips</li>
+                <li>Game tracking (wishlist and currently playing lists)</li>
+                <li>Progress tracking and achievements</li>
+                <li>Post and reply in forums (cannot create forums)</li>
               </ul>
               <p className="mt-2">
                 <strong>Pro Access:</strong> Pro users receive enhanced access,
                 including:
               </p>
               <ul className="list-disc pl-6 space-y-1">
-                <li>Unlimited questions (no rate limits)</li>
-                <li>Access to exclusive Pro-only forums</li>
-                <li>Enhanced features and priority support</li>
-                <li>Advanced game tracking and analytics</li>
+                <li>
+                  Create, and edit your own forums (free users can post in
+                  forums but cannot create them)
+                </li>
+                <li>
+                  Twitch Bot integration - use Video Game Wingman in Twitch chat
+                </li>
+                <li>
+                  Discord Bot integration - add Video Game Wingman to your
+                  Discord server
+                </li>
+                <li>
+                  Real-time notifications about achievements and forum activity
+                </li>
+                <li>Priority support</li>
               </ul>
               <p className="mt-2">
                 Pro access may be granted through free periods, paid

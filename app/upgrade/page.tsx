@@ -12,14 +12,22 @@ const ProFeatures = [
     icon: "🔔",
   },
   {
-    title: "Forum Access",
-    description: "Participate in exclusive Pro-only forums and discussions.",
+    title: "Create & Manage Forums",
+    description:
+      "Create, and edit your own forums. Free users can post in forums, but only Pro users can create and manage them.",
     icon: "💬",
   },
   {
-    title: "Advanced Analytics",
-    description: "Track your gaming progress and get personalized insights.",
-    icon: "📊",
+    title: "Twitch Bot Integration",
+    description:
+      "Use Video Game Wingman in Twitch chat - ask questions and get AI-powered gaming assistance directly in your favorite streams.",
+    icon: "📺",
+  },
+  {
+    title: "Discord Bot Integration",
+    description:
+      "Add Video Game Wingman to your Discord server - get gaming help via DMs, mentions, or slash commands.",
+    icon: "💬",
   },
   {
     title: "Priority Support",
