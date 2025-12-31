@@ -38,7 +38,7 @@ function loadGameList(userPreferences: UserPreferences): { games: string[]; genr
   // Check if this is InterdimensionalHipster (has both single-player and multiplayer genres)
   const isInterdimensionalHipster = userPreferences.genres.length > 5 && 
     userPreferences.genres.some(g => ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer', 'Action', 'Horror', 'Stealth', 'Metroidvania'].includes(g)) &&
-    userPreferences.genres.some(g => ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox', 'FPS', 'MOBA', 'Sports'].includes(g));
+    userPreferences.genres.some(g => ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox', 'FPS', 'MOBA', 'MMORPG', 'Sports'].includes(g));
   
   if (isInterdimensionalHipster) {
     // Load both single-player and multiplayer games

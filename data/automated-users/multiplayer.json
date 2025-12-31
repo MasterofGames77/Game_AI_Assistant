@@ -12,7 +12,8 @@
     "The Crew Motorfest",
     "Sonic Racing Crossworlds",
     "F1 2019",
-    "F1 2020"
+    "F1 2020",
+    "Diddy Kong Racing"
   ],
   "battle-royale": [
     "Fall Guys",
@@ -40,7 +41,8 @@
     "Super Smash Bros. Melee",
     "Granblue Fantasy Versus: Rising",
     "Dead or Alive 3",
-    "Virtua Fighter 5"
+    "Virtua Fighter 5",
+    "Injustice 2: Gods Among Us"
   ],
   "sandbox": [
     "Minecraft",
@@ -75,6 +77,16 @@
     "Pokémon Unite",
     "Honor of Kings",
     "SUPERVIVE"
+  ],
+  "mmorpg": [
+    "World of Warcraft",
+    "Final Fantasy XIV",
+    "The Elder Scrolls Online",
+    "Path of Exile 2",
+    "Sea of Thieves",
+    "War Thunder",
+    "Runescape",
+    "Guild Wars 2"
   ],
   "sports": [
     "Wii Sports",
