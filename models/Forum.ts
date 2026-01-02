@@ -126,6 +126,19 @@ ForumSchema.index({ 'metadata.gameTitle': 1 });
 ForumSchema.index({ 'metadata.category': 1 });
 ForumSchema.index({ 'metadata.tags': 1 });
 
+// Indexes for weekly digest queries
+// Note: MongoDB has limitations indexing nested arrays, but these help with the query structure
+ForumSchema.index({ 'metadata.status': 1, isPrivate: 1 });
+ForumSchema.index({ 'posts.username': 1, 'metadata.status': 1 });
+ForumSchema.index({ allowedUsers: 1, 'metadata.status': 1 });
+
+// Compound index for posts queries (recommended for weekly digest)
+// This index helps with queries that filter by posts.timestamp, posts.username, and metadata.status
+ForumSchema.index({ 'posts.timestamp': 1, 'posts.username': 1, 'metadata.status': 1 });
+
+// Index for posts metadata status (for filtering active posts)
+ForumSchema.index({ 'posts.metadata.status': 1 });
+
 ForumSchema.methods.updateActivity = async function(userId: string) {
   this.metadata.lastActivityAt = new Date();
   this.metadata.lastActiveUser = userId;

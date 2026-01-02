@@ -28,13 +28,18 @@ function withTimeout<T>(
  * Get achievements for weekly digest
  * - First email: returns all current achievements
  * - Subsequent emails: returns only achievements earned in the past week
+ * @param username - Username to get achievements for
+ * @param isFirstEmail - Whether this is the first weekly digest email
+ * @param userData - Optional pre-fetched user data to avoid duplicate queries
  */
 export async function getWeeklyAchievements(
   username: string,
-  isFirstEmail: boolean
+  isFirstEmail: boolean,
+  userData?: any
 ): Promise<Array<{ name: string; dateEarned: Date }>> {
   try {
-    const user = await User.findOne({ username });
+    // Use pre-fetched user data if available, otherwise fetch
+    const user = userData || await User.findOne({ username }).select('achievements').lean();
     if (!user || !user.achievements || user.achievements.length === 0) {
       return [];
     }
@@ -73,6 +78,7 @@ export async function getWeeklyAchievements(
 /**
  * Get forum activity for the past week
  * Returns posts created by the user in the past 7 days
+ * Optimized query with better index usage
  */
 export async function getWeeklyForumActivity(
   username: string
@@ -87,17 +93,24 @@ export async function getWeeklyForumActivity(
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-    // Find all forums where user has posted in the past week
+    // Optimized query: Use $elemMatch for nested array queries and better index usage
+    // This query structure works better with MongoDB's indexing capabilities
     const forums = await Forum.find({
       $or: [
         { isPrivate: false },
         { allowedUsers: username }
       ],
       'metadata.status': 'active',
-      'posts.username': username,
-      'posts.timestamp': { $gte: oneWeekAgo },
-      'posts.metadata.status': 'active'
-    }).lean();
+      posts: {
+        $elemMatch: {
+          username: username,
+          timestamp: { $gte: oneWeekAgo },
+          'metadata.status': 'active'
+        }
+      }
+    })
+      .select('title gameTitle posts')
+      .lean();
 
     const activities: Array<{
       forumTitle: string;
@@ -163,14 +176,23 @@ export async function getWeeklyGameRecommendations(
     // Step 1: Get weekly forum activity
     const weeklyForumActivity = await getWeeklyForumActivity(username);
     
-    // Step 2: Get weekly questions (past 7 days)
-    const weeklyQuestionsRaw = await Question.find({
-      username,
-      timestamp: { $gte: oneWeekAgo }
-    })
-      .sort({ timestamp: -1 })
-      .select('detectedGame detectedGenre question timestamp')
-      .lean();
+    // Step 2: Get weekly questions (past 7 days) and recent questions in parallel
+    // This reduces sequential queries
+    const [weeklyQuestionsRaw, recentQuestionsRaw, userDoc] = await Promise.all([
+      Question.find({
+        username,
+        timestamp: { $gte: oneWeekAgo }
+      })
+        .sort({ timestamp: -1 })
+        .select('detectedGame detectedGenre question timestamp')
+        .lean(),
+      Question.find({ username })
+        .sort({ timestamp: -1 })
+        .limit(5)
+        .select('detectedGame detectedGenre question timestamp')
+        .lean(),
+      User.findOne({ username }).select('weeklyDigest progress').lean()
+    ]);
     
     const weeklyQuestions = weeklyQuestionsRaw
       .filter((q: any) => q && q.timestamp)
@@ -181,16 +203,10 @@ export async function getWeeklyGameRecommendations(
         timestamp: new Date(q.timestamp)
       }));
 
-    // Step 3: Get weekly achievements
-    const weeklyAchievements = await getWeeklyAchievements(username, false);
+    // Step 3: Get weekly achievements (using pre-fetched user data if available)
+    const weeklyAchievements = await getWeeklyAchievements(username, false, userDoc);
 
-    // Step 4: Get the 5 most recent questions (for fallback)
-    const recentQuestionsRaw = await Question.find({ username })
-      .sort({ timestamp: -1 })
-      .limit(5)
-      .select('detectedGame detectedGenre question timestamp')
-      .lean();
-    
+    // Step 4: Process recent questions (already fetched above)
     const recentQuestions = recentQuestionsRaw
       .filter((q: any) => q && q.timestamp)
       .map((q: any) => ({
@@ -383,8 +399,9 @@ export async function getWeeklyGameRecommendations(
       // Take top 2-3 genres for variety
       primaryGenres = sortedGenres.slice(0, 3);
     } else {
-      // Final fallback: try to infer from user progress
-      const user = await User.findOne({ username });
+      // Final fallback: try to infer from user progress (use pre-fetched user data)
+      // Type guard: ensure userDoc is a single object, not an array
+      const user = Array.isArray(userDoc) ? null : userDoc;
       if (user?.progress) {
         const progress = user.progress;
         const progressGenreCounts: { [key: string]: number } = {
@@ -495,6 +512,7 @@ export async function getWeeklyGameRecommendations(
     };
 
     // Step 11: Get all games user has asked about (for exclusion)
+    // Optimize: Only fetch detectedGame field, and use lean() for better performance
     const allUserQuestions = await Question.find({ username })
       .select('detectedGame')
       .lean();
@@ -507,11 +525,13 @@ export async function getWeeklyGameRecommendations(
     }
 
     // Step 11b: Get previously recommended games (to avoid repeats)
-    const userDoc = await User.findOne({ username }).select('weeklyDigest').lean();
+    // Use pre-fetched userDoc if available
     const previouslyRecommended = new Set<string>();
-    if (userDoc && !Array.isArray(userDoc) && (userDoc as any).weeklyDigest?.previouslyRecommendedGames) {
+    // Type guard: ensure userDoc is a single object, not an array
+    const userForRecommendations = Array.isArray(userDoc) ? null : userDoc;
+    if (userForRecommendations && (userForRecommendations as any).weeklyDigest?.previouslyRecommendedGames) {
       // Limit to last 25 games to prevent the list from growing too large
-      const recentRecommendations = (userDoc as any).weeklyDigest.previouslyRecommendedGames.slice(-25);
+      const recentRecommendations = (userForRecommendations as any).weeklyDigest.previouslyRecommendedGames.slice(-25);
       for (const game of recentRecommendations) {
         if (game && typeof game === 'string') {
           previouslyRecommended.add(game.toLowerCase().trim());
@@ -704,8 +724,12 @@ export async function getWeeklyGameRecommendations(
     // IMPORTANT: Save BEFORE returning to ensure it completes
     if (finalRecommendations.length > 0) {
       try {
-        // Get current user to read existing recommendations
-        const currentUser = await User.findOne({ username });
+        // Use pre-fetched userDoc if available, otherwise fetch
+        // Type guard: ensure userDoc is a single object, not an array
+        const preFetchedUser = Array.isArray(userDoc) ? null : userDoc;
+        const fetchedUser = preFetchedUser || await User.findOne({ username });
+        // Type guard: ensure fetchedUser is a single object, not an array
+        const currentUser = Array.isArray(fetchedUser) ? null : fetchedUser;
         if (currentUser) {
           // Ensure weeklyDigest object exists
           if (!currentUser.weeklyDigest) {

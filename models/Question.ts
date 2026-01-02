@@ -32,7 +32,8 @@ const QuestionSchema = new mongoose.Schema<IQuestion>({
   imageUrl: { type: String, required: false } // URL of image uploaded with this question
 }, { collection: 'questions' });
 
-QuestionSchema.index({ username: 1, timestamp: 1 });
+// Compound index optimized for weekly digest queries (sorted by timestamp descending)
+QuestionSchema.index({ username: 1, timestamp: -1 });
 QuestionSchema.index({ detectedGenre: 1 }); // Index for future genre-based queries
 
 export default mongoose.models.Question || mongoose.model<IQuestion>('Question', QuestionSchema);
