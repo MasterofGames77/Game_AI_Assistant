@@ -36,6 +36,240 @@ const getAppUrl = (): string => {
 
 const APP_URL = getAppUrl();
 
+// ============================================================================
+// Circuit Breaker for Email Service
+// ============================================================================
+
+/**
+ * Circuit Breaker for email service
+ * Prevents wasting time when email service is down
+ * States: CLOSED (normal), OPEN (failing), HALF_OPEN (testing recovery)
+ */
+class EmailCircuitBreaker {
+  private state: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED';
+  private failureCount: number = 0;
+  private lastFailureTime: number = 0;
+  private successCount: number = 0;
+  
+  // Configuration
+  private readonly FAILURE_THRESHOLD = 5; // Open circuit after 5 consecutive failures
+  private readonly SUCCESS_THRESHOLD = 2; // Close circuit after 2 successes in half-open state
+  private readonly TIMEOUT_MS = 60000; // 1 minute before attempting recovery
+  
+  /**
+   * Check if circuit breaker allows the operation
+   */
+  canAttempt(): boolean {
+    const now = Date.now();
+    
+    if (this.state === 'CLOSED') {
+      return true;
+    }
+    
+    if (this.state === 'OPEN') {
+      // Check if enough time has passed to attempt recovery
+      if (now - this.lastFailureTime >= this.TIMEOUT_MS) {
+        this.state = 'HALF_OPEN';
+        this.successCount = 0;
+        console.log('[Email Circuit Breaker] Moving to HALF_OPEN state - testing recovery');
+        return true;
+      }
+      return false;
+    }
+    
+    // HALF_OPEN state - allow attempts to test recovery
+    return true;
+  }
+  
+  /**
+   * Record a successful operation
+   */
+  recordSuccess(): void {
+    if (this.state === 'HALF_OPEN') {
+      this.successCount++;
+      if (this.successCount >= this.SUCCESS_THRESHOLD) {
+        this.state = 'CLOSED';
+        this.failureCount = 0;
+        console.log('[Email Circuit Breaker] Moving to CLOSED state - service recovered');
+      }
+    } else if (this.state === 'CLOSED') {
+      // Reset failure count on success
+      this.failureCount = 0;
+    }
+  }
+  
+  /**
+   * Record a failed operation
+   */
+  recordFailure(): void {
+    this.failureCount++;
+    this.lastFailureTime = Date.now();
+    
+    if (this.state === 'HALF_OPEN') {
+      // If we fail in half-open, go back to open
+      this.state = 'OPEN';
+      this.successCount = 0;
+      console.log('[Email Circuit Breaker] Moving to OPEN state - recovery failed');
+    } else if (this.state === 'CLOSED' && this.failureCount >= this.FAILURE_THRESHOLD) {
+      this.state = 'OPEN';
+      console.error('[Email Circuit Breaker] Moving to OPEN state - too many failures', {
+        failureCount: this.failureCount,
+        threshold: this.FAILURE_THRESHOLD,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+  
+  /**
+   * Get current state
+   */
+  getState(): 'CLOSED' | 'OPEN' | 'HALF_OPEN' {
+    return this.state;
+  }
+  
+  /**
+   * Get failure count
+   */
+  getFailureCount(): number {
+    return this.failureCount;
+  }
+  
+  /**
+   * Reset circuit breaker (for testing/manual recovery)
+   */
+  reset(): void {
+    this.state = 'CLOSED';
+    this.failureCount = 0;
+    this.successCount = 0;
+    this.lastFailureTime = 0;
+    console.log('[Email Circuit Breaker] Reset to CLOSED state');
+  }
+}
+
+// Singleton instance
+export const emailCircuitBreaker = new EmailCircuitBreaker();
+
+// ============================================================================
+// Retry Logic with Exponential Backoff
+// ============================================================================
+
+/**
+ * Retry a function with exponential backoff
+ * @param fn - Function to retry
+ * @param maxRetries - Maximum number of retries (default: 3)
+ * @param baseDelayMs - Base delay in milliseconds (default: 1000)
+ * @param operation - Operation name for logging
+ * @returns Result of the function or throws error if all retries fail
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelayMs: number = 1000,
+  operation: string = 'operation'
+): Promise<T> {
+  let lastError: Error | unknown;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await fn();
+      
+      // If this is a retry attempt, log success
+      if (attempt > 0) {
+        console.log(`[Email Retry] ${operation} succeeded on attempt ${attempt + 1}/${maxRetries + 1}`);
+      }
+      
+      return result;
+    } catch (error) {
+      lastError = error;
+      
+      // Don't retry on last attempt
+      if (attempt >= maxRetries) {
+        break;
+      }
+      
+      // Calculate delay with exponential backoff
+      const delay = baseDelayMs * Math.pow(2, attempt);
+      
+      // Determine if error is retryable
+      const isRetryable = isRetryableError(error);
+      
+      if (!isRetryable) {
+        // Non-retryable error (e.g., invalid email, authentication error)
+        console.error(`[Email Retry] ${operation} failed with non-retryable error:`, {
+          error: error instanceof Error ? error.message : String(error),
+          attempt: attempt + 1,
+          timestamp: new Date().toISOString()
+        });
+        throw error;
+      }
+      
+      console.warn(`[Email Retry] ${operation} failed, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`, {
+        error: error instanceof Error ? error.message : String(error),
+        attempt: attempt + 1,
+        maxRetries,
+        delay,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  // All retries exhausted
+  throw lastError;
+}
+
+/**
+ * Check if an error is retryable
+ * Retry on: network errors, timeouts, 5xx errors
+ * Don't retry on: 4xx errors (client errors), invalid configuration
+ */
+function isRetryableError(error: unknown): boolean {
+  if (!error) return false;
+  
+  // Check for Resend API error structure
+  if (typeof error === 'object' && 'message' in error) {
+    const errorMessage = String((error as any).message || '').toLowerCase();
+    
+    // Don't retry on client errors (4xx)
+    if ('status' in error && typeof (error as any).status === 'number') {
+      const status = (error as any).status;
+      if (status >= 400 && status < 500) {
+        return false; // Client errors are not retryable
+      }
+    }
+    
+    // Retry on network errors, timeouts, server errors
+    if (
+      errorMessage.includes('timeout') ||
+      errorMessage.includes('network') ||
+      errorMessage.includes('econnrefused') ||
+      errorMessage.includes('enotfound') ||
+      errorMessage.includes('econnreset')
+    ) {
+      return true;
+    }
+  }
+  
+  // Check for error code
+  if (typeof error === 'object' && 'code' in error) {
+    const code = String((error as any).code || '').toLowerCase();
+    if (
+      code === 'econnrefused' ||
+      code === 'enotfound' ||
+      code === 'econnreset' ||
+      code === 'etimedout' ||
+      code === 'econnaborted'
+    ) {
+      return true;
+    }
+  }
+  
+  // Default: retry on unknown errors (could be transient)
+  return true;
+}
+
 // Function to load logo as base64 (for local development when APP_URL is localhost)
 function getLogoBase64(): string | null {
   try {
@@ -448,9 +682,30 @@ export const sendWeeklyDigestEmail = async (
   gameRecommendations: string[],
   isFirstEmail: boolean
 ): Promise<boolean> => {
+  // Check circuit breaker before attempting
+  if (!emailCircuitBreaker.canAttempt()) {
+    const state = emailCircuitBreaker.getState();
+    const failureCount = emailCircuitBreaker.getFailureCount();
+    console.error('[Email] Circuit breaker is OPEN - skipping email send', {
+      email,
+      username,
+      state,
+      failureCount,
+      timestamp: new Date().toISOString(),
+      operation: 'weekly-digest-email-send'
+    });
+    return false;
+  }
+
   const resend = getResendClient();
   if (!resend) {
-    console.error('Email service not configured');
+    console.error('[Email] Email service not configured', {
+      email,
+      username,
+      timestamp: new Date().toISOString(),
+      operation: 'weekly-digest-email-send'
+    });
+    emailCircuitBreaker.recordFailure();
     return false;
   }
 
@@ -574,6 +829,7 @@ export const sendWeeklyDigestEmail = async (
     console.log(`[Email] Using public URL for logo: ${logoSrc}`);
   }
 
+  const sendStartTime = Date.now();
   try {
     // Build HTML with proper line breaks to prevent Gmail clipping
     // Gmail clips emails over ~102KB or with very long lines (>998 chars)
@@ -646,17 +902,57 @@ ${recommendationsHtml}
       `
     };
 
-    const { data, error } = await resend.emails.send(emailPayload);
+    // Use retry logic with exponential backoff
+    try {
+      const result = await withRetry(
+        async () => {
+          const sendResult = await resend.emails.send(emailPayload);
+          if (sendResult.error) {
+            throw sendResult.error;
+          }
+          return sendResult;
+        },
+        3, // Max 3 retries
+        1000, // Base delay 1 second
+        `sendWeeklyDigestEmail to ${email}`
+      );
 
-    if (error) {
-      console.error('Error sending weekly digest email:', error);
+      // If we get here, email was sent successfully
+      const duration = Date.now() - sendStartTime;
+      console.log(`[Email] Weekly digest email sent to ${email} in ${duration}ms`);
+      emailCircuitBreaker.recordSuccess();
+      return true;
+    } catch (retryError: unknown) {
+      // All retries exhausted or non-retryable error
+      const duration = Date.now() - sendStartTime;
+      const errorMessage = retryError instanceof Error ? retryError.message : String(retryError);
+      console.error('[Email] Error sending weekly digest email after retries', {
+        email,
+        username,
+        error: errorMessage,
+        stack: retryError instanceof Error ? retryError.stack : undefined,
+        timestamp: new Date().toISOString(),
+        operation: 'weekly-digest-email-send',
+        duration,
+        retriesExhausted: true
+      });
+      emailCircuitBreaker.recordFailure();
       return false;
     }
-
-    console.log(`Weekly digest email sent to ${email}`);
-    return true;
-  } catch (error) {
-    console.error('Error sending weekly digest email:', error);
+  } catch (error: unknown) {
+    const duration = Date.now() - sendStartTime;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('[Email] Error sending weekly digest email', {
+      email,
+      username,
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+      operation: 'weekly-digest-email-send',
+      duration,
+      isRetryable: isRetryableError(error)
+    });
+    emailCircuitBreaker.recordFailure();
     return false;
   }
 };

@@ -6,7 +6,27 @@ import {
   getWeeklyForumActivity,
   getWeeklyGameRecommendations
 } from '../../../utils/weeklyDigestHelpers';
-import { sendWeeklyDigestEmail } from '../../../utils/emailService';
+import { sendWeeklyDigestEmail, emailCircuitBreaker } from '../../../utils/emailService';
+
+/**
+ * Helper function to add timeout to promises
+ * Prevents individual operations from hanging indefinitely
+ */
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  operation: string
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`${operation} timed out after ${timeoutMs}ms`)),
+        timeoutMs
+      )
+    ),
+  ]);
+}
 
 /**
  * Weekly digest email cron job endpoint
@@ -91,11 +111,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`[Weekly Digest] Running scheduled job - Day: Sunday, Time: ${currentHour}:${currentMinute.toString().padStart(2, '0')} UTC`);
   }
 
-  // Test mode logging
+  // Test mode logging and validation
   if (isTestMode) {
     console.log('[Weekly Digest] TEST MODE: Bypassing day/hour check');
     if (testUsername) {
       console.log(`[Weekly Digest] SINGLE USER TEST MODE: Testing for user ${testUsername}`);
+    } else {
+      // Safety check: require username in test mode to prevent accidentally sending to all users
+      return res.status(400).json({
+        success: false,
+        error: 'Username required in test mode',
+        message: 'When using test mode (?test=true), you must specify a username with ?user=username',
+        note: 'This prevents accidentally sending test emails to all users. Example: ?test=true&user=YourUsername'
+      });
     }
   }
 
@@ -110,7 +138,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     // Verify email service is configured
     if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) {
-      console.error('[Weekly Digest] Email service not configured - RESEND_API_KEY or RESEND_FROM_EMAIL missing');
+      console.error('[Weekly Digest] Email service not configured', {
+        error: 'RESEND_API_KEY or RESEND_FROM_EMAIL missing',
+        timestamp: new Date().toISOString(),
+        operation: 'weekly-digest-configuration-check',
+        missingKeys: {
+          RESEND_API_KEY: !process.env.RESEND_API_KEY,
+          RESEND_FROM_EMAIL: !process.env.RESEND_FROM_EMAIL
+        }
+      });
       return res.status(500).json({
         success: false,
         error: 'Email service not configured',
@@ -201,41 +237,106 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     results.totalUsers = users.length;
     console.log(`[Weekly Digest] Processing ${users.length} user${users.length !== 1 ? 's' : ''}...`);
 
+    // Check circuit breaker before processing
+    const circuitBreakerState = emailCircuitBreaker.getState();
+    const circuitBreakerFailures = emailCircuitBreaker.getFailureCount();
+    
+    if (circuitBreakerState === 'OPEN') {
+      console.error('[Weekly Digest] Email circuit breaker is OPEN - aborting batch processing', {
+        state: circuitBreakerState,
+        failureCount: circuitBreakerFailures,
+        timestamp: new Date().toISOString(),
+        operation: 'weekly-digest-circuit-breaker-check'
+      });
+      return res.status(503).json({
+        success: false,
+        error: 'Email service unavailable',
+        message: 'Email service is currently unavailable. Please try again later.',
+        circuitBreakerState,
+        failureCount: circuitBreakerFailures,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    if (circuitBreakerState === 'HALF_OPEN') {
+      console.warn('[Weekly Digest] Email circuit breaker is HALF_OPEN - testing recovery', {
+        state: circuitBreakerState,
+        failureCount: circuitBreakerFailures,
+        timestamp: new Date().toISOString(),
+        operation: 'weekly-digest-circuit-breaker-check'
+      });
+    }
+
     // Process users in batches to avoid overwhelming the system
     const batchSize = 10;
     for (let i = 0; i < users.length; i += batchSize) {
       const batch = users.slice(i, i + batchSize);
+      const batchStartTime = Date.now();
       
-      await Promise.all(
+      // Use Promise.allSettled to continue processing even if some users fail
+      const batchResults = await Promise.allSettled(
         batch.map(async (user: UserForDigest) => {
+          const userStartTime = Date.now();
+          const username = user.username;
+          const email = user.email;
+
+          if (!email || !username) {
+            console.warn(`[Weekly Digest] Skipping user ${username} - missing email or username`);
+            return { success: false, skipped: true, username };
+          }
+
           try {
-            const username = user.username;
-            const email = user.email;
-
-            if (!email || !username) {
-              console.warn(`[Weekly Digest] Skipping user ${username} - missing email or username`);
-              return;
-            }
-
             // Check if this is the first weekly digest email
             const isFirstEmail = !user.weeklyDigest?.firstEmailSentAt;
 
-            // Get data for the email
-            const [achievements, forumActivity, gameRecommendations] = await Promise.all([
-              getWeeklyAchievements(username, isFirstEmail),
-              getWeeklyForumActivity(username),
-              getWeeklyGameRecommendations(username)
-            ]);
+            // Get data for the email with timeout (60 seconds total for data fetching)
+            const [achievements, forumActivity, gameRecommendations] = await withTimeout(
+              Promise.all([
+                getWeeklyAchievements(username, isFirstEmail),
+                getWeeklyForumActivity(username),
+                getWeeklyGameRecommendations(username)
+              ]),
+              60000, // 60 seconds timeout for data fetching
+              `Weekly digest data fetch for ${username}`
+            ).catch((error) => {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+              console.error('[Weekly Digest] Timeout or error fetching data for user', {
+                username,
+                email,
+                error: errorMessage,
+                stack: error instanceof Error ? error.stack : undefined,
+                timestamp: new Date().toISOString(),
+                operation: 'weekly-digest-data-fetch',
+                duration: Date.now() - userStartTime
+              });
+              throw error;
+            });
 
-            // Send the email
-            const emailSent = await sendWeeklyDigestEmail(
-              email,
-              username,
-              achievements,
-              forumActivity,
-              gameRecommendations,
-              isFirstEmail
-            );
+            // Send the email with timeout (30 seconds for email sending)
+            const emailSent = await withTimeout(
+              sendWeeklyDigestEmail(
+                email,
+                username,
+                achievements,
+                forumActivity,
+                gameRecommendations,
+                isFirstEmail
+              ),
+              30000, // 30 seconds timeout for email sending
+              `Email send for ${username}`
+            ).catch((error) => {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+              console.error('[Weekly Digest] Timeout or error sending email to user', {
+                username,
+                email,
+                error: errorMessage,
+                stack: error instanceof Error ? error.stack : undefined,
+                timestamp: new Date().toISOString(),
+                operation: 'weekly-digest-email-send',
+                duration: Date.now() - userStartTime
+              });
+              return false; // Return false on timeout/error instead of throwing
+            });
 
             if (emailSent) {
               // Update user's weekly digest tracking
@@ -249,22 +350,77 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 }
               );
 
-              results.emailsSent++;
-              console.log(`[Weekly Digest] Email sent to ${username} (${email})`);
+              const duration = Date.now() - userStartTime;
+              console.log(`[Weekly Digest] Email sent to ${username} (${email}) in ${duration}ms`);
+              return { success: true, username, email, duration };
             } else {
-              results.emailsFailed++;
-              results.errors.push(`Failed to send email to ${username} (${email})`);
-              console.error(`[Weekly Digest] Failed to send email to ${username} (${email})`);
+              const duration = Date.now() - userStartTime;
+              const errorMsg = `Failed to send email to ${username} (${email})`;
+              results.errors.push(errorMsg);
+              console.error('[Weekly Digest] Failed to send email to user', {
+                username,
+                email,
+                error: 'Email sending returned false',
+                timestamp: new Date().toISOString(),
+                operation: 'weekly-digest-email-send',
+                duration
+              });
+              return { success: false, username, email, duration, error: 'Email sending failed' };
             }
           } catch (error) {
-            results.emailsFailed++;
+            const duration = Date.now() - userStartTime;
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            const errorUsername = (user as UserForDigest).username || 'unknown';
-            results.errors.push(`Error processing ${errorUsername}: ${errorMessage}`);
-            console.error(`[Weekly Digest] Error processing user ${errorUsername}:`, error);
+            const errorMsg = `Error processing ${username}: ${errorMessage}`;
+            results.errors.push(errorMsg);
+            
+            console.error('[Weekly Digest] Error processing user', {
+              username,
+              email,
+              error: errorMessage,
+              stack: error instanceof Error ? error.stack : undefined,
+              timestamp: new Date().toISOString(),
+              operation: 'weekly-digest-processing',
+              duration,
+              isTimeout: errorMessage.includes('timed out')
+            });
+            
+            return { success: false, username, email, duration, error: errorMessage };
           }
         })
       );
+
+      // Process batch results - handle both fulfilled and rejected promises
+      batchResults.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          // Handle promise rejection (shouldn't happen with our try-catch, but safety net)
+          const user = batch[index];
+          results.emailsFailed++;
+          const errorMessage = result.reason instanceof Error ? result.reason.message : String(result.reason);
+          results.errors.push(`Error processing ${user.username}: ${errorMessage}`);
+          
+          console.error('[Weekly Digest] Promise rejected for user', {
+            username: user.username,
+            email: user.email,
+            error: errorMessage,
+            stack: result.reason instanceof Error ? result.reason.stack : undefined,
+            timestamp: new Date().toISOString(),
+            operation: 'weekly-digest-batch-processing'
+          });
+        } else if (result.status === 'fulfilled') {
+          // Handle fulfilled promise result
+          const userResult = result.value;
+          if (userResult && !userResult.skipped) {
+            if (userResult.success) {
+              results.emailsSent++;
+            } else {
+              results.emailsFailed++;
+            }
+          }
+        }
+      });
+
+      const batchDuration = Date.now() - batchStartTime;
+      console.log(`[Weekly Digest] Batch ${Math.floor(i / batchSize) + 1} completed in ${batchDuration}ms (${batch.length} users)`);
 
       // Small delay between batches to avoid rate limiting
       if (i + batchSize < users.length) {
@@ -275,13 +431,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const totalTime = Date.now() - startTime;
     const success = results.emailsFailed === 0;
 
-    // Log completion summary
+    // Log completion summary with circuit breaker status
+    const finalCircuitBreakerState = emailCircuitBreaker.getState();
+    const finalCircuitBreakerFailures = emailCircuitBreaker.getFailureCount();
+    
     console.log(`[Weekly Digest] Completed in ${Math.floor(totalTime / 1000)}s`);
     console.log(`[Weekly Digest] Results: ${results.emailsSent} sent, ${results.emailsFailed} failed out of ${results.totalUsers} total users`);
+    console.log(`[Weekly Digest] Circuit breaker state: ${finalCircuitBreakerState} (${finalCircuitBreakerFailures} failures)`);
     
     // Log detailed error information if there were failures
     if (results.emailsFailed > 0) {
-      console.error(`[Weekly Digest] Failed emails:`, results.errors.slice(0, 5)); // Log first 5 errors
+      console.error('[Weekly Digest] Failed emails summary', {
+        totalFailed: results.emailsFailed,
+        totalUsers: results.totalUsers,
+        failureRate: `${((results.emailsFailed / results.totalUsers) * 100).toFixed(2)}%`,
+        sampleErrors: results.errors.slice(0, 5), // Log first 5 errors
+        circuitBreakerState: finalCircuitBreakerState,
+        circuitBreakerFailures: finalCircuitBreakerFailures,
+        timestamp: new Date().toISOString(),
+        operation: 'weekly-digest-completion',
+        totalTime: `${Math.floor(totalTime / 1000)}s`
+      });
     }
 
     return res.status(success ? 200 : 207).json({
@@ -299,12 +469,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       timestamp: new Date().toISOString()
     });
   } catch (error: any) {
-    console.error('[Weekly Digest] Fatal error:', error);
+    const totalTime = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    console.error('[Weekly Digest] Fatal error', {
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+      operation: 'weekly-digest-fatal-error',
+      duration: totalTime,
+      results: {
+        totalUsers: results.totalUsers,
+        emailsSent: results.emailsSent,
+        emailsFailed: results.emailsFailed,
+        errorCount: results.errors.length
+      }
+    });
+    
     return res.status(500).json({
       success: false,
       error: 'Failed to send weekly digest emails',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      details: errorMessage,
       results,
+      totalTime: `${Math.floor(totalTime / 1000)}s`,
+      timestamp: new Date().toISOString()
     });
   }
 }

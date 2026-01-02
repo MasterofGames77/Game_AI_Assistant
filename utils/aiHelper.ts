@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { externalApiClient } from './axiosConfig';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -1647,8 +1648,10 @@ export const fetchRecommendations = async (
     url += ',-released';
   }
 
+  const startTime = Date.now();
   try {
-    const response = await axios.get(url);
+    // Use externalApiClient which has timeout (15s) and retry logic built in
+    const response = await externalApiClient.get(url);
     if (response.data && response.data.results && response.data.results.length > 0) {
       // Filter out unreleased games and include genre information
       let games = response.data.results
@@ -2003,11 +2006,39 @@ ONLY include games where ${genre} is clearly the primary genre. If unsure, EXCLU
       return [];
     }
   } catch (error: any) {
-    // Log detailed error for debugging
+    const duration = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isTimeout = error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT' || errorMessage.includes('timeout');
+    
+    // Log detailed error with structured format
     if (error.response) {
-      console.error(`[Recommendations] RAWG API error for genre "${genre}":`, error.response.status, error.response.data);
+      console.error('[Recommendations] RAWG API error', {
+        genre,
+        url,
+        status: error.response.status,
+        statusText: error.response.statusText,
+        error: errorMessage,
+        responseData: error.response.data,
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString(),
+        operation: 'fetch-recommendations-rawg-api',
+        duration,
+        isTimeout,
+        retryCount: error.config?.__retryCount || 0
+      });
     } else {
-      console.error(`[Recommendations] Error fetching data from RAWG for genre "${genre}":`, error.message);
+      console.error('[Recommendations] Error fetching data from RAWG', {
+        genre,
+        url,
+        error: errorMessage,
+        code: error.code,
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString(),
+        operation: 'fetch-recommendations-rawg-api',
+        duration,
+        isTimeout,
+        retryCount: error.config?.__retryCount || 0
+      });
     }
     return [];
   }

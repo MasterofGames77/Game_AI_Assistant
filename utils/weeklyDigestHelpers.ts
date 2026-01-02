@@ -5,6 +5,26 @@ import { fetchRecommendations } from './aiHelper';
 import { Achievement } from '../types';
 
 /**
+ * Helper function to add timeout to promises
+ * Prevents API calls from hanging indefinitely
+ */
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  operation: string
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`${operation} timed out after ${timeoutMs}ms`)),
+        timeoutMs
+      )
+    ),
+  ]);
+}
+
+/**
  * Get achievements for weekly digest
  * - First email: returns all current achievements
  * - Subsequent emails: returns only achievements earned in the past week
@@ -38,7 +58,14 @@ export async function getWeeklyAchievements(
         }));
     }
   } catch (error) {
-    console.error(`[Weekly Digest] Error getting achievements for ${username}:`, error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Weekly Digest] Error getting achievements for user', {
+      username,
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+      operation: 'get-weekly-achievements'
+    });
     return [];
   }
 }
@@ -109,7 +136,14 @@ export async function getWeeklyForumActivity(
     // Limit to top 10 most recent activities
     return activities.slice(0, 10);
   } catch (error) {
-    console.error(`[Weekly Digest] Error getting forum activity for ${username}:`, error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Weekly Digest] Error getting forum activity for user', {
+      username,
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+      operation: 'get-weekly-forum-activity'
+    });
     return [];
   }
 }
@@ -389,7 +423,7 @@ export async function getWeeklyGameRecommendations(
         primaryGenres = ['Action-Adventure', 'RPG', 'Action', 'Adventure', 'Shooter', 
           'Platformer', 'Puzzle', 'Fighting', 'Sports', 'Horror', 'Stealth', 'Simulation', 
           'Survival', 'Rhythm', 'Sandbox', 'Shoot em Up', 'Battle Royale', 
-          'Visual Novel', 'Beat Em Up', 'Trivia'];
+          'Visual Novel', 'Beat Em Up', 'Trivia', 'MOBA', 'MMORPG'];
       }
     }
 
@@ -512,10 +546,16 @@ export async function getWeeklyGameRecommendations(
     
     for (let i = 0; i < primaryGenres.length && allRecommendations.length < 8; i++) {
       const genre = primaryGenres[i];
+      const genreStartTime = Date.now();
       try {
-        const genreRecs = await fetchRecommendations(genre, {
-          currentPopular: true
-        });
+        // Wrap fetchRecommendations with timeout (15 seconds per genre)
+        const genreRecs = await withTimeout(
+          fetchRecommendations(genre, {
+            currentPopular: true
+          }),
+          15000, // 15 seconds timeout for RAWG API call
+          `Fetch recommendations for genre ${genre}`
+        );
 
           // Filter out games user has already asked about or previously recommended
           // Normalize game names (trim whitespace, lowercase) for consistent comparison
@@ -563,7 +603,18 @@ export async function getWeeklyGameRecommendations(
           }
         }
       } catch (error) {
-        console.error(`[Weekly Digest] Error fetching recommendations for genre ${genre}:`, error);
+        const duration = Date.now() - genreStartTime;
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[Weekly Digest] Error fetching recommendations for genre', {
+          username,
+          genre,
+          error: errorMessage,
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString(),
+          operation: 'fetch-recommendations',
+          duration,
+          isTimeout: errorMessage.includes('timed out')
+        });
       }
     }
 
@@ -574,10 +625,16 @@ export async function getWeeklyGameRecommendations(
         if (allRecommendations.length >= 5) break;
         if (primaryGenres.includes(genre)) continue;
 
+        const fallbackStartTime = Date.now();
         try {
-          const fallbackRecs = await fetchRecommendations(genre, {
-            currentPopular: true
-          });
+          // Wrap fetchRecommendations with timeout (15 seconds per genre)
+          const fallbackRecs = await withTimeout(
+            fetchRecommendations(genre, {
+              currentPopular: true
+            }),
+            15000, // 15 seconds timeout for RAWG API call
+            `Fetch fallback recommendations for genre ${genre}`
+          );
           
           // Filter and shuffle fallback recommendations for variety
           // Normalize game names (trim whitespace, lowercase) for consistent comparison
@@ -611,7 +668,18 @@ export async function getWeeklyGameRecommendations(
             }
           }
         } catch (error) {
-          console.error(`[Weekly Digest] Error with fallback genre ${genre}:`, error);
+          const duration = Date.now() - fallbackStartTime;
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          console.error('[Weekly Digest] Error with fallback genre', {
+            username,
+            genre,
+            error: errorMessage,
+            stack: error instanceof Error ? error.stack : undefined,
+            timestamp: new Date().toISOString(),
+            operation: 'fetch-fallback-recommendations',
+            duration,
+            isTimeout: errorMessage.includes('timed out')
+          });
         }
       }
     }
@@ -684,13 +752,15 @@ export async function getWeeklyGameRecommendations(
           console.error(`[Weekly Digest] ❌ User ${username} not found when trying to save recommendations`);
         }
       } catch (error) {
-        console.error(`[Weekly Digest] ❌ Error saving recommended games for ${username}:`, error);
-        if (error instanceof Error) {
-          console.error(`[Weekly Digest] Error details:`, error.message);
-          if (error.stack) {
-            console.error(`[Weekly Digest] Error stack:`, error.stack);
-          }
-        }
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[Weekly Digest] Error saving recommended games for user', {
+          username,
+          error: errorMessage,
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString(),
+          operation: 'save-recommended-games',
+          recommendationsCount: finalRecommendations.length
+        });
         // Don't fail the whole process if saving fails, but log it prominently
       }
     } else {
@@ -699,12 +769,43 @@ export async function getWeeklyGameRecommendations(
     
     return finalRecommendations;
   } catch (error) {
-    console.error(`[Weekly Digest] Error getting game recommendations for ${username}:`, error);
-    // Fallback to default recommendations
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Weekly Digest] Error getting game recommendations for user', {
+      username,
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+      operation: 'get-weekly-game-recommendations'
+    });
+    
+    // Fallback to default recommendations with timeout
     try {
-      return await fetchRecommendations('Action-Adventure', { currentPopular: true });
+      const fallbackStartTime = Date.now();
+      const fallbackRecs = await withTimeout(
+        fetchRecommendations('Action-Adventure', { currentPopular: true }),
+        15000, // 15 seconds timeout for fallback
+        'Fetch fallback Action-Adventure recommendations'
+      );
+      const duration = Date.now() - fallbackStartTime;
+      console.log('[Weekly Digest] Fallback recommendations fetched successfully', {
+        username,
+        genre: 'Action-Adventure',
+        recommendationsCount: fallbackRecs.length,
+        duration,
+        timestamp: new Date().toISOString(),
+        operation: 'get-weekly-game-recommendations-fallback'
+      });
+      return fallbackRecs;
     } catch (fallbackError) {
-      console.error('[Weekly Digest] Error with fallback recommendations:', fallbackError);
+      const fallbackErrorMessage = fallbackError instanceof Error ? fallbackError.message : 'Unknown error';
+      console.error('[Weekly Digest] Error with fallback recommendations', {
+        username,
+        error: fallbackErrorMessage,
+        stack: fallbackError instanceof Error ? fallbackError.stack : undefined,
+        timestamp: new Date().toISOString(),
+        operation: 'get-weekly-game-recommendations-fallback',
+        isTimeout: fallbackErrorMessage.includes('timed out')
+      });
       return [];
     }
   }
