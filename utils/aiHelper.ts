@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import path from 'path';
 import { getClientCredentialsAccessToken } from './twitchAuth';
+import { LRUCache, cacheManager } from './cacheManager';
 
 // Load environment variables from both .env and .env.local
 dotenv.config(); // Loads .env by default
@@ -26,14 +27,27 @@ function getOpenAIClient(): OpenAI {
   return openaiInstance;
 }
 
-// Cache implementation for API responses
-export class AICacheMetrics {
-  private hits: number = 0;
-  private misses: number = 0;
-  private cacheData: Map<string, any> = new Map();
-  private static instance: AICacheMetrics;
+// Cache implementation for API responses with LRU eviction
 
-  private constructor() {}
+export class AICacheMetrics {
+  private cache: LRUCache<any>;
+  private static instance: AICacheMetrics;
+  
+  // Default max size: 2000 entries (adjust based on memory constraints)
+  // Each entry is roughly 1-5KB, so 2000 entries = ~2-10MB
+  private readonly MAX_CACHE_SIZE = 2000;
+  private readonly DEFAULT_TTL = 60 * 60 * 1000; // 1 hour
+
+  private constructor() {
+    this.cache = new LRUCache<any>(
+      this.MAX_CACHE_SIZE,
+      this.DEFAULT_TTL,
+      5 * 60 * 1000 // Cleanup every 5 minutes
+    );
+    
+    // Register with cache manager for monitoring
+    cacheManager.registerCache('AICache', this.cache);
+  }
 
   public static getInstance(): AICacheMetrics {
     if (!AICacheMetrics.instance) {
@@ -42,55 +56,37 @@ export class AICacheMetrics {
     return AICacheMetrics.instance;
   }
 
-  // Record hits and misses
-  recordHit() { this.hits++; }
-  recordMiss() { this.misses++; }
-
-  getHitRate() {
-    const total = this.hits + this.misses;
-    return total ? (this.hits / total * 100).toFixed(2) + '%' : '0%';
-  }
-
-  // Set the cache value and expiry time
-  set(key: string, value: any, ttl: number = 3600000) { // Default TTL: 1 hour
-    this.cacheData.set(key, {
-      value,
-      expiry: Date.now() + ttl
-    });
+  // Set the cache value with TTL
+  set(key: string, value: any, ttl: number = this.DEFAULT_TTL): void {
+    this.cache.set(key, value, ttl);
   }
 
   // Get the cache value
   get(key: string): any {
-    const data = this.cacheData.get(key);
-    
-    if (!data) {
-      this.recordMiss();
-      return null;
-    }
-    
-    // Check if the cache value has expired
-    if (data.expiry < Date.now()) {
-      this.cacheData.delete(key);
-      this.recordMiss();
-      return null;
-    }
-    
-    // Record a hit if the value is still valid
-    this.recordHit();
-    return data.value;
+    return this.cache.get(key);
   }
 
   getMetrics() {
+    const metrics = this.cache.getMetrics();
     return {
-      hits: this.hits,
-      misses: this.misses,
-      hitRate: this.getHitRate(),
-      cacheSize: this.cacheData.size
+      hits: metrics.hits,
+      misses: metrics.misses,
+      hitRate: metrics.hitRate,
+      cacheSize: metrics.size,
+      maxSize: metrics.maxSize,
+      evictions: metrics.evictions,
+      expiredRemovals: metrics.expiredRemovals,
+      utilization: this.cache.getUtilization().toFixed(2) + '%'
     };
   }
 
-  clearCache() {
-    this.cacheData.clear();
+  clearCache(): void {
+    this.cache.clear();
+  }
+
+  // Expose cache for direct access if needed
+  getCache(): LRUCache<any> {
+    return this.cache;
   }
 }
 
@@ -113,10 +109,19 @@ interface ModelSelectionResult {
 
 /**
  * Cache for game release dates to avoid repeated API calls
- * Key: game title (lowercase), Value: { releaseDate: Date, timestamp: number }
+ * Uses LRU eviction with max size limit
+ * Key: game title (lowercase), Value: Date
  */
-const releaseDateCache = new Map<string, { releaseDate: Date; timestamp: number }>();
 const RELEASE_DATE_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const RELEASE_DATE_CACHE_MAX_SIZE = 5000; // Max 5000 games (roughly 5-10MB)
+const releaseDateCache = new LRUCache<Date>(
+  RELEASE_DATE_CACHE_MAX_SIZE,
+  RELEASE_DATE_CACHE_TTL,
+  10 * 60 * 1000 // Cleanup every 10 minutes
+);
+
+// Register with cache manager for monitoring
+cacheManager.registerCache('ReleaseDateCache', releaseDateCache);
 
 /**
  * Fetch release date for a game from IGDB (lightweight version)
@@ -212,12 +217,11 @@ async function fetchReleaseDateFromRAWG(gameTitle: string): Promise<Date | null>
  */
 async function getGameReleaseDate(gameTitle: string): Promise<Date | null> {
   const cacheKey = gameTitle.toLowerCase().trim();
-  const now = Date.now();
   
   // Check cache first
   const cached = releaseDateCache.get(cacheKey);
-  if (cached && (now - cached.timestamp) < RELEASE_DATE_CACHE_TTL) {
-    return cached.releaseDate;
+  if (cached) {
+    return cached;
   }
   
   // Try IGDB first (more reliable)
@@ -230,10 +234,7 @@ async function getGameReleaseDate(gameTitle: string): Promise<Date | null> {
   
   // Cache the result if we got one
   if (releaseDate) {
-    releaseDateCache.set(cacheKey, {
-      releaseDate,
-      timestamp: now
-    });
+    releaseDateCache.set(cacheKey, releaseDate, RELEASE_DATE_CACHE_TTL);
   }
   
   return releaseDate;
@@ -719,7 +720,8 @@ Provide only the game title. If you cannot identify it with confidence, respond 
       modelUsageStats[modelSelection.model] = (modelUsageStats[modelSelection.model] || 0) + 1;
       
       // Use OpenAI to identify the game from the image description
-      const completion = await getOpenAIClient().chat.completions.create({
+      // Note: gpt-4o-search-preview doesn't support temperature parameter
+      const completionParams: any = {
         model: modelSelection.model,
         messages: [
           {
@@ -732,8 +734,14 @@ Provide only the game title. If you cannot identify it with confidence, respond 
           }
         ],
         max_completion_tokens: 100,
-        temperature: 0.3, // Lower temperature for more consistent identification
-      });
+      };
+      
+      // Only include temperature for models that support it
+      if (modelSelection.model !== 'gpt-4o-search-preview') {
+        completionParams.temperature = 0.3; // Lower temperature for more consistent identification
+      }
+      
+      const completion = await getOpenAIClient().chat.completions.create(completionParams);
 
       const identifiedGame = completion.choices[0].message.content?.trim();
       
@@ -1085,12 +1093,19 @@ export const getChatCompletionWithVision = async (
     // Track model usage
     modelUsageStats[modelSelection.model] = (modelUsageStats[modelSelection.model] || 0) + 1;
 
-    const completion = await getOpenAIClient().chat.completions.create({
+    // Note: gpt-4o-search-preview doesn't support temperature parameter
+    const completionParams: any = {
       model: modelSelection.model,
       messages: messages as any,
       max_completion_tokens: 1000,
-      temperature: 0.7,
-    });
+    };
+    
+    // Only include temperature for models that support it
+    if (modelSelection.model !== 'gpt-4o-search-preview') {
+      completionParams.temperature = 0.7;
+    }
+
+    const completion = await getOpenAIClient().chat.completions.create(completionParams);
 
     return completion.choices[0].message.content;
   } catch (error) {
@@ -4712,16 +4727,18 @@ function measureExplorationTendencies(
  * Cache for gameplay pattern analysis results
  * Phase 4.1: Intelligent Caching
  */
-const patternCache = new Map<
-  string,
-  {
-    data: Awaited<ReturnType<typeof analyzeGameplayPatternsInternal>>;
-    timestamp: number;
-    ttl: number;
-  }
->();
-
 const PATTERN_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+const PATTERN_CACHE_MAX_SIZE = 1000; // Max 1000 users (roughly 50-100MB depending on pattern data size)
+
+// Pattern cache with LRU eviction
+const patternCache = new LRUCache<Awaited<ReturnType<typeof analyzeGameplayPatternsInternal>>>(
+  PATTERN_CACHE_MAX_SIZE,
+  PATTERN_CACHE_TTL,
+  10 * 60 * 1000 // Cleanup every 10 minutes
+);
+
+// Register with cache manager for monitoring
+cacheManager.registerCache('PatternCache', patternCache);
 
 /**
  * Get cached patterns or calculate and cache new ones
@@ -4735,34 +4752,28 @@ async function getOrCalculatePatterns(
   username: string,
   forceRefresh: boolean = false
 ): Promise<Awaited<ReturnType<typeof analyzeGameplayPatternsInternal>>> {
-  const cached = patternCache.get(username);
-  const now = Date.now();
-
   // Return cached data if valid and not forcing refresh
-  if (!forceRefresh && cached && now - cached.timestamp < cached.ttl) {
-    const cacheAge = Math.round((now - cached.timestamp) / 1000); // Age in seconds
-    console.log(`[Performance Safeguards] Cache HIT for ${username} (age: ${cacheAge}s, TTL: ${PATTERN_CACHE_TTL / 1000}s)`);
-    return cached.data;
+  if (!forceRefresh) {
+    const cached = patternCache.get(username);
+    if (cached) {
+      const metrics = patternCache.getMetrics();
+      console.log(`[Performance Safeguards] Cache HIT for ${username} (cache size: ${metrics.size}/${metrics.maxSize}, utilization: ${patternCache.getUtilization().toFixed(1)}%)`);
+      return cached;
+    }
   }
 
   // Calculate and cache
   if (forceRefresh) {
     console.log(`[Performance Safeguards] Cache BYPASS for ${username} (forceRefresh=true)`);
-  } else if (cached) {
-    const cacheAge = Math.round((now - cached.timestamp) / 1000);
-    console.log(`[Performance Safeguards] Cache EXPIRED for ${username} (age: ${cacheAge}s, recalculating)`);
   } else {
     console.log(`[Performance Safeguards] Cache MISS for ${username} (calculating new)`);
   }
 
   const data = await analyzeGameplayPatternsInternal(username);
-  patternCache.set(username, {
-    data,
-    timestamp: now,
-    ttl: PATTERN_CACHE_TTL,
-  });
+  patternCache.set(username, data, PATTERN_CACHE_TTL);
 
-  console.log(`[Performance Safeguards] Cache UPDATED for ${username} (cache size: ${patternCache.size})`);
+  const metrics = patternCache.getMetrics();
+  console.log(`[Performance Safeguards] Cache UPDATED for ${username} (cache size: ${metrics.size}/${metrics.maxSize}, utilization: ${patternCache.getUtilization().toFixed(1)}%)`);
   return data;
 }
 

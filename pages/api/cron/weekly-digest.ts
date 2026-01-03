@@ -29,6 +29,40 @@ function withTimeout<T>(
 }
 
 /**
+ * Helper function to measure memory usage
+ * Returns formatted memory statistics
+ */
+function getMemoryUsage() {
+  const usage = process.memoryUsage();
+  return {
+    heapUsed: Math.round(usage.heapUsed / 1024 / 1024 * 100) / 100, // MB
+    heapTotal: Math.round(usage.heapTotal / 1024 / 1024 * 100) / 100, // MB
+    rss: Math.round(usage.rss / 1024 / 1024 * 100) / 100, // MB
+    external: Math.round(usage.external / 1024 / 1024 * 100) / 100, // MB
+    heapUsedMB: `${Math.round(usage.heapUsed / 1024 / 1024 * 100) / 100}MB`,
+    heapTotalMB: `${Math.round(usage.heapTotal / 1024 / 1024 * 100) / 100}MB`,
+    rssMB: `${Math.round(usage.rss / 1024 / 1024 * 100) / 100}MB`,
+    externalMB: `${Math.round(usage.external / 1024 / 1024 * 100) / 100}MB`
+  };
+}
+
+/**
+ * Calculate memory delta between two measurements
+ */
+function calculateMemoryDelta(before: ReturnType<typeof getMemoryUsage>, after: ReturnType<typeof getMemoryUsage>) {
+  return {
+    heapUsedDelta: Math.round((after.heapUsed - before.heapUsed) * 100) / 100, // MB
+    heapTotalDelta: Math.round((after.heapTotal - before.heapTotal) * 100) / 100, // MB
+    rssDelta: Math.round((after.rss - before.rss) * 100) / 100, // MB
+    externalDelta: Math.round((after.external - before.external) * 100) / 100, // MB
+    heapUsedDeltaMB: `${Math.round((after.heapUsed - before.heapUsed) * 100) / 100}MB`,
+    heapTotalDeltaMB: `${Math.round((after.heapTotal - before.heapTotal) * 100) / 100}MB`,
+    rssDeltaMB: `${Math.round((after.rss - before.rss) * 100) / 100}MB`,
+    externalDeltaMB: `${Math.round((after.external - before.external) * 100) / 100}MB`
+  };
+}
+
+/**
  * Weekly digest email cron job endpoint
  * Sends weekly summary emails to all users on Sunday at 8:00 PM UTC (3:00 PM EST)
  * 
@@ -128,12 +162,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const startTime = Date.now();
+  const initialMemory = getMemoryUsage();
   const results = {
     totalUsers: 0,
     emailsSent: 0,
     emailsFailed: 0,
     errors: [] as string[]
   };
+  
+  // Log initial memory state
+  console.log('[Weekly Digest] Memory monitoring started', {
+    initialMemory,
+    timestamp: new Date().toISOString(),
+    operation: 'weekly-digest-start'
+  });
 
   try {
     // Verify email service is configured
@@ -235,7 +277,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     results.totalUsers = users.length;
+    const afterUserLoadMemory = getMemoryUsage();
+    const userLoadMemoryDelta = calculateMemoryDelta(initialMemory, afterUserLoadMemory);
+    
     console.log(`[Weekly Digest] Processing ${users.length} user${users.length !== 1 ? 's' : ''}...`);
+    console.log('[Weekly Digest] Memory after loading users', {
+      currentMemory: afterUserLoadMemory,
+      memoryDelta: userLoadMemoryDelta,
+      usersLoaded: users.length,
+      timestamp: new Date().toISOString(),
+      operation: 'weekly-digest-user-load'
+    });
+    
+    // Warn if memory usage is high after loading users
+    if (afterUserLoadMemory.heapUsed > 500) { // 500MB threshold
+      console.warn('[Weekly Digest] High memory usage detected after loading users', {
+        heapUsed: afterUserLoadMemory.heapUsedMB,
+        threshold: '500MB',
+        usersLoaded: users.length,
+        timestamp: new Date().toISOString(),
+        operation: 'weekly-digest-memory-warning'
+      });
+    }
 
     // Check circuit breaker before processing
     const circuitBreakerState = emailCircuitBreaker.getState();
@@ -269,9 +332,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Process users in batches to avoid overwhelming the system
     const batchSize = 10;
+    const batchMemorySnapshots: Array<{ batchNumber: number; memory: ReturnType<typeof getMemoryUsage>; timestamp: number }> = [];
+    
     for (let i = 0; i < users.length; i += batchSize) {
       const batch = users.slice(i, i + batchSize);
       const batchStartTime = Date.now();
+      const batchNumber = Math.floor(i / batchSize) + 1;
+      const batchMemoryBefore = getMemoryUsage();
       
       // Use Promise.allSettled to continue processing even if some users fail
       const batchResults = await Promise.allSettled(
@@ -420,7 +487,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
       const batchDuration = Date.now() - batchStartTime;
-      console.log(`[Weekly Digest] Batch ${Math.floor(i / batchSize) + 1} completed in ${batchDuration}ms (${batch.length} users)`);
+      const batchMemoryAfter = getMemoryUsage();
+      const batchMemoryDelta = calculateMemoryDelta(batchMemoryBefore, batchMemoryAfter);
+      
+      // Store memory snapshot for this batch
+      batchMemorySnapshots.push({
+        batchNumber,
+        memory: batchMemoryAfter,
+        timestamp: Date.now()
+      });
+      
+      console.log(`[Weekly Digest] Batch ${batchNumber} completed in ${batchDuration}ms (${batch.length} users)`);
+      console.log(`[Weekly Digest] Batch ${batchNumber} memory usage`, {
+        batchNumber,
+        usersInBatch: batch.length,
+        memoryBefore: batchMemoryBefore,
+        memoryAfter: batchMemoryAfter,
+        memoryDelta: batchMemoryDelta,
+        duration: `${batchDuration}ms`,
+        timestamp: new Date().toISOString(),
+        operation: 'weekly-digest-batch-completion'
+      });
+      
+      // Warn if memory usage is growing significantly
+      if (batchMemoryDelta.heapUsedDelta > 50) { // 50MB growth per batch
+        console.warn(`[Weekly Digest] Significant memory growth in batch ${batchNumber}`, {
+          batchNumber,
+          memoryGrowth: batchMemoryDelta.heapUsedDeltaMB,
+          currentHeapUsed: batchMemoryAfter.heapUsedMB,
+          threshold: '50MB per batch',
+          timestamp: new Date().toISOString(),
+          operation: 'weekly-digest-memory-growth-warning'
+        });
+      }
+      
+      // Warn if total memory usage is very high
+      if (batchMemoryAfter.heapUsed > 1000) { // 1GB threshold
+        console.warn(`[Weekly Digest] Very high memory usage after batch ${batchNumber}`, {
+          batchNumber,
+          heapUsed: batchMemoryAfter.heapUsedMB,
+          threshold: '1GB',
+          timestamp: new Date().toISOString(),
+          operation: 'weekly-digest-high-memory-warning'
+        });
+      }
 
       // Small delay between batches to avoid rate limiting
       if (i + batchSize < users.length) {
@@ -430,14 +540,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const totalTime = Date.now() - startTime;
     const success = results.emailsFailed === 0;
+    const finalMemory = getMemoryUsage();
+    const totalMemoryDelta = calculateMemoryDelta(initialMemory, finalMemory);
 
-    // Log completion summary with circuit breaker status
+    // Log completion summary with circuit breaker status and memory metrics
     const finalCircuitBreakerState = emailCircuitBreaker.getState();
     const finalCircuitBreakerFailures = emailCircuitBreaker.getFailureCount();
     
     console.log(`[Weekly Digest] Completed in ${Math.floor(totalTime / 1000)}s`);
     console.log(`[Weekly Digest] Results: ${results.emailsSent} sent, ${results.emailsFailed} failed out of ${results.totalUsers} total users`);
     console.log(`[Weekly Digest] Circuit breaker state: ${finalCircuitBreakerState} (${finalCircuitBreakerFailures} failures)`);
+    
+    // Log comprehensive memory summary
+    console.log('[Weekly Digest] Memory summary', {
+      initialMemory,
+      finalMemory,
+      totalMemoryDelta,
+      batchesProcessed: batchMemorySnapshots.length,
+      peakMemory: batchMemorySnapshots.length > 0 
+        ? batchMemorySnapshots.reduce((max, snap) => 
+            snap.memory.heapUsed > max.heapUsed ? snap.memory : max, 
+            batchMemorySnapshots[0].memory
+          )
+        : finalMemory,
+      timestamp: new Date().toISOString(),
+      operation: 'weekly-digest-completion'
+    });
+    
+    // Log warning if memory usage increased significantly
+    if (totalMemoryDelta.heapUsedDelta > 200) { // 200MB total growth
+      console.warn('[Weekly Digest] Significant total memory growth during processing', {
+        totalMemoryGrowth: totalMemoryDelta.heapUsedDeltaMB,
+        initialHeapUsed: initialMemory.heapUsedMB,
+        finalHeapUsed: finalMemory.heapUsedMB,
+        threshold: '200MB',
+        timestamp: new Date().toISOString(),
+        operation: 'weekly-digest-total-memory-growth-warning'
+      });
+    }
     
     // Log detailed error information if there were failures
     if (results.emailsFailed > 0) {
@@ -465,12 +605,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         emailsFailed: results.emailsFailed,
         errors: results.errors.slice(0, 10) // Limit errors in response
       },
+      memory: {
+        initial: {
+          heapUsed: initialMemory.heapUsedMB,
+          heapTotal: initialMemory.heapTotalMB,
+          rss: initialMemory.rssMB
+        },
+        final: {
+          heapUsed: finalMemory.heapUsedMB,
+          heapTotal: finalMemory.heapTotalMB,
+          rss: finalMemory.rssMB
+        },
+        delta: {
+          heapUsed: totalMemoryDelta.heapUsedDeltaMB,
+          heapTotal: totalMemoryDelta.heapTotalDeltaMB,
+          rss: totalMemoryDelta.rssDeltaMB
+        },
+        peak: batchMemorySnapshots.length > 0 
+          ? (() => {
+              const peak = batchMemorySnapshots.reduce((max, snap) => 
+                snap.memory.heapUsed > max.heapUsed ? snap.memory : max, 
+                batchMemorySnapshots[0].memory
+              );
+              return {
+                heapUsed: peak.heapUsedMB,
+                heapTotal: peak.heapTotalMB,
+                rss: peak.rssMB,
+                batchNumber: batchMemorySnapshots.find(s => s.memory.heapUsed === peak.heapUsed)?.batchNumber
+              };
+            })()
+          : undefined
+      },
       totalTime: `${Math.floor(totalTime / 1000)}s`,
       timestamp: new Date().toISOString()
     });
   } catch (error: any) {
     const totalTime = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMemory = getMemoryUsage();
+    const errorMemoryDelta = calculateMemoryDelta(initialMemory, errorMemory);
     
     console.error('[Weekly Digest] Fatal error', {
       error: errorMessage,
@@ -478,6 +651,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       timestamp: new Date().toISOString(),
       operation: 'weekly-digest-fatal-error',
       duration: totalTime,
+      memory: {
+        initial: initialMemory,
+        atError: errorMemory,
+        delta: errorMemoryDelta
+      },
       results: {
         totalUsers: results.totalUsers,
         emailsSent: results.emailsSent,

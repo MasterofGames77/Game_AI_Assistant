@@ -20,6 +20,7 @@ import fs from 'fs';
 import { clearUserCache } from './getConversation';
 import { requireAuth, AuthenticatedRequest } from '../../middleware/auth';
 import { withRequestSizeLimit } from '../../middleware/requestSizeLimit';
+import { LRUCache, cacheManager } from '../../utils/cacheManager';
 
 // Optimized performance monitoring with conditional logging
 const measureLatency = async (operation: string, callback: () => Promise<any>, enableLogging: boolean = false) => {
@@ -44,21 +45,37 @@ const measureLatency = async (operation: string, callback: () => Promise<any>, e
 // Functions for reading and processing game data from CSV file
 const CSV_FILE_PATH = path.join(process.cwd(), 'data/Video Games Data.csv');
 
-// Cache for CSV data and genre mappings
+// Cache for CSV data (single value cache with TTL)
 let csvDataCache: any[] | null = null;
 let csvDataCacheTime: number = 0;
 const CSV_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-// Cached genre mappings
-const GENRE_MAPPING_CACHE = new Map<string, string>();
+// Cached genre mappings with LRU eviction
+const GENRE_MAPPING_CACHE_MAX_SIZE = 500; // Max 500 genre mappings
+const GENRE_MAPPING_CACHE = new LRUCache<string>(
+  GENRE_MAPPING_CACHE_MAX_SIZE,
+  24 * 60 * 60 * 1000, // 24 hours TTL (genre mappings don't change often)
+  30 * 60 * 1000 // Cleanup every 30 minutes
+);
 
-// Cache for user achievements to reduce database calls
-const userAchievementCache = new Map<string, { 
+// Register with cache manager
+cacheManager.registerCache('GenreMappingCache', GENRE_MAPPING_CACHE);
+
+// Cache for user achievements to reduce database calls with LRU eviction
+const ACHIEVEMENT_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+const ACHIEVEMENT_CACHE_MAX_SIZE = 2000; // Max 2000 users
+const userAchievementCache = new LRUCache<{ 
   achievements: any[], 
   hasProAccess: boolean,
   lastChecked: number 
-}>();
-const ACHIEVEMENT_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+}>(
+  ACHIEVEMENT_CACHE_MAX_SIZE,
+  ACHIEVEMENT_CACHE_TTL,
+  5 * 60 * 1000 // Cleanup every 5 minutes
+);
+
+// Register with cache manager
+cacheManager.registerCache('UserAchievementCache', userAchievementCache);
 
 // Request deduplication cache to prevent duplicate API calls
 const pendingRequests = new Map<string, Promise<any>>();
@@ -203,24 +220,20 @@ initializeGenreCache();
 // Cache cleanup function to prevent memory leaks
 const cleanupCache = () => {
   const now = Date.now();
+  
+  // Clean up CSV cache (single value cache)
   if (csvDataCache && (now - csvDataCacheTime) > CSV_CACHE_TTL * 2) {
     csvDataCache = null;
     csvDataCacheTime = 0;
     // console.log('CSV cache cleaned up'); // Commented out for production
   }
   
-  // Clean up achievement cache
-  const usernamesToDelete: string[] = [];
-  userAchievementCache.forEach((cacheData, username) => {
-    if ((now - cacheData.lastChecked) > ACHIEVEMENT_CACHE_TTL * 2) {
-      usernamesToDelete.push(username);
-    }
-  });
+  // LRU caches handle their own cleanup, but we can trigger manual cleanup
+  const genreRemoved = GENRE_MAPPING_CACHE.cleanup();
+  const achievementRemoved = userAchievementCache.cleanup();
   
-  usernamesToDelete.forEach(username => userAchievementCache.delete(username));
-  
-  if (usernamesToDelete.length > 0) {
-    // console.log(`Achievement cache cleaned up ${usernamesToDelete.length} entries`); // Commented out for production
+  if (genreRemoved > 0 || achievementRemoved > 0) {
+    // console.log(`Cache cleanup: ${genreRemoved} genre mappings, ${achievementRemoved} achievements removed`); // Commented out for production
   }
   
   // Clean up request deduplication cache (remove completed requests)
@@ -677,7 +690,7 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
   const cacheKey = username;
   const cached = userAchievementCache.get(cacheKey);
   
-  // Use cache if recent enough (within 2 minutes)
+  // Use cache if available (LRU cache handles TTL automatically)
   if (cached && (now - cached.lastChecked) < ACHIEVEMENT_CACHE_TTL) {
     // console.log('Using cached achievement data for user:', username); // Commented out for production
     const currentAchievements = cached.achievements;
@@ -978,7 +991,7 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
       achievements: [...currentAchievements, ...newAchievements],
       hasProAccess: user?.hasProAccess || false,
       lastChecked: now
-    });
+    }, ACHIEVEMENT_CACHE_TTL);
     // console.log('Achievement cache updated for user:', username); // Commented out for production
 
     return newAchievements;
@@ -989,7 +1002,7 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
     achievements: currentAchievements,
     hasProAccess: user?.hasProAccess || false,
     lastChecked: now
-  });
+  }, ACHIEVEMENT_CACHE_TTL);
   // console.log('Achievement cache updated (no new achievements) for user:', username); // Commented out for production
 
   return [];

@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { generateQuestion, generateForumPost, generatePostReply, generateCommonGamerPost, generateExpertGamerReply, UserPreferences } from './automatedContentGenerator';
@@ -10,6 +10,220 @@ import { connectToWingmanDB } from './databaseConnections';
 import Forum from '../models/Forum';
 import User from '../models/User';
 import mongoose from 'mongoose';
+
+/**
+ * Helper function to determine if an error is retryable
+ * Retries on timeouts, network errors, and 5xx server errors (transient failures)
+ */
+function isRetryableError(error: unknown): boolean {
+  if (!error) return false;
+  
+  // Check for axios error structure
+  if (axios.isAxiosError(error)) {
+    const axiosError = error as AxiosError;
+    const responseStatus = axiosError.response?.status;
+    
+    // Don't retry on client errors (4xx)
+    if (responseStatus && responseStatus >= 400 && responseStatus < 500) {
+      return false; // Client errors are not retryable
+    }
+    
+    // Retry on network errors, timeouts, and server errors
+    const errorCode = axiosError.code || '';
+    const errorMessage = axiosError.message?.toLowerCase() || '';
+    
+    if (
+      errorCode === 'ECONNABORTED' ||
+      errorCode === 'ETIMEDOUT' ||
+      errorCode === 'ECONNREFUSED' ||
+      errorCode === 'ENOTFOUND' ||
+      errorCode === 'ECONNRESET' ||
+      errorMessage.includes('timeout') ||
+      errorMessage.includes('network') ||
+      (responseStatus && responseStatus >= 500 && responseStatus < 600)
+    ) {
+      return true;
+    }
+  }
+  
+  // Check for error code in generic errors
+  if (typeof error === 'object' && 'code' in error) {
+    const code = String((error as any).code || '').toLowerCase();
+    if (
+      code === 'econnaborted' ||
+      code === 'etimedout' ||
+      code === 'econnrefused' ||
+      code === 'enotfound' ||
+      code === 'econnreset'
+    ) {
+      return true;
+    }
+  }
+  
+  // Default: don't retry on unknown errors (could be client errors)
+  return false;
+}
+
+/**
+ * Retry a function with exponential backoff
+ * @param fn - Function to retry
+ * @param maxRetries - Maximum number of retries (default: 3)
+ * @param baseDelayMs - Base delay in milliseconds (default: 1000)
+ * @param operation - Operation name for logging
+ * @returns Result of the function or throws error if all retries fail
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelayMs: number = 1000,
+  operation: string = 'operation'
+): Promise<T> {
+  let lastError: Error | unknown;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await fn();
+      
+      // If this is a retry attempt, log success
+      if (attempt > 0) {
+        console.log(`[Automated Users Retry] ${operation} succeeded on attempt ${attempt + 1}/${maxRetries + 1}`, {
+          operation,
+          attempt: attempt + 1,
+          totalAttempts: maxRetries + 1,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      return result;
+    } catch (error) {
+      lastError = error;
+      
+      // Don't retry on last attempt
+      if (attempt >= maxRetries) {
+        break;
+      }
+      
+      // Determine if error is retryable
+      const isRetryable = isRetryableError(error);
+      
+      if (!isRetryable) {
+        // Non-retryable error (e.g., 4xx client errors)
+        console.error(`[Automated Users Retry] ${operation} failed with non-retryable error:`, {
+          operation,
+          error: error instanceof Error ? error.message : String(error),
+          attempt: attempt + 1,
+          timestamp: new Date().toISOString()
+        });
+        throw error;
+      }
+      
+      // Calculate delay with exponential backoff
+      const delay = baseDelayMs * Math.pow(2, attempt);
+      
+      console.warn(`[Automated Users Retry] ${operation} failed, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`, {
+        operation,
+        error: error instanceof Error ? error.message : String(error),
+        attempt: attempt + 1,
+        maxRetries,
+        delay,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  // All retries exhausted
+  throw lastError;
+}
+
+/**
+ * Helper function to add timeout to promises
+ * Prevents API calls from hanging indefinitely
+ */
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  operation: string
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`${operation} timed out after ${timeoutMs}ms`)),
+        timeoutMs
+      )
+    ),
+  ]);
+}
+
+/**
+ * Improved error logging with request context
+ * Provides structured logging with all relevant information
+ */
+function logApiError(
+  error: unknown,
+  context: {
+    operation: string;
+    username?: string;
+    url?: string;
+    method?: string;
+    requestData?: any;
+    timeout?: number;
+  }
+): void {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const isTimeout = errorMessage.includes('timeout') || 
+                   errorMessage.includes('ECONNABORTED') ||
+                   errorMessage.includes('ETIMEDOUT');
+  
+  const logData: any = {
+    operation: context.operation,
+    error: errorMessage,
+    timestamp: new Date().toISOString(),
+    isTimeout
+  };
+  
+  // Add context fields
+  if (context.username) logData.username = context.username;
+  if (context.url) logData.url = context.url;
+  if (context.method) logData.method = context.method;
+  if (context.timeout) logData.timeout = `${context.timeout}ms`;
+  
+  // Add axios-specific error details
+  if (axios.isAxiosError(error)) {
+    const axiosError = error as AxiosError;
+    logData.status = axiosError.response?.status;
+    logData.statusText = axiosError.response?.statusText;
+    logData.responseData = axiosError.response?.data;
+    logData.code = axiosError.code;
+    logData.config = {
+      url: axiosError.config?.url,
+      method: axiosError.config?.method,
+      timeout: axiosError.config?.timeout
+    };
+  }
+  
+  // Add stack trace for errors
+  if (error instanceof Error) {
+    logData.stack = error.stack;
+  }
+  
+  // Add timeout-specific message
+  if (isTimeout) {
+    logData.timeoutMessage = `Request timed out after ${context.timeout || 'unknown'}ms. The server may be overloaded or the network connection is slow.`;
+  }
+  
+  // Log with appropriate level
+  if (isTimeout) {
+    console.error(`[Automated Users API] ${context.operation} - TIMEOUT`, logData);
+  } else if (axios.isAxiosError(error) && (error as AxiosError).response?.status && (error as AxiosError).response!.status >= 500) {
+    console.error(`[Automated Users API] ${context.operation} - SERVER ERROR`, logData);
+  } else {
+    console.error(`[Automated Users API] ${context.operation} - ERROR`, logData);
+  }
+}
 
 /**
  * Get the base URL for API calls
@@ -318,24 +532,39 @@ export async function askQuestion(
       };
     }
     
-    // Call assistant API
+    // Call assistant API with retry logic and improved error handling
     const baseUrl = getBaseUrl();
+    const apiUrl = `${baseUrl}/api/assistant`;
+    const timeoutMs = 60000; // 60 second timeout
+    const requestData = {
+      username,
+      question,
+      userId: `auto-${username.toLowerCase()}-${Date.now()}`
+    };
+    
     console.log(`[ASK QUESTION] Using baseUrl: ${baseUrl} for ${username}`);
     
     try {
-      const response = await axios.post(
-        `${baseUrl}/api/assistant`,
-        {
-          username,
-          question,
-          userId: `auto-${username.toLowerCase()}-${Date.now()}`
+      const response = await withRetry(
+        async () => {
+          return await withTimeout(
+            axios.post(
+              apiUrl,
+              requestData,
+              {
+                timeout: timeoutMs,
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              }
+            ),
+            timeoutMs,
+            `Assistant API call for ${username}`
+          );
         },
-        {
-          timeout: 60000, // 60 second timeout
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
+        3, // Max 3 retries
+        2000, // Base delay 2 seconds
+        `askQuestion for ${username}`
       );
       
       return {
@@ -349,17 +578,26 @@ export async function askQuestion(
         }
       };
     } catch (error) {
-      console.error('[ASK QUESTION] Error calling assistant API:', error);
-      if (axios.isAxiosError(error)) {
-        console.error('[ASK QUESTION] Axios error details:', {
-          message: error.message,
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data,
-          url: error.config?.url,
-          code: error.code
-        });
+      // Log error with improved context
+      logApiError(error, {
+        operation: 'askQuestion',
+        username,
+        url: apiUrl,
+        method: 'POST',
+        requestData: { ...requestData, question: question.substring(0, 100) + '...' }, // Truncate question for logging
+        timeout: timeoutMs
+      });
+      
+      // Provide timeout-specific error message
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const isTimeout = errorMessage.includes('timeout') || 
+                       errorMessage.includes('ECONNABORTED') ||
+                       errorMessage.includes('ETIMEDOUT');
+      
+      if (isTimeout) {
+        throw new Error(`Request to assistant API timed out after ${timeoutMs}ms. The server may be overloaded or processing is taking longer than expected.`);
       }
+      
       throw error; // Re-throw to be caught by outer catch
     }
   } catch (error) {
@@ -1093,19 +1331,34 @@ export async function likePost(
 ): Promise<ActivityResult> {
   try {
     const baseUrl = getBaseUrl();
+    const apiUrl = `${baseUrl}/api/likePost`;
+    const timeoutMs = 30000; // 30 second timeout for like operations
+    const requestData = {
+      forumId,
+      postId,
+      username
+    };
     
-    const response = await axios.post(
-      `${baseUrl}/api/likePost`,
-      {
-        forumId,
-        postId,
-        username
+    const response = await withRetry(
+      async () => {
+        return await withTimeout(
+          axios.post(
+            apiUrl,
+            requestData,
+            {
+              timeout: timeoutMs,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          ),
+          timeoutMs,
+          `Like post API call for ${username}`
+        );
       },
-      {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
+      3, // Max 3 retries
+      1000, // Base delay 1 second
+      `likePost for ${username}`
     );
     
     return {
@@ -1118,11 +1371,30 @@ export async function likePost(
       }
     };
   } catch (error) {
-    console.error('Error liking post:', error);
+    // Log error with improved context
+    logApiError(error, {
+      operation: 'likePost',
+      username,
+      url: `${getBaseUrl()}/api/likePost`,
+      method: 'POST',
+      requestData: { forumId, postId, username },
+      timeout: 30000
+    });
+    
+    // Provide timeout-specific error message
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isTimeout = errorMessage.includes('timeout') || 
+                     errorMessage.includes('ECONNABORTED') ||
+                     errorMessage.includes('ETIMEDOUT');
+    
+    const userFriendlyMessage = isTimeout
+      ? `Request to like post timed out after 30s. The server may be overloaded.`
+      : `Failed to like post: ${errorMessage}`;
+    
     return {
       success: false,
       message: 'Failed to like post',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: userFriendlyMessage
     };
   }
 }

@@ -1740,68 +1740,74 @@ export default function Home() {
     const oldUserId = localStorage.getItem("userId");
 
     try {
-      // Call logout API to blacklist tokens
+      // Call logout API to blacklist tokens with timeout
       // This ensures tokens are invalidated on the server
-      await axios.post(
+      // Use Promise.race to add a 5-second timeout to prevent infinite hanging
+      const logoutPromise = axios.post(
         "/api/auth/logout",
         {},
         {
           withCredentials: true, // Ensure cookies are sent
         }
       );
+      
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Logout request timed out")), 5000)
+      );
+
+      await Promise.race([logoutPromise, timeoutPromise]);
     } catch (error) {
       // Log error but continue with logout process
-      // Even if API call fails, we still want to clear local state
+      // Even if API call fails or times out, we still want to clear local state
       console.error("Error calling logout API:", error);
-    }
+    } finally {
+      // Always clear state and reset loading, even if API call fails or hangs
+      // Clear state immediately for better UX
+      setUsername(null);
+      setUserId(null);
+      setQuestion("");
+      setResponse("");
+      setSelectedConversation(null);
+      setError("");
+      setPasswordInput("");
+      setShowPasswordSetupModal(false);
+      setIsLegacyUser(false);
+      setShowEarlyAccessSetupModal(false);
+      setIsEarlyAccessUser(false);
+      setEarlyAccessUserData(null);
+      setUserType("free"); // Reset user type on sign out
+      setIsAdmin(false); // Reset admin status on sign out
 
-    // Clear state immediately for better UX
-    setUsername(null);
-    setUserId(null);
-    setQuestion("");
-    setResponse("");
-    setSelectedConversation(null);
-    setError("");
-    setPasswordInput("");
-    setShowPasswordSetupModal(false);
-    setIsLegacyUser(false);
-    setShowEarlyAccessSetupModal(false);
-    setIsEarlyAccessUser(false);
-    setEarlyAccessUserData(null);
-    setUserType("free"); // Reset user type on sign out
-    setIsAdmin(false); // Reset admin status on sign out
+      // Clear localStorage
+      localStorage.removeItem("username");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("userEmail");
 
-    // Clear localStorage
-    localStorage.removeItem("username");
-    localStorage.removeItem("userId");
-    localStorage.removeItem("userEmail");
+      // Dispatch custom events to notify Sidebar and other components
+      window.dispatchEvent(
+        new CustomEvent("localStorageChange", {
+          detail: {
+            key: "username",
+            oldValue: oldUsername,
+            newValue: null,
+          },
+        })
+      );
+      window.dispatchEvent(
+        new CustomEvent("localStorageChange", {
+          detail: {
+            key: "userId",
+            oldValue: oldUserId,
+            newValue: null,
+          },
+        })
+      );
 
-    // Dispatch custom events to notify Sidebar and other components
-    window.dispatchEvent(
-      new CustomEvent("localStorageChange", {
-        detail: {
-          key: "username",
-          oldValue: oldUsername,
-          newValue: null,
-        },
-      })
-    );
-    window.dispatchEvent(
-      new CustomEvent("localStorageChange", {
-        detail: {
-          key: "userId",
-          oldValue: oldUserId,
-          newValue: null,
-        },
-      })
-    );
+      setShowUsernameModal(false); // Don't show modal, allow viewing the app
 
-    setShowUsernameModal(false); // Don't show modal, allow viewing the app
-
-    // Reset signing out state after a brief delay
-    setTimeout(() => {
+      // Always reset signing out state
       setIsSigningOut(false);
-    }, 100);
+    }
   };
 
   const handleNavigateToAccount = () => {

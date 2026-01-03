@@ -1765,7 +1765,7 @@ Respond with ONLY "YES" or "NO" - nothing else.`;
         }
       ],
       max_tokens: 10,
-      temperature: 0.1,
+      // Note: gpt-4o-search-preview doesn't support temperature parameter
     });
 
     const response = completion.choices[0].message.content?.trim().toUpperCase();
@@ -1784,7 +1784,7 @@ Respond with ONLY "YES" or "NO" - nothing else.`;
  * Returns true if the game supports achievements, false for games without achievement systems
  */
 async function hasAchievements(
-  detectedGenres?: string[],
+  _detectedGenres?: string[],
   detectedGame?: string,
   detectedPlatform?: string
 ): Promise<boolean> {
