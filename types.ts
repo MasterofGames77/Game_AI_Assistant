@@ -70,6 +70,16 @@ export interface ChallengeRewardMilestone {
   reward: Omit<ChallengeReward, 'dateEarned'>;
 }
 
+export interface ChallengeHistoryEntry {
+  challengeId: string;
+  date: string; // YYYY-MM-DD
+  completedAt: Date;
+  challengeTitle?: string; // Optional for backward compatibility with old entries
+  challengeDescription?: string; // Optional for backward compatibility with old entries
+  difficulty?: "easy" | "medium" | "hard";
+  streakAtCompletion: number;
+}
+
 export interface SideBarProps {
   conversations: Conversation[];
   onSelectConversation: (conversation: Conversation) => void;

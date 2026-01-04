@@ -1,10 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import connectToMongoDB from '../../utils/mongodb';
 import User from '../../models/User';
-import { ChallengeProgress, ChallengeStreak, ChallengeReward } from '../../types';
+import { ChallengeProgress, ChallengeStreak, ChallengeReward, ChallengeHistoryEntry } from '../../types';
 import { logger } from '../../utils/logger';
 import { updateChallengeStreak, getTodayDateString } from '../../utils/challengeStreak';
 import { checkAndAwardRewards } from '../../utils/checkChallengeRewards';
+import { DAILY_CHALLENGES } from '../../utils/dailyChallenges';
 
 /**
  * GET /api/challenge-progress?username=xxx
@@ -164,6 +165,7 @@ export default async function handler(
       // Update challenge streak if challenge is completed
       let updatedStreak: ChallengeStreak | undefined;
       let newRewards: ChallengeReward[] = [];
+      let historyEntry: ChallengeHistoryEntry | undefined;
       
       if (progressToSave.completed) {
         const currentStreak = existingUser?.challengeStreak || null;
@@ -176,6 +178,31 @@ export default async function handler(
         if (updatedStreak) {
           const existingRewards = existingUser?.challengeRewards || [];
           newRewards = checkAndAwardRewards(updatedStreak, existingRewards);
+        }
+
+        // Create history entry for completed challenge
+        const challenge = DAILY_CHALLENGES.find(c => c.id === progressToSave.challengeId);
+        if (challenge) {
+          historyEntry = {
+            challengeId: progressToSave.challengeId,
+            date: progressToSave.date,
+            completedAt: progressToSave.completedAt || new Date(),
+            challengeTitle: challenge.title,
+            challengeDescription: challenge.description,
+            difficulty: (challenge as any).difficulty, // Will be undefined until Phase 3
+            streakAtCompletion: updatedStreak?.currentStreak || 0,
+          };
+          logger.info('Challenge history entry created', {
+            username,
+            challengeId: progressToSave.challengeId,
+            challengeTitle: challenge.title,
+            date: progressToSave.date,
+          });
+        } else {
+          logger.warn('Challenge not found in DAILY_CHALLENGES', {
+            username,
+            challengeId: progressToSave.challengeId,
+          });
         }
       }
 
@@ -195,14 +222,46 @@ export default async function handler(
         updateData.challengeRewards = [...existingRewards, ...newRewards];
       }
 
+      // Build update operations
+      const updateOperations: any = {
+        $set: updateData,
+      };
+
+      // Add history entry if challenge was completed
+      if (historyEntry) {
+        updateOperations.$push = {
+          challengeHistory: historyEntry,
+        };
+        logger.info('Adding challenge history entry to update operations', {
+          username,
+          historyEntry,
+        });
+      }
+
       // Update user's challenge progress and streak
+      // MongoDB supports both $set and $push in the same update operation
       const user = await User.findOneAndUpdate(
         { username },
-        {
-          $set: updateData,
-        },
+        updateOperations,
         { new: true }
       );
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      return res.status(200).json({
+        progress: {
+          challengeId: progressToSave.challengeId,
+          date: progressToSave.date,
+          completed: progressToSave.completed,
+          completedAt: progressToSave.completedAt,
+          progress: progressToSave.progress,
+          target: progressToSave.target,
+        },
+        streak: user.challengeStreak || null,
+        newRewards: newRewards.length > 0 ? newRewards : undefined,
+      });
 
       if (!user) {
         return res.status(404).json({ error: 'User not found' });

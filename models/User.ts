@@ -1,5 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
-import { Achievement, Progress, Subscription, UsageLimit, HealthMonitoring, ChallengeProgress, ChallengeStreak, ChallengeReward } from '../types';
+import { Achievement, Progress, Subscription, UsageLimit, HealthMonitoring, ChallengeProgress, ChallengeStreak, ChallengeReward, ChallengeHistoryEntry } from '../types';
 
 export interface IUser extends Document {
   userId: string;
@@ -35,6 +35,7 @@ export interface IUser extends Document {
   challengeProgress?: ChallengeProgress;
   challengeStreak?: ChallengeStreak;
   challengeRewards?: ChallengeReward[];
+  challengeHistory?: ChallengeHistoryEntry[];
   avatarUrl?: string; // Current avatar URL
   avatarHistory?: Array<{ url: string; uploadedAt: Date }>; // Last 6 avatars
   gameTracking?: {
@@ -328,6 +329,16 @@ const UserSchema = new Schema<IUser>({
     description: { type: String, required: true },
     icon: { type: String },
     dateEarned: { type: Date, default: Date.now }
+  }],
+  // Challenge history - stores completed challenges
+  challengeHistory: [{
+    challengeId: { type: String, required: true },
+    date: { type: String, required: true },
+    completedAt: { type: Date, required: true },
+    challengeTitle: { type: String, required: true },
+    challengeDescription: { type: String, required: true },
+    difficulty: { type: String, enum: ['easy', 'medium', 'hard'] },
+    streakAtCompletion: { type: Number, default: 0 }
   }],
   // Avatar/profile picture
   avatarUrl: { type: String },

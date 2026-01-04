@@ -2475,7 +2475,12 @@ function extractGameTitleCandidates(question: string): string[] {
   // Character class includes: À-ÿ (Latin-1), Ā-ž (Latin Extended-A), and common Unicode letters
   // Added "of" to catch patterns like "versions of Deisim", "differences between versions of [Game]"
   // IMPORTANT: Preserve remake/remaster/sequel indicators and version indicators (Remake, Remaster, HD, 2, World 2, II, etc.)
-  const inGamePattern = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&-(]+?(?:\s+(?:Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|2|II|3|III|4|IV|World\s*2|World\s*II))?)(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)|$|[?.!])/gi;
+  // CRITICAL: Capture full game titles including colons and subtitles (e.g., "The Legend of Zelda: Breath of the Wild")
+  // Pattern: "in [Title]: [Subtitle]" or "in [Title]" - captures up to question mark, period, or end of string
+  // IMPORTANT: Pattern explicitly handles colons - captures "Title: Subtitle" as a single candidate
+  // The pattern captures: "in The Legend of Zelda: Breath of the Wild" -> "The Legend of Zelda: Breath of the Wild"
+  // Main title part stops at colon or end, subtitle part (after colon) uses greedy matching to capture full subtitle
+  const inGamePattern = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s'&\-]+?(?:\s*:\s*[A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s'&\-]+)?(?:\s+(?:Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|2|II|3|III|4|IV|World\s*2|World\s*II))?)(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)|$|[?.!])/gi;
   let match: RegExpExecArray | null;
   while ((match = inGamePattern.exec(question)) !== null) {
     if (match[1]) {
@@ -2499,7 +2504,7 @@ function extractGameTitleCandidates(question: string): string[] {
           'has best', 'has the lowest', 'has the worst', 'CTGP', 'has the slowest',
           'has the easiest', 'has the hardest', 'gameplay mechanics', 'mechanics',
           'gameplay', 'different versions', 'versions', 'key differences', 'differences',
-          'between', 'version', 'edition', 'editions'
+          'between', 'version', 'edition', 'editions', 'location'
         ];
         
         const isNonGamePhrase = nonGamePhrases.some(phrase => lowerCandidate.includes(phrase));
@@ -2539,14 +2544,39 @@ function extractGameTitleCandidates(question: string): string[] {
   // Also matches patterns like "Pokémon X and Y", "Final Fantasy VII", "God of War Ragnarök", "Resident Evil 4 Remake"
   // Character class includes: À-ÿ (Latin-1), Ā-ž (Latin Extended-A) for characters like ö, ō
   // IMPORTANT: Include numbers, remake/remaster indicators, and version indicators (HD, 4K, etc.) in the pattern
+  // CRITICAL: Filter out candidates that appear before "in [Game Title]" patterns - these are likely locations/characters/items
   const properNounPattern = /\b([A-ZÀ-ÿĀ-ž][a-zÀ-ÿĀ-ž]+(?:\s+(?:[A-ZÀ-ÿĀ-ž][a-zÀ-ÿĀ-ž]+|[IVXLCDM]+|\d+|Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|\band\b)){1,6})\b/g;
   const properNounMatches: Array<{ candidate: string; index: number }> = [];
+  
+  // First, find all "in [Game Title]" patterns to identify what comes after them
+  const inGamePatternIndices: number[] = [];
+  const inGameCheckRegex = /\b(?:in|for|from|on|of)\s+(?:the\s+)?[A-ZÀ-ÿĀ-ž]/gi;
+  let inGameCheckMatch: RegExpExecArray | null;
+  while ((inGameCheckMatch = inGameCheckRegex.exec(question)) !== null) {
+    inGamePatternIndices.push(inGameCheckMatch.index);
+  }
+  
   while ((match = properNounPattern.exec(question)) !== null) {
     if (match[1]) {
       let candidate = match[1].trim();
       // Skip if it's at the start of a sentence (likely not a game)
       const candidateIndex = question.indexOf(candidate);
       if (candidateIndex > 0 && candidate.length >= 3) {
+        // CRITICAL: If this candidate appears before an "in [Game Title]" pattern,
+        // and the candidate is short (1-3 words), it's likely a location/character/item, not a game
+        const wordCount = candidate.split(/\s+/).length;
+        const isShortCandidate = wordCount <= 3 && candidate.length < 40;
+        
+        // Check if there's an "in [Game Title]" pattern after this candidate
+        const hasInGamePatternAfter = inGamePatternIndices.some(inGameIndex => 
+          inGameIndex > candidateIndex && inGameIndex < candidateIndex + candidate.length + 50
+        );
+        
+        // Skip short candidates that appear before "in [Game Title]" patterns
+        if (isShortCandidate && hasInGamePatternAfter) {
+          continue; // Skip this candidate - it's likely not a game title
+        }
+        
         // Filter out common question starters and non-game phrases
         const lowerCandidate = candidate.toLowerCase();
         if (!/^(How|What|Where|When|Why|Which|Who)\s+/.test(candidate) &&
@@ -2633,7 +2663,9 @@ function extractGameTitleCandidates(question: string): string[] {
   // Identify which candidates came from "in [Game Title]" pattern (highest priority)
   const inGamePatternCandidates = new Set<string>();
   // Match "in [Game Title]" pattern - extract the game title part
-  const inGamePatternRegex = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?)(?:\s+(?:Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|2|II|3|III|4|IV|World\s*2|World\s*II))?(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)|$|[?.!])/gi;
+  // IMPORTANT: Use greedy matching for subtitle part to capture full titles with colons
+  // Keep colon in character class to allow titles with colons
+  const inGamePatternRegex = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?(?:\s*:\s*[A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+)?(?:\s+(?:Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|2|II|3|III|4|IV|World\s*2|World\s*II))?)(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)|$|[?.!])/gi;
   let inGameMatch: RegExpExecArray | null;
   while ((inGameMatch = inGamePatternRegex.exec(question)) !== null) {
     if (inGameMatch[1]) {
@@ -3270,8 +3302,9 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
     
     // CRITICAL: Identify candidates from "in [Game Title]" patterns
     // These should be tried FIRST, before any other candidates
+    // IMPORTANT: Updated regex to capture full game titles including colons (e.g., "The Legend of Zelda: Breath of the Wild")
     const inGamePatternCandidates = new Set<string>();
-    const inGamePatternRegex = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?)(?:\s+(?:Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|2|II|3|III|4|IV|World\s*2|World\s*II))?(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)|$|[?.!])/gi;
+    const inGamePatternRegex = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?(?:\s*:\s*[A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?)?(?:\s+(?:Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|2|II|3|III|4|IV|World\s*2|World\s*II))?)(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)|$|[?.!])/gi;
     let inGameMatch: RegExpExecArray | null;
     while ((inGameMatch = inGamePatternRegex.exec(question)) !== null) {
       if (inGameMatch[1]) {
@@ -3308,14 +3341,17 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
       // Check if there's an "in [Game Title]" pattern after this candidate
       if (firstCandidateIndex >= 0 && !inGamePatternCandidates.has(firstCandidate)) {
         const textAfter = question.substring(firstCandidateIndex + firstCandidate.length);
-        const inGamePatternAfter = /\bin\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&-]{5,})/i;
+        // Updated regex to capture full game titles including colons
+        const inGamePatternAfter = /\bin\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?(?:\s*:\s*[A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?)?)/i;
         const afterMatch = textAfter.match(inGamePatternAfter);
         
         // If first candidate is short (1-3 words) and there's a longer candidate after "in",
         // skip the first candidate entirely (it's likely a character/enemy/location)
-        if (afterMatch) {
+        if (afterMatch && afterMatch[1]) {
           const wordCount = firstCandidate.split(/\s+/).length;
-          if (wordCount <= 3 && firstCandidate.length < 40) {
+          const afterCandidateWordCount = afterMatch[1].trim().split(/\s+/).length;
+          // Remove short candidates (1-3 words) that appear before longer "in [Game Title]" candidates
+          if (wordCount <= 3 && firstCandidate.length < 40 && afterCandidateWordCount > wordCount) {
             // Remove this candidate from the list - it's likely not a game title
             validCandidates = validCandidates.filter(c => c !== firstCandidate);
           }
@@ -3334,13 +3370,16 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
         
         if (candidateIndex >= 0) {
           const textAfter = question.substring(candidateIndex + candidate.length);
-          const inGamePatternAfter = /\bin\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&-]{5,})/i;
+          // Updated regex to capture full game titles including colons
+          const inGamePatternAfter = /\bin\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?(?:\s*:\s*[A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?)?)/i;
           const afterMatch = textAfter.match(inGamePatternAfter);
           
-          if (afterMatch && inGamePatternCandidates.size > 0) {
+          if (afterMatch && afterMatch[1] && inGamePatternCandidates.size > 0) {
             // This candidate appears before "in [Game Title]" and we have "in [Game Title]" candidates
             const wordCount = candidate.split(/\s+/).length;
-            if (wordCount <= 3 && candidate.length < 40) {
+            const afterCandidateWordCount = afterMatch[1].trim().split(/\s+/).length;
+            // Skip short candidates (1-3 words) that appear before longer "in [Game Title]" candidates
+            if (wordCount <= 3 && candidate.length < 40 && afterCandidateWordCount > wordCount) {
               // Skip this candidate - it's likely a character/enemy/location, not a game title
               continue;
             }

@@ -12,6 +12,7 @@ import TwitchBotChannelManager from "@/components/TwitchBotChannelManager";
 import TwitchAccountLinker from "@/components/TwitchAccountLinker";
 import TwitchModerationSettings from "@/components/TwitchModerationSettings";
 import TwitchBotAnalytics from "@/components/TwitchBotAnalytics";
+import ChallengeHistory from "@/components/ChallengeHistory";
 import { GameTracking } from "@/types";
 
 export default function AccountPage() {
@@ -69,19 +70,21 @@ export default function AccountPage() {
   const [sessions, setSessions] = useState<any[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sessionsError, setSessionsError] = useState("");
-  const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null);
+  const [revokingSessionId, setRevokingSessionId] = useState<string | null>(
+    null
+  );
 
   // Fetch active sessions
   const fetchSessions = useCallback(async (retryCount = 0) => {
     try {
       setSessionsLoading(true);
       setSessionsError("");
-      
+
       // Prevent infinite retry loops
       if (retryCount > 1) {
         throw new Error("Session expired. Please sign in again.");
       }
-      
+
       let response = await fetch("/api/auth/sessions", {
         method: "GET",
         credentials: "include",
@@ -102,20 +105,38 @@ export default function AccountPage() {
           } else {
             // Refresh failed - get error details
             const refreshData = await refreshResponse.json().catch(() => ({}));
-            const refreshErrorMsg = refreshData.message || refreshData.error || "Token refresh failed";
-            
-            if (refreshErrorMsg.includes('revoked') || refreshErrorMsg.includes('Session has been revoked')) {
-              throw new Error("Unable to refresh session. Please try signing out and back in.");
-            } else if (refreshErrorMsg.includes('expired') || refreshErrorMsg.includes('not found')) {
-              throw new Error("Session expired. Please try signing out and back in.");
+            const refreshErrorMsg =
+              refreshData.message ||
+              refreshData.error ||
+              "Token refresh failed";
+
+            if (
+              refreshErrorMsg.includes("revoked") ||
+              refreshErrorMsg.includes("Session has been revoked")
+            ) {
+              throw new Error(
+                "Unable to refresh session. Please try signing out and back in."
+              );
+            } else if (
+              refreshErrorMsg.includes("expired") ||
+              refreshErrorMsg.includes("not found")
+            ) {
+              throw new Error(
+                "Session expired. Please try signing out and back in."
+              );
             } else {
               // Other refresh error - show generic message
-              throw new Error("Unable to load sessions. Please try refreshing the page.");
+              throw new Error(
+                "Unable to load sessions. Please try refreshing the page."
+              );
             }
           }
         } catch (refreshError) {
           // Refresh failed - don't retry again
-          const errorMessage = refreshError instanceof Error ? refreshError.message : "Session expired. Please sign in again.";
+          const errorMessage =
+            refreshError instanceof Error
+              ? refreshError.message
+              : "Session expired. Please sign in again.";
           throw new Error(errorMessage);
         }
       }
@@ -123,7 +144,8 @@ export default function AccountPage() {
       if (!response.ok) {
         // Get error details for better debugging
         const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.message || errorData.error || "Failed to fetch sessions";
+        const errorMessage =
+          errorData.message || errorData.error || "Failed to fetch sessions";
         throw new Error(errorMessage);
       }
 
@@ -131,9 +153,12 @@ export default function AccountPage() {
       setSessions(data.sessions || []);
     } catch (error) {
       console.error("Error fetching sessions:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to load active sessions";
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to load active sessions";
       setSessionsError(errorMessage);
-      
+
       // Don't auto-redirect - just show the error message
       // User can manually sign out if needed
       // Auto-redirect was causing loops when combined with auto-login logic
@@ -180,7 +205,7 @@ export default function AccountPage() {
         const subscriptionData = await subscriptionResponse.json();
 
         // Debug logging (development only)
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           console.log(
             "Account page - subscription data received:",
             subscriptionData
@@ -280,7 +305,11 @@ export default function AccountPage() {
 
   // Revoke all other sessions
   const revokeAllOtherSessions = async () => {
-    if (!confirm("Are you sure you want to revoke all other sessions? You will be logged out on all other devices.")) {
+    if (
+      !confirm(
+        "Are you sure you want to revoke all other sessions? You will be logged out on all other devices."
+      )
+    ) {
       return;
     }
 
@@ -329,22 +358,31 @@ export default function AccountPage() {
 
   // Format IP address for display
   const formatIpAddress = (ip: string) => {
-    if (!ip || ip === 'unknown') {
-      return 'Unknown';
+    if (!ip || ip === "unknown") {
+      return "Unknown";
     }
-    
+
     // Check if it's localhost (development)
-    const cleanIp = ip.replace(/^\[|\]$/g, '');
-    if (cleanIp === '::1' || cleanIp === '127.0.0.1' || cleanIp === 'localhost') {
+    const cleanIp = ip.replace(/^\[|\]$/g, "");
+    if (
+      cleanIp === "::1" ||
+      cleanIp === "127.0.0.1" ||
+      cleanIp === "localhost"
+    ) {
       return `${ip} (Localhost - Access via network IP to see real IP)`;
     }
-    
+
     // Check if it's a private IP
-    if (cleanIp.startsWith('192.168.') || cleanIp.startsWith('10.') || 
-        (cleanIp.startsWith('172.') && parseInt(cleanIp.split('.')[1] || '0') >= 16 && parseInt(cleanIp.split('.')[1] || '0') <= 31)) {
+    if (
+      cleanIp.startsWith("192.168.") ||
+      cleanIp.startsWith("10.") ||
+      (cleanIp.startsWith("172.") &&
+        parseInt(cleanIp.split(".")[1] || "0") >= 16 &&
+        parseInt(cleanIp.split(".")[1] || "0") <= 31)
+    ) {
       return `${ip} (Private Network)`;
     }
-    
+
     return ip;
   };
 
@@ -1101,7 +1139,9 @@ export default function AccountPage() {
                   title="Refresh sessions"
                 >
                   <svg
-                    className={`w-4 h-4 ${sessionsLoading ? "animate-spin" : ""}`}
+                    className={`w-4 h-4 ${
+                      sessionsLoading ? "animate-spin" : ""
+                    }`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1183,7 +1223,9 @@ export default function AccountPage() {
                               {formatIpAddress(session.ipAddress)}
                             </p>
                             <p>
-                              <span className="text-gray-500">Last Activity:</span>{" "}
+                              <span className="text-gray-500">
+                                Last Activity:
+                              </span>{" "}
                               {formatRelativeDate(session.lastActivity)}
                             </p>
                             {session.createdAt && (
@@ -1201,11 +1243,9 @@ export default function AccountPage() {
                             className="ml-4 px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm rounded transition-colors duration-200"
                             title="Revoke this session"
                           >
-                            {revokingSessionId === session.sessionId ? (
-                              "Revoking..."
-                            ) : (
-                              "Revoke"
-                            )}
+                            {revokingSessionId === session.sessionId
+                              ? "Revoking..."
+                              : "Revoke"}
                           </button>
                         )}
                       </div>
@@ -1301,7 +1341,8 @@ export default function AccountPage() {
                 Game Tracker
               </h2>
               <p className="text-gray-400 text-sm mb-4">
-                Track games you want to play or are currently playing. Share your gaming status with others!
+                Track games you want to play or are currently playing. Share
+                your gaming status with others!
               </p>
               {accountData && (
                 <GameTracker
@@ -1313,7 +1354,9 @@ export default function AccountPage() {
                       const response = await fetch("/api/game-tracking-get", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ username: accountData.username }),
+                        body: JSON.stringify({
+                          username: accountData.username,
+                        }),
                       });
                       if (response.ok) {
                         const data = await response.json();
@@ -1326,6 +1369,13 @@ export default function AccountPage() {
                 />
               )}
             </div>
+
+            {/* Challenge History */}
+            {accountData && (
+              <div className="mt-6">
+                <ChallengeHistory username={accountData.username} />
+              </div>
+            )}
 
             {/* Health & Wellness Settings */}
             <div className="bg-[#252642]/50 backdrop-blur-sm rounded-2xl p-6 shadow-[0_0_15px_rgba(0,255,255,0.1)] border border-[#00ffff]/20 mt-6">
@@ -1545,42 +1595,54 @@ export default function AccountPage() {
                       Weekly Digest Email
                     </label>
                     <p className="text-gray-400 text-sm">
-                      Receive a weekly summary of your achievements, forum activity, and game recommendations
+                      Receive a weekly summary of your achievements, forum
+                      activity, and game recommendations
                     </p>
                   </div>
                   <button
                     onClick={async () => {
                       const newValue = !weeklyDigestEnabled;
                       setWeeklyDigestEnabled(newValue);
-                      
+
                       // Auto-save when toggled
                       setEmailPreferencesLoading(true);
                       setEmailPreferencesError("");
                       setEmailPreferencesSuccess("");
-                      
+
                       try {
                         const username = localStorage.getItem("username");
                         if (!username) {
-                          setEmailPreferencesError("User not found. Please sign in again.");
+                          setEmailPreferencesError(
+                            "User not found. Please sign in again."
+                          );
                           setWeeklyDigestEnabled(!newValue); // Revert
                           return;
                         }
 
-                        const response = await axios.post("/api/email-preferences", {
-                          username,
-                          weeklyDigestEnabled: newValue,
-                        });
+                        const response = await axios.post(
+                          "/api/email-preferences",
+                          {
+                            username,
+                            weeklyDigestEnabled: newValue,
+                          }
+                        );
 
                         if (response.data.success) {
                           setEmailPreferencesSuccess(
-                            newValue 
-                              ? "Weekly digest emails enabled" 
+                            newValue
+                              ? "Weekly digest emails enabled"
                               : "Weekly digest emails disabled"
                           );
-                          setTimeout(() => setEmailPreferencesSuccess(""), 3000);
+                          setTimeout(
+                            () => setEmailPreferencesSuccess(""),
+                            3000
+                          );
                         }
                       } catch (error: any) {
-                        console.error("Error updating email preferences:", error);
+                        console.error(
+                          "Error updating email preferences:",
+                          error
+                        );
                         setEmailPreferencesError(
                           error.response?.data?.message ||
                             "Failed to update email preferences. Please try again."
@@ -1592,16 +1654,12 @@ export default function AccountPage() {
                     }}
                     disabled={emailPreferencesLoading}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      weeklyDigestEnabled
-                        ? "bg-[#00ffff]"
-                        : "bg-gray-600"
+                      weeklyDigestEnabled ? "bg-[#00ffff]" : "bg-gray-600"
                     } disabled:opacity-50`}
                   >
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        weeklyDigestEnabled
-                          ? "translate-x-6"
-                          : "translate-x-1"
+                        weeklyDigestEnabled ? "translate-x-6" : "translate-x-1"
                       }`}
                     />
                   </button>
@@ -1628,7 +1686,7 @@ export default function AccountPage() {
 
             {/* Twitch Account Linking (for viewers) */}
             <div className="mt-6">
-              <TwitchAccountLinker 
+              <TwitchAccountLinker
                 twitchUsername={accountData.twitchUsername}
                 twitchId={accountData.twitchId}
               />
