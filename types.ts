@@ -50,6 +50,9 @@ export interface ChallengeProgress {
   target?: number;
 }
 
+// Type alias for array of challenge progress entries (Phase 2: Multiple Challenges)
+export type ChallengeProgresses = ChallengeProgress[];
+
 export interface ChallengeStreak {
   currentStreak: number;
   longestStreak: number;
@@ -1323,4 +1326,16 @@ export interface BotStats {
     channelName: string;
     messageCount: number;
   }>;
+}
+
+export interface ChallengeHistoryProps {
+  username: string | null;
+}
+
+// Phase 2: Challenge with its progress state
+export interface ChallengeWithProgress {
+  challenge: DailyChallenge;
+  completed: boolean;
+  progress: { current: number; target: number } | null;
+  progressEntry?: ChallengeProgress; // From backend
 }

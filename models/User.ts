@@ -32,7 +32,8 @@ export interface IUser extends Document {
     currentStreak?: number;
     longestStreak?: number;
   };
-  challengeProgress?: ChallengeProgress;
+  challengeProgress?: ChallengeProgress; // Legacy: kept for backward compatibility
+  challengeProgresses?: ChallengeProgress[]; // Phase 2: Multiple challenges per day
   challengeStreak?: ChallengeStreak;
   challengeRewards?: ChallengeReward[];
   challengeHistory?: ChallengeHistoryEntry[];
@@ -302,7 +303,7 @@ const UserSchema = new Schema<IUser>({
     currentStreak: { type: Number, default: 0 },
     longestStreak: { type: Number, default: 0 }
   },
-  // Daily challenge progress
+  // Daily challenge progress (legacy - kept for backward compatibility)
   challengeProgress: {
     challengeId: { type: String },
     date: { type: String }, // YYYY-MM-DD format
@@ -311,6 +312,15 @@ const UserSchema = new Schema<IUser>({
     progress: { type: Number }, // For count-based challenges
     target: { type: Number } // For count-based challenges
   },
+  // Phase 2: Multiple challenges per day - array of challenge progress entries
+  challengeProgresses: [{
+    challengeId: { type: String, required: true },
+    date: { type: String, required: true }, // YYYY-MM-DD format
+    completed: { type: Boolean, default: false },
+    completedAt: { type: Date },
+    progress: { type: Number }, // For count-based challenges
+    target: { type: Number } // For count-based challenges
+  }],
   // Daily challenge streak tracking
   challengeStreak: {
     currentStreak: { type: Number, default: 0 },

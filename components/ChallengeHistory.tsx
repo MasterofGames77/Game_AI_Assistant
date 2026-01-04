@@ -1,12 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ChallengeHistoryEntry } from "../types";
+import { ChallengeHistoryEntry, ChallengeHistoryProps } from "../types";
 import axios from "axios";
-
-interface ChallengeHistoryProps {
-  username: string | null;
-}
 
 const ChallengeHistory: React.FC<ChallengeHistoryProps> = ({ username }) => {
   const [history, setHistory] = useState<ChallengeHistoryEntry[]>([]);

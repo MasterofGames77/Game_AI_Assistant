@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import connectToMongoDB from '../../utils/mongodb';
 import User from '../../models/User';
-import { ChallengeProgress, ChallengeStreak, ChallengeReward, ChallengeHistoryEntry } from '../../types';
+import { ChallengeProgress, ChallengeProgresses, ChallengeStreak, ChallengeReward, ChallengeHistoryEntry } from '../../types';
 import { logger } from '../../utils/logger';
 import { updateChallengeStreak, getTodayDateString } from '../../utils/challengeStreak';
 import { checkAndAwardRewards } from '../../utils/checkChallengeRewards';
@@ -9,12 +9,14 @@ import { DAILY_CHALLENGES } from '../../utils/dailyChallenges';
 
 /**
  * GET /api/challenge-progress?username=xxx
- * Returns the challenge progress for today's challenge
+ * Returns the challenge progress for today's challenges (Phase 2: Multiple Challenges)
+ * Also supports legacy single challenge format for backward compatibility
  */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<{ 
-    progress: ChallengeProgress | null; 
+    progress?: ChallengeProgress | null; // Legacy: single challenge (backward compatibility)
+    progresses?: ChallengeProgress[]; // Phase 2: multiple challenges
     streak: ChallengeStreak | null;
     rewards?: ChallengeReward[];
     newRewards?: ChallengeReward[];
@@ -30,7 +32,7 @@ export default async function handler(
 
       await connectToMongoDB();
 
-      const user = await User.findOne({ username }).select('challengeProgress challengeStreak challengeRewards');
+      const user = await User.findOne({ username }).select('challengeProgress challengeProgresses challengeStreak challengeRewards');
 
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
@@ -39,7 +41,28 @@ export default async function handler(
       // Get today's date string (UTC)
       const todayString = getTodayDateString();
 
-      // Check if progress exists and is for today (UTC)
+      // Phase 2: Check challengeProgresses array first (multiple challenges)
+      if (user.challengeProgresses && Array.isArray(user.challengeProgresses) && user.challengeProgresses.length > 0) {
+        // Filter progress entries for today
+        const todayProgresses = user.challengeProgresses
+          .filter((p: any) => p && p.date === todayString)
+          .map((p: any) => ({
+            challengeId: p.challengeId || '',
+            date: p.date,
+            completed: p.completed || false,
+            completedAt: p.completedAt ? new Date(p.completedAt) : undefined,
+            progress: p.progress,
+            target: p.target,
+          }));
+
+        return res.status(200).json({ 
+          progresses: todayProgresses,
+          streak: user.challengeStreak || null,
+          rewards: user.challengeRewards || []
+        });
+      }
+
+      // Legacy: Check single challengeProgress (backward compatibility)
       if (
         user.challengeProgress &&
         user.challengeProgress.date === todayString
@@ -56,7 +79,8 @@ export default async function handler(
           target: user.challengeProgress.target,
         };
         return res.status(200).json({ 
-          progress,
+          progress, // Legacy format
+          progresses: [progress], // Also include in new format for compatibility
           streak: user.challengeStreak || null,
           rewards: user.challengeRewards || []
         });
@@ -64,7 +88,8 @@ export default async function handler(
 
       // No progress for today
       return res.status(200).json({ 
-        progress: null,
+        progress: null, // Legacy format
+        progresses: [], // Phase 2 format
         streak: user.challengeStreak || null,
         rewards: user.challengeRewards || []
       });
@@ -81,15 +106,17 @@ export default async function handler(
 
   if (req.method === 'POST') {
     try {
-      const { username, progress } = req.body;
+      const { username, progress, progresses } = req.body;
 
       // Debug logging in development
       if (process.env.NODE_ENV === 'development') {
         console.log('[Challenge Progress API] POST request received:', {
           username,
+          hasProgress: !!progress,
+          hasProgresses: !!progresses,
           progressType: typeof progress,
           progressIsArray: Array.isArray(progress),
-          progressValue: progress,
+          progressesIsArray: Array.isArray(progresses),
         });
       }
 
@@ -97,81 +124,165 @@ export default async function handler(
         return res.status(400).json({ error: 'Username is required' });
       }
 
-      if (!progress) {
+      // Phase 2: Support both single progress and array of progresses
+      let progressEntries: ChallengeProgress[] = [];
+      
+      if (progresses && Array.isArray(progresses)) {
+        // New format: array of progresses
+        progressEntries = progresses;
+      } else if (progress && typeof progress === 'object' && !Array.isArray(progress)) {
+        // Legacy format: single progress object
+        progressEntries = [progress];
+      } else {
         return res.status(400).json({ 
           error: 'Progress data is required',
-          details: 'Expected an object with challengeId, date, and completed fields'
+          details: 'Expected either a progress object or progresses array with challengeId, date, and completed fields'
         });
       }
 
-      if (typeof progress !== 'object' || Array.isArray(progress)) {
-        return res.status(400).json({ 
-          error: 'Invalid progress data type',
-          details: `Progress must be an object, received: ${typeof progress}${Array.isArray(progress) ? ' (array)' : ''}`
-        });
-      }
-
-      // Validate progress structure
-      if (!progress.challengeId || typeof progress.challengeId !== 'string') {
-        return res.status(400).json({ 
-          error: 'Invalid progress data',
-          details: 'challengeId is required and must be a string'
-        });
-      }
-
-      if (typeof progress.completed !== 'boolean') {
-        return res.status(400).json({ 
-          error: 'Invalid progress data',
-          details: 'completed field is required and must be a boolean'
-        });
+      // Validate all progress entries
+      for (let i = 0; i < progressEntries.length; i++) {
+        const p = progressEntries[i];
+        if (!p || typeof p !== 'object') {
+          return res.status(400).json({ 
+            error: 'Invalid progress entry',
+            details: `Progress entry at index ${i} must be an object`
+          });
+        }
+        if (!p.challengeId || typeof p.challengeId !== 'string') {
+          return res.status(400).json({ 
+            error: 'Invalid progress data',
+            details: `challengeId is required and must be a string for entry at index ${i}`
+          });
+        }
+        if (typeof p.completed !== 'boolean') {
+          return res.status(400).json({ 
+            error: 'Invalid progress data',
+            details: `completed field is required and must be a boolean for entry at index ${i}`
+          });
+        }
       }
 
       await connectToMongoDB();
 
       // Get today's date string to ensure we're saving for today (UTC)
-      const today = new Date();
-      const year = today.getUTCFullYear();
-      const month = String(today.getUTCMonth() + 1).padStart(2, '0');
-      const day = String(today.getUTCDate()).padStart(2, '0');
-      const todayString = `${year}-${month}-${day}`;
+      const todayString = getTodayDateString();
 
-      // Ensure date is set to today
-      const progressToSave: ChallengeProgress = {
-        ...progress,
+      // Get existing user to check current progress, streak, and rewards
+      const existingUser = await User.findOne({ username }).select('challengeProgress challengeProgresses challengeStreak challengeRewards challengeHistory');
+
+      if (!existingUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Phase 2: Process multiple progress entries
+      // Ensure all dates are set to today
+      const progressEntriesToSave = progressEntries.map(p => ({
+        ...p,
         date: todayString,
-      };
+      }));
 
-      // Prepare challenge progress object for database
-      const challengeProgressData: any = {
-        challengeId: progressToSave.challengeId,
-        date: progressToSave.date,
-        completed: progressToSave.completed,
-      };
+      // Get existing progress entries for today (from challengeProgresses array)
+      const existingProgresses = (existingUser.challengeProgresses || []) as any[];
+      const todayProgresses = existingProgresses.filter((p: any) => p && p.date === todayString);
+      
+      // Track which challenges are already completed to prevent duplicates
+      const completedChallengeIds = new Set(
+        todayProgresses
+          .filter((p: any) => p.completed)
+          .map((p: any) => p.challengeId)
+      );
 
-      // Only include optional fields if they exist
-      if (progressToSave.completedAt) {
-        challengeProgressData.completedAt = new Date(progressToSave.completedAt);
+      // Also check challengeHistory to prevent duplicate history entries
+      // A challenge might have a history entry even if progress entry doesn't exist
+      const existingHistory = (existingUser.challengeHistory || []) as any[];
+      const todayHistoryEntries = existingHistory.filter((h: any) => h && h.date === todayString);
+      const challengesWithHistoryToday = new Set(
+        todayHistoryEntries.map((h: any) => h.challengeId)
+      );
+
+      // Process each progress entry
+      // Track which challenge IDs are being updated in this batch
+      const updatedChallengeIds = new Set<string>();
+      const newProgressEntries: any[] = [];
+      const completedEntries: ChallengeProgress[] = [];
+      const historyEntries: ChallengeHistoryEntry[] = [];
+
+      for (const progressEntry of progressEntriesToSave) {
+        // Skip if this challenge is already completed today (prevent duplicates)
+        if (progressEntry.completed && completedChallengeIds.has(progressEntry.challengeId)) {
+          logger.info('Skipping duplicate challenge completion', {
+            username,
+            challengeId: progressEntry.challengeId,
+          });
+          continue;
+        }
+
+        // Track that we're updating this challenge
+        updatedChallengeIds.add(progressEntry.challengeId);
+
+        // Prepare challenge progress object for database
+        const challengeProgressData: any = {
+          challengeId: progressEntry.challengeId,
+          date: progressEntry.date,
+          completed: progressEntry.completed,
+        };
+
+        // Only include optional fields if they exist
+        if (progressEntry.completedAt) {
+          challengeProgressData.completedAt = new Date(progressEntry.completedAt);
+        }
+        if (progressEntry.progress !== undefined) {
+          challengeProgressData.progress = progressEntry.progress;
+        }
+        if (progressEntry.target !== undefined) {
+          challengeProgressData.target = progressEntry.target;
+        }
+
+        newProgressEntries.push(challengeProgressData);
+
+        // Track completed challenges for streak and history
+        if (progressEntry.completed) {
+          completedEntries.push(progressEntry);
+          completedChallengeIds.add(progressEntry.challengeId);
+
+          // Only create history entry if one doesn't already exist for this challenge today
+          // This prevents duplicate history entries when challenges are re-saved
+          if (!challengesWithHistoryToday.has(progressEntry.challengeId)) {
+            const challenge = DAILY_CHALLENGES.find(c => c.id === progressEntry.challengeId);
+            if (challenge) {
+              historyEntries.push({
+                challengeId: progressEntry.challengeId,
+                date: progressEntry.date,
+                completedAt: progressEntry.completedAt || new Date(),
+                challengeTitle: challenge.title,
+                challengeDescription: challenge.description,
+                difficulty: (challenge as any).difficulty, // Will be undefined until Phase 3
+                streakAtCompletion: 0, // Will be updated after streak calculation
+              });
+              // Track that we're creating a history entry for this challenge
+              challengesWithHistoryToday.add(progressEntry.challengeId);
+            }
+          } else {
+            logger.info('Skipping duplicate history entry creation', {
+              username,
+              challengeId: progressEntry.challengeId,
+              date: todayString,
+            });
+          }
+        }
       }
-      if (progressToSave.progress !== undefined) {
-        challengeProgressData.progress = progressToSave.progress;
-      }
-      if (progressToSave.target !== undefined) {
-        challengeProgressData.target = progressToSave.target;
-      }
 
-      // Get existing user to check current streak and rewards
-      const existingUser = await User.findOne({ username }).select('challengeStreak challengeRewards');
-
-      // Update challenge streak if challenge is completed
+      // Phase 2: Update streak if at least one challenge is completed
+      // Streak is maintained if user completes at least one challenge per day
       let updatedStreak: ChallengeStreak | undefined;
       let newRewards: ChallengeReward[] = [];
-      let historyEntry: ChallengeHistoryEntry | undefined;
       
-      if (progressToSave.completed) {
+      if (completedEntries.length > 0) {
         const currentStreak = existingUser?.challengeStreak || null;
         updatedStreak = updateChallengeStreak(
           currentStreak,
-          progressToSave.date
+          todayString
         );
 
         // Check for new milestone rewards
@@ -180,66 +291,66 @@ export default async function handler(
           newRewards = checkAndAwardRewards(updatedStreak, existingRewards);
         }
 
-        // Create history entry for completed challenge
-        const challenge = DAILY_CHALLENGES.find(c => c.id === progressToSave.challengeId);
-        if (challenge) {
-          historyEntry = {
-            challengeId: progressToSave.challengeId,
-            date: progressToSave.date,
-            completedAt: progressToSave.completedAt || new Date(),
-            challengeTitle: challenge.title,
-            challengeDescription: challenge.description,
-            difficulty: (challenge as any).difficulty, // Will be undefined until Phase 3
-            streakAtCompletion: updatedStreak?.currentStreak || 0,
-          };
-          logger.info('Challenge history entry created', {
-            username,
-            challengeId: progressToSave.challengeId,
-            challengeTitle: challenge.title,
-            date: progressToSave.date,
-          });
-        } else {
-          logger.warn('Challenge not found in DAILY_CHALLENGES', {
-            username,
-            challengeId: progressToSave.challengeId,
-          });
-        }
+        // Update streakAtCompletion in history entries
+        historyEntries.forEach(entry => {
+          entry.streakAtCompletion = updatedStreak?.currentStreak || 0;
+        });
       }
 
-      // Prepare update object
-      const updateData: any = {
-        challengeProgress: challengeProgressData,
+      // Build update operations
+      const updateOperations: any = {};
+
+      // Phase 2: Update challengeProgresses array
+      // Strategy: Keep existing entries for today that aren't being updated, replace/update ones that are
+      const otherDayProgresses = existingProgresses.filter((p: any) => p && p.date !== todayString);
+      // Keep existing today's entries that aren't being updated in this batch
+      const existingTodayProgresses = todayProgresses.filter((p: any) => 
+        p && !updatedChallengeIds.has(p.challengeId)
+      );
+      // Combine: other days + existing today (not updated) + new/updated entries
+      const allProgresses = [...otherDayProgresses, ...existingTodayProgresses, ...newProgressEntries];
+      
+      logger.info('Merging challenge progress entries', {
+        username,
+        otherDaysCount: otherDayProgresses.length,
+        existingTodayCount: existingTodayProgresses.length,
+        newEntriesCount: newProgressEntries.length,
+        totalProgresses: allProgresses.length,
+        updatedChallengeIds: Array.from(updatedChallengeIds),
+      });
+
+      updateOperations.$set = {
+        challengeProgresses: allProgresses,
       };
 
-      // Include streak update if challenge was completed
+      // Legacy: Also update challengeProgress for backward compatibility (use first entry)
+      if (newProgressEntries.length > 0) {
+        updateOperations.$set.challengeProgress = newProgressEntries[0];
+      }
+
+      // Include streak update if at least one challenge was completed
       if (updatedStreak) {
-        updateData.challengeStreak = updatedStreak;
+        updateOperations.$set.challengeStreak = updatedStreak;
       }
 
       // Add new rewards if any were earned
       if (newRewards.length > 0) {
         const existingRewards = existingUser?.challengeRewards || [];
-        updateData.challengeRewards = [...existingRewards, ...newRewards];
+        updateOperations.$set.challengeRewards = [...existingRewards, ...newRewards];
       }
 
-      // Build update operations
-      const updateOperations: any = {
-        $set: updateData,
-      };
-
-      // Add history entry if challenge was completed
-      if (historyEntry) {
+      // Add history entries if any challenges were completed
+      if (historyEntries.length > 0) {
         updateOperations.$push = {
-          challengeHistory: historyEntry,
+          challengeHistory: { $each: historyEntries },
         };
-        logger.info('Adding challenge history entry to update operations', {
+        logger.info('Adding challenge history entries to update operations', {
           username,
-          historyEntry,
+          historyEntriesCount: historyEntries.length,
         });
       }
 
       // Update user's challenge progress and streak
-      // MongoDB supports both $set and $push in the same update operation
       const user = await User.findOneAndUpdate(
         { username },
         updateOperations,
@@ -250,41 +361,33 @@ export default async function handler(
         return res.status(404).json({ error: 'User not found' });
       }
 
-      return res.status(200).json({
-        progress: {
-          challengeId: progressToSave.challengeId,
-          date: progressToSave.date,
-          completed: progressToSave.completed,
-          completedAt: progressToSave.completedAt,
-          progress: progressToSave.progress,
-          target: progressToSave.target,
-        },
-        streak: user.challengeStreak || null,
-        newRewards: newRewards.length > 0 ? newRewards : undefined,
-      });
-
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
       logger.info('Challenge progress saved', {
         username,
-        challengeId: progressToSave.challengeId,
-        completed: progressToSave.completed,
+        progressEntriesCount: newProgressEntries.length,
+        completedCount: completedEntries.length,
         streakUpdated: !!updatedStreak,
         currentStreak: updatedStreak?.currentStreak || 0,
         rewardsEarned: newRewards.length,
       });
 
+      // Return array format (Phase 2) and legacy single format for backward compatibility
       return res.status(200).json({
-        progress: {
-          challengeId: progressToSave.challengeId,
-          date: progressToSave.date,
-          completed: progressToSave.completed,
-          completedAt: progressToSave.completedAt,
-          progress: progressToSave.progress,
-          target: progressToSave.target,
-        },
+        progresses: newProgressEntries.map(p => ({
+          challengeId: p.challengeId,
+          date: p.date,
+          completed: p.completed,
+          completedAt: p.completedAt ? new Date(p.completedAt) : undefined,
+          progress: p.progress,
+          target: p.target,
+        })),
+        progress: newProgressEntries.length > 0 ? { // Legacy format
+          challengeId: newProgressEntries[0].challengeId,
+          date: newProgressEntries[0].date,
+          completed: newProgressEntries[0].completed,
+          completedAt: newProgressEntries[0].completedAt ? new Date(newProgressEntries[0].completedAt) : undefined,
+          progress: newProgressEntries[0].progress,
+          target: newProgressEntries[0].target,
+        } : null,
         streak: user.challengeStreak || null,
         newRewards: newRewards.length > 0 ? newRewards : undefined,
       });

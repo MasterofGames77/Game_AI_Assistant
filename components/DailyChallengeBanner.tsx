@@ -3,15 +3,14 @@
 import React, { useState, useEffect } from "react";
 import {
   DailyChallenge,
-  Conversation,
   ChallengeStreak,
   ChallengeReward,
+  ChallengeProgress,
 } from "../types";
 import {
-  getTodaysChallenge,
-  getChallengeProgress,
-  markChallengeCompleted,
+  getTodaysChallenges,
   getTodayDateString,
+  saveChallengesProgress,
 } from "../utils/challengeSelector";
 import {
   hasCompletedChallenge,
@@ -20,18 +19,14 @@ import {
 import { getChallengeStreakInfo } from "../utils/challengeStreak";
 import { getNextMilestoneInfo } from "../utils/checkChallengeRewards";
 import { formatRewardMessage } from "../utils/challengeRewards";
-import { DailyChallengeBannerProps } from "../types";
+import { DailyChallengeBannerProps, ChallengeWithProgress } from "../types";
 
 const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
   username,
   conversations,
 }) => {
-  const [challenge, setChallenge] = useState<DailyChallenge | null>(null);
-  const [completed, setCompleted] = useState(false);
-  const [progress, setProgress] = useState<{
-    current: number;
-    target: number;
-  } | null>(null);
+  // Phase 2: Multiple challenges
+  const [challenges, setChallenges] = useState<ChallengeWithProgress[]>([]);
   const [isDismissed, setIsDismissed] = useState(false);
   const [streak, setStreak] = useState<ChallengeStreak | null>(null);
   const [rewards, setRewards] = useState<ChallengeReward[]>([]);
@@ -40,120 +35,170 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
 
   useEffect(() => {
     if (!username) {
-      setChallenge(null);
+      setChallenges([]);
       return;
     }
 
-    // Get today's challenge
-    const todaysChallenge = getTodaysChallenge();
-    setChallenge(todaysChallenge);
+    // Phase 2: Get today's challenges (3 challenges)
+    const todaysChallenges = getTodaysChallenges();
 
-    // Async function to check progress and completion
+    // Async function to check progress and completion for all challenges
     const checkProgress = async () => {
       try {
-        // Check if already completed (from backend)
+        // Fetch progress from backend
         const response = await fetch(
           `/api/challenge-progress?username=${encodeURIComponent(username)}`
         );
 
-        let data: any = null;
+        let backendProgresses: ChallengeProgress[] = [];
+
         if (response.ok) {
-          data = await response.json();
-          // If already completed for today, set completed and don't re-check
-          if (
-            data.progress?.completed &&
-            data.progress?.date === getTodayDateString()
+          const data = await response.json();
+
+          // Phase 2: Get progresses array (new format) or fallback to single progress (legacy)
+          if (data.progresses && Array.isArray(data.progresses)) {
+            backendProgresses = data.progresses;
+          } else if (
+            data.progress &&
+            data.progress.date === getTodayDateString()
           ) {
-            setCompleted(true);
-            if (data.streak) {
-              setStreak(data.streak);
-            }
-            if (data.rewards) {
-              setRewards(data.rewards);
-            }
-            // Don't check conversations if already completed for today
-            return;
+            // Legacy: single progress object
+            backendProgresses = [data.progress];
           }
+
           if (data.streak) {
             setStreak(data.streak);
           }
           if (data.rewards) {
             setRewards(data.rewards);
           }
-        }
-
-        // Only check conversations if not already completed in backend for today
-        // This prevents re-triggering completion if already marked as done
-        if (
-          !data?.progress?.completed ||
-          data?.progress?.date !== getTodayDateString()
-        ) {
-          // Check if completed based on conversations
-          const isCompleted = hasCompletedChallenge(
-            conversations,
-            todaysChallenge
-          );
-
-          // Update completion status
-          if (isCompleted) {
-            setCompleted(true);
-            // Mark challenge as completed (async, but don't wait)
-            markChallengeCompleted(username, todaysChallenge.id).then(() => {
-              // Fetch updated data after completion (streak, rewards)
-              fetch(
-                `/api/challenge-progress?username=${encodeURIComponent(
-                  username
-                )}`
-              )
-                .then((streakResponse) => streakResponse.json())
-                .then((streakData) => {
-                  if (streakData.streak) {
-                    setStreak(streakData.streak);
-                  }
-                  if (streakData.rewards) {
-                    setRewards(streakData.rewards);
-                  }
-                  // Check for new rewards
-                  if (
-                    streakData.newRewards &&
-                    streakData.newRewards.length > 0
-                  ) {
-                    setNewRewards(streakData.newRewards);
-                    setShowRewardNotification(true);
-                    // Auto-hide notification after 5 seconds
-                    setTimeout(() => setShowRewardNotification(false), 5000);
-                  }
-                })
-                .catch((error) => {
-                  console.error(
-                    "Error fetching updated challenge data:",
-                    error
-                  );
-                });
-            });
-          } else {
-            setCompleted(false);
+          if (data.newRewards && data.newRewards.length > 0) {
+            setNewRewards(data.newRewards);
+            setShowRewardNotification(true);
+            setTimeout(() => setShowRewardNotification(false), 5000);
           }
         }
 
-        // Get progress for count-based challenges
-        if (todaysChallenge.criteria.type === "count") {
-          const progressData = getProgress(conversations, todaysChallenge);
-          setProgress({
-            current: progressData.current,
-            target: progressData.target,
+        // Build challenge progress state for each challenge
+        const challengesWithProgress: ChallengeWithProgress[] =
+          todaysChallenges.map((challenge) => {
+            // Find matching progress entry from backend
+            const progressEntry = backendProgresses.find(
+              (p) =>
+                p.challengeId === challenge.id &&
+                p.date === getTodayDateString()
+            );
+
+            // Check if completed based on conversations (if not already marked in backend)
+            const isCompletedInBackend = progressEntry?.completed || false;
+            const isCompletedInConversations = hasCompletedChallenge(
+              conversations,
+              challenge
+            );
+
+            // Challenge is completed if either backend says so OR conversations match
+            const isCompleted =
+              isCompletedInBackend || isCompletedInConversations;
+
+            // Get progress for count-based challenges
+            let progressData: { current: number; target: number } | null = null;
+            if (challenge.criteria.type === "count") {
+              const progress = getProgress(conversations, challenge);
+              progressData = {
+                current: progress.current,
+                target: progress.target,
+              };
+            }
+
+            return {
+              challenge,
+              completed: isCompleted,
+              progress: progressData,
+              progressEntry,
+            };
           });
-        } else {
-          setProgress(null);
+
+        setChallenges(challengesWithProgress);
+
+        // Phase 2: Save progress for all challenges that are completed but not yet saved
+        const progressesToSave: ChallengeProgress[] = [];
+        for (const challengeWithProgress of challengesWithProgress) {
+          // If completed in conversations but not in backend, save it
+          if (
+            challengeWithProgress.completed &&
+            !challengeWithProgress.progressEntry?.completed
+          ) {
+            const progressToSave: ChallengeProgress = {
+              challengeId: challengeWithProgress.challenge.id,
+              date: getTodayDateString(),
+              completed: true,
+              completedAt: new Date(),
+              progress: challengeWithProgress.progress?.current,
+              target: challengeWithProgress.progress?.target,
+            };
+            progressesToSave.push(progressToSave);
+          }
+        }
+
+        // Save all new completions at once
+        if (progressesToSave.length > 0) {
+          await saveChallengesProgress(username, progressesToSave);
+
+          // Fetch updated data after saving (streak, rewards)
+          const updatedResponse = await fetch(
+            `/api/challenge-progress?username=${encodeURIComponent(username)}`
+          );
+          if (updatedResponse.ok) {
+            const updatedData = await updatedResponse.json();
+            if (updatedData.streak) {
+              setStreak(updatedData.streak);
+            }
+            if (updatedData.rewards) {
+              setRewards(updatedData.rewards);
+            }
+            if (updatedData.newRewards && updatedData.newRewards.length > 0) {
+              setNewRewards(updatedData.newRewards);
+              setShowRewardNotification(true);
+              setTimeout(() => setShowRewardNotification(false), 5000);
+            }
+
+            // Update challenges with new progress entries
+            const updatedProgresses = updatedData.progresses || [];
+            setChallenges(
+              challengesWithProgress.map((cwp) => {
+                const updatedEntry = updatedProgresses.find(
+                  (p: ChallengeProgress) => p.challengeId === cwp.challenge.id
+                );
+                return {
+                  ...cwp,
+                  completed: updatedEntry?.completed || cwp.completed,
+                  progressEntry: updatedEntry || cwp.progressEntry,
+                };
+              })
+            );
+          }
         }
       } catch (error) {
         console.error("Error checking challenge progress:", error);
-        // Fallback: check completion based on conversations only
-        const isCompleted = hasCompletedChallenge(
-          conversations,
-          todaysChallenge
-        );
-        setCompleted(isCompleted);
+        // Fallback: just check completion based on conversations
+        const challengesWithProgress: ChallengeWithProgress[] =
+          todaysChallenges.map((challenge) => {
+            const isCompleted = hasCompletedChallenge(conversations, challenge);
+            let progressData: { current: number; target: number } | null = null;
+            if (challenge.criteria.type === "count") {
+              const progress = getProgress(conversations, challenge);
+              progressData = {
+                current: progress.current,
+                target: progress.target,
+              };
+            }
+            return {
+              challenge,
+              completed: isCompleted,
+              progress: progressData,
+            };
+          });
+        setChallenges(challengesWithProgress);
       }
     };
 
@@ -172,16 +217,20 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
     setIsDismissed(true);
   };
 
-  // Don't render if no username, no challenge, or dismissed
-  if (!username || !challenge || isDismissed) {
+  // Don't render if no username, no challenges, or dismissed
+  if (!username || challenges.length === 0 || isDismissed) {
     return null;
   }
 
-  // Get next milestone info for display
+  // Get next milestone info for display (shown once for all challenges)
   const milestoneInfo =
     streak && streak.currentStreak > 0
       ? getNextMilestoneInfo(streak, rewards)
       : null;
+
+  // Count completed challenges
+  const completedCount = challenges.filter((c) => c.completed).length;
+  const totalChallenges = challenges.length;
 
   return (
     <>
@@ -222,72 +271,20 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
           </div>
         </div>
       )}
-      {/* Challenge Banner */}
-      <div
-        className={`mt-4 px-4 py-3 rounded-lg border-2 transition-all max-w-xl w-full ${
-          completed
-            ? "bg-green-50 border-green-500 text-green-900 dark:bg-green-900/30 dark:text-white"
-            : "bg-blue-50 border-blue-500 text-blue-900 dark:bg-blue-900/30 dark:text-white"
-        }`}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="text-xl flex-shrink-0">
-              {challenge.icon || "🎯"}
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-xs">
-                  {completed ? "✅ " : ""}
-                  Daily Challenge: {challenge.title}
-                </h3>
-              </div>
-              <p className="text-xs text-gray-700 dark:text-gray-300 mt-0.5">
-                {challenge.description}
-              </p>
-              {streak && streak.currentStreak > 0 && (
-                <div className="mt-1 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
-                  {getChallengeStreakInfo(streak).message}
-                </div>
-              )}
-              {milestoneInfo &&
-                milestoneInfo.progress &&
-                milestoneInfo.nextMilestone && (
-                  <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                    Next reward: {milestoneInfo.nextMilestone.reward.icon}{" "}
-                    {milestoneInfo.nextMilestone.reward.name} (
-                    {milestoneInfo.progress.current}/
-                    {milestoneInfo.progress.target} days)
-                  </div>
-                )}
-              {progress && (
-                <div className="mt-1.5">
-                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                    <span className="whitespace-nowrap text-xs">
-                      Progress: {progress.current}/{progress.target}
-                    </span>
-                    <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 min-w-0">
-                      <div
-                        className={`h-1.5 rounded-full transition-all ${
-                          completed ? "bg-green-500" : "bg-blue-500"
-                        }`}
-                        style={{
-                          width: `${Math.min(
-                            (progress.current / progress.target) * 100,
-                            100
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+
+      {/* Phase 2: Multiple Challenges Banner */}
+      <div className="mt-4 px-4 py-3 rounded-lg border-2 bg-blue-50 border-blue-500 text-blue-900 dark:bg-blue-900/30 dark:text-white transition-all max-w-xl w-full">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🎯</span>
+            <h3 className="font-bold text-sm">
+              Daily Challenges ({completedCount}/{totalChallenges} completed)
+            </h3>
           </div>
           <button
             onClick={handleDismiss}
             className="text-gray-400 hover:text-white ml-2 flex-shrink-0 transition-colors"
-            aria-label="Dismiss challenge"
+            aria-label="Dismiss challenges"
             type="button"
           >
             <svg
@@ -304,6 +301,79 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
               />
             </svg>
           </button>
+        </div>
+
+        {/* Streak and milestone info (shown once) */}
+        {streak && streak.currentStreak > 0 && (
+          <div className="mb-3 text-xs font-semibold text-yellow-600 dark:text-yellow-400">
+            {getChallengeStreakInfo(streak).message}
+          </div>
+        )}
+        {milestoneInfo &&
+          milestoneInfo.progress &&
+          milestoneInfo.nextMilestone && (
+            <div className="mb-3 text-xs text-gray-600 dark:text-gray-400">
+              Next reward: {milestoneInfo.nextMilestone.reward.icon}{" "}
+              {milestoneInfo.nextMilestone.reward.name} (
+              {milestoneInfo.progress.current}/{milestoneInfo.progress.target}{" "}
+              days)
+            </div>
+          )}
+
+        {/* List of challenges */}
+        <div className="space-y-2">
+          {challenges.map((challengeWithProgress) => {
+            const { challenge, completed, progress } = challengeWithProgress;
+            return (
+              <div
+                key={challenge.id}
+                className={`px-3 py-2 rounded border transition-all ${
+                  completed
+                    ? "bg-green-100 border-green-400 dark:bg-green-900/20 dark:border-green-500"
+                    : "bg-gray-100 border-gray-300 dark:bg-gray-800/30 dark:border-gray-600"
+                }`}
+              >
+                <div className="flex items-start gap-2">
+                  <span className="text-lg flex-shrink-0 mt-0.5">
+                    {challenge.icon || "🎯"}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-semibold text-xs">
+                        {completed ? "✅ " : ""}
+                        {challenge.title}
+                      </h4>
+                    </div>
+                    <p className="text-xs text-gray-700 dark:text-gray-300 mt-0.5">
+                      {challenge.description}
+                    </p>
+                    {progress && (
+                      <div className="mt-1.5">
+                        <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                          <span className="whitespace-nowrap text-xs">
+                            Progress: {progress.current}/{progress.target}
+                          </span>
+                          <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 min-w-0">
+                            <div
+                              className={`h-1.5 rounded-full transition-all ${
+                                completed ? "bg-green-500" : "bg-blue-500"
+                              }`}
+                              style={{
+                                width: `${Math.min(
+                                  (progress.current / progress.target) * 100,
+                                  100
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </>
