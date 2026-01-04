@@ -445,20 +445,34 @@ export async function getWeeklyGameRecommendations(
     }
 
     // Step 10: Helper function to extract base game series name for duplicate checking
-    // IMPORTANT: This is ONLY used to prevent multiple games from the same series in one email.
-    // The full game name (e.g., "Final Fantasy IX") is still shown in recommendations.
+    // 
+    // ⚠️ IMPORTANT: This function is ONLY used for duplicate checking within a single email.
+    // The FULL game name (e.g., "Final Fantasy IX", "Super Mario Galaxy 2") is ALWAYS shown in the email.
     // This function extracts the series name to check: "Have we already recommended a game from this series?"
-    // Examples of series extraction (used for duplicate checking):
-    // - "Final Fantasy IX" -> "Final Fantasy" (removes Roman numerals for duplicate checking)
-    // - "Final Fantasy VII" -> "Final Fantasy" (same series, so only one can appear per email)
-    // - "The Legend of Zelda: Breath of the Wild" -> "The Legend of Zelda" (removes subtitle for duplicate checking)
-    // - "The Legend of Zelda: Ocarina of Time" -> "The Legend of Zelda" (same series)
-    // - "Half-Life 2: Episode One" -> "Half-Life 2" (removes colon content, keeps number)
-    // - "Half-Life 2: Episode Two" -> "Half-Life 2" (same series)
-    // - "Super Mario Galaxy 2" -> "Super Mario Galaxy" (removes trailing number for duplicate checking)
-    // - "Super Mario Galaxy" -> "Super Mario Galaxy" (same series)
-    // - "Ori and the Will of the Wisps" -> "Ori" (removes "and the [subtitle]" pattern)
-    // - "Ori and the Blind Forest" -> "Ori" (same series)
+    // 
+    // Example: If "Final Fantasy IX" is recommended, we extract "Final Fantasy" to check if we've
+    // already recommended a game from that series. If "Final Fantasy VII" comes up next, we skip it
+    // because "Final Fantasy" is already in seenSeries. But the email shows "Final Fantasy IX", not "Final Fantasy".
+    // 
+    // Rules:
+    // 1. Games with colons containing "Episode" → extract base name (e.g., "Half-Life 2: Episode One" → "Half-Life 2")
+    // 2. Games with colons (no Episode) → extract base name (e.g., "The Legend of Zelda: Breath of the Wild" → "The Legend of Zelda")
+    // 3. Games without colons → remove trailing numbers/Roman numerals to get base series (e.g., "Super Mario Galaxy 2" → "Super Mario Galaxy")
+    // 4. Handle "and the" pattern (e.g., "Ori and the Will of the Wisps" → "Ori")
+    // 5. Remove edition names (Remastered, Definitive Edition, etc.)
+    //
+    // Examples:
+    // - "Super Mario Galaxy" → "Super Mario Galaxy" (no number to remove)
+    // - "Super Mario Galaxy 2" → "Super Mario Galaxy" (remove trailing number - 3 words, same series, won't appear together)
+    // - "Final Fantasy IX" → "Final Fantasy" (remove Roman numeral)
+    // - "Final Fantasy VII" → "Final Fantasy" (remove Roman numeral - same series, won't appear together)
+    // - "Half-Life 2: Episode One" → "Half-Life 2" (extract because Episode, keep number)
+    // - "Half-Life 2" → "Half-Life 2" (keep number - 2 words, matches with Episode games, same series)
+    // - "The Legend of Zelda: Breath of the Wild" → "The Legend of Zelda" (extract because colon)
+    // - "The Legend of Zelda: Ocarina of Time" → "The Legend of Zelda" (same series)
+    // - "Ori and the Will of the Wisps" → "Ori" (extract "and the" pattern)
+    // - "Ori and the Blind Forest" → "Ori" (same series)
+    // Note: Games in the same series won't appear together in the same email, but can appear in different weeks
     const extractSeriesName = (gameName: string): string => {
       let series = gameName
         .replace(/\s*\([^)]*\)/g, '') // Remove parenthetical content (years, subtitles)
@@ -482,27 +496,57 @@ export async function getWeeklyGameRecommendations(
         }
       }
       
-      // Handle colons: remove everything after colon to group by main series name
-      // This groups "The Legend of Zelda: Breath of the Wild" and "The Legend of Zelda: Ocarina of Time" together
-      // For "Half-Life 2: Episode One", we keep "Half-Life 2" (the number is part of the series identifier)
+      // Handle colons: check if it contains "Episode" or is a regular subtitle
       const colonIndex = series.indexOf(':');
+      let hadColonWithEpisode = false;
       if (colonIndex > 0) {
-        series = series.substring(0, colonIndex).trim();
-        // After removing colon content, we keep the number (e.g., "Half-Life 2" stays "Half-Life 2")
-        // This groups episodes of the same numbered game together
+        const afterColon = series.substring(colonIndex + 1).trim();
+        const hasEpisode = /\bepisode\b/i.test(afterColon);
+        
+        if (hasEpisode) {
+          // Game has "Episode" in the colon content - extract base name (e.g., "Half-Life 2: Episode One" → "Half-Life 2")
+          // Keep the number because episodes are part of a numbered game
+          series = series.substring(0, colonIndex).trim();
+          hadColonWithEpisode = true; // Mark that we should keep the number
+        } else {
+          // Regular colon subtitle - extract base name (e.g., "The Legend of Zelda: Breath of the Wild" → "The Legend of Zelda")
+          series = series.substring(0, colonIndex).trim();
+        }
       }
       
-      // Remove trailing numbers and Roman numerals ONLY if there's no colon (pure sequels)
-      // This groups "Final Fantasy IX" and "Final Fantasy VII" together as "Final Fantasy"
-      // Also handles "Super Mario Galaxy 2" -> "Super Mario Galaxy"
-      // But keeps "Half-Life 2" as "Half-Life 2" (since it had a colon, we already processed it)
-      // Pattern matches: space followed by digits, or Roman numerals at the very end
-      if (colonIndex === -1) {
-        // Only remove trailing numbers/Roman numerals if there was no colon
-        series = series.replace(/\s+\d+$/, ''); // Remove trailing numbers like " 2", " 3", etc.
-        // Remove trailing Roman numerals (handles I, II, III, IV, V, VI, VII, VIII, IX, X, XI, XII, etc.)
-        series = series.replace(/\s+[IVXLCDM]+$/i, ''); // Expanded to include L, C, D, M for larger numbers
+      // For games without colons, or after extracting colon content:
+      // Remove trailing numbers and Roman numerals to get the base series name
+      // This ensures games in the same series (e.g., "Super Mario Galaxy" and "Super Mario Galaxy 2")
+      // are treated as the same series and won't appear together in the same email
+      // Exception: If the game had a colon with "Episode", keep the number (already extracted above)
+      if (!hadColonWithEpisode) {
+        // Check if the series ends with a number
+        const endsWithNumber = /\s+\d+$/.test(series);
+        
+        if (endsWithNumber) {
+          // Extract the base name (without the number) to check its length
+          const baseName = series.replace(/\s+\d+$/, '').trim();
+          // Count words in base name (split by space or hyphen)
+          const wordCount = baseName.split(/[\s-]+/).filter(w => w.length > 0).length;
+          
+          // Heuristic: Keep numbers for short series names (1-2 words) that might have episodes
+          // Examples: "Half-Life 2" (2 words) → keep "2" to match with "Half-Life 2: Episode One"
+          //           "Doom 2" (1 word) → keep "2" (might have episodes)
+          // Remove numbers for longer series (likely sequels like "Super Mario Galaxy 2")
+          if (wordCount <= 2) {
+            // Keep the number - might have episodes, so keep it to match with episode games
+            // Don't remove it
+          } else {
+            // Longer series name - likely a sequel, remove the number
+            series = baseName;
+          }
+        } else {
+          // Doesn't end with number, so remove Roman numerals
+          series = series.replace(/\s+[IVXLCDM]+$/i, ''); // Remove trailing Roman numerals
+        }
       }
+      // If it had a colon with Episode, we keep the number (e.g., "Half-Life 2: Episode One" → "Half-Life 2")
+      // This allows "Half-Life 2" (base game, 2 words, keeps number) to match with "Half-Life 2: Episode One"
       
       let result = series.trim();
       result = result.replace(/\s+/g, ' '); // Multiple spaces to single space
@@ -640,7 +684,11 @@ export async function getWeeklyGameRecommendations(
 
     // Step 13: If we don't have enough recommendations, try additional genres
     if (allRecommendations.length < 5) {
-      const fallbackGenres = ['Action-Adventure', 'RPG', 'Action', 'Adventure', 'Shooter', 'Platformer'];
+      const fallbackGenres = [
+        'Action-Adventure', 'RPG', 'Action', 'Adventure', 'Shooter', 'Platformer',
+        'Puzzle', 'Racing', 'Fighting', 'Sports', 'Horror', 'Stealth',
+        'Simulation', 'Survival', 'Strategy', 'MOBA', 'Battle Royale', 'MMORPG'
+      ];
       for (const genre of fallbackGenres) {
         if (allRecommendations.length >= 5) break;
         if (primaryGenres.includes(genre)) continue;
@@ -717,6 +765,8 @@ export async function getWeeklyGameRecommendations(
     });
 
     // Return 5 recommendations
+    // NOTE: allRecommendations contains the FULL game names (e.g., "Final Fantasy IX", "Super Mario Galaxy 2")
+    // These are what will be displayed in the email. extractSeriesName() is only used for duplicate checking.
     const finalRecommendations = allRecommendations.slice(0, 5);
     
     // Save recommended games to user's weeklyDigest for future exclusion
@@ -803,23 +853,77 @@ export async function getWeeklyGameRecommendations(
     });
     
     // Fallback to default recommendations with timeout
+    // Try multiple genres for variety instead of just Action-Adventure
+    const fallbackGenres = [
+      'Action-Adventure', 'RPG', 'Platformer', 'Shooter', 'Puzzle', 'Adventure', 'Action', 'Strategy',
+      'Racing', 'Fighting', 'Sports', 'Horror', 'Stealth', 'Simulation', 'Survival',
+      'MOBA', 'Battle Royale', 'MMORPG', 'Rhythm', 'Sandbox'
+    ];
+    const fallbackRecommendations: string[] = [];
+    
     try {
-      const fallbackStartTime = Date.now();
-      const fallbackRecs = await withTimeout(
-        fetchRecommendations('Action-Adventure', { currentPopular: true }),
-        15000, // 15 seconds timeout for fallback
-        'Fetch fallback Action-Adventure recommendations'
-      );
-      const duration = Date.now() - fallbackStartTime;
-      console.log('[Weekly Digest] Fallback recommendations fetched successfully', {
-        username,
-        genre: 'Action-Adventure',
-        recommendationsCount: fallbackRecs.length,
-        duration,
-        timestamp: new Date().toISOString(),
-        operation: 'get-weekly-game-recommendations-fallback'
-      });
-      return fallbackRecs;
+      // Try each genre until we have at least 5 recommendations
+      for (const genre of fallbackGenres) {
+        if (fallbackRecommendations.length >= 5) break;
+        
+        const genreStartTime = Date.now();
+        try {
+          const genreRecs = await withTimeout(
+            fetchRecommendations(genre, { currentPopular: true }),
+            10000, // 10 seconds timeout per genre (shorter since we're trying multiple)
+            `Fetch fallback recommendations for genre ${genre}`
+          );
+          
+          // Add unique recommendations (avoid duplicates)
+          for (const rec of genreRecs) {
+            if (fallbackRecommendations.length >= 5) break;
+            const recLower = rec.toLowerCase().trim();
+            if (!fallbackRecommendations.some(r => r.toLowerCase().trim() === recLower)) {
+              fallbackRecommendations.push(rec);
+            }
+          }
+          
+          const duration = Date.now() - genreStartTime;
+          console.log(`[Weekly Digest] Fallback genre ${genre} fetched`, {
+            username,
+            genre,
+            recommendationsCount: genreRecs.length,
+            totalSoFar: fallbackRecommendations.length,
+            duration,
+            timestamp: new Date().toISOString(),
+            operation: 'get-weekly-game-recommendations-fallback'
+          });
+        } catch (genreError) {
+          const genreErrorMessage = genreError instanceof Error ? genreError.message : 'Unknown error';
+          console.warn(`[Weekly Digest] Fallback genre ${genre} failed, trying next`, {
+            username,
+            genre,
+            error: genreErrorMessage,
+            timestamp: new Date().toISOString(),
+            operation: 'get-weekly-game-recommendations-fallback-genre'
+          });
+          // Continue to next genre
+        }
+      }
+      
+      if (fallbackRecommendations.length > 0) {
+        console.log('[Weekly Digest] Fallback recommendations fetched successfully', {
+          username,
+          genresTried: fallbackGenres.slice(0, Math.ceil(fallbackRecommendations.length / 5)),
+          recommendationsCount: fallbackRecommendations.length,
+          timestamp: new Date().toISOString(),
+          operation: 'get-weekly-game-recommendations-fallback'
+        });
+        return fallbackRecommendations.slice(0, 5); // Return up to 5 recommendations
+      } else {
+        console.warn('[Weekly Digest] All fallback genres failed, returning empty array', {
+          username,
+          genresTried: fallbackGenres,
+          timestamp: new Date().toISOString(),
+          operation: 'get-weekly-game-recommendations-fallback'
+        });
+        return [];
+      }
     } catch (fallbackError) {
       const fallbackErrorMessage = fallbackError instanceof Error ? fallbackError.message : 'Unknown error';
       console.error('[Weekly Digest] Error with fallback recommendations', {
