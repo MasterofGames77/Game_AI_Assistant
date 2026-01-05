@@ -39,8 +39,8 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
       return;
     }
 
-    // Phase 2: Get today's challenges (3 challenges)
-    const todaysChallenges = getTodaysChallenges();
+    // Phase 2: Get today's challenges (3 challenges) - user-specific
+    const todaysChallenges = getTodaysChallenges(username);
 
     // Async function to check progress and completion for all challenges
     const checkProgress = async () => {

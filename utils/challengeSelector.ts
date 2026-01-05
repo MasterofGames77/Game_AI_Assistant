@@ -18,15 +18,30 @@ export function getTodayDateString(): string {
 
 /**
  * Get a deterministic challenge for a specific date and index
- * Uses date and index as seed for consistent daily selection
- * All users will get the same challenges on the same day
+ * Uses date, username (optional), and index as seed for consistent daily selection
+ * If username is provided, each user gets unique challenges; otherwise all users get the same challenges
  * @param dateString - Date in YYYY-MM-DD format
  * @param index - Index of challenge (0, 1, or 2 for 3 challenges per day)
+ * @param username - Optional username to make challenges user-specific
  */
-export function getChallengeForDate(dateString: string, index: number = 0): DailyChallenge {
+export function getChallengeForDate(
+  dateString: string,
+  index: number = 0,
+  username?: string
+): DailyChallenge {
   // Convert date string to a number seed
   const date = new Date(dateString + "T00:00:00Z"); // Use UTC midnight
-  const baseSeed = date.getTime();
+  let baseSeed = date.getTime();
+  
+  // If username is provided, incorporate it into the seed for user-specific challenges
+  if (username) {
+    // Convert username to a numeric hash for consistent seeding
+    const usernameHash = username
+      .split("")
+      .reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    // Use a large prime multiplier to ensure username affects seed significantly
+    baseSeed = baseSeed + (usernameHash * 100003);
+  }
   
   // Combine date seed with index to get unique seed for each challenge
   // Use different multipliers for each index to ensure variety
@@ -54,32 +69,81 @@ export function getTodaysChallenge(): DailyChallenge {
 /**
  * Get today's challenges (Phase 2: Multiple Challenges)
  * Returns 3 deterministic challenges for today
- * All users will get the same 3 challenges on the same day
+ * If username is provided, each user gets unique challenges; otherwise all users get the same challenges
+ * Ensures all 3 challenges are unique (no duplicates)
+ * @param username - Optional username to make challenges user-specific
  */
-export function getTodaysChallenges(): DailyChallenge[] {
+export function getTodaysChallenges(username?: string): DailyChallenge[] {
   const today = getTodayDateString();
   const challenges: DailyChallenge[] = [];
-  const usedIndices = new Set<number>();
+  const usedChallengeIds = new Set<string>();
   
   // Generate 3 unique challenges
   for (let i = 0; i < 3; i++) {
     let challenge: DailyChallenge;
     let attempts = 0;
-    const maxAttempts = 50; // Prevent infinite loop
+    const maxAttempts = 100; // Prevent infinite loop
+    let offset = 0; // Offset to try different challenges when duplicates occur
     
     // Keep trying until we get a unique challenge
     do {
-      challenge = getChallengeForDate(today, i);
+      // Use base index + offset to get different challenges
+      // This ensures we get unique challenges even if the seed calculation
+      // would normally produce duplicates
+      challenge = getChallengeForDate(today, i + offset, username);
       attempts++;
+      offset++;
       
-      // If we've used all challenges, allow duplicates
-      if (usedIndices.size >= DAILY_CHALLENGES.length) {
+      // If we've used all challenges, we can't avoid duplicates
+      // But this should be very rare since we have many challenges
+      if (usedChallengeIds.size >= DAILY_CHALLENGES.length) {
         break;
       }
-    } while (usedIndices.has(DAILY_CHALLENGES.indexOf(challenge)) && attempts < maxAttempts);
+      
+      // If we've tried too many times, break to prevent infinite loop
+      if (attempts >= maxAttempts) {
+        // Log warning but continue - this should be very rare
+        console.warn(`[Challenge Selector] Could not find unique challenge after ${maxAttempts} attempts for index ${i}${username ? ` (user: ${username})` : ''}`);
+        break;
+      }
+    } while (usedChallengeIds.has(challenge.id) && attempts < maxAttempts);
     
-    challenges.push(challenge);
-    usedIndices.add(DAILY_CHALLENGES.indexOf(challenge));
+    // Only add if we haven't seen this challenge ID before
+    if (!usedChallengeIds.has(challenge.id)) {
+      challenges.push(challenge);
+      usedChallengeIds.add(challenge.id);
+    } else {
+      // If we still have a duplicate after all attempts, try selecting from remaining challenges
+      // This is a fallback to ensure we always return 3 challenges
+      const remainingChallenges = DAILY_CHALLENGES.filter(
+        c => !usedChallengeIds.has(c.id)
+      );
+      
+      if (remainingChallenges.length > 0) {
+        // Use a deterministic selection from remaining challenges
+        // Include username in seed if provided for user-specific fallback
+        const date = new Date(today + "T00:00:00Z");
+        let seed = date.getTime() + (i * 1000);
+        
+        // Add username hash to seed if provided
+        if (username) {
+          const usernameHash = username
+            .split("")
+            .reduce((acc, char) => acc + char.charCodeAt(0), 0);
+          seed = seed + (usernameHash * 100003);
+        }
+        
+        const fallbackIndex = Math.abs(Math.floor(Math.sin(seed) * 10000)) % remainingChallenges.length;
+        const fallbackChallenge = remainingChallenges[fallbackIndex];
+        
+        challenges.push(fallbackChallenge);
+        usedChallengeIds.add(fallbackChallenge.id);
+      } else {
+        // Last resort: if all challenges are used, we have to allow a duplicate
+        // This should never happen in practice since we have many challenges
+        challenges.push(challenge);
+      }
+    }
   }
   
   return challenges;
