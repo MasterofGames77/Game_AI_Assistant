@@ -2476,11 +2476,15 @@ function extractGameTitleCandidates(question: string): string[] {
   // Added "of" to catch patterns like "versions of Deisim", "differences between versions of [Game]"
   // IMPORTANT: Preserve remake/remaster/sequel indicators and version indicators (Remake, Remaster, HD, 2, World 2, II, etc.)
   // CRITICAL: Capture full game titles including colons and subtitles (e.g., "The Legend of Zelda: Breath of the Wild")
-  // Pattern: "in [Title]: [Subtitle]" or "in [Title]" - captures up to question mark, period, or end of string
+  // CRITICAL: Also capture titles with subtitles that don't use colons (e.g., "Super Mario Bros. Wonder")
+  // Pattern: "in [Title]: [Subtitle]" or "in [Title] [Subtitle]" - captures up to question mark, period, or end of string
   // IMPORTANT: Pattern explicitly handles colons - captures "Title: Subtitle" as a single candidate
+  // IMPORTANT: Pattern also captures titles with space-separated subtitles (e.g., "Super Mario Bros. Wonder")
   // The pattern captures: "in The Legend of Zelda: Breath of the Wild" -> "The Legend of Zelda: Breath of the Wild"
+  // The pattern captures: "in Super Mario Bros. Wonder" -> "Super Mario Bros. Wonder"
   // Main title part stops at colon or end, subtitle part (after colon) uses greedy matching to capture full subtitle
-  const inGamePattern = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s'&\-]+?(?:\s*:\s*[A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s'&\-]+)?(?:\s+(?:Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|2|II|3|III|4|IV|World\s*2|World\s*II))?)(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)|$|[?.!])/gi;
+  // For non-colon subtitles, capture up to question mark/period/end, allowing for multi-word subtitles
+  const inGamePattern = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s'&\-]+?(?:\s*:\s*[A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s'&\-]+)?(?:\s+[A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s'&\-]+)*(?:\s+(?:Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|2|II|3|III|4|IV|World\s*2|World\s*II|Wonder|Odyssey|Breath|Wild|Tears|Kingdom))?)(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)|$|[?.!])/gi;
   let match: RegExpExecArray | null;
   while ((match = inGamePattern.exec(question)) !== null) {
     if (match[1]) {
@@ -3330,6 +3334,25 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
       validCandidates = [...inGameCandidates, ...otherCandidates];
     }
     
+    // CRITICAL: Prioritize longer, more specific candidates
+    // If one candidate contains another (e.g., "Super Mario Bros. Wonder" contains "Super Mario Bros."),
+    // try the longer one first as it's more specific
+    validCandidates.sort((a, b) => {
+      const aLower = a.toLowerCase();
+      const bLower = b.toLowerCase();
+      
+      // If one contains the other, prioritize the longer one
+      if (aLower.includes(bLower) && a.length > b.length) {
+        return -1; // a comes first
+      }
+      if (bLower.includes(aLower) && b.length > a.length) {
+        return 1; // b comes first
+      }
+      
+      // Otherwise, sort by length (longer first) for more specific matches
+      return b.length - a.length;
+    });
+    
     // Additional validation: If we have multiple candidates, check if first candidate
     // appears before an "in [Game Title]" pattern (likely a character/enemy/location)
     if (validCandidates.length > 1) {
@@ -3700,6 +3723,12 @@ function detectQuestionCategory(question: string): string | undefined {
     return 'character';
   }
 
+  // Level/walkthrough patterns (check BEFORE general "how to" to catch level questions)
+  // This includes "how to beat the level", "how to complete", etc.
+  if (/(walkthrough|guide|how to get|how to reach|how do i get|location|where is|find|locate|how to clear|how to complete|how to beat.*level|how to beat.*stage|how to beat.*area|temple|dungeon|area|level|stage|mission|quest)/i.test(lowerQuestion)) {
+    return 'level_walkthrough';
+  }
+
   // Achievement/completion patterns - but only if it's specifically about achievements/trophies
   // Don't match just "unlock" if it's part of "how to unlock" (general gameplay)
   if (/^(how to|what is|explain|tell me about|help with)/i.test(lowerQuestion)) {
@@ -3714,11 +3743,6 @@ function detectQuestionCategory(question: string): string | undefined {
   // Achievement pattern for questions that mention achievements but don't start with "how to"
   if (/(achievement|trophy|100%|complete|completion|collect all|unlock)/i.test(lowerQuestion)) {
     return 'achievement';
-  }
-
-  // Level/walkthrough patterns (including temple, dungeon, area, clear)
-  if (/(walkthrough|guide|how to get|how to reach|how do i get|location|where is|find|locate|how to clear|how to complete|temple|dungeon|area|level)/i.test(lowerQuestion)) {
-    return 'level_walkthrough';
   }
 
   // Performance/technical patterns
