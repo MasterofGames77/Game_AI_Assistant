@@ -52,6 +52,19 @@ export async function createOrUpdateSession(
 
     if (existingSession) {
       // Update existing session
+      // If session is inactive, don't reactivate it - it was explicitly revoked or user logged out
+      // The refresh endpoint will block refresh for inactive sessions, so this is a safety check
+      if (existingSession.isActive === false) {
+        // Session was revoked or user logged out - don't reactivate
+        // Just update lastActivity for tracking purposes, but keep it inactive
+        existingSession.lastActivity = new Date();
+        existingSession.deviceInfo = deviceInfo;
+        existingSession.ipAddress = ipAddress;
+        await existingSession.save();
+        return existingSession;
+      }
+      
+      // Session is active - update it normally
       existingSession.lastActivity = new Date();
       existingSession.isActive = true;
       existingSession.deviceInfo = deviceInfo;
@@ -66,6 +79,19 @@ export async function createOrUpdateSession(
     if (existingSession) {
       // Session with this ID exists but different refreshTokenHash
       // This can happen during token refresh - update it with new hash
+      // If session is inactive, don't reactivate it - it was explicitly revoked or user logged out
+      if (existingSession.isActive === false) {
+        // Session was revoked or user logged out - don't reactivate
+        // Just update lastActivity and hash for tracking purposes, but keep it inactive
+        existingSession.refreshTokenHash = refreshTokenHash;
+        existingSession.lastActivity = new Date();
+        existingSession.deviceInfo = deviceInfo;
+        existingSession.ipAddress = ipAddress;
+        await existingSession.save();
+        return existingSession;
+      }
+      
+      // Session is active - update it normally
       existingSession.refreshTokenHash = refreshTokenHash;
       existingSession.lastActivity = new Date();
       existingSession.isActive = true;
@@ -87,7 +113,7 @@ export async function createOrUpdateSession(
           deviceInfo,
           ipAddress,
           lastActivity: new Date(),
-          isActive: true,
+          isActive: true, // New sessions are always active
         },
         {
           upsert: true,
@@ -102,6 +128,19 @@ export async function createOrUpdateSession(
         // Duplicate key - find existing session and update it
         const existing = await Session.findOne({ sessionId });
         if (existing) {
+          // If session is inactive, don't reactivate it - it was explicitly revoked or user logged out
+          if (existing.isActive === false) {
+            // Session was revoked or user logged out - don't reactivate
+            // Just update lastActivity and hash for tracking purposes, but keep it inactive
+            existing.refreshTokenHash = refreshTokenHash;
+            existing.lastActivity = new Date();
+            existing.deviceInfo = deviceInfo;
+            existing.ipAddress = ipAddress;
+            await existing.save();
+            return existing;
+          }
+          
+          // Session is active - update it normally
           existing.refreshTokenHash = refreshTokenHash;
           existing.lastActivity = new Date();
           existing.isActive = true;

@@ -42,30 +42,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         userId: decoded.userId,
       }).lean() as any;
 
-      // If session exists and is inactive, we have two options:
-      // 1. Block refresh (if session was explicitly revoked by user)
-      // 2. Allow refresh and reactivate session (if session was accidentally marked inactive)
-      // 
-      // For now, we'll be lenient: if the token is valid (not expired, not blacklisted),
-      // we'll allow refresh. The session will be updated/recreated by setAuthCookiesWithSession.
-      // This ensures backward compatibility and handles edge cases.
-      //
-      // If a user explicitly revoked a session, they would need to sign in again anyway,
-      // so blocking here is redundant. The blacklist check in verifyRefreshToken already
-      // handles revoked tokens.
+      // If session exists and is inactive, block refresh
+      // This ensures that revoked sessions or logged-out sessions cannot be refreshed
+      // Users must sign in again to create a new active session
       if (session && 
           typeof session === 'object' && 
           'isActive' in session && 
           session.isActive === false) {
-        // Session is marked inactive, but token is valid
-        // Allow refresh - the session will be reactivated/updated by setAuthCookiesWithSession
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[Refresh] Session marked inactive but token valid - allowing refresh and reactivating', {
-            sessionId: session.sessionId,
-            userId: decoded.userId,
-          });
-        }
-        // Continue with refresh - don't block
+        // Session was explicitly revoked or user logged out
+        // Block refresh and require re-authentication
+        return res.status(401).json({
+          message: 'Session has been revoked. Please sign in again.',
+        });
       }
       
       // If session doesn't exist, is active, or doesn't have isActive property, allow refresh

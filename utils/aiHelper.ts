@@ -2482,9 +2482,11 @@ function extractGameTitleCandidates(question: string): string[] {
   // IMPORTANT: Pattern also captures titles with space-separated subtitles (e.g., "Super Mario Bros. Wonder")
   // The pattern captures: "in The Legend of Zelda: Breath of the Wild" -> "The Legend of Zelda: Breath of the Wild"
   // The pattern captures: "in Super Mario Bros. Wonder" -> "Super Mario Bros. Wonder"
-  // Main title part stops at colon or end, subtitle part (after colon) uses greedy matching to capture full subtitle
-  // For non-colon subtitles, capture up to question mark/period/end, allowing for multi-word subtitles
-  const inGamePattern = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s'&\-]+?(?:\s*:\s*[A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s'&\-]+)?(?:\s+[A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s'&\-]+)*(?:\s+(?:Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|2|II|3|III|4|IV|World\s*2|World\s*II|Wonder|Odyssey|Breath|Wild|Tears|Kingdom))?)(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)|$|[?.!])/gi;
+  // CRITICAL: Use greedy matching to capture the longest possible title including subtitles
+  // The pattern captures everything from "in" until a question mark, period, or end of string
+  // For questions ending with "?", capture everything up to the "?" (e.g., "in Super Mario Bros. Wonder?")
+  // Use greedy matching to capture the full title including subtitles (change +? to + for greedy)
+  const inGamePattern = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s'&\-:]+)(?=\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)\b|[?.!]|$)/gi;
   let match: RegExpExecArray | null;
   while ((match = inGamePattern.exec(question)) !== null) {
     if (match[1]) {
