@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import path from 'path';
+import { getGameReleaseDate } from './aiHelper';
 
 // Load environment variables from both .env and .env.local
 dotenv.config(); // Loads .env by default
@@ -21,6 +22,43 @@ function getOpenAIClient(): OpenAI {
     });
   }
   return openaiInstance;
+}
+
+/**
+ * Select the appropriate OpenAI model for automated users based on game release date
+ * - GPT-5.2 for games released 2024+ (better knowledge cutoff - Aug 2025 vs Oct 2023)
+ * - GPT-4o for games released before 2024 (proven quality, cost-effective)
+ * 
+ * This matches the logic used by the main Video Game Wingman assistant
+ * 
+ * @param gameTitle - Game title to check release date for
+ * @returns Model name to use ('gpt-5.2' or 'gpt-4o')
+ */
+async function selectModelForAutomatedUser(gameTitle: string): Promise<string> {
+  const CUTOFF_YEAR = 2024; // Games released 2024+ use GPT-5.2
+  const DEFAULT_MODEL = 'gpt-4o'; // Default for automated users (not search-preview)
+  
+  try {
+    const releaseDate = await getGameReleaseDate(gameTitle);
+    
+    if (releaseDate) {
+      const releaseYear = releaseDate.getFullYear();
+      
+      if (releaseYear >= CUTOFF_YEAR) {
+        console.log(`[Automated User] Using GPT-5.2 for ${gameTitle} (released ${releaseYear})`);
+        return 'gpt-5.2';
+      } else {
+        console.log(`[Automated User] Using GPT-4o for ${gameTitle} (released ${releaseYear})`);
+        return DEFAULT_MODEL;
+      }
+    }
+  } catch (error) {
+    console.error(`[Automated User] Error determining model for ${gameTitle}:`, error);
+  }
+  
+  // Default to GPT-4o if we can't determine release date
+  console.log(`[Automated User] Using default GPT-4o for ${gameTitle} (release date unavailable)`);
+  return DEFAULT_MODEL;
 }
 
 export interface UserPreferences {
@@ -75,7 +113,6 @@ export async function generateQuestion(
   const { gameTitle, genre, userPreferences, previousQuestions = [], preferredQuestionTypes = [] } = options;
   
   const isSinglePlayer = userPreferences.focus === 'single-player';
-  const username = isSinglePlayer ? 'MysteriousMrEnter' : 'WaywardJammer';
   
   // Build previous questions context for uniqueness
   let previousQuestionsContext = '';
@@ -219,8 +256,11 @@ Genre: ${genre} (Racing/Battle Royale/Fighting/FPS/Sandbox focus)
 Generate ONLY the direct question, nothing else:`;
 
   try {
+    // Select model based on game release date (GPT-5.2 for 2024+ games, GPT-4o for older)
+    const selectedModel = await selectModelForAutomatedUser(gameTitle);
+    
     const completion = await getOpenAIClient().chat.completions.create({
-      model: 'gpt-4o',
+      model: selectedModel,
       messages: [
         {
           role: 'system',
@@ -449,12 +489,10 @@ export async function generateForumPost(
   const { gameTitle, genre, userPreferences, forumTopic, forumCategory, previousPosts = [] } = options;
   
   const isSinglePlayer = userPreferences.focus === 'single-player';
-  // Determine username - check if this is for InterdimensionalHipster by checking if they have both types of genres
+  // Determine if this is for InterdimensionalHipster by checking if they have both types of genres
   const isInterdimensionalHipster = userPreferences.genres.length > 5 && 
     userPreferences.genres.some(g => ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer'].includes(g)) &&
     userPreferences.genres.some(g => ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox'].includes(g));
-  
-  const username = isInterdimensionalHipster ? 'InterdimensionalHipster' : (isSinglePlayer ? 'MysteriousMrEnter' : 'WaywardJammer');
   
   // Check if this is a single-player or multiplayer game based on genre
   const singlePlayerGenres = ['rpg', 'adventure', 'simulation', 'puzzle', 'platformer'];
@@ -618,8 +656,11 @@ Forum Category: ${forumCategory || 'general'}
 Generate ONLY the post content, nothing else:`;
 
   try {
+    // Select model based on game release date (GPT-5.2 for 2024+ games, GPT-4o for older)
+    const selectedModel = await selectModelForAutomatedUser(gameTitle);
+    
     const completion = await getOpenAIClient().chat.completions.create({
-      model: 'gpt-4o',
+      model: selectedModel,
       messages: [
         {
           role: 'system',
@@ -712,8 +753,11 @@ Original Post:
 Generate ONLY the reply content, nothing else:`;
 
   try {
+    // Select model based on game release date (GPT-5.2 for 2024+ games, GPT-4o for older)
+    const selectedModel = await selectModelForAutomatedUser(gameTitle);
+    
     const completion = await getOpenAIClient().chat.completions.create({
-      model: 'gpt-4o',
+      model: selectedModel,
       messages: [
         {
           role: 'system',
@@ -819,8 +863,11 @@ Forum Category: ${forumCategory || 'general'}
 Generate ONLY the post content, nothing else:`;
 
   try {
+    // Select model based on game release date (GPT-5.2 for 2024+ games, GPT-4o for older)
+    const selectedModel = await selectModelForAutomatedUser(gameTitle);
+    
     const completion = await getOpenAIClient().chat.completions.create({
-      model: 'gpt-4o',
+      model: selectedModel,
       messages: [
         {
           role: 'system',
@@ -924,8 +971,11 @@ Original Post:
 Generate ONLY the reply content, nothing else:`;
 
   try {
+    // Select model based on game release date (GPT-5.2 for 2024+ games, GPT-4o for older)
+    const selectedModel = await selectModelForAutomatedUser(gameTitle);
+    
     const completion = await getOpenAIClient().chat.completions.create({
-      model: 'gpt-4o',
+      model: selectedModel,
       messages: [
         {
           role: 'system',

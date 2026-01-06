@@ -245,6 +245,14 @@ function getBaseUrl(): string {
 }
 
 /**
+ * Normalize game title for consistent comparison (case-insensitive, trimmed)
+ * This ensures we can match game titles even if they have slight variations
+ */
+function normalizeGameTitle(title: string): string {
+  return title.toLowerCase().trim();
+}
+
+/**
  * Load game list for a user based on their preferences
  * InterdimensionalHipster can access both single-player and multiplayer games
  */
@@ -443,23 +451,33 @@ export async function askQuestion(
       // Continue even if we can't fetch previous questions
     }
     
-    // Load available games
+    // Load available games from JSON files
     const { games } = loadGameList(userPreferences);
+    console.log(`[ASK QUESTION] Loaded ${games.length} games from JSON files for ${username}`);
     
-    // Prioritize games that haven't been asked about recently (70% chance)
+    // Prioritize games that haven't been asked about recently (80% chance)
     // Or games that have been asked about fewer times
-    const shouldPrioritizeNewGames = Math.random() < 0.7;
+    const shouldPrioritizeNewGames = Math.random() < 0.8;
     
     let gameSelection: { gameTitle: string; genre: string } | null = null;
     
     if (shouldPrioritizeNewGames && games.length > 0) {
       // Find games that haven't been asked about (or asked about less frequently)
+      // Normalize both the game list and the asked-about games for comparison
       const gamesNotAskedAbout = games.filter(game => {
-        const gameLower = game.toLowerCase();
-        const askCount = gamesAskedAbout[gameLower] || 0;
+        const gameLower = normalizeGameTitle(game);
+        // Check against normalized asked-about games
+        const askCount = Object.keys(gamesAskedAbout).reduce((count, askedGame) => {
+          if (normalizeGameTitle(askedGame) === gameLower) {
+            return count + (gamesAskedAbout[askedGame] || 0);
+          }
+          return count;
+        }, 0);
         // Prioritize games with 0-2 questions (not asked about much)
         return askCount < 3;
       });
+      
+      console.log(`[ASK QUESTION] Games not asked about much: ${gamesNotAskedAbout.length} out of ${games.length}`);
       
       if (gamesNotAskedAbout.length > 0) {
         // Select from games that haven't been asked about much
@@ -467,8 +485,10 @@ export async function askQuestion(
         const gameGenre = determineGenreFromGame(randomGame);
         if (randomGame && gameGenre) {
           gameSelection = { gameTitle: randomGame, genre: gameGenre };
-          console.log(`[ASK QUESTION] Selected game NOT asked about recently: ${randomGame}`);
+          console.log(`[ASK QUESTION] Selected game NOT asked about recently: ${randomGame} (genre: ${gameGenre})`);
         }
+      } else {
+        console.log(`[ASK QUESTION] All games have been asked about recently, will select from all games`);
       }
     }
     
@@ -482,7 +502,7 @@ export async function askQuestion(
           error: 'No games found'
         };
       }
-      console.log(`[ASK QUESTION] Selected game from preferences: ${gameSelection.gameTitle}`);
+      console.log(`[ASK QUESTION] Selected game from preferences: ${gameSelection.gameTitle} (genre: ${gameSelection.genre})`);
     }
     
     const { gameTitle, genre } = gameSelection;
@@ -660,21 +680,33 @@ async function createForumForGame(
     
     // CRITICAL: Check if a forum with the same game AND category already exists
     // This prevents duplicate forums like "Story of Seasons - General Discussion" being created multiple times
-    const existingForum = await Forum.findOne({
-      gameTitle: { $regex: new RegExp(`^${gameTitle}$`, 'i') }, // Case-insensitive match
-      category: selectedCategory,
-      'metadata.status': 'active'
-    }).lean() as any;
+    // BUT allows multiple forums per game as long as they have different categories
+    const gameTitleNormalized = normalizeGameTitle(gameTitle);
     
-    if (existingForum) {
-      console.log(`[FORUM CREATION] Forum already exists for ${gameTitle} with category ${selectedCategory}. Forum ID: ${existingForum.forumId}`);
+    // Find all active forums for this game (case-insensitive)
+    const existingForums = await Forum.find({
+      gameTitle: { $regex: new RegExp(`^${gameTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }, // Escape special regex chars, case-insensitive
+      'metadata.status': 'active'
+    }).lean() as any[];
+    
+    // Check if any existing forum has the same category
+    const existingForumWithCategory = existingForums.find((f: any) => {
+      const forumCategory = (f.category || 'general').toLowerCase();
+      return forumCategory === selectedCategory.toLowerCase();
+    });
+    
+    if (existingForumWithCategory) {
+      console.log(`[FORUM CREATION] Forum already exists for ${gameTitle} with category ${selectedCategory}. Forum ID: ${existingForumWithCategory.forumId}`);
       // Return the existing forum info instead of creating a duplicate
       return {
-        forumId: existingForum.forumId || (existingForum._id as any).toString(),
-        forumTitle: existingForum.title || `${gameTitle} - General Discussion`,
+        forumId: existingForumWithCategory.forumId || (existingForumWithCategory._id as any).toString(),
+        forumTitle: existingForumWithCategory.title || `${gameTitle} - General Discussion`,
         category: selectedCategory
       };
     }
+    
+    // No forum exists for this game+category combination - we can create a new one
+    console.log(`[FORUM CREATION] No forum exists for ${gameTitle} with category ${selectedCategory}. Found ${existingForums.length} forum(s) with other categories.`);
     
     // Generate forum title based on category
     const categoryTitles: { [key: string]: string } = {
@@ -874,24 +906,35 @@ export async function createForumPost(
     }
     
     // NEW LOGIC: Prioritize creating forums for games that DON'T have forums yet
-    // Track which games already have forums
+    // Track which games already have forums (by game title, case-insensitive)
+    // Also track which game+category combinations exist
     const gamesWithForums = new Set<string>();
     const forumCountsByGame: { [gameTitle: string]: number } = {};
+    const gameCategoryCombinations = new Set<string>(); // Format: "gametitle|category"
+    
+    // Normalize game title for consistent comparison
+    const normalizeGameTitle = (title: string): string => {
+      return title.toLowerCase().trim();
+    };
     
     forums.forEach((f: any) => {
       if (f.gameTitle && f.metadata?.status === 'active') {
-        const gameTitleLower = f.gameTitle.toLowerCase();
+        const gameTitleLower = normalizeGameTitle(f.gameTitle);
+        const category = (f.category || 'general').toLowerCase();
         gamesWithForums.add(gameTitleLower);
         forumCountsByGame[gameTitleLower] = (forumCountsByGame[gameTitleLower] || 0) + 1;
+        // Track game+category combinations
+        gameCategoryCombinations.add(`${gameTitleLower}|${category}`);
       }
     });
     
     console.log(`[FORUM POST] Games with existing forums: ${gamesWithForums.size}`);
     console.log(`[FORUM POST] Forum counts: ${JSON.stringify(forumCountsByGame)}`);
+    console.log(`[FORUM POST] Game+category combinations: ${gameCategoryCombinations.size}`);
     
-    // Strategy: 60% chance to prioritize games WITHOUT forums (to create new forums)
-    // 40% chance to post in existing forums (to maintain activity)
-    const shouldPrioritizeNewForums = Math.random() < 0.6;
+    // Strategy: 70% chance to prioritize games WITHOUT forums or games missing specific categories (to create new forums)
+    // 30% chance to post in existing forums (to maintain activity)
+    const shouldPrioritizeNewForums = Math.random() < 0.7;
     
     let gameSelection: { gameTitle: string; genre: string } | null = null;
     let selectedFromExistingForums = false;
@@ -899,23 +942,41 @@ export async function createForumPost(
     
     if (shouldPrioritizeNewForums) {
       // PRIORITY: Find games from user preferences that DON'T have forums yet
+      // OR games that don't have forums with all categories yet
       const { games } = loadGameList(userPreferences);
-      const gamesWithoutForums = games.filter(game => {
-        const gameLower = game.toLowerCase();
-        const hasForum = gamesWithForums.has(gameLower);
+      console.log(`[FORUM POST] Available games from JSON files: ${games.length}`);
+      
+      // Filter games that either:
+      // 1. Don't have any forums yet, OR
+      // 2. Have forums but are missing some categories (allows creating forums with different categories)
+      const gamesNeedingForums = games.filter(game => {
+        const gameLower = normalizeGameTitle(game);
+        const hasAnyForum = gamesWithForums.has(gameLower);
         const forumCount = forumCountsByGame[gameLower] || 0;
-        // Also avoid games that already have 3+ forums (too many)
-        return !hasForum || forumCount < 3;
+        
+        // If game has no forums at all, it needs a forum
+        if (!hasAnyForum) {
+          return true;
+        }
+        
+        // If game has forums but less than 5 (one per category), it can still get more forums
+        // This allows multiple forums per game with different categories
+        // We have 5 categories: speedruns, gameplay, mods, general, help
+        return forumCount < 5;
       });
       
-      if (gamesWithoutForums.length > 0) {
-        // Select a random game that doesn't have a forum (or has few forums)
-        const randomGame = gamesWithoutForums[Math.floor(Math.random() * gamesWithoutForums.length)];
+      console.log(`[FORUM POST] Games needing forums: ${gamesNeedingForums.length} out of ${games.length}`);
+      
+      if (gamesNeedingForums.length > 0) {
+        // Select a random game that needs a forum
+        const randomGame = gamesNeedingForums[Math.floor(Math.random() * gamesNeedingForums.length)];
         const gameGenre = determineGenreFromGame(randomGame);
         if (randomGame && gameGenre) {
           gameSelection = { gameTitle: randomGame, genre: gameGenre };
           shouldCreateNewForum = true;
-          console.log(`[FORUM POST] Selected game WITHOUT forum: ${randomGame} (will create new forum)`);
+          const gameLower = normalizeGameTitle(randomGame);
+          const hasForum = gamesWithForums.has(gameLower);
+          console.log(`[FORUM POST] Selected game ${hasForum ? 'with some forums' : 'WITHOUT any forums'}: ${randomGame} (will create new forum with appropriate category)`);
         }
       }
     }
@@ -985,37 +1046,36 @@ export async function createForumPost(
     
     // Now check if a forum exists for this game AND category
     // This prevents duplicate forums like "Story of Seasons - General Discussion" being created multiple times
+    // BUT allows multiple forums per game as long as they have different categories
     let targetForum: any | null = null;
     
-    // First, try to find an existing forum with the same game AND category
-    targetForum = findSuitableForum(forums, username, gameTitle, selectedCategory);
+    // Normalize game title for comparison
+    const gameTitleNormalized = normalizeGameTitle(gameTitle);
+    const categoryKey = `${gameTitleNormalized}|${selectedCategory}`;
     
-    if (targetForum) {
-      // Found an existing forum with matching game and category
-      console.log(`[FORUM POST] Found existing forum for ${gameTitle} with category ${selectedCategory}: ${targetForum.title} (created by: ${targetForum.createdBy || 'unknown'})`);
-      shouldCreateNewForum = false;
-    } else {
-      // No forum found with matching game and category
-      // Check if we should create a new one or post to a different category forum
-      const gameLower = gameTitle.toLowerCase();
-      const forumCount = forumCountsByGame[gameLower] || 0;
-      
-      // If the game already has many forums (3+), try to find any forum for this game (different category)
-      // Otherwise, create a new forum with the selected category
-      if (forumCount >= 3) {
-        // Game has many forums, try to find any forum for this game (any category)
-        targetForum = findSuitableForum(forums, username, gameTitle);
-        if (targetForum) {
-          console.log(`[FORUM POST] Game has ${forumCount} forums, posting to existing forum with different category: ${targetForum.title}`);
-          shouldCreateNewForum = false;
-        } else {
-          // Still create a new one even if game has many forums (but with the selected category)
-          shouldCreateNewForum = true;
-          console.log(`[FORUM POST] Game has ${forumCount} forums but no suitable forum found, will create new forum with category ${selectedCategory}`);
-        }
+    // Check if this exact game+category combination already exists
+    const hasExactMatch = gameCategoryCombinations.has(categoryKey);
+    
+    if (hasExactMatch) {
+      // Forum with this exact game+category already exists, find it and post to it
+      targetForum = findSuitableForum(forums, username, gameTitle, selectedCategory);
+      if (targetForum) {
+        console.log(`[FORUM POST] Found existing forum for ${gameTitle} with category ${selectedCategory}: ${targetForum.title} (created by: ${targetForum.createdBy || 'unknown'})`);
+        shouldCreateNewForum = false;
       } else {
-        // Game doesn't have many forums, create a new one with the selected category
+        // Shouldn't happen, but if it does, create a new one
+        console.warn(`[FORUM POST] Category combination exists but forum not found, will create new forum`);
         shouldCreateNewForum = true;
+      }
+    } else {
+      // No forum exists for this game+category combination
+      // This is good - we can create a new forum with this category
+      // Even if the game already has forums with other categories
+      shouldCreateNewForum = true;
+      const forumCount = forumCountsByGame[gameTitleNormalized] || 0;
+      if (forumCount > 0) {
+        console.log(`[FORUM POST] Game ${gameTitle} has ${forumCount} forum(s) but none with category ${selectedCategory}, will create new forum`);
+      } else {
         console.log(`[FORUM POST] No forum found for ${gameTitle} with category ${selectedCategory}, will create new forum`);
       }
     }
@@ -1452,6 +1512,104 @@ async function findPostToRespondTo(
   
   if (forumsWithPosts.length === 0) {
     return null;
+  }
+  
+  // PRIORITY 0 (HIGHEST): Find posts that @mention the responding user OR are replies to their posts
+  // This ensures common/expert gamers respond to ALL users (real and automated) who mention them or reply to them
+  for (const forum of forumsWithPosts) {
+    const posts = forum.posts || [];
+    
+    // Check for @mentions of the responding user
+    const mentionPattern = new RegExp(`@${respondingUsername}\\b`, 'i');
+    const mentionedPosts = posts
+      .filter((p: any) => 
+        p.username !== respondingUsername &&
+        p.metadata?.status === 'active' &&
+        p.message && mentionPattern.test(p.message)
+      )
+      .sort((a: any, b: any) => {
+        const aTime = new Date(a.timestamp || 0).getTime();
+        const bTime = new Date(b.timestamp || 0).getTime();
+        return bTime - aTime; // Most recent first
+      });
+    
+    if (mentionedPosts.length > 0) {
+      // Check if we've already replied to this post
+      const unrespondedMentions = mentionedPosts.filter((post: any) => {
+        const hasReplied = posts.some((p: any) => 
+          p.username === respondingUsername && 
+          p.replyTo && p.replyTo.toString() === post._id?.toString()
+        );
+        return !hasReplied;
+      });
+      
+      if (unrespondedMentions.length > 0) {
+        const post = unrespondedMentions[0]; // Most recent unresponded mention
+        const postTime = new Date(post.timestamp);
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        
+        if (postTime > sevenDaysAgo) {
+          const genre = determineGenreFromGame(forum.gameTitle || forum.title);
+          console.log(`[POST REPLY] ${respondingUsername} found @mention from ${post.username}`);
+          return {
+            forum,
+            post,
+            gameTitle: forum.gameTitle || 'Unknown Game',
+            genre
+          };
+        }
+      }
+    }
+    
+    // Check for replies to posts made by the responding user
+    const userPosts = posts.filter((p: any) => 
+      p.username === respondingUsername &&
+      p.metadata?.status === 'active'
+    );
+    
+    for (const userPost of userPosts) {
+      // Find replies to this user's post
+      const repliesToUserPost = posts
+        .filter((p: any) => 
+          p.username !== respondingUsername &&
+          p.metadata?.status === 'active' &&
+          p.replyTo && p.replyTo.toString() === userPost._id?.toString()
+        )
+        .sort((a: any, b: any) => {
+          const aTime = new Date(a.timestamp || 0).getTime();
+          const bTime = new Date(b.timestamp || 0).getTime();
+          return bTime - aTime; // Most recent first
+        });
+      
+      if (repliesToUserPost.length > 0) {
+        // Check if we've already replied to this reply
+        const unrespondedReplies = repliesToUserPost.filter((reply: any) => {
+          const hasReplied = posts.some((p: any) => 
+            p.username === respondingUsername && 
+            p.replyTo && p.replyTo.toString() === reply._id?.toString() &&
+            new Date(p.timestamp) > new Date(reply.timestamp)
+          );
+          return !hasReplied;
+        });
+        
+        if (unrespondedReplies.length > 0) {
+          const reply = unrespondedReplies[0]; // Most recent unresponded reply
+          const replyTime = new Date(reply.timestamp);
+          const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+          
+          if (replyTime > sevenDaysAgo) {
+            const genre = determineGenreFromGame(forum.gameTitle || forum.title);
+            console.log(`[POST REPLY] ${respondingUsername} found reply to their post from ${reply.username}`);
+            return {
+              forum,
+              post: reply,
+              gameTitle: forum.gameTitle || 'Unknown Game',
+              genre
+            };
+          }
+        }
+      }
+    }
   }
   
   // Priority 1 (for EXPERT gamers): Find posts from COMMON gamers

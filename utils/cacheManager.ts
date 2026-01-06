@@ -384,7 +384,7 @@ export class CacheManager {
    * Start periodic metrics collection and logging
    */
   private startMetricsCollection(): void {
-    // Log metrics every 15 minutes
+    // Log metrics every 20 minutes
     this.metricsInterval = setInterval(() => {
       const metrics = this.getAllMetrics();
       const memory = this.getTotalMemoryEstimate();
@@ -394,7 +394,7 @@ export class CacheManager {
         memory,
         caches: metrics
       });
-    }, 15 * 60 * 1000); // 15 minutes
+    }, 20 * 60 * 1000); // 20 minutes
   }
 
   /**
@@ -410,4 +410,3 @@ export class CacheManager {
 
 // Export singleton instance
 export const cacheManager = CacheManager.getInstance();
-

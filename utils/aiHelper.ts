@@ -215,7 +215,7 @@ async function fetchReleaseDateFromRAWG(gameTitle: string): Promise<Date | null>
  * Get release date for a game with caching
  * Checks cache first, then tries IGDB, then RAWG
  */
-async function getGameReleaseDate(gameTitle: string): Promise<Date | null> {
+export async function getGameReleaseDate(gameTitle: string): Promise<Date | null> {
   const cacheKey = gameTitle.toLowerCase().trim();
   
   // Check cache first

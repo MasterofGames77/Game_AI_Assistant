@@ -78,28 +78,33 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
             setTimeout(() => setShowRewardNotification(false), 5000);
           }
 
-          // CRITICAL FIX: If we have progress entries for today, use those challenge IDs
-          // This ensures challenges persist across logins and don't regenerate
+          // CRITICAL FIX: If we have progress entries for today, validate they match today's challenges
+          // This ensures challenges reset at midnight UTC (7 PM EST / 8 PM EDT)
+          // If saved challenge IDs don't match today's challenges, regenerate them
           if (backendProgresses.length > 0) {
+            // Get today's challenges to validate against saved progress
+            const todaysGeneratedChallenges = getTodaysChallenges(username);
+            const todaysChallengeIds = new Set(todaysGeneratedChallenges.map(c => c.id));
+            
             // Extract challenge IDs from saved progress entries
             const savedChallengeIds = backendProgresses.map(p => p.challengeId);
             
-            // Get challenges that match the saved IDs
-            const savedChallenges = savedChallengeIds
-              .map(id => DAILY_CHALLENGES.find(c => c.id === id))
-              .filter((c): c is DailyChallenge => c !== undefined);
+            // Check if saved challenge IDs match today's challenges
+            // If any saved ID is not in today's challenges, they're from yesterday and we should regenerate
+            const allSavedIdsMatchToday = savedChallengeIds.every(id => todaysChallengeIds.has(id));
             
-            // If we have saved challenges, use those
-            // Otherwise, generate new ones (first time today)
-            if (savedChallenges.length > 0) {
-              // Use saved challenges, but ensure we have 3 total
-              // If we have fewer than 3, generate the remaining ones deterministically
+            if (allSavedIdsMatchToday && savedChallengeIds.length > 0) {
+              // Saved challenges match today's challenges - use them
+              const savedChallenges = savedChallengeIds
+                .map(id => DAILY_CHALLENGES.find(c => c.id === id))
+                .filter((c): c is DailyChallenge => c !== undefined);
+              
+              // Ensure we have 3 challenges
               if (savedChallenges.length < 3) {
-                const generatedChallenges = getTodaysChallenges(username);
                 const savedIdsSet = new Set(savedChallengeIds);
                 
                 // Add generated challenges that aren't already saved
-                for (const genChallenge of generatedChallenges) {
+                for (const genChallenge of todaysGeneratedChallenges) {
                   if (!savedIdsSet.has(genChallenge.id) && savedChallenges.length < 3) {
                     savedChallenges.push(genChallenge);
                     savedIdsSet.add(genChallenge.id);
@@ -108,8 +113,15 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
               }
               todaysChallenges = savedChallenges.slice(0, 3);
             } else {
-              // No saved challenges found (invalid IDs?), generate new ones
-              todaysChallenges = getTodaysChallenges(username);
+              // Saved challenges don't match today's challenges (they're from yesterday)
+              // This happens when challenges were completed after midnight UTC
+              // Regenerate today's challenges
+              console.log('[DailyChallengeBanner] Saved challenge IDs do not match today\'s challenges - regenerating', {
+                savedIds: savedChallengeIds,
+                todaysIds: Array.from(todaysChallengeIds),
+                allMatch: allSavedIdsMatchToday
+              });
+              todaysChallenges = todaysGeneratedChallenges;
             }
           } else {
             // No progress entries for today, generate new challenges

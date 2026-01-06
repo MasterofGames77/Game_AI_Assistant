@@ -5,6 +5,30 @@ import User from '../../models/User';
 import mongoose from 'mongoose';
 import { UserContextResponse } from '../../types';
 import axios from 'axios';
+import { LRUCache } from '../../utils/cacheManager';
+import { cacheManager } from '../../utils/cacheManager';
+
+// Cache for user context responses (5 minute TTL - user data changes frequently)
+const USER_CONTEXT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const USER_CONTEXT_CACHE_MAX_SIZE = 500; // Max 500 users
+const userContextCache = new LRUCache<UserContextResponse>(
+  USER_CONTEXT_CACHE_MAX_SIZE,
+  USER_CONTEXT_CACHE_TTL,
+  5 * 60 * 1000 // Cleanup every 5 minutes
+);
+
+// Cache for game verification results (24 hour TTL - games don't change)
+const GAME_VERIFICATION_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const GAME_VERIFICATION_CACHE_MAX_SIZE = 10000; // Max 10,000 games
+const gameVerificationCache = new LRUCache<boolean>(
+  GAME_VERIFICATION_CACHE_MAX_SIZE,
+  GAME_VERIFICATION_CACHE_TTL,
+  10 * 60 * 1000 // Cleanup every 10 minutes
+);
+
+// Register caches with cache manager for monitoring
+cacheManager.registerCache('UserContextCache', userContextCache);
+cacheManager.registerCache('GameVerificationCache', gameVerificationCache);
 
 export default async function handler(
   req: NextApiRequest,
@@ -20,6 +44,15 @@ export default async function handler(
     return res.status(400).json({ error: 'Username is required' });
   }
 
+  // Check cache first (bypass cache if ?refresh=true is provided)
+  const shouldRefresh = req.query.refresh === 'true';
+  if (!shouldRefresh) {
+    const cachedResponse = userContextCache.get(username);
+    if (cachedResponse) {
+      return res.status(200).json(cachedResponse);
+    }
+  }
+
   try {
     // Connect to database
     if (mongoose.connection.readyState !== 1) {
@@ -27,9 +60,10 @@ export default async function handler(
     }
 
     // Get user's recent questions with detected games and genres
+    // Optimized: Only fetch what we need, limit to 50 questions (sufficient for analysis)
     const recentQuestions = await Question.find({ username })
       .sort({ timestamp: -1 })
-      .limit(100) // Get last 100 questions for better pattern analysis
+      .limit(50) // Reduced from 100 to 50 for better performance
       .select('detectedGame detectedGenre timestamp questionCategory interactionType question')
       .lean();
 
@@ -99,20 +133,30 @@ export default async function handler(
     /**
      * Verify if a detected game title exists in game databases
      * Returns true if it exists (including DLC), false if it doesn't exist at all
+     * Uses caching to avoid repeated API calls
      */
     const verifyGameExists = async (gameTitle: string): Promise<boolean> => {
       if (!gameTitle || gameTitle.trim().length < 3) {
         return false;
       }
 
+      const sanitizedTitle = gameTitle.trim();
+      const cacheKey = sanitizedTitle.toLowerCase();
+      
+      // Check cache first
+      const cachedResult = gameVerificationCache.get(cacheKey);
+      if (cachedResult !== null) {
+        return cachedResult;
+      }
+
       try {
-        const sanitizedTitle = gameTitle.trim();
         const lowerTitle = sanitizedTitle.toLowerCase();
 
         // Quick heuristic: Very short names (1-2 words, < 10 chars) are likely not games
         const wordCount = sanitizedTitle.split(/\s+/).length;
         if (wordCount === 1 && sanitizedTitle.length < 5) {
           // Single word, very short - likely a character/boss name
+          gameVerificationCache.set(cacheKey, false, GAME_VERIFICATION_CACHE_TTL);
           return false;
         }
 
@@ -131,6 +175,8 @@ export default async function handler(
             });
             
             if (exactMatch) {
+              // Cache positive result
+              gameVerificationCache.set(cacheKey, true, GAME_VERIFICATION_CACHE_TTL);
               return true; // Game/DLC exists in RAWG
             }
           }
@@ -139,9 +185,11 @@ export default async function handler(
         }
 
         // If RAWG didn't find it, it's likely not a real game/DLC
+        // Cache negative result
+        gameVerificationCache.set(cacheKey, false, GAME_VERIFICATION_CACHE_TTL);
         return false;
       } catch (error) {
-        // On error, be conservative and include it
+        // On error, be conservative and include it (don't cache errors)
         console.error(`Error verifying game "${gameTitle}":`, error);
         return true; // Default to true to avoid filtering out real games on API errors
       }
@@ -162,7 +210,8 @@ export default async function handler(
     }
 
     // Verify all unique games in parallel to filter out boss/character names
-    const uniqueGames = Array.from(gamesMapWithTimestamps.keys());
+    // Limit to top 10 games to avoid too many API calls
+    const uniqueGames = Array.from(gamesMapWithTimestamps.keys()).slice(0, 10);
     const verificationResults = await Promise.all(
       uniqueGames.map(async (game) => ({
         game,
@@ -361,13 +410,18 @@ export default async function handler(
       }
     }
 
-    return res.status(200).json({
+    const response: UserContextResponse = {
       recentGames: recentGames.length > 0 ? recentGames : undefined,
       topGenres: topGenres.length > 0 ? topGenres : undefined,
       preferences,
       activity,
       questionPatterns,
-    });
+    };
+
+    // Cache the response
+    userContextCache.set(username, response, USER_CONTEXT_CACHE_TTL);
+
+    return res.status(200).json(response);
 
   } catch (error) {
     console.error('Error in user-context API:', error);
