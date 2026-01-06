@@ -268,6 +268,17 @@ export default function Home() {
               localStorage.setItem("userId", userData.userId);
               localStorage.setItem("userEmail", userData.email);
 
+              // Record token refresh time for automatic refresh tracking
+              // Also reset any invalid refresh token flags
+              if (typeof window !== "undefined") {
+                // Record login to prevent immediate refresh attempts
+                const { recordLogin, clearTokenRefreshRecord } = await import(
+                  "../utils/tokenRefresh"
+                );
+                clearTokenRefreshRecord(); // Clear any invalid flags first
+                recordLogin(); // Record login time
+              }
+
               // Dispatch custom events to notify components
               window.dispatchEvent(
                 new CustomEvent("localStorageChange", {
@@ -762,6 +773,103 @@ export default function Home() {
     };
   }, [username, fetchConversations, fetchUsageStatus]);
 
+  // Listen for session expiration events and handle token refresh
+  useEffect(() => {
+    let loginGracePeriodEnd = 0;
+
+    const handleSessionExpired = () => {
+      // Don't handle session expired if we just logged in (grace period)
+      const now = Date.now();
+      if (loginGracePeriodEnd > 0 && now < loginGracePeriodEnd) {
+        console.log(
+          "[Session] Ignoring session expired event - within login grace period"
+        );
+        return;
+      }
+
+      console.log("[Session] Session expired event received");
+      // Clear user data from localStorage
+      localStorage.removeItem("username");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("userEmail");
+
+      // Update state to reflect logged out status
+      setUsername(null);
+      setUserId(null);
+      setConversations([]);
+      setSelectedConversation(null);
+
+      // Show message to user
+      setError("Your session has expired. Please sign in again.");
+
+      // Redirect to sign-in page after a short delay
+      setTimeout(() => {
+        window.location.href = "/signin";
+      }, 2000);
+    };
+
+    const handleTokenRefreshed = () => {
+      // Token was refreshed successfully - no action needed
+      // The axios interceptor already handled the retry
+      console.log("[Session] Token refreshed successfully");
+    };
+
+    const handleLocalStorageChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{
+        key: string;
+        oldValue: string | null;
+        newValue: string | null;
+      }>;
+      // If username was just set (login), set grace period
+      if (
+        customEvent.detail?.key === "username" &&
+        customEvent.detail?.newValue
+      ) {
+        loginGracePeriodEnd = Date.now() + 10000; // 10 second grace period
+        console.log("[Session] Login detected, setting grace period");
+      }
+    };
+
+    // Listen for session expiration events
+    window.addEventListener("sessionExpired", handleSessionExpired);
+    window.addEventListener("tokenRefreshed", handleTokenRefreshed);
+    window.addEventListener("localStorageChange", handleLocalStorageChange);
+
+    return () => {
+      window.removeEventListener("sessionExpired", handleSessionExpired);
+      window.removeEventListener("tokenRefreshed", handleTokenRefreshed);
+      window.removeEventListener(
+        "localStorageChange",
+        handleLocalStorageChange
+      );
+    };
+  }, []);
+
+  // Periodic token refresh check (every 13 minutes to refresh before 15-minute expiration)
+  useEffect(() => {
+    if (!username) return; // Only check if user is logged in
+
+    const checkAndRefreshToken = async () => {
+      const { ensureTokenValid, recordTokenRefresh } = await import(
+        "../utils/tokenRefresh"
+      );
+      const refreshed = await ensureTokenValid();
+      if (refreshed) {
+        recordTokenRefresh();
+      }
+    };
+
+    // Check immediately on mount
+    checkAndRefreshToken();
+
+    // Then check every 13 minutes (780000ms) to refresh before 15-minute expiration
+    const interval = setInterval(() => {
+      checkAndRefreshToken();
+    }, 13 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [username]);
+
   // Check user type and admin status
   useEffect(() => {
     const checkUserStatus = async () => {
@@ -986,60 +1094,30 @@ export default function Home() {
           }
         );
       } catch (error: any) {
-        // Handle authentication errors gracefully - try to refresh token first
+        // Handle authentication errors
+        // Note: The axios interceptor should have already tried to refresh the token
+        // This is a fallback in case the interceptor didn't handle it
         if (error.response?.status === 401) {
-          try {
-            // Attempt to refresh the token
-            const refreshResponse = await fetch("/api/auth/refresh", {
-              method: "POST",
-              credentials: "include", // Include cookies (refresh token)
-            });
-
-            if (refreshResponse.ok) {
-              // Token refreshed successfully, retry the original request
-              res = await axios.post(
-                "/api/assistant",
-                {
-                  question,
-                  imageFilePath: imageFilePath,
-                  imageUrl: imageUrlForAnalysis,
-                },
-                {
-                  timeout: 65000,
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  withCredentials: true,
-                }
-              );
-              // Continue with normal response handling below
-            } else {
-              // Refresh failed - redirect to sign in
-              const refreshData = await refreshResponse.json().catch(() => ({}));
-              const refreshErrorMsg = refreshData.message || refreshData.error || "Token refresh failed";
-              
-              setResponse(
-                "Your session has expired. Redirecting to sign-in page..."
-              );
-              setTimeout(() => {
-                window.location.href = "/signin";
-              }, 1500);
-              return;
-            }
-          } catch (refreshError) {
-            // Refresh attempt failed - redirect to sign in
+          const errorMessage = error.response?.data?.message || "";
+          if (
+            errorMessage.includes("Authentication required") ||
+            errorMessage.includes("sign in") ||
+            errorMessage.includes("Token expired")
+          ) {
+            // Session expired - the interceptor should have handled this
+            // But if we're here, it means refresh failed
             setResponse(
-              "Please sign in to use the assistant. Redirecting to sign-in page..."
+              "Your session has expired. Redirecting to sign-in page..."
             );
             setTimeout(() => {
               window.location.href = "/signin";
             }, 1500);
             return;
           }
-        } else {
-          // Re-throw other errors
-          throw error;
         }
+
+        // Re-throw other errors
+        throw error;
       }
 
       //const endTime = performance.now();
@@ -1354,7 +1432,7 @@ export default function Home() {
     }
   };
 
-  // Parse markdown links and extract sources
+  // Parse markdown links and plain URLs, then extract sources
   const parseResponseWithSources = (
     response: string
   ): {
@@ -1363,16 +1441,89 @@ export default function Home() {
     linkMap: Map<string, { url: string; shortened: string }>;
   } => {
     const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+    // Match plain URLs: http://, https://, or www. at start, or domain.com patterns
+    // This regex matches URLs that aren't already in markdown format
+    // Updated to handle URLs with query parameters, fragments, and trailing punctuation
+    const plainUrlRegex =
+      /(https?:\/\/[^\s\)\]\>]+|www\.[^\s\)\]\>]+|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.[a-zA-Z]{2,}(?:\/[^\s\)\]\>]*)?)/g;
     const sourcesMap = new Map<string, { name: string; url: string }>();
     const urlToSourceName = new Map<string, string>();
     const linkMap = new Map<string, { url: string; shortened: string }>();
+    const processedUrls = new Set<string>();
 
     // First pass: find all markdown links and extract sources
     let match;
-    const matches: Array<{ fullMatch: string; url: string }> = [];
+    const markdownMatches: Array<{
+      fullMatch: string;
+      url: string;
+      linkText: string;
+    }> = [];
     while ((match = markdownLinkRegex.exec(response)) !== null) {
       const [fullMatch, linkText, url] = match;
-      matches.push({ fullMatch, url });
+      // Normalize URL (add https:// if missing)
+      const normalizedUrl =
+        url.startsWith("http://") || url.startsWith("https://")
+          ? url
+          : `https://${url}`;
+      markdownMatches.push({ fullMatch, url: normalizedUrl, linkText });
+      processedUrls.add(normalizedUrl);
+
+      // Store unique sources and their display names
+      if (!sourcesMap.has(normalizedUrl)) {
+        const sourceName = getSourceName(normalizedUrl);
+        sourcesMap.set(normalizedUrl, { name: sourceName, url: normalizedUrl });
+        urlToSourceName.set(normalizedUrl, sourceName);
+      }
+    }
+
+    // Second pass: find plain URLs (not already in markdown format)
+    const plainUrlMatches: Array<{ fullMatch: string; url: string }> = [];
+    // Reset regex
+    plainUrlRegex.lastIndex = 0;
+    while ((match = plainUrlRegex.exec(response)) !== null) {
+      let fullMatch = match[0];
+
+      // Trim trailing punctuation that shouldn't be part of the URL
+      // But keep punctuation that's part of URLs (like ?query=value&param=value)
+      const trailingPunctuation = /([.,;:!?])+$/;
+      const punctuationMatch = fullMatch.match(trailingPunctuation);
+      if (punctuationMatch && !fullMatch.includes("?")) {
+        // Only trim if it's not a query string URL
+        fullMatch = fullMatch.replace(trailingPunctuation, "");
+      }
+
+      let url = fullMatch;
+
+      // Normalize URL (add https:// if missing)
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        url = `https://${url}`;
+      }
+
+      // Skip if this URL was already processed as a markdown link
+      if (processedUrls.has(url)) {
+        continue;
+      }
+
+      // Skip if this is part of a markdown link (already processed)
+      let isPartOfMarkdown = false;
+      for (const markdownMatch of markdownMatches) {
+        if (
+          markdownMatch.fullMatch.includes(fullMatch) ||
+          markdownMatch.url === url
+        ) {
+          isPartOfMarkdown = true;
+          break;
+        }
+      }
+      if (isPartOfMarkdown) {
+        continue;
+      }
+
+      // Use the original fullMatch from the response for replacement
+      const originalMatch = match[0];
+      plainUrlMatches.push({ fullMatch: originalMatch, url });
+      processedUrls.add(url);
+      processedUrls.add(originalMatch);
 
       // Store unique sources and their display names
       if (!sourcesMap.has(url)) {
@@ -1382,9 +1533,9 @@ export default function Home() {
       }
     }
 
-    // Second pass: replace all markdown links with shortened URL (inline format)
+    // Third pass: replace all markdown links with shortened URL (inline format)
     let formattedText = response;
-    matches.forEach(({ fullMatch, url }) => {
+    markdownMatches.forEach(({ fullMatch, url }) => {
       const shortened = shortenUrl(url);
 
       // Create a placeholder with just the shortened URL in parentheses
@@ -1397,6 +1548,26 @@ export default function Home() {
 
       // Escape special regex characters in the full match
       const escapedMatch = fullMatch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      formattedText = formattedText.replace(
+        new RegExp(escapedMatch, "g"),
+        placeholder
+      );
+    });
+
+    // Fourth pass: replace plain URLs with shortened URL (inline format)
+    // Process in reverse order to maintain correct indices when replacing
+    plainUrlMatches.reverse().forEach(({ fullMatch, url }) => {
+      const shortened = shortenUrl(url);
+      const placeholder = `(${shortened})`;
+
+      // Store the mapping for later rendering
+      linkMap.set(placeholder, { url, shortened });
+
+      // Escape special regex characters in the full match for regex replacement
+      const escapedMatch = fullMatch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+      // Replace the URL in the formatted text
+      // Use a simple global replace - the escaped match should be unique enough
       formattedText = formattedText.replace(
         new RegExp(escapedMatch, "g"),
         placeholder
@@ -1758,7 +1929,7 @@ export default function Home() {
           withCredentials: true, // Ensure cookies are sent
         }
       );
-      
+
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Logout request timed out")), 5000)
       );
@@ -2388,7 +2559,11 @@ export default function Home() {
                             width={200}
                             height={200}
                             className="rounded border border-gray-300 dark:border-gray-600"
-                            unoptimized={imageUrl.startsWith("http") || imageUrl.startsWith("//") || imageUrl.startsWith("blob:")}
+                            unoptimized={
+                              imageUrl.startsWith("http") ||
+                              imageUrl.startsWith("//") ||
+                              imageUrl.startsWith("blob:")
+                            }
                           />
                           <button
                             type="button"
@@ -2609,7 +2784,10 @@ export default function Home() {
                         width={300}
                         height={300}
                         className="rounded border border-gray-300 dark:border-gray-600"
-                        unoptimized={responseImageUrl.startsWith("http") || responseImageUrl.startsWith("//")}
+                        unoptimized={
+                          responseImageUrl.startsWith("http") ||
+                          responseImageUrl.startsWith("//")
+                        }
                       />
                     </div>
                   )}

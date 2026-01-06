@@ -6,6 +6,7 @@ import { logger } from '../../utils/logger';
 import { updateChallengeStreak, getTodayDateString } from '../../utils/challengeStreak';
 import { checkAndAwardRewards } from '../../utils/checkChallengeRewards';
 import { DAILY_CHALLENGES } from '../../utils/dailyChallenges';
+import { getTodaysChallenges } from '../../utils/challengeSelector';
 
 /**
  * GET /api/challenge-progress?username=xxx
@@ -273,27 +274,75 @@ export default async function handler(
         }
       }
 
-      // Phase 2: Update streak if at least one challenge is completed
-      // Streak is maintained if user completes at least one challenge per day
+      // Phase 2: Update streak ONLY if ALL 3 challenges for today are completed
+      // Streak is maintained if user completes all 3 challenges per day
       let updatedStreak: ChallengeStreak | undefined;
       let newRewards: ChallengeReward[] = [];
       
-      if (completedEntries.length > 0) {
-        const currentStreak = existingUser?.challengeStreak || null;
-        updatedStreak = updateChallengeStreak(
-          currentStreak,
-          todayString
-        );
+      // Get today's 3 challenges to check if all are completed
+      const todaysChallenges = getTodaysChallenges(username);
+      const todaysChallengeIds = new Set(todaysChallenges.map(c => c.id));
+      
+      // Count how many of today's challenges are completed
+      // We need to check the final merged state: existing today's entries + new entries
+      // existingTodayProgresses is defined later, so we'll calculate it here
+      const existingTodayNotUpdated = todayProgresses.filter((p: any) => 
+        p && !updatedChallengeIds.has(p.challengeId)
+      );
+      const finalTodayProgresses = [
+        ...existingTodayNotUpdated,
+        ...newProgressEntries.filter(p => p.date === todayString)
+      ];
+      
+      // Count how many of today's challenges are completed
+      const completedTodayChallengeIds = new Set(
+        finalTodayProgresses
+          .filter((p: any) => p && p.completed && todaysChallengeIds.has(p.challengeId))
+          .map((p: any) => p.challengeId)
+      );
+      
+      // Only update streak if ALL 3 challenges for today are completed
+      const allChallengesCompleted = completedTodayChallengeIds.size >= 3;
+      
+      if (allChallengesCompleted && completedEntries.length > 0) {
+        // Check if streak was already updated today (prevent duplicate updates)
+        const lastCompletedDate = existingUser?.challengeStreak?.lastCompletedDate;
+        const streakAlreadyUpdatedToday = lastCompletedDate === todayString;
+        
+        if (!streakAlreadyUpdatedToday) {
+          const currentStreak = existingUser?.challengeStreak || null;
+          updatedStreak = updateChallengeStreak(
+            currentStreak,
+            todayString
+          );
 
-        // Check for new milestone rewards
-        if (updatedStreak) {
-          const existingRewards = existingUser?.challengeRewards || [];
-          newRewards = checkAndAwardRewards(updatedStreak, existingRewards);
+          // Check for new milestone rewards
+          if (updatedStreak) {
+            const existingRewards = existingUser?.challengeRewards || [];
+            newRewards = checkAndAwardRewards(updatedStreak, existingRewards);
+          }
+        } else {
+          // Streak already updated today, use existing streak
+          updatedStreak = existingUser?.challengeStreak || null;
         }
 
         // Update streakAtCompletion in history entries
         historyEntries.forEach(entry => {
           entry.streakAtCompletion = updatedStreak?.currentStreak || 0;
+        });
+      } else if (completedEntries.length > 0) {
+        // Some challenges completed but not all 3 - don't update streak
+        // But still update streakAtCompletion in history entries with current streak
+        const currentStreak = existingUser?.challengeStreak || null;
+        historyEntries.forEach(entry => {
+          entry.streakAtCompletion = currentStreak?.currentStreak || 0;
+        });
+        
+        logger.info('Challenges completed but not all 3 - streak not updated', {
+          username,
+          completedCount: completedTodayChallengeIds.size,
+          requiredCount: 3,
+          completedChallengeIds: Array.from(completedTodayChallengeIds),
         });
       }
 

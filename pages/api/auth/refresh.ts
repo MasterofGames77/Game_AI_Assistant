@@ -105,7 +105,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
   } catch (error) {
-    console.error('Error in refresh API:', error);
+    // Only log unexpected errors, not expected token validation failures
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isExpectedError = 
+      errorMessage.includes('expired') ||
+      errorMessage.includes('revoked') ||
+      errorMessage.includes('Invalid refresh token') ||
+      errorMessage.includes('Invalid token type');
+
+    if (!isExpectedError) {
+      console.error('Error in refresh API:', error);
+    }
 
     if (error instanceof Error) {
       if (error.message.includes('expired')) {
@@ -123,7 +133,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(401).json({
       message: 'Invalid refresh token',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: errorMessage
     });
   }
 }

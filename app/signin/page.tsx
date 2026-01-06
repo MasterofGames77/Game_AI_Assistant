@@ -96,6 +96,15 @@ const SignInPage: React.FC = () => {
         localStorage.setItem("userId", res.data.user.userId);
         localStorage.setItem("userEmail", res.data.user.email);
 
+        // Record token refresh time for automatic refresh tracking
+        // Also reset any invalid refresh token flags
+        if (typeof window !== 'undefined') {
+          // Record login to prevent immediate refresh attempts
+          const { recordLogin, clearTokenRefreshRecord } = await import('../../utils/tokenRefresh');
+          clearTokenRefreshRecord(); // Clear any invalid flags first
+          recordLogin(); // Record login time
+        }
+
         // Track sign in event and set user properties
         trackSignIn('email');
         setUserProperties(
