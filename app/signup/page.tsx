@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import Image from "next/image";
 import { getPasswordStrength } from "../../utils/passwordUtils";
+import { trackSignUp, setUserProperties } from "../../utils/analytics";
 
 const SignUpPage: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -93,6 +94,10 @@ const SignUpPage: React.FC = () => {
           localStorage.setItem("userId", response.data.user.userId);
           localStorage.setItem("username", response.data.user.username);
           localStorage.setItem("userEmail", response.data.user.email);
+          
+          // Track sign up event and set user properties
+          trackSignUp('email');
+          setUserProperties(response.data.user.username, 'free');
         }
 
         // Redirect to main app (user will be automatically signed in)

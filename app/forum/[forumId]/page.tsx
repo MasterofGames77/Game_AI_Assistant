@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import PrivateForumUserManagement from "../../../components/PrivateForumUserManagement";
 import toast from "react-hot-toast";
 import Image from "next/image";
+import { trackForumPostCreated, trackForumView } from "../../../utils/analytics";
 
 export default function ForumPageWrapper({
   params,
@@ -94,6 +95,14 @@ function ForumPage({ params }: { params: { forumId: string } }) {
           `/api/getForumTopic?forumId=${params.forumId}&username=${username}`
         );
         setCurrentForum(response.data);
+        // Track forum view
+        if (response.data) {
+          trackForumView(
+            params.forumId,
+            response.data.title,
+            response.data.gameTitle
+          );
+        }
         setLoading(false);
       } catch (err: any) {
         setError(err.message || "Failed to load forum");
@@ -199,6 +208,13 @@ function ForumPage({ params }: { params: { forumId: string } }) {
                   fontSize: "14px",
                 },
               });
+              // Track forum post creation
+              trackForumPostCreated(
+                params.forumId,
+                currentForum?.title,
+                currentForum?.gameTitle,
+                selectedImages.length > 0
+              );
             }
           },
         }

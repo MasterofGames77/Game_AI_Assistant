@@ -313,6 +313,8 @@ export async function selectModelForQuestion(
 // Track model usage for cost monitoring
 const modelUsageStats: { [key: string]: number } = {
   'gpt-4o-search-preview': 0,
+  'gpt-4o': 0,
+  'gpt-4o-mini': 0,
   'gpt-5.2': 0
 };
 
@@ -328,6 +330,8 @@ export function getModelUsageStats() {
  */
 export function resetModelUsageStats() {
   modelUsageStats['gpt-4o-search-preview'] = 0;
+  modelUsageStats['gpt-4o'] = 0;
+  modelUsageStats['gpt-4o-mini'] = 0;
   modelUsageStats['gpt-5.2'] = 0;
 }
 
@@ -1084,33 +1088,85 @@ export const getChatCompletionWithVision = async (
       text: question
     });
 
+    // For vision requests, we MUST use a model that supports images
+    // gpt-4o-search-preview does NOT support image inputs
+    // Use gpt-4o or gpt-4o-mini for vision requests instead
+    const VISION_MODELS = {
+      'gpt-4o': 'gpt-4o',           // Full vision support
+      'gpt-4o-mini': 'gpt-4o-mini', // Full vision support, cheaper
+      'gpt-5.2': 'gpt-5.2'          // If available, supports vision
+    };
+    
     // Select model based on game release date (extract from question if possible)
     const modelSelection = await selectModelForQuestion(undefined, question);
     
+    // Override to vision-capable model if the selected model doesn't support images
+    let visionModel = modelSelection.model;
+    if (visionModel === 'gpt-4o-search-preview') {
+      // Fallback to gpt-4o for vision (it supports images and has good knowledge)
+      visionModel = 'gpt-4o';
+      console.log(`[Model Selection] Overriding to gpt-4o for vision request (gpt-4o-search-preview doesn't support images)`);
+    } else if (!Object.values(VISION_MODELS).includes(visionModel as any)) {
+      // If selected model isn't in our vision-capable list, use gpt-4o as safe default
+      visionModel = 'gpt-4o';
+      console.log(`[Model Selection] Overriding to gpt-4o for vision request (${modelSelection.model} may not support images)`);
+    }
+    
     // Log model selection for monitoring
-    console.log(`[Model Selection] Using ${modelSelection.model} for vision request (reason: ${modelSelection.reason})`);
+    console.log(`[Model Selection] Using ${visionModel} for vision request (reason: ${modelSelection.reason}, original: ${modelSelection.model})`);
     
     // Track model usage
-    modelUsageStats[modelSelection.model] = (modelUsageStats[modelSelection.model] || 0) + 1;
+    modelUsageStats[visionModel] = (modelUsageStats[visionModel] || 0) + 1;
 
-    // Note: gpt-4o-search-preview doesn't support temperature parameter
+    // Note: gpt-4o-search-preview doesn't support temperature parameter, but we're not using it for vision
     const completionParams: any = {
-      model: modelSelection.model,
+      model: visionModel,
       messages: messages as any,
       max_completion_tokens: 1000,
+      temperature: 0.7, // Vision models support temperature
     };
-    
-    // Only include temperature for models that support it
-    if (modelSelection.model !== 'gpt-4o-search-preview') {
-      completionParams.temperature = 0.7;
+
+    try {
+      const completion = await getOpenAIClient().chat.completions.create(completionParams);
+      return completion.choices[0].message.content;
+    } catch (apiError: any) {
+      // Handle rate limit errors specifically
+      if (apiError?.status === 429 && apiError?.error?.type === 'input-images') {
+        console.error('[Vision API] Rate limit error for image inputs. Model may not support images:', visionModel);
+        
+        // Try fallback to gpt-4o if we're not already using it
+        if (visionModel !== 'gpt-4o') {
+          console.log('[Vision API] Retrying with gpt-4o fallback...');
+          try {
+            const fallbackParams = {
+              ...completionParams,
+              model: 'gpt-4o',
+            };
+            const fallbackCompletion = await getOpenAIClient().chat.completions.create(fallbackParams);
+            modelUsageStats['gpt-4o'] = (modelUsageStats['gpt-4o'] || 0) + 1;
+            return fallbackCompletion.choices[0].message.content;
+          } catch (fallbackError) {
+            console.error('[Vision API] Fallback also failed:', fallbackError);
+            throw new Error('Unable to process image. The selected AI model does not support image inputs. Please try again or contact support if this persists.');
+          }
+        } else {
+          throw new Error('Rate limit exceeded for image processing. Please try again in a moment.');
+        }
+      }
+      // Re-throw other errors
+      throw apiError;
     }
-
-    const completion = await getOpenAIClient().chat.completions.create(completionParams);
-
-    return completion.choices[0].message.content;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in getChatCompletionWithVision:', error);
-    return null;
+    
+    // Provide user-friendly error message
+    if (error?.message?.includes('rate limit') || error?.message?.includes('Rate limit')) {
+      throw new Error('Rate limit exceeded. Please wait a moment and try again.');
+    } else if (error?.message?.includes('does not support image')) {
+      throw error; // Already user-friendly
+    } else {
+      throw new Error('Failed to process image. Please try again or contact support if this persists.');
+    }
   }
 };
 

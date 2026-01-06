@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 import axios from "axios";
 import { Forum, ForumContextType } from "../types";
+import { trackForumCreated } from "../utils/analytics";
 
 const ForumContext = createContext<ForumContextType | undefined>(undefined);
 
@@ -77,6 +78,13 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
       );
       const newForum = response.data.forum;
       setForums((prevForums) => [...prevForums, newForum]);
+      // Track forum creation
+      trackForumCreated(
+        newForum.forumId,
+        newForum.title,
+        newForum.gameTitle,
+        newForum.category
+      );
       return newForum;
     } catch (err: any) {
       setError(

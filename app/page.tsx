@@ -26,6 +26,7 @@ import ShareCardModal from "../components/ShareCardModal";
 import DailyChallengeBanner from "../components/DailyChallengeBanner";
 import MyGuides from "../components/MyGuides";
 import { isLongGuide, extractGuideTitle } from "../utils/guideDetection";
+import { trackQuestionAsked } from "../utils/analytics";
 // import { useRouter } from "next/navigation";
 
 export default function Home() {
@@ -1051,6 +1052,13 @@ export default function Home() {
       if (res.data.metrics) {
         setMetrics(res.data.metrics);
       }
+
+      // Track question asked event for GA4
+      trackQuestionAsked(
+        question,
+        res.data.detectedGame,
+        res.data.detectedGenre
+      );
 
       // Optimistically add the new question to conversations immediately when response is received
       // This ensures the question appears in the sidebar right away
@@ -2380,6 +2388,7 @@ export default function Home() {
                             width={200}
                             height={200}
                             className="rounded border border-gray-300 dark:border-gray-600"
+                            unoptimized={imageUrl.startsWith("http") || imageUrl.startsWith("//") || imageUrl.startsWith("blob:")}
                           />
                           <button
                             type="button"
@@ -2600,6 +2609,7 @@ export default function Home() {
                         width={300}
                         height={300}
                         className="rounded border border-gray-300 dark:border-gray-600"
+                        unoptimized={responseImageUrl.startsWith("http") || responseImageUrl.startsWith("//")}
                       />
                     </div>
                   )}

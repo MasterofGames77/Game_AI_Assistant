@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import toast from "react-hot-toast";
+import { trackFeedbackSubmitted } from "../utils/analytics";
 import { FeedbackFormProps, FeedbackFormData } from "../types";
 
 const FeedbackForm: React.FC<FeedbackFormProps> = ({
@@ -86,6 +87,8 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
         toast.success(
           "Feedback submitted successfully! Thank you for your input."
         );
+        // Track feedback submission
+        trackFeedbackSubmitted(formData.category, formData.priority);
         setFormData({
           category: "general",
           title: "",

@@ -12,6 +12,7 @@ import {
   getTodayDateString,
   saveChallengesProgress,
 } from "../utils/challengeSelector";
+import { DAILY_CHALLENGES } from "../utils/dailyChallenges";
 import {
   hasCompletedChallenge,
   getChallengeProgress as getProgress,
@@ -39,18 +40,17 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
       return;
     }
 
-    // Phase 2: Get today's challenges (3 challenges) - user-specific
-    const todaysChallenges = getTodaysChallenges(username);
-
     // Async function to check progress and completion for all challenges
     const checkProgress = async () => {
       try {
-        // Fetch progress from backend
+        // CRITICAL: First fetch progress from backend to see which challenges are already saved
+        // This ensures we show the same challenges that were saved, not regenerate new ones
         const response = await fetch(
           `/api/challenge-progress?username=${encodeURIComponent(username)}`
         );
 
         let backendProgresses: ChallengeProgress[] = [];
+        let todaysChallenges: DailyChallenge[] = [];
 
         if (response.ok) {
           const data = await response.json();
@@ -77,6 +77,47 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
             setShowRewardNotification(true);
             setTimeout(() => setShowRewardNotification(false), 5000);
           }
+
+          // CRITICAL FIX: If we have progress entries for today, use those challenge IDs
+          // This ensures challenges persist across logins and don't regenerate
+          if (backendProgresses.length > 0) {
+            // Extract challenge IDs from saved progress entries
+            const savedChallengeIds = backendProgresses.map(p => p.challengeId);
+            
+            // Get challenges that match the saved IDs
+            const savedChallenges = savedChallengeIds
+              .map(id => DAILY_CHALLENGES.find(c => c.id === id))
+              .filter((c): c is DailyChallenge => c !== undefined);
+            
+            // If we have saved challenges, use those
+            // Otherwise, generate new ones (first time today)
+            if (savedChallenges.length > 0) {
+              // Use saved challenges, but ensure we have 3 total
+              // If we have fewer than 3, generate the remaining ones deterministically
+              if (savedChallenges.length < 3) {
+                const generatedChallenges = getTodaysChallenges(username);
+                const savedIdsSet = new Set(savedChallengeIds);
+                
+                // Add generated challenges that aren't already saved
+                for (const genChallenge of generatedChallenges) {
+                  if (!savedIdsSet.has(genChallenge.id) && savedChallenges.length < 3) {
+                    savedChallenges.push(genChallenge);
+                    savedIdsSet.add(genChallenge.id);
+                  }
+                }
+              }
+              todaysChallenges = savedChallenges.slice(0, 3);
+            } else {
+              // No saved challenges found (invalid IDs?), generate new ones
+              todaysChallenges = getTodaysChallenges(username);
+            }
+          } else {
+            // No progress entries for today, generate new challenges
+            todaysChallenges = getTodaysChallenges(username);
+          }
+        } else {
+          // API call failed, generate new challenges as fallback
+          todaysChallenges = getTodaysChallenges(username);
         }
 
         // Build challenge progress state for each challenge
@@ -180,9 +221,10 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
         }
       } catch (error) {
         console.error("Error checking challenge progress:", error);
-        // Fallback: just check completion based on conversations
+        // Fallback: generate challenges and just check completion based on conversations
+        const fallbackChallenges = getTodaysChallenges(username);
         const challengesWithProgress: ChallengeWithProgress[] =
-          todaysChallenges.map((challenge) => {
+          fallbackChallenges.map((challenge) => {
             const isCompleted = hasCompletedChallenge(conversations, challenge);
             let progressData: { current: number; target: number } | null = null;
             if (challenge.criteria.type === "count") {

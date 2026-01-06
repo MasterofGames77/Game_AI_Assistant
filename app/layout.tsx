@@ -1,12 +1,15 @@
 import "./styles/global.css";
 import { Toaster } from "react-hot-toast";
 import Script from "next/script";
+import PageViewTracker from "../components/PageViewTracker";
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const measurementId = process.env.NEXT_PUBLIC_GOOGLE_MEASUREMENT_ID;
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -53,21 +56,31 @@ export default function RootLayout({
             `,
           }}
         />
-        {/* Google Analytics */}
-        <Script
-          src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GOOGLE_MEASUREMENT_ID}`}
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', '${process.env.NEXT_PUBLIC_GOOGLE_MEASUREMENT_ID}');
-          `}
-        </Script>
+        {/* Google Analytics 4 - Only load if measurement ID is configured */}
+        {measurementId && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${measurementId}`}
+              strategy="afterInteractive"
+            />
+            <Script id="google-analytics" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${measurementId}', {
+                  page_path: window.location.pathname,
+                  page_title: document.title,
+                  page_location: window.location.href,
+                  send_page_view: false // We'll manually send page views via PageViewTracker
+                });
+              `}
+            </Script>
+          </>
+        )}
       </head>
       <body>
+        {measurementId && <PageViewTracker />}
         {children}
         <Toaster />
       </body>

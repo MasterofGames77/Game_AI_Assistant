@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import axios from "../../utils/axiosConfig";
 import Image from "next/image";
 import PasswordSetupModal from "../../components/PasswordSetupModal";
+import { trackSignIn, setUserProperties } from "../../utils/analytics";
 
 const SignInPage: React.FC = () => {
   const [usernameInput, setUsernameInput] = useState("");
@@ -94,6 +95,13 @@ const SignInPage: React.FC = () => {
         localStorage.setItem("username", res.data.user.username);
         localStorage.setItem("userId", res.data.user.userId);
         localStorage.setItem("userEmail", res.data.user.email);
+
+        // Track sign in event and set user properties
+        trackSignIn('email');
+        setUserProperties(
+          res.data.user.username,
+          res.data.user.hasProAccess ? 'pro' : 'free'
+        );
 
         // Dispatch custom events to notify Sidebar and other components
         window.dispatchEvent(
