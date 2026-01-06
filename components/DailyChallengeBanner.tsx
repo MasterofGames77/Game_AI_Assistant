@@ -81,31 +81,69 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
           // CRITICAL FIX: If we have progress entries for today, validate they match today's challenges
           // This ensures challenges reset at midnight UTC (7 PM EST / 8 PM EDT)
           // If saved challenge IDs don't match today's challenges, regenerate them
+          // Also check if challenges were completed in early morning (00:00-03:00 UTC) - likely from yesterday
           if (backendProgresses.length > 0) {
             // Get today's challenges to validate against saved progress
             const todaysGeneratedChallenges = getTodaysChallenges(username);
-            const todaysChallengeIds = new Set(todaysGeneratedChallenges.map(c => c.id));
-            
+            const todaysChallengeIds = new Set(
+              todaysGeneratedChallenges.map((c) => c.id)
+            );
+
             // Extract challenge IDs from saved progress entries
-            const savedChallengeIds = backendProgresses.map(p => p.challengeId);
-            
+            const savedChallengeIds = backendProgresses.map(
+              (p) => p.challengeId
+            );
+
             // Check if saved challenge IDs match today's challenges
             // If any saved ID is not in today's challenges, they're from yesterday and we should regenerate
-            const allSavedIdsMatchToday = savedChallengeIds.every(id => todaysChallengeIds.has(id));
-            
-            if (allSavedIdsMatchToday && savedChallengeIds.length > 0) {
-              // Saved challenges match today's challenges - use them
+            const allSavedIdsMatchToday = savedChallengeIds.every((id) =>
+              todaysChallengeIds.has(id)
+            );
+
+            // EDGE CASE: Check if challenges were completed in the early morning hours (00:00-03:00 UTC)
+            // This likely means they were completed after midnight UTC but are from yesterday's challenge set
+            // Challenges reset at midnight UTC (7 PM EST / 8 PM EDT), so anything completed in the first 3 hours
+            // of the UTC day is likely from yesterday's challenges
+            const todayDateString = getTodayDateString();
+            const todayStartUTC = new Date(
+              todayDateString + "T00:00:00Z"
+            ).getTime();
+            const earlyMorningThreshold = todayStartUTC + 3 * 60 * 60 * 1000; // 3 hours after midnight UTC
+
+            // Check if any challenge was completed in early morning (00:00-03:00 UTC)
+            const anyCompletedInEarlyMorning = backendProgresses.some((p) => {
+              if (!p.completedAt) return false;
+              const completedTime = new Date(p.completedAt).getTime();
+              return (
+                completedTime >= todayStartUTC &&
+                completedTime < earlyMorningThreshold
+              );
+            });
+
+            // Use saved challenges only if:
+            // 1. All saved IDs match today's generated IDs
+            // 2. AND no challenges were completed in early morning (likely from yesterday)
+            const shouldUseSavedChallenges =
+              allSavedIdsMatchToday &&
+              savedChallengeIds.length > 0 &&
+              !anyCompletedInEarlyMorning;
+
+            if (shouldUseSavedChallenges) {
+              // Saved challenges match today's challenges and weren't completed in early morning - use them
               const savedChallenges = savedChallengeIds
-                .map(id => DAILY_CHALLENGES.find(c => c.id === id))
+                .map((id) => DAILY_CHALLENGES.find((c) => c.id === id))
                 .filter((c): c is DailyChallenge => c !== undefined);
-              
+
               // Ensure we have 3 challenges
               if (savedChallenges.length < 3) {
                 const savedIdsSet = new Set(savedChallengeIds);
-                
+
                 // Add generated challenges that aren't already saved
                 for (const genChallenge of todaysGeneratedChallenges) {
-                  if (!savedIdsSet.has(genChallenge.id) && savedChallenges.length < 3) {
+                  if (
+                    !savedIdsSet.has(genChallenge.id) &&
+                    savedChallenges.length < 3
+                  ) {
                     savedChallenges.push(genChallenge);
                     savedIdsSet.add(genChallenge.id);
                   }
@@ -113,13 +151,19 @@ const DailyChallengeBanner: React.FC<DailyChallengeBannerProps> = ({
               }
               todaysChallenges = savedChallenges.slice(0, 3);
             } else {
-              // Saved challenges don't match today's challenges (they're from yesterday)
+              // Saved challenges don't match today's challenges OR were completed in early morning
               // This happens when challenges were completed after midnight UTC
               // Regenerate today's challenges
-              console.log('[DailyChallengeBanner] Saved challenge IDs do not match today\'s challenges - regenerating', {
+              const reason = anyCompletedInEarlyMorning
+                ? "Challenges completed in early morning (00:00-03:00 UTC) - likely from yesterday"
+                : "Saved challenge IDs do not match today's challenges";
+
+              console.log("[DailyChallengeBanner] Regenerating challenges", {
                 savedIds: savedChallengeIds,
                 todaysIds: Array.from(todaysChallengeIds),
-                allMatch: allSavedIdsMatchToday
+                allMatch: allSavedIdsMatchToday,
+                anyCompletedInEarlyMorning,
+                reason,
               });
               todaysChallenges = todaysGeneratedChallenges;
             }
