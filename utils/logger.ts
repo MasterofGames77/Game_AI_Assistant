@@ -44,13 +44,25 @@ export const createLogger = (service: string) => {
 export const logger = createLogger('app');
 
 // Error handling for uncaught exceptions
-if (process.env.NODE_ENV === 'production') {
+// Note: These handlers are set up in server.ts with better error handling
+// Only set up here if not in a Next.js/server context
+// The server.ts handlers provide more detailed logging and graceful shutdown
+if (process.env.NODE_ENV === 'production' && !process.env.SERVER_INITIALIZED) {
   process.on('uncaughtException', (error) => {
     logger.error('Uncaught Exception:', { error: error.message, stack: error.stack });
     process.exit(1);
   });
 
   process.on('unhandledRejection', (reason, promise) => {
-    logger.error('Unhandled Rejection:', { reason, promise });
+    // Better error serialization - don't try to serialize promises
+    const errorInfo: any = {};
+    if (reason instanceof Error) {
+      errorInfo.error = reason.message;
+      errorInfo.stack = reason.stack;
+      errorInfo.name = reason.name;
+    } else {
+      errorInfo.reason = String(reason);
+    }
+    logger.error('Unhandled Rejection:', errorInfo);
   });
 } 

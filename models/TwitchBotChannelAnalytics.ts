@@ -37,6 +37,14 @@ export interface ITwitchBotChannelAnalytics extends Document {
   newUsers: number; // First-time users this period
   returningUsers: number; // Returning users this period
 
+  // Engagement Events (new)
+  engagementEvents: number; // Total engagement events (subs, follows, raids, etc.)
+  subscriptionCount: number; // Number of subscriptions
+  followCount: number; // Number of follows
+  raidCount: number; // Number of raids
+  hypeMoments: number; // Number of hype moments detected
+  averageEngagementScore: number; // Average engagement score (0-100)
+
   createdAt?: Date; // Document creation timestamp
   updatedAt?: Date; // Document update timestamp
 }
@@ -169,6 +177,44 @@ const twitchBotChannelAnalyticsSchema = new Schema<ITwitchBotChannelAnalytics>(
       required: true,
       default: 0,
       min: 0
+    },
+    // Engagement Events
+    engagementEvents: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0
+    },
+    subscriptionCount: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0
+    },
+    followCount: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0
+    },
+    raidCount: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0
+    },
+    hypeMoments: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0
+    },
+    averageEngagementScore: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0,
+      max: 100
     }
   },
   {

@@ -64,17 +64,47 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.redirect(errorUrl.toString());
   }
 
+  // URL-decode the state (Next.js should do this automatically, but be explicit)
+  // Twitch may URL-encode the state parameter when redirecting back
+  let decodedState = state as string;
+  try {
+    decodedState = decodeURIComponent(decodedState);
+  } catch (decodeError) {
+    // If decoding fails, use original (might already be decoded)
+    logger.warn('State parameter decode failed, using original', {
+      error: decodeError instanceof Error ? decodeError.message : String(decodeError)
+    });
+  }
+
   // Verify state
-  const stateVerification = verifyOAuthState(state as string);
+  logger.info('Verifying OAuth state', {
+    stateLength: decodedState.length,
+    statePreview: decodedState.substring(0, 50) + '...',
+    hasColon: decodedState.includes(':'),
+    parts: decodedState.split(':').length
+  });
+  
+  const stateVerification = verifyOAuthState(decodedState);
   if (!stateVerification.valid || !stateVerification.username) {
     logger.error('Invalid state parameter in viewer callback', {
-      state: (state as string).substring(0, 50)
+      state: decodedState.substring(0, 100), // Log more of the state
+      stateLength: decodedState.length,
+      hasColon: decodedState.split(':').length > 1,
+      parts: decodedState.split(':').length,
+      verificationResult: {
+        valid: stateVerification.valid,
+        hasUsername: !!stateVerification.username
+      }
     });
     const errorUrl = new URL('/twitch-viewer-landing', domain);
     errorUrl.searchParams.append('auth', 'error');
     errorUrl.searchParams.append('error', 'invalid_state');
     return res.redirect(errorUrl.toString());
   }
+  
+  logger.info('State verification successful', {
+    username: stateVerification.username
+  });
 
   const username = stateVerification.username;
 

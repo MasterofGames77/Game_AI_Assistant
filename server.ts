@@ -68,6 +68,9 @@ const setupGoogleCredentials = () => {
   }
 };
 
+// Mark that server is initializing (prevents duplicate error handlers in logger)
+process.env.SERVER_INITIALIZED = 'true';
+
 app.prepare().then(async () => {
   const server = createServer((req, res) => {
     const parsedUrl: UrlWithParsedQuery = req.url
@@ -133,20 +136,30 @@ app.prepare().then(async () => {
       startTokenRefreshScheduler();
       console.log('✅ Twitch bot token refresh scheduler started');
     } catch (schedulerError) {
-      console.warn('⚠️ Failed to start token refresh scheduler:', schedulerError);
+      const schedulerErrorMessage = schedulerError instanceof Error ? schedulerError.message : String(schedulerError);
+      const schedulerErrorStack = schedulerError instanceof Error ? schedulerError.stack : undefined;
+      console.warn('⚠️ Failed to start token refresh scheduler:', schedulerErrorMessage);
+      if (dev && schedulerErrorStack) {
+        console.warn('Stack:', schedulerErrorStack);
+      }
       // Non-fatal - bot will still work, just won't auto-refresh
     }
   } catch (error) {
     // Unexpected error during initialization - log but don't crash server
     const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
     console.error('❌ Unexpected error during Twitch bot initialization:', errorMessage);
+    if (dev && errorStack) {
+      console.error('Stack:', errorStack);
+    }
     
     // Still try to start the scheduler - it might help refresh tokens
     try {
       startTokenRefreshScheduler();
       console.log('✅ Twitch bot token refresh scheduler started (despite initialization error)');
     } catch (schedulerError) {
-      console.warn('⚠️ Failed to start token refresh scheduler:', schedulerError);
+      const schedulerErrorMessage = schedulerError instanceof Error ? schedulerError.message : String(schedulerError);
+      console.warn('⚠️ Failed to start token refresh scheduler:', schedulerErrorMessage);
     }
     // Server continues even if bot fails to initialize
   }
@@ -230,9 +243,25 @@ app.prepare().then(async () => {
       return;
     }
     
-    console.error('❌ Unhandled Rejection:', reason);
-    if (dev && reason instanceof Error && reason.stack) {
-      console.error('Stack:', reason.stack);
+    // Log full error details
+    console.error('❌ Unhandled Rejection:');
+    if (reason instanceof Error) {
+      console.error('  Error:', reason.message);
+      console.error('  Name:', reason.name);
+      if (reason.stack) {
+        console.error('  Stack:', reason.stack);
+      }
+      if (nodeError.code) {
+        console.error('  Code:', nodeError.code);
+      }
+    } else {
+      console.error('  Reason:', reason);
+      console.error('  Type:', typeof reason);
+      try {
+        console.error('  Stringified:', JSON.stringify(reason, null, 2));
+      } catch (e) {
+        console.error('  (Could not stringify reason)');
+      }
     }
   });
 });

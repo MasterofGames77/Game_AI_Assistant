@@ -3,7 +3,6 @@ import axios from 'axios';
 import connectToMongoDB from '../../utils/mongodb';
 import TwitchBotChannel from '../../models/TwitchBotChannel';
 import User from '../../models/User';
-import { getSession } from '../../utils/session';
 import { joinChannel } from '../../utils/twitchBot';
 import { logger } from '../../utils/logger';
 
@@ -285,6 +284,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         error: joinError instanceof Error ? joinError.message : String(joinError)
       });
       // Don't fail the whole flow if join fails - bot will join on next restart
+    }
+
+    // Automatically set up EventSub subscriptions for engagement tracking
+    // Note: Some subscriptions require user OAuth token (channel.subscribe, channel.subscription.gift, channel.cheer)
+    // channel.follow is deprecated and has been removed
+    try {
+      const { setupEventSubSubscriptions } = await import('../../utils/twitch/eventsubSetup');
+      const eventsubResult = await setupEventSubSubscriptions(
+        streamerTwitchId,
+        [
+          'channel.subscribe',
+          'channel.subscription.gift',
+          'channel.raid',
+          'channel.cheer'
+        ],
+        access_token // Pass user OAuth token for subscriptions that require it
+      );
+      logger.info('EventSub subscriptions set up automatically', {
+        channelName,
+        created: eventsubResult.created,
+        existing: eventsubResult.existing,
+        errors: eventsubResult.errors
+      });
+    } catch (eventsubError) {
+      // Don't fail the whole flow if EventSub setup fails
+      logger.warn('Failed to set up EventSub subscriptions automatically', {
+        channelName,
+        error: eventsubError instanceof Error ? eventsubError.message : String(eventsubError)
+      });
     }
 
     // Redirect to Twitch landing page with success status

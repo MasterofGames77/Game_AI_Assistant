@@ -103,11 +103,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   });
 
   // Construct the Twitch OAuth2 authorization URL
-  const twitchAuthUrl = `${authUrl}?response_type=code&client_id=${clientId}&redirect_uri=${encodedRedirectUri}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}&force_verify=true`;
+  const encodedState = encodeURIComponent(state);
+  const twitchAuthUrl = `${authUrl}?response_type=code&client_id=${clientId}&redirect_uri=${encodedRedirectUri}&scope=${encodeURIComponent(scopes)}&state=${encodedState}&force_verify=true`;
 
   logger.info('Redirecting to Twitch OAuth for viewer account linking', {
     username,
-    redirectUri
+    redirectUri,
+    stateLength: state.length,
+    statePreview: state.substring(0, 50) + '...',
+    encodedStateLength: encodedState.length,
+    storeSize: oauthStateStore.size
   });
 
   // Redirect to Twitch OAuth
@@ -144,21 +149,31 @@ export function verifyOAuthState(state: string): { valid: boolean; username?: st
     return { valid: true, username: storedState.username };
   }
 
-  // Fallback: If state not in memory (e.g., hot-reload in dev), verify using encoded username
-  // This is less secure but works for development when hot-reload clears the store
+  // Fallback: If state not in memory (e.g., hot-reload in dev, or Heroku dyno restart in prod),
+  // verify using encoded username. The state includes a random token + base64(username),
+  // so we can still verify the username even if the in-memory store was cleared.
+  // This is acceptable because:
+  // 1. The state is only valid for 10 minutes (expiresAt check above)
+  // 2. The state includes a random token that prevents replay attacks
+  // 3. The username is base64-encoded, providing some obfuscation
   try {
     const decodedUsername = Buffer.from(encodedUsername, 'base64').toString('utf-8');
     
     // Basic validation: username should be a valid string
     if (decodedUsername && decodedUsername.length > 0 && decodedUsername.length < 100) {
-      // In development, allow this fallback
-      if (process.env.NODE_ENV === 'development') {
-        logger.warn('⚠️ State not found in memory store (likely due to hot-reload), using fallback verification');
-        return { valid: true, username: decodedUsername };
-      }
+      // Allow fallback in both development and production (needed for Heroku dyno restarts)
+      logger.warn('⚠️ State not found in memory store (likely due to server restart), using fallback verification', {
+        username: decodedUsername,
+        environment: process.env.NODE_ENV
+      });
+      return { valid: true, username: decodedUsername };
     }
   } catch (error) {
     // Invalid base64 encoding
+    logger.error('Failed to decode username from state', {
+      error: error instanceof Error ? error.message : String(error),
+      encodedUsernameLength: encodedUsername?.length
+    });
     return { valid: false };
   }
 

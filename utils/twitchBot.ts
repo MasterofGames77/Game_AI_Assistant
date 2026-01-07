@@ -1,6 +1,7 @@
 import tmi from 'tmi.js';
 import axios from 'axios';
 import { TwitchBotHandler } from './twitch/botHandler';
+import { EngagementTracker } from './twitch/engagementTracker';
 import dotenv from 'dotenv';
 import connectToMongoDB from './mongodb';
 import TwitchBotChannel from '../models/TwitchBotChannel';
@@ -10,6 +11,7 @@ dotenv.config();
 // Initialize variables that will be set during initialization
 let client: tmi.Client | null = null;
 let botHandler: TwitchBotHandler | null = null;
+let engagementTracker: EngagementTracker | null = null;
 let isInitializing = false;
 let isInitialized = false;
 
@@ -161,6 +163,9 @@ export async function initializeTwitchBot(): Promise<boolean> {
 
     // Initialize bot handler
     botHandler = new TwitchBotHandler(client);
+    
+    // Initialize engagement tracker
+    engagementTracker = new EngagementTracker(client);
 
     // Set up event handlers
     client.on('connected', (addr, port) => {
@@ -232,6 +237,7 @@ export async function initializeTwitchBot(): Promise<boolean> {
     // Clean up on failure
     client = null;
     botHandler = null;
+    engagementTracker = null;
     isInitialized = false;
     isInitializing = false;
     return false;
@@ -293,6 +299,7 @@ export async function shutdownTwitchBot(): Promise<void> {
     await client.disconnect();
     client = null;
     botHandler = null;
+    engagementTracker = null;
     isInitialized = false;
     if (dev) {
       console.log('✅ Twitch bot shut down successfully');
@@ -303,8 +310,22 @@ export async function shutdownTwitchBot(): Promise<void> {
     // Force cleanup even if disconnect fails
     client = null;
     botHandler = null;
+    engagementTracker = null;
     isInitialized = false;
   }
+}
+
+/**
+ * Get the engagement tracker instance
+ */
+export function getEngagementTracker(): EngagementTracker | null {
+  if (!isInitialized || !engagementTracker) {
+    if (dev) {
+      console.warn('⚠️ Engagement tracker accessed before initialization. Call initializeTwitchBot() first.');
+    }
+    return null;
+  }
+  return engagementTracker;
 }
 
 /**

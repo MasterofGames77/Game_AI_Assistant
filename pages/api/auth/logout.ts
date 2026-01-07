@@ -55,8 +55,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 'logout'
               );
             } catch (error) {
-              // Token might be expired or invalid - that's okay
-              console.warn('Error blacklisting access token:', error instanceof Error ? error.message : error);
+              // Token might be expired or invalid - that's okay, logout should still proceed
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              // Only log if it's not a common expected error (expired/invalid tokens are normal)
+              if (!errorMessage.includes('expired') && !errorMessage.includes('Invalid')) {
+                console.warn('Error blacklisting access token:', errorMessage);
+              }
+              // Silently continue - expired/invalid tokens don't need to be blacklisted
             }
           })(),
           3000, // 3 second timeout per token
@@ -81,8 +86,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 'logout'
               );
             } catch (error) {
-              // Token might be expired or invalid - that's okay
-              console.warn('Error blacklisting refresh token:', error instanceof Error ? error.message : error);
+              // Token might be expired or invalid - that's okay, logout should still proceed
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              // Only log if it's not a common expected error (expired/invalid tokens are normal)
+              if (!errorMessage.includes('expired') && !errorMessage.includes('Invalid')) {
+                console.warn('Error blacklisting refresh token:', errorMessage);
+              }
+              // Silently continue - expired/invalid tokens don't need to be blacklisted
             }
           })(),
           3000, // 3 second timeout per token

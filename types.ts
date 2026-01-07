@@ -1339,3 +1339,32 @@ export interface ChallengeWithProgress {
   progress: { current: number; target: number } | null;
   progressEntry?: ChallengeProgress; // From backend
 }
+
+/**
+ * Engagement spike detection configuration
+ */
+export interface EngagementConfig {
+  // Hype moment detection (chat velocity)
+  hypeMomentThreshold: number; // Messages per minute to trigger hype moment
+  hypeMomentWindowMs: number; // Time window for measuring velocity (default: 60 seconds)
+  hypeMomentCooldownMs: number; // Cooldown between hype moment detections (default: 5 minutes)
+  
+  // Engagement scoring
+  baseEngagementScore: number; // Base score for any engagement event
+  subscriptionMultiplier: number; // Multiplier for subscription events
+  raidMultiplier: number; // Multiplier for raid events
+  followMultiplier: number; // Multiplier for follow events
+  hypeMomentMultiplier: number; // Multiplier for hype moments
+  
+  // Response settings
+  autoRespond: boolean; // Whether to automatically respond to engagement spikes
+  responseDelayMs: number; // Delay before responding (to avoid spam)
+}
+
+/**
+ * Message timestamp for velocity tracking
+ */
+export interface MessageTimestamp {
+  timestamp: number;
+  username: string;
+}
