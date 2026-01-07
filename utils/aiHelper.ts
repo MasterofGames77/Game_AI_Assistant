@@ -3136,6 +3136,101 @@ function isAPIResultRelevantToQuestion(apiResult: string, question: string, cand
   
   const lowerResult = apiResult.toLowerCase();
   const lowerCandidate = candidate.toLowerCase();
+  const lowerQuestion = question.toLowerCase();
+  
+  // CRITICAL: Check if question contains an "in [Game Title]" pattern
+  // If it does, and the candidate is short and doesn't match the game title, we need to be more strict
+  // Use the same pattern as extractGameTitleCandidates to ensure consistency
+  const inGamePattern = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?(?:\s*:\s*[A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?)?)(?=\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)\b|[?.!]|$)/gi;
+  const inGameMatches: Array<{ title: string; index: number }> = [];
+  let inGameMatch: RegExpExecArray | null;
+  
+  // Find all "in [Game Title]" patterns in the question (works for both beginning and end)
+  while ((inGameMatch = inGamePattern.exec(question)) !== null) {
+    if (inGameMatch[1]) {
+      let title = inGameMatch[1].trim();
+      // Clean up the title (same as extractGameTitleCandidates)
+      title = title.replace(/^(?:what|which|where|when|why|how|who|the|a|an)\s+/i, '');
+      title = title.replace(/\s+(?:has|have|is|are|does|do|can|could|would|should|was|were|will|did)$/i, '');
+      if (title.length >= 3) {
+        inGameMatches.push({ title: title.toLowerCase(), index: inGameMatch.index });
+      }
+    }
+  }
+  
+  // Use the most relevant "in [Game Title]" match (prefer longer titles, or the one closest to the candidate)
+  if (inGameMatches.length > 0) {
+    // Sort by length (longer = more specific) and then by position
+    inGameMatches.sort((a, b) => {
+      if (a.title.length !== b.title.length) {
+        return b.title.length - a.title.length; // Longer first
+      }
+      return a.index - b.index; // Earlier position first
+    });
+    
+    const inGameTitle = inGameMatches[0].title;
+    const inGameIndex = inGameMatches[0].index;
+    const candidateIndex = lowerQuestion.indexOf(lowerCandidate);
+    
+    // Extract meaningful words from the "in [Game Title]" game title
+    const commonWords = new Set([
+      'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
+      'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
+      'what', 'which', 'where', 'when', 'why', 'how', 'who', 'can', 'could', 'would', 'should',
+      'game', 'games', 'play', 'player', 'playing', 'get', 'got', 'how', 'best', 'way'
+    ]);
+    
+    const extractMeaningfulWords = (text: string): Set<string> => {
+      return new Set(
+        text
+          .toLowerCase()
+          .split(/\s+/)
+          .filter(w => w.length > 2 && !commonWords.has(w))
+          .map(w => w.replace(/[^a-z0-9]/g, ''))
+          .filter(w => w.length > 2)
+      );
+    };
+    
+    const inGameTitleWords = extractMeaningfulWords(inGameTitle);
+    const resultWords = extractMeaningfulWords(apiResult);
+    
+    // Check if result shares meaningful words with the "in [Game Title]" game title
+    const sharedWords = Array.from(resultWords).filter(w => inGameTitleWords.has(w));
+    
+    // If candidate is short (1-3 words) and doesn't share meaningful words with the "in [Game Title]" game title
+    const wordCount = candidate.split(/\s+/).length;
+    if (wordCount <= 3 && candidate.length < 40) {
+      // Check if candidate appears before "in [Game Title]" pattern
+      if (candidateIndex >= 0 && inGameIndex >= 0 && candidateIndex < inGameIndex) {
+        // Candidate appears before "in [Game Title]" - likely a character/enemy/location
+        // The API result must share meaningful words with the "in [Game Title]" game title
+        if (sharedWords.length === 0) {
+          return false; // Reject - result doesn't match the game title mentioned in question
+        }
+      } else if (candidateIndex >= 0 && inGameIndex >= 0 && candidateIndex > inGameIndex) {
+        // Candidate appears after "in [Game Title]" - could be a character/enemy/location
+        // If the result doesn't share meaningful words with the "in [Game Title]" game title,
+        // and the candidate is short, reject it
+        if (wordCount === 1 && sharedWords.length === 0) {
+          return false; // Reject single-word candidates that don't match the game title
+        }
+        // For multi-word candidates after "in [Game Title]" (like "Petey Piranha"), check if any words match
+        if (wordCount <= 3 && sharedWords.length === 0) {
+          const candidateLower = candidate.toLowerCase();
+          const inGameTitleLower = inGameTitle.toLowerCase();
+          // Check if any individual word from the candidate appears in the game title
+          // This catches cases like "Petey Piranha" where neither word appears in "Mario Superstar Baseball"
+          const candidateWords = candidateLower.split(/\s+/).filter(w => w.length > 2);
+          const hasMatchingWord = candidateWords.some(word => inGameTitleLower.includes(word));
+          
+          // If no words from the candidate appear in the game title, it's likely a character/enemy/location
+          if (!hasMatchingWord) {
+            return false; // Reject - candidate words don't match the game title
+          }
+        }
+      }
+    }
+  }
   
   // Extract distinctive words from candidate (numbers, remake/remaster, HD, version indicators, sequel indicators)
   // These MUST be present in the result for it to be considered relevant
