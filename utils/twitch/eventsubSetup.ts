@@ -71,6 +71,14 @@ async function createEventSubSubscription(
     };
   }
   
+  // Log the webhook URL being used for debugging
+  logger.info('Creating EventSub subscription', {
+    subscriptionType,
+    broadcasterUserId,
+    webhookCallbackUrl: WEBHOOK_CALLBACK_URL,
+    hasWebhookSecret: !!WEBHOOK_SECRET
+  });
+  
   const response = await axios.post(
     `${TWITCH_API_BASE}/eventsub/subscriptions`,
     {
@@ -92,9 +100,17 @@ async function createEventSubSubscription(
     }
   );
   
+  const subscription = response.data.data[0];
+  logger.info('EventSub subscription created successfully', {
+    subscriptionType,
+    subscriptionId: subscription.id,
+    status: subscription.status,
+    webhookCallbackUrl: subscription.transport?.callback || WEBHOOK_CALLBACK_URL
+  });
+  
   return {
-    id: response.data.data[0].id,
-    status: response.data.data[0].status
+    id: subscription.id,
+    status: subscription.status
   };
 }
 
@@ -234,12 +250,28 @@ export async function setupEventSubSubscriptions(
         });
       } catch (error: any) {
         errors++;
-        logger.error('Error creating EventSub subscription', {
-          broadcasterUserId,
-          subscriptionType,
-          error: error.response?.data || error.message,
-          status: error.response?.status
-        });
+        const errorData = error.response?.data || {};
+        const errorStatus = error.response?.status;
+        const errorMessage = errorData.message || error.message;
+        
+        // Some subscription types require broadcaster features to be enabled
+        // (e.g., subscription program, bits enabled, etc.)
+        if (errorStatus === 403 && errorMessage?.includes('authorization')) {
+          logger.warn('EventSub subscription requires broadcaster features', {
+            broadcasterUserId,
+            subscriptionType,
+            reason: 'Broadcaster may need to enable subscription program, bits, or other features',
+            error: errorMessage
+          });
+        } else {
+          logger.error('Error creating EventSub subscription', {
+            broadcasterUserId,
+            subscriptionType,
+            error: errorData,
+            status: errorStatus,
+            message: errorMessage
+          });
+        }
       }
     }
     
