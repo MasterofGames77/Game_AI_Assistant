@@ -150,7 +150,7 @@ async function deleteEventSubSubscription(
  * 
  * @param broadcasterUserId - Twitch user ID of the broadcaster
  * @param subscriptionTypes - Types of events to subscribe to (default: all engagement events)
- * @param userAccessToken - Optional user OAuth access token (required for some subscription types)
+ * @param userAccessToken - Optional (deprecated - not used, all subscriptions use app token)
  */
 export async function setupEventSubSubscriptions(
   broadcasterUserId: string,
@@ -160,7 +160,7 @@ export async function setupEventSubSubscriptions(
     'channel.raid',
     'channel.cheer'
   ],
-  userAccessToken?: string
+  userAccessToken?: string // Deprecated - kept for backward compatibility but not used
 ): Promise<{ created: number; existing: number; errors: number }> {
   if (!CLIENT_ID || !CLIENT_SECRET) {
     throw new Error('TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET must be set');
@@ -185,13 +185,6 @@ export async function setupEventSubSubscriptions(
     let created = 0;
     let existingCount = 0;
     let errors = 0;
-    
-    // Subscription types that require user OAuth token (not app token)
-    const requiresUserToken = [
-      'channel.subscribe',
-      'channel.subscription.gift',
-      'channel.cheer'
-    ];
     
     // Set up each subscription type
     for (const subscriptionType of subscriptionTypes) {
@@ -219,21 +212,11 @@ export async function setupEventSubSubscriptions(
         continue;
       }
       
-      // Determine which token to use
-      const needsUserToken = requiresUserToken.includes(subscriptionType);
-      const accessToken = needsUserToken && userAccessToken 
-        ? userAccessToken 
-        : appAccessToken;
-      
-      if (needsUserToken && !userAccessToken) {
-        errors++;
-        logger.error('User access token required for EventSub subscription', {
-          broadcasterUserId,
-          subscriptionType,
-          reason: 'This subscription type requires user OAuth token with proper scopes'
-        });
-        continue;
-      }
+      // All EventSub subscriptions must use app access token
+      // The error "auth must use app access token to create webhook subscription" 
+      // indicates that Twitch requires app tokens for creating webhook subscriptions
+      // User tokens are only needed for certain API operations, not subscription creation
+      const accessToken = appAccessToken;
       
       try {
         const result = await createEventSubSubscription(
@@ -247,8 +230,7 @@ export async function setupEventSubSubscriptions(
           broadcasterUserId,
           subscriptionType,
           subscriptionId: result.id,
-          status: result.status,
-          usedUserToken: needsUserToken
+          status: result.status
         });
       } catch (error: any) {
         errors++;
@@ -256,8 +238,7 @@ export async function setupEventSubSubscriptions(
           broadcasterUserId,
           subscriptionType,
           error: error.response?.data || error.message,
-          status: error.response?.status,
-          usedUserToken: needsUserToken
+          status: error.response?.status
         });
       }
     }

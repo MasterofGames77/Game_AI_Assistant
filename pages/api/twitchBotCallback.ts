@@ -298,8 +298,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           'channel.subscription.gift',
           'channel.raid',
           'channel.cheer'
-        ],
-        access_token // Pass user OAuth token for subscriptions that require it
+        ]
+        // Note: All EventSub subscriptions use app access token (not user token)
       );
       logger.info('EventSub subscriptions set up automatically', {
         channelName,

@@ -77,8 +77,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const result = await setupEventSubSubscriptions(
         channel.streamerTwitchId,
-        types,
-        channel.accessToken // Pass user OAuth token for subscriptions that require it
+        types
+        // Note: All EventSub subscriptions use app access token (not user token)
       );
 
       return res.status(200).json({
