@@ -414,6 +414,8 @@ const OFFENSIVE_WORDS = [
   'Charlie Hurt',
   'Mike Dunleavy',
   'Joe Rogan',
+  'Jake Lang',
+  'Adam Johnson',
   'Alex Jones',
   'Liz Wheeler',
   'Megyn Kelly',

@@ -101,6 +101,44 @@ export async function createOrUpdateSession(
       return existingSession;
     }
 
+    // Before creating a new session, check if there's a recently logged-out session from the same device
+    // This prevents new sessions from being created immediately after logout (race condition protection)
+    // Only check for the last 10 seconds to avoid blocking legitimate new logins
+    const recentLogoutWindow = new Date(Date.now() - 10000); // 10 seconds ago
+    const recentInactiveSession = await Session.findOne({
+      userId,
+      isActive: false,
+      updatedAt: { $gte: recentLogoutWindow }, // Recently deactivated
+      $or: [
+        // Match by IP address (most reliable for same device)
+        ...(ipAddress && ipAddress !== '::1' && !ipAddress.includes('127.0.0.1') && ipAddress !== 'unknown'
+          ? [{ ipAddress }]
+          : []),
+        // Also match by user agent (helps identify same browser/device)
+        ...(deviceInfo.userAgent
+          ? [{ 'deviceInfo.userAgent': deviceInfo.userAgent }]
+          : []),
+      ],
+    }).lean();
+
+    // If there's a recently logged-out session from the same device, don't create a new active session
+    // Instead, return null to indicate session creation was blocked
+    // This prevents race conditions where logout and refresh happen simultaneously
+    if (recentInactiveSession) {
+      if (process.env.NODE_ENV === 'development') {
+        // Type assertion: lean() returns a plain object with timestamps from mongoose
+        const sessionData = recentInactiveSession as any;
+        console.log('[createOrUpdateSession] Blocked new session creation - recent logout detected', {
+          userId,
+          ipAddress,
+          recentLogoutTime: sessionData.updatedAt || sessionData.lastActivity,
+        });
+      }
+      // Return null to indicate session creation was blocked
+      // The refresh endpoint will handle this appropriately
+      return null;
+    }
+
     // Create new session - use findOneAndUpdate with upsert to handle race conditions
     try {
       const session = await Session.findOneAndUpdate(

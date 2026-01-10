@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForum } from "../../../context/ForumContext";
 import { ForumProvider } from "../../../context/ForumContext";
 import axios from "axios";
@@ -8,7 +8,10 @@ import { useRouter } from "next/navigation";
 import PrivateForumUserManagement from "../../../components/PrivateForumUserManagement";
 import toast from "react-hot-toast";
 import Image from "next/image";
-import { trackForumPostCreated, trackForumView } from "../../../utils/analytics";
+import {
+  trackForumPostCreated,
+  trackForumView,
+} from "../../../utils/analytics";
 
 export default function ForumPageWrapper({
   params,
@@ -927,6 +930,185 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     }
   };
 
+  // Process and sort posts with reply depth calculation
+  const processedPosts = useMemo(() => {
+    if (!currentForum?.posts) return [];
+
+    // Helper function to calculate reply depth (how many levels deep this reply is)
+    const calculateReplyDepth = (
+      post: any,
+      posts: any[],
+      visited: Set<string> = new Set()
+    ): number => {
+      if (!post.replyTo) return 0;
+
+      const postId = post._id ? String(post._id) : null;
+      const replyToId = String(post.replyTo);
+
+      // Prevent infinite loops
+      if (postId && visited.has(postId)) return 0;
+      if (postId) visited.add(postId);
+
+      const parentPost = posts.find((p: any) => {
+        if (!p._id) return false;
+        return String(p._id) === replyToId;
+      });
+
+      if (!parentPost) return 0;
+
+      // If parent is also a reply, recursively calculate its depth and add 1
+      if (parentPost.replyTo) {
+        return calculateReplyDepth(parentPost, posts, visited) + 1;
+      }
+
+      // Parent is a top-level post, so this is depth 1
+      return 1;
+    };
+
+    // Filter valid posts
+    const validPosts = [...currentForum.posts].filter(
+      (post) =>
+        post &&
+        post._id &&
+        (post.message?.trim() ||
+          (post.metadata?.attachments && post.metadata.attachments.length > 0))
+    );
+
+    // Build a map of post IDs to posts for quick lookup
+    const postMap = new Map<string, any>();
+    validPosts.forEach((post) => {
+      if (post._id) {
+        postMap.set(String(post._id), post);
+      }
+    });
+
+    // Helper function to find post ID from @mention in message
+    const findPostIdFromMention = (
+      post: any,
+      allPosts: any[]
+    ): string | null => {
+      if (!post.message) return null;
+
+      // Extract @mention from message (format: @Username)
+      const mentionMatch = post.message.match(/^@(\w+)/);
+      if (!mentionMatch) return null;
+
+      const mentionedUsername = mentionMatch[1];
+
+      // Find the most recent post by that username before this post's timestamp
+      const postTime = new Date(post.timestamp || 0).getTime();
+      const candidatePosts = allPosts
+        .filter((p: any) => {
+          if (!p._id || p._id === post._id) return false;
+          const pUsername = p.username || p.createdBy;
+          if (!pUsername) return false;
+          return pUsername.toLowerCase() === mentionedUsername.toLowerCase();
+        })
+        .filter((p: any) => {
+          // Only consider posts that came before this one
+          const pTime = new Date(p.timestamp || 0).getTime();
+          return pTime < postTime;
+        })
+        .sort((a: any, b: any) => {
+          // Sort by timestamp descending (most recent first)
+          const aTime = new Date(a.timestamp || 0).getTime();
+          const bTime = new Date(b.timestamp || 0).getTime();
+          return bTime - aTime;
+        });
+
+      // Return the most recent post by that user (most likely the one being replied to)
+      return candidatePosts.length > 0 ? String(candidatePosts[0]._id) : null;
+    };
+
+    // Helper function to get all replies to a post (recursively)
+    // This includes posts with replyTo field AND posts with @mentions that match
+    const getReplies = (parentId: string, parentUsername?: string): any[] => {
+      const replies = validPosts.filter((post) => {
+        // Check if post has replyTo field pointing to parent
+        if (post.replyTo && String(post.replyTo) === parentId) {
+          return true;
+        }
+
+        // If no replyTo field, check if it has @mention matching parent post's author
+        if (!post.replyTo && parentUsername) {
+          const mentionedPostId = findPostIdFromMention(post, validPosts);
+          if (mentionedPostId === parentId) {
+            return true;
+          }
+        }
+
+        return false;
+      });
+
+      // Sort replies chronologically
+      replies.sort((a, b) => {
+        const aTime = new Date(a.timestamp || 0).getTime();
+        const bTime = new Date(b.timestamp || 0).getTime();
+        return aTime - bTime;
+      });
+
+      // For each reply, get its nested replies
+      const result: any[] = [];
+      replies.forEach((reply) => {
+        result.push(reply);
+        // Recursively get replies to this reply
+        const replyUsername = reply.username || reply.createdBy;
+        const nestedReplies = getReplies(String(reply._id), replyUsername);
+        result.push(...nestedReplies);
+      });
+
+      return result;
+    };
+
+    // Get all top-level posts (posts without replyTo AND not detected as replies via @mention)
+    const topLevelPosts = validPosts.filter((post) => {
+      if (post.replyTo) return false; // Has replyTo field, so it's a reply
+
+      // Check if it's a reply based on @mention
+      // If message starts with @mention, try to find if it's replying to an existing post
+      const mentionedPostId = findPostIdFromMention(post, validPosts);
+      // If we found a post it's replying to, it's not a top-level post
+      return !mentionedPostId;
+    });
+
+    // Sort top-level posts chronologically
+    topLevelPosts.sort((a, b) => {
+      const aTime = new Date(a.timestamp || 0).getTime();
+      const bTime = new Date(b.timestamp || 0).getTime();
+      return aTime - bTime;
+    });
+
+    // Build sorted list: for each top-level post, add it and all its replies
+    const sortedPosts: any[] = [];
+    const processedPostIds = new Set<string>();
+
+    topLevelPosts.forEach((post) => {
+      const postId = String(post._id);
+      if (processedPostIds.has(postId)) return; // Skip if already processed as a reply
+
+      sortedPosts.push(post);
+      processedPostIds.add(postId);
+
+      // Get all replies to this post (recursively)
+      // Pass the post's username to help match @mentions
+      const postUsername = post.username || post.createdBy;
+      const replies = getReplies(postId, postUsername);
+
+      replies.forEach((reply) => {
+        const replyId = String(reply._id);
+        if (!processedPostIds.has(replyId)) {
+          sortedPosts.push(reply);
+          processedPostIds.add(replyId);
+        }
+      });
+    });
+
+    return sortedPosts.map((post) => ({
+      post,
+      replyDepth: calculateReplyDepth(post, currentForum.posts || []),
+    }));
+  }, [currentForum?.posts]);
+
   if (loading) {
     return <div className="text-center">Loading forum...</div>;
   }
@@ -940,7 +1122,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-4">
+    <div className="max-w-4xl mx-auto p-4 pt-2">
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
@@ -982,7 +1164,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       </button>
 
       {/* Forum Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">{currentForum.title}</h1>
         <div className="mb-2 text-gray-800 dark:text-gray-200">
           <p>Game: {currentForum.gameTitle}</p>
@@ -1013,7 +1195,7 @@ function ForumPage({ params }: { params: { forumId: string } }) {
         />
       )}
 
-      <div className="mb-8">
+      <div className="mb-6">
         {username ? (
           <form onSubmit={handlePostSubmit} className="space-y-4">
             <textarea
@@ -1128,42 +1310,72 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       </div>
 
       <div className="space-y-4">
-        {currentForum.posts
-          ?.filter(
-            (post) =>
-              post &&
-              post._id &&
-              (post.message?.trim() ||
-                (post.metadata?.attachments &&
-                  post.metadata.attachments.length > 0))
-          )
-          .map((post) => {
-            // Find the original post if this is a reply
-            // Handle both ObjectId and string formats
-            const replyToId: string | null = post.replyTo
-              ? String(post.replyTo)
-              : null;
+        {processedPosts.map(({ post, replyDepth }) => {
+          // Find the original post if this is a reply
+          const replyToId: string | null = post.replyTo
+            ? String(post.replyTo)
+            : null;
 
-            const originalPost = replyToId
-              ? currentForum.posts?.find((p: any) => {
-                  if (!p._id) return false;
-                  const postId: string = String(p._id);
-                  return postId === replyToId;
-                })
-              : null;
+          const originalPost = replyToId
+            ? currentForum.posts?.find((p: any) => {
+                if (!p._id) return false;
+                const postId: string = String(p._id);
+                return postId === replyToId;
+              })
+            : null;
 
-            const postIdString: string = post._id
-              ? String(post._id)
-              : `post-${Math.random()}`;
+          const postIdString: string = post._id
+            ? String(post._id)
+            : `post-${Math.random()}`;
 
-            return (
+          // Calculate indentation based on depth
+          // Each level adds 3rem (48px) of indentation for better visual hierarchy (Reddit-style)
+          // Check if this is a reply by looking at replyTo field OR @mention in message
+          const hasReplyTo = !!post.replyTo;
+          const hasMention = post.message?.trim().startsWith("@");
+          const isReply = hasReplyTo || hasMention;
+          const indentAmount = isReply ? Math.max(replyDepth, 1) * 3 : 0; // Ensure at least 1 level if it's a reply (3rem = 48px per level)
+
+          // Debug logging (remove in production if needed)
+          if (process.env.NODE_ENV === "development" && isReply) {
+            console.log("Reply detected:", {
+              postId: postIdString,
+              replyTo: post.replyTo,
+              hasMention,
+              replyDepth,
+              indentAmount,
+              username: post.username || post.createdBy,
+              messageStart: post.message?.substring(0, 50),
+            });
+          }
+
+          return (
+            <div
+              key={postIdString}
+              className="relative"
+              style={
+                isReply
+                  ? {
+                      marginLeft: `${indentAmount}rem`,
+                    }
+                  : undefined
+              }
+            >
+              {/* Reddit-style vertical line indicator for replies */}
+              {isReply && (
+                <div
+                  className="absolute left-0 top-0 bottom-0 w-0.5 bg-gray-400 dark:bg-gray-500"
+                  style={{
+                    left: `-${Math.max(indentAmount - 0.5, 0.5)}rem`,
+                  }}
+                />
+              )}
               <div
                 id={`post-${postIdString}`}
-                key={postIdString}
-                className={`bg-white dark:bg-gray-900 p-4 rounded-lg shadow hover:shadow-md transition-shadow ${
-                  post.replyTo
-                    ? "ml-8 md:ml-12 border-l-4 border-blue-500 dark:border-blue-400 bg-blue-50/50 dark:bg-blue-900/20"
-                    : ""
+                className={`p-4 rounded-lg shadow hover:shadow-md transition-shadow relative ${
+                  isReply
+                    ? "bg-blue-100 dark:bg-blue-950 border-l-4 border-blue-600 dark:border-blue-300 ring-2 ring-blue-200 dark:ring-blue-800"
+                    : "bg-white dark:bg-gray-900"
                 }`}
               >
                 <div className="flex justify-between items-start">
@@ -1738,8 +1950,9 @@ function ForumPage({ params }: { params: { forumId: string } }) {
                   </div>
                 </div>
               </div>
-            );
-          })}
+            </div>
+          );
+        })}
 
         {currentForum.posts?.length === 0 && (
           <div className="text-center text-gray-500 py-8">

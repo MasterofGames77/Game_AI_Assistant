@@ -2566,7 +2566,7 @@ function extractGameTitleCandidates(question: string): string[] {
           'has best', 'has the lowest', 'has the worst', 'CTGP', 'has the slowest',
           'has the easiest', 'has the hardest', 'gameplay mechanics', 'mechanics',
           'gameplay', 'different versions', 'versions', 'key differences', 'differences',
-          'between', 'version', 'edition', 'editions', 'location'
+          'between', 'version', 'edition', 'editions', 'location', 'item'
         ];
         
         const isNonGamePhrase = nonGamePhrases.some(phrase => lowerCandidate.includes(phrase));
@@ -3349,11 +3349,12 @@ function extractConsoleFromQuestion(question: string): string | undefined {
     'Xbox 360': [/xbox\s+360/i],
     'PC': [/\b(pc|steam|epic|gog)\b(?!\s+engine)/i],
     'Wii U': [/wii\s+u/i],
-    'Wii': [/\bwii\b(?!\s+u)/i],
+    'Nintendo Wii': [/nintendo\s+wii\b(?!\s+u)/i],
     'GameCube': [/gamecube|game\s+cube/i],
     'Nintendo 64': [/nintendo\s+64|n64/i],
     'Nintendo 3DS': [/nintendo\s+3ds/i],
     'Nintendo DS': [/nintendo\s+ds/i],
+    'Nintendo DSi': [/nintendo\s+dsi/i],
     'Nintendo Game Boy': [/nintendo\s+game\s+boy/i],
     'Nintendo Game Boy Advance': [/nintendo\s+game\s+boy\s+advance/i],
     'Nintendo Game Boy Color': [/nintendo\s+game\s+boy\s+color/i],
@@ -3370,6 +3371,7 @@ function extractConsoleFromQuestion(question: string): string | undefined {
     'Sega Master System': [/sega\s+master\s+system/i],
     'TurboGrafx-16': [/turbo\s+grafx-16/i],
     'Atari 2600': [/atari\s+2600/i],
+    'Magnavox Odyssey': [/magnavox\s+odyssey/i],
     'Commodore 64': [/commodore\s+64/i],
     'Amiga': [/amiga/i],
     'PC Engine': [/pc\s+engine|pc-engine|turbo\s*grafx-?16/i],
@@ -3382,7 +3384,9 @@ function extractConsoleFromQuestion(question: string): string | undefined {
     'Sega Game Gear': [/sega\s+game\s+gear/i],
     'Atari Jaguar': [/atari\s+jaguar/i],
     'Virtual Boy': [/virtual\s+boy/i],
-    'Arcade': [/arcade/i]
+    'Arcade': [/arcade/i],
+    'Meta Quest 3': [/meta\s+quest\s+3/i],
+    'Meta Quest 2': [/meta\s+quest\s+2/i]
   };
   
   // Check if question is about console (price, release date, specs, etc.)
