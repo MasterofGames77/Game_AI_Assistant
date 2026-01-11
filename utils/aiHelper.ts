@@ -1983,12 +1983,22 @@ Format: ["Game 1", "Game 2", "Game 3", ...]
 ONLY include games where ${genre} is clearly the primary genre. If unsure, EXCLUDE the game.`;
 
         try {
-          // For recommendation filtering, use default model (4o) since we're filtering a list
-          // This is a lightweight operation and doesn't need game-specific knowledge
-          const modelSelection = await selectModelForQuestion(undefined, `currently popular ${genre} games`);
+          // For recommendation filtering with currentPopular=true, use GPT-5.2 for better knowledge of recent games
+          // For other cases, use default model (4o) since we're filtering a list
+          let modelSelection;
+          if (currentPopular) {
+            // Use GPT-5.2 for current/popular games to leverage better knowledge cutoff (Aug 2025 vs Apr 2024)
+            modelSelection = {
+              model: 'gpt-5.2',
+              reason: 'current_popular_games_need_recent_knowledge'
+            };
+          } else {
+            // Use default model selection logic for other cases
+            modelSelection = await selectModelForQuestion(undefined, `popular ${genre} games`);
+          }
           
           // Log model selection for monitoring
-          console.log(`[Model Selection] Using ${modelSelection.model} for recommendation filtering (popular) (reason: ${modelSelection.reason})`);
+          console.log(`[Model Selection] Using ${modelSelection.model} for recommendation filtering (popular: ${currentPopular}) (reason: ${modelSelection.reason})`);
           
           // Track model usage
           modelUsageStats[modelSelection.model] = (modelUsageStats[modelSelection.model] || 0) + 1;

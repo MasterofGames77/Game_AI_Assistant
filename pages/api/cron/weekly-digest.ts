@@ -260,6 +260,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Additional safety filter: exclude automated users and fake emails
           if (!doc.username || !doc.email) return false;
           
+          // Exclude test users by username
+          const testUsernames = [
+            'testuser-1753916871772',
+            'cleanup-test-1755477084172',
+            'earlyuser-1753916869201'
+          ];
+          if (testUsernames.includes(doc.username)) {
+            console.log(`[Weekly Digest] Excluding test user: ${doc.username}`);
+            return false;
+          }
+          
+          // Exclude users that consistently timeout (add usernames here if needed)
+          // Timeouts typically occur when getWeeklyGameRecommendations makes many API calls
+          // (one per genre, 15 seconds each). Users with many genres may exceed the 60s timeout.
+          const timeoutExcludedUsers: string[] = []; // Add usernames here if they consistently timeout
+          if (timeoutExcludedUsers.includes(doc.username)) {
+            console.log(`[Weekly Digest] Excluding user due to consistent timeouts: ${doc.username}`);
+            return false;
+          }
+          
           const email = doc.email.toLowerCase();
           // Exclude @wingman.internal emails (automated users)
           if (email.endsWith('@wingman.internal')) return false;
@@ -357,16 +377,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const isFirstEmail = !user.weeklyDigest?.firstEmailSentAt;
 
             // Get data for the email with timeout (60 seconds total for data fetching)
+            // Use Promise.allSettled to track which operations complete/fail
+            const dataFetchStartTime = Date.now();
             const [achievements, forumActivity, gameRecommendations] = await withTimeout(
               Promise.all([
-                getWeeklyAchievements(username, isFirstEmail),
-                getWeeklyForumActivity(username),
-                getWeeklyGameRecommendations(username)
+                getWeeklyAchievements(username, isFirstEmail).then(result => {
+                  console.log(`[Weekly Digest] ✅ Achievements fetched for ${username} in ${Date.now() - dataFetchStartTime}ms`);
+                  return result;
+                }).catch(err => {
+                  console.error(`[Weekly Digest] ❌ Achievements fetch failed for ${username}:`, err);
+                  throw err;
+                }),
+                getWeeklyForumActivity(username).then(result => {
+                  console.log(`[Weekly Digest] ✅ Forum activity fetched for ${username} in ${Date.now() - dataFetchStartTime}ms`);
+                  return result;
+                }).catch(err => {
+                  console.error(`[Weekly Digest] ❌ Forum activity fetch failed for ${username}:`, err);
+                  throw err;
+                }),
+                getWeeklyGameRecommendations(username).then(result => {
+                  console.log(`[Weekly Digest] ✅ Game recommendations fetched for ${username} in ${Date.now() - dataFetchStartTime}ms`);
+                  return result;
+                }).catch(err => {
+                  console.error(`[Weekly Digest] ❌ Game recommendations fetch failed for ${username}:`, err);
+                  throw err;
+                })
               ]),
               60000, // 60 seconds timeout for data fetching
               `Weekly digest data fetch for ${username}`
             ).catch((error) => {
               const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+              const duration = Date.now() - userStartTime;
               console.error('[Weekly Digest] Timeout or error fetching data for user', {
                 username,
                 email,
@@ -374,7 +415,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 stack: error instanceof Error ? error.stack : undefined,
                 timestamp: new Date().toISOString(),
                 operation: 'weekly-digest-data-fetch',
-                duration: Date.now() - userStartTime
+                duration,
+                isTimeout: errorMessage.includes('timed out'),
+                note: 'This timeout usually occurs when getWeeklyGameRecommendations makes many API calls (one per genre). Users with many genres may need a longer timeout or optimization.'
               });
               throw error;
             });
