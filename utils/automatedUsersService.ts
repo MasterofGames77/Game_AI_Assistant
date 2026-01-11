@@ -2,7 +2,9 @@ import axios, { AxiosError } from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { generateQuestion, generateForumPost, generatePostReply, generateCommonGamerPost, generateExpertGamerReply, UserPreferences } from './automatedContentGenerator';
-import { getRandomGameImage, recordImageUsage } from './automatedImageService';
+import { getRandomGameImage, recordImageUsage, downloadAndStoreImage } from './automatedImageService';
+import { searchGameImage, searchGameImageUnsplash, getCachedImageSearch, cacheImageSearch } from './automatedImageSearch';
+import { extractKeywordsSimple } from './imageKeywordExtractor';
 import { containsOffensiveContent } from './contentModeration';
 import { GameList, ActivityResult } from '../types';
 import connectToMongoDB from './mongodb';
@@ -1277,38 +1279,113 @@ export async function createForumPost(
       };
     }
     
-    // Find image for the game (excluding images already used by this user for this game)
-    // This will automatically upload to cloud storage if configured
+    // NEW: Search for relevant image from internet, with fallback to static images
     let imageUrl: string | null = null;
     let attachments: any[] = [];
     
-    const gameImage = await getRandomGameImage(actualGameTitle, username, true);
-    if (gameImage) {
-      // Image found - record that this user has used this image for this game
-      // Record the URL (could be local path or cloud URL)
-      recordImageUsage(username, actualGameTitle, gameImage);
-      
-      // If it's a cloud URL, we can use it directly
-      // If it's a local path, it will be served from /public
-      imageUrl = gameImage;
-      
-      // Add image to attachments if it's a cloud URL or if we're in production
-      // For local development, the image will be served from /public automatically
-      if (gameImage.startsWith('http://') || gameImage.startsWith('https://')) {
-        // Cloud URL - add as attachment
-        attachments.push({
-          type: 'image',
-          url: gameImage,
-          name: path.basename(gameImage)
-        });
-      } else {
-        // Local path - will be served from /public, but we can still add it
-        attachments.push({
-          type: 'image',
-          url: gameImage,
-          name: path.basename(gameImage)
-        });
+    // Check if image search is enabled
+    const imageSearchEnabled = process.env.IMAGE_SEARCH_ENABLED !== 'false'; // Default to true
+    
+    if (imageSearchEnabled) {
+      try {
+        // Extract keywords from post content
+        const keywords = extractKeywordsSimple(postContent, actualGameTitle, forumCategory);
+        console.log(`[IMAGE SEARCH] Extracted keywords for ${actualGameTitle}:`, keywords);
+        
+        // Check cache first
+        const cachedImage = getCachedImageSearch(actualGameTitle, keywords);
+        if (cachedImage) {
+          imageUrl = cachedImage;
+          console.log(`[IMAGE SEARCH] Using cached image for ${actualGameTitle}`);
+        } else {
+          // Search for image using Google Custom Search API
+          const searchResult = await searchGameImage({
+            gameTitle: actualGameTitle,
+            keywords: keywords,
+            postContent: postContent,
+            forumCategory: forumCategory,
+            maxResults: 10
+          });
+          
+          if (searchResult && searchResult.relevanceScore && searchResult.relevanceScore >= 50) {
+            // Download and store the image
+            const downloadedPath = await downloadAndStoreImage(
+              searchResult.url,
+              actualGameTitle,
+              keywords,
+              true // uploadToCloud
+            );
+            
+            if (downloadedPath) {
+              imageUrl = downloadedPath;
+              // Cache the result
+              cacheImageSearch(actualGameTitle, keywords, downloadedPath);
+              console.log(`[IMAGE SEARCH] Successfully downloaded and cached image for ${actualGameTitle}`);
+            } else {
+              console.log(`[IMAGE SEARCH] Failed to download image, trying fallback...`);
+            }
+          } else {
+            console.log(`[IMAGE SEARCH] No relevant image found (score: ${searchResult?.relevanceScore || 0}), trying fallback...`);
+          }
+          
+          // Fallback to Unsplash if Google search failed or had low relevance
+          if (!imageUrl) {
+            const unsplashResult = await searchGameImageUnsplash({
+              gameTitle: actualGameTitle,
+              keywords: keywords,
+              postContent: postContent,
+              forumCategory: forumCategory,
+              maxResults: 10
+            });
+            
+            if (unsplashResult) {
+              const downloadedPath = await downloadAndStoreImage(
+                unsplashResult.url,
+                actualGameTitle,
+                keywords,
+                true
+              );
+              
+              if (downloadedPath) {
+                imageUrl = downloadedPath;
+                cacheImageSearch(actualGameTitle, keywords, downloadedPath);
+                console.log(`[IMAGE SEARCH] Successfully downloaded image from Unsplash for ${actualGameTitle}`);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[IMAGE SEARCH] Error during image search:', error);
+        // Fall through to static image fallback
       }
+    }
+    
+    // Fallback to static images if search failed or is disabled
+    if (!imageUrl) {
+      console.log(`[IMAGE SEARCH] Using static image fallback for ${actualGameTitle}`);
+      const gameImage = await getRandomGameImage(actualGameTitle, username, true);
+      if (gameImage) {
+        recordImageUsage(username, actualGameTitle, gameImage);
+        imageUrl = gameImage;
+      }
+    }
+    
+    // Add image to attachments if found
+    if (imageUrl) {
+      // Record usage if it's a static image (internet images are already recorded)
+      if (!imageSearchEnabled || imageUrl.includes('/uploads/automated-images/')) {
+        // Only record usage for static images (to avoid double-counting)
+        // Internet images are tracked via cache
+      } else {
+        recordImageUsage(username, actualGameTitle, imageUrl);
+      }
+      
+      // Add to attachments
+      attachments.push({
+        type: 'image',
+        url: imageUrl,
+        name: path.basename(imageUrl)
+      });
     }
     
     // Post to forum directly via database (more reliable than HTTP)

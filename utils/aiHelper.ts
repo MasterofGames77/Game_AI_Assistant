@@ -22,6 +22,8 @@ function getOpenAIClient(): OpenAI {
     }
     openaiInstance = new OpenAI({
       apiKey: apiKey,
+      timeout: 20000, // 20 seconds - well under Heroku's 30s limit to prevent H12 timeouts
+      maxRetries: 1, // Reduce retries to avoid compounding delays
     });
   }
   return openaiInstance;

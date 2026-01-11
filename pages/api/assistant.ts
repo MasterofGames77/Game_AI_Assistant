@@ -1301,10 +1301,12 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
       return { promise: safePromise, cancel, id };
     };
     
-    const timeoutWrapper = createTimeoutPromise(25000, 'Request timeout');
+    // Reduced timeouts to provide better buffer under Heroku's 30-second H12 limit
+    // 20s for text-only (10s buffer), 25s for vision (5s buffer)
+    const timeoutWrapper = createTimeoutPromise(20000, 'Request timeout');
     const timeoutPromise = timeoutWrapper.promise;
     
-    const visionTimeoutWrapper = createTimeoutPromise(60000, 'Vision API request timeout');
+    const visionTimeoutWrapper = createTimeoutPromise(25000, 'Vision API request timeout');
     const visionTimeoutPromise = visionTimeoutWrapper.promise;
     
     // Helper function to clear timeouts
@@ -1334,17 +1336,27 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
           let imagePath: string | null = null;
           
           if (imageUrl && imageUrl.startsWith('http')) {
-            // Download cloud image temporarily for analysis
-            const response = await fetch(imageUrl);
-            if (response.ok) {
-              const buffer = await response.arrayBuffer();
-              const tempPath = path.join(process.cwd(), 'tmp', 'analysis', `temp-${Date.now()}.jpg`);
-              const tempDir = path.dirname(tempPath);
-              if (!fs.existsSync(tempDir)) {
-                fs.mkdirSync(tempDir, { recursive: true });
+            // Download cloud image temporarily for analysis with timeout protection
+            try {
+              const downloadPromise = fetch(imageUrl);
+              const downloadTimeout = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('Image download timeout after 5 seconds')), 5000)
+              );
+              
+              const response = await Promise.race([downloadPromise, downloadTimeout]);
+              if (response.ok) {
+                const buffer = await response.arrayBuffer();
+                const tempPath = path.join(process.cwd(), 'tmp', 'analysis', `temp-${Date.now()}.jpg`);
+                const tempDir = path.dirname(tempPath);
+                if (!fs.existsSync(tempDir)) {
+                  fs.mkdirSync(tempDir, { recursive: true });
+                }
+                fs.writeFileSync(tempPath, Buffer.from(buffer));
+                imagePath = tempPath;
               }
-              fs.writeFileSync(tempPath, Buffer.from(buffer));
-              imagePath = tempPath;
+            } catch (downloadError) {
+              console.error('Error downloading image for analysis:', downloadError);
+              // Continue without image analysis if download fails
             }
           } else if (imageFilePath) {
             imagePath = path.join(process.cwd(), 'public', imageFilePath);
@@ -1804,8 +1816,8 @@ CRITICAL INSTRUCTIONS:
             clearTimeouts();
             // Fallback to text-only API
             try {
-              // Create a new timeout for the fallback
-              const fallbackTimeout = createTimeoutPromise(25000, 'Request timeout');
+              // Create a new timeout for the fallback (reduced to 20s to match main timeout)
+              const fallbackTimeout = createTimeoutPromise(20000, 'Request timeout');
               baseAnswer = await Promise.race([
                 deduplicateRequest(cacheKey, () => getChatCompletion(questionToProcess, systemMessage)),
                 fallbackTimeout.promise

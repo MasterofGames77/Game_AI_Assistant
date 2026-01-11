@@ -1368,3 +1368,20 @@ export interface MessageTimestamp {
   timestamp: number;
   username: string;
 }
+
+/**
+ * Cache structure for image search results
+ */
+export interface ImageSearchCache {
+  cache: {
+    [gameTitle: string]: {
+      [keywords: string]: string; // imagePath
+    };
+  };
+  metadata: {
+    lastUpdated: string;
+    totalCached: number;
+    cacheHits: number;
+    cacheMisses: number;
+  };
+}

@@ -174,7 +174,6 @@ export function findGameImage(gameTitle: string): string | null {
   const baseDir = path.join(process.cwd(), 'public', 'uploads', 'automated-images');
   if (fs.existsSync(baseDir)) {
     const files = fs.readdirSync(baseDir);
-    const sanitizedTitle = sanitizeGameTitle(gameTitle);
     const imageFiles = files.filter(file => {
       if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(file)) return false;
       
@@ -507,3 +506,116 @@ export function getAllGamesWithImages(): string[] {
   });
 }
 
+/**
+ * Download image from URL and store locally
+ * @param imageUrl - URL of the image to download
+ * @param gameTitle - Game title for organizing files
+ * @param keywords - Keywords for filename
+ * @param uploadToCloud - Whether to upload to cloud storage after download
+ * @returns Path to the stored image (local or cloud URL), or null if download fails
+ */
+export async function downloadAndStoreImage(
+  imageUrl: string,
+  gameTitle: string,
+  keywords: string[],
+  uploadToCloud: boolean = true
+): Promise<string | null> {
+  const axios = require('axios');
+  const { getImageStorage } = require('./imageStorage');
+  
+  try {
+    // Download image
+    console.log(`[IMAGE SEARCH] Downloading image from: ${imageUrl}`);
+    const response = await axios.get(imageUrl, {
+      responseType: 'arraybuffer',
+      timeout: 10000, // 10 second timeout
+      maxContentLength: 10 * 1024 * 1024, // 10MB max
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+    
+    const imageBuffer = Buffer.from(response.data);
+    const contentType = response.headers['content-type'] || '';
+    
+    // Validate file format
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.some(type => contentType.includes(type))) {
+      console.error(`[IMAGE SEARCH] Invalid image type: ${contentType}`);
+      return null;
+    }
+    
+    // Validate file size (max 10MB)
+    if (imageBuffer.length > 10 * 1024 * 1024) {
+      console.error(`[IMAGE SEARCH] Image too large: ${imageBuffer.length} bytes`);
+      return null;
+    }
+    
+    // Determine file extension from content type
+    let extension = 'jpg';
+    if (contentType.includes('png')) extension = 'png';
+    else if (contentType.includes('webp')) extension = 'webp';
+    else if (contentType.includes('jpeg') || contentType.includes('jpg')) extension = 'jpg';
+    
+    // Generate filename
+    const sanitizedGame = sanitizeGameTitle(gameTitle);
+    const sanitizedKeywords = keywords
+      .map(k => k.toLowerCase().replace(/[^a-z0-9]+/g, '-'))
+      .filter(k => k.length > 0)
+      .join('-');
+    const timestamp = Date.now();
+    const filename = sanitizedKeywords 
+      ? `${sanitizedGame}-${sanitizedKeywords}-${timestamp}.${extension}`
+      : `${sanitizedGame}-${timestamp}.${extension}`;
+    
+    // Create directory if it doesn't exist
+    const gameDir = getGameImageDirectory(gameTitle);
+    if (!fs.existsSync(gameDir)) {
+      fs.mkdirSync(gameDir, { recursive: true });
+    }
+    
+    // Save locally
+    const localPath = path.join(gameDir, filename);
+    fs.writeFileSync(localPath, imageBuffer);
+    
+    // Get relative path for public access
+    const relativePath = `/uploads/automated-images/${sanitizedGame}/${filename}`;
+    
+    console.log(`[IMAGE SEARCH] Image saved locally: ${relativePath}`);
+    
+    // Upload to cloud storage if configured
+    if (uploadToCloud) {
+      try {
+        const imageStorage = getImageStorage();
+        const uploadResult = await imageStorage.uploadImage(
+          localPath,
+          filename,
+          `automated-images/${sanitizedGame}`
+        );
+        
+        if (uploadResult && uploadResult.url) {
+          console.log(`[IMAGE SEARCH] Image uploaded to cloud: ${uploadResult.url}`);
+          
+          // Register the cloud URL in the image mapping
+          registerGameImage(gameTitle, uploadResult.url, false);
+          
+          return uploadResult.url;
+        }
+      } catch (cloudError) {
+        console.error(`[IMAGE SEARCH] Cloud upload failed, using local path:`, cloudError);
+        // Fall back to local path if cloud upload fails
+      }
+    }
+    
+    // Register the local path in the image mapping
+    registerGameImage(gameTitle, relativePath, false);
+    
+    return relativePath;
+  } catch (error: any) {
+    console.error(`[IMAGE SEARCH] Error downloading image:`, error.message);
+    if (error.response) {
+      console.error(`[IMAGE SEARCH] HTTP ${error.response.status}: ${error.response.statusText}`);
+    }
+    return null;
+  }
+}
