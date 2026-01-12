@@ -4,7 +4,8 @@ import path from 'path';
 import { generateQuestion, generateForumPost, generatePostReply, generateCommonGamerPost, generateExpertGamerReply, UserPreferences } from './automatedContentGenerator';
 import { getRandomGameImage, recordImageUsage, downloadAndStoreImage } from './automatedImageService';
 import { searchGameImage, searchGameImageUnsplash, getCachedImageSearch, cacheImageSearch } from './automatedImageSearch';
-import { extractKeywordsSimple } from './imageKeywordExtractor';
+import { extractKeywordsSimple, extractKeywordsFromPost } from './imageKeywordExtractor';
+import { verifyImageRelevance, buildSearchQuery } from './imageRelevanceVerifier';
 import { containsOffensiveContent } from './contentModeration';
 import { GameList, ActivityResult } from '../types';
 import connectToMongoDB from './mongodb';
@@ -1288,51 +1289,79 @@ export async function createForumPost(
     
     if (imageSearchEnabled) {
       try {
-        // Extract keywords from post content
-        const keywords = extractKeywordsSimple(postContent, actualGameTitle, forumCategory);
-        console.log(`[IMAGE SEARCH] Extracted keywords for ${actualGameTitle}:`, keywords);
+        // Phase 2: Extract keywords using AI-powered extraction
+        const extractedKeywords = await extractKeywordsFromPost(postContent, actualGameTitle, forumCategory);
+        console.log(`[IMAGE SEARCH] Extracted keywords for ${actualGameTitle}:`, {
+          characters: extractedKeywords.characters,
+          locations: extractedKeywords.locations,
+          items: extractedKeywords.items,
+          topics: extractedKeywords.topics
+        });
+        
+        // Build search keywords array for cache lookup (use all keywords)
+        const allKeywords = [
+          ...extractedKeywords.characters,
+          ...extractedKeywords.locations,
+          ...extractedKeywords.items,
+          ...extractedKeywords.topics
+        ];
         
         // Check cache first
-        const cachedImage = getCachedImageSearch(actualGameTitle, keywords);
+        const cachedImage = getCachedImageSearch(actualGameTitle, allKeywords);
         if (cachedImage) {
           imageUrl = cachedImage;
           console.log(`[IMAGE SEARCH] Using cached image for ${actualGameTitle}`);
         } else {
+          // Build optimized search query
+          const searchQuery = buildSearchQuery(actualGameTitle, extractedKeywords);
+          
           // Search for image using Google Custom Search API
           const searchResult = await searchGameImage({
             gameTitle: actualGameTitle,
-            keywords: keywords,
+            keywords: extractedKeywords, // Pass structured keywords
             postContent: postContent,
             forumCategory: forumCategory,
             maxResults: 10
           });
           
-          if (searchResult && searchResult.relevanceScore && searchResult.relevanceScore >= 50) {
-            // Download and store the image
-            const downloadedPath = await downloadAndStoreImage(
+          // Verify relevance with enhanced verification
+          if (searchResult) {
+            const verification = verifyImageRelevance(
               searchResult.url,
+              searchResult.title,
               actualGameTitle,
-              keywords,
-              true // uploadToCloud
+              extractedKeywords
             );
             
-            if (downloadedPath) {
-              imageUrl = downloadedPath;
-              // Cache the result
-              cacheImageSearch(actualGameTitle, keywords, downloadedPath);
-              console.log(`[IMAGE SEARCH] Successfully downloaded and cached image for ${actualGameTitle}`);
+            if (verification.isRelevant && verification.confidence >= 40) {
+              // Download and store the image
+              const downloadedPath = await downloadAndStoreImage(
+                searchResult.url,
+                actualGameTitle,
+                allKeywords,
+                true // uploadToCloud
+              );
+              
+              if (downloadedPath) {
+                imageUrl = downloadedPath;
+                // Cache the result
+                cacheImageSearch(actualGameTitle, allKeywords, downloadedPath);
+                console.log(`[IMAGE SEARCH] Successfully downloaded and cached image for ${actualGameTitle} (confidence: ${verification.confidence})`);
+              } else {
+                console.log(`[IMAGE SEARCH] Failed to download image, trying fallback...`);
+              }
             } else {
-              console.log(`[IMAGE SEARCH] Failed to download image, trying fallback...`);
+              console.log(`[IMAGE SEARCH] Image relevance verification failed (confidence: ${verification.confidence}, reason: ${verification.reason}), trying fallback...`);
             }
           } else {
-            console.log(`[IMAGE SEARCH] No relevant image found (score: ${searchResult?.relevanceScore || 0}), trying fallback...`);
+            console.log(`[IMAGE SEARCH] No search results found, trying fallback...`);
           }
           
           // Fallback to Unsplash if Google search failed or had low relevance
           if (!imageUrl) {
             const unsplashResult = await searchGameImageUnsplash({
               gameTitle: actualGameTitle,
-              keywords: keywords,
+              keywords: extractedKeywords, // Use structured keywords
               postContent: postContent,
               forumCategory: forumCategory,
               maxResults: 10
@@ -1342,13 +1371,13 @@ export async function createForumPost(
               const downloadedPath = await downloadAndStoreImage(
                 unsplashResult.url,
                 actualGameTitle,
-                keywords,
+                allKeywords,
                 true
               );
               
               if (downloadedPath) {
                 imageUrl = downloadedPath;
-                cacheImageSearch(actualGameTitle, keywords, downloadedPath);
+                cacheImageSearch(actualGameTitle, allKeywords, downloadedPath);
                 console.log(`[IMAGE SEARCH] Successfully downloaded image from Unsplash for ${actualGameTitle}`);
               }
             }

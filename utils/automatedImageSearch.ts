@@ -12,7 +12,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
  */
 export interface ImageSearchOptions {
   gameTitle: string;
-  keywords: string[];
+  keywords: string[] | { characters?: string[]; locations?: string[]; items?: string[]; topics?: string[] };
   postContent?: string;
   forumCategory?: string;
   maxResults?: number;
@@ -105,22 +105,98 @@ function normalizeKeywords(keywords: string[]): string {
 
 /**
  * Check cache for existing search results
+ * Supports both Phase 1 (string array) and Phase 2 (structured keywords)
  */
 export function getCachedImageSearch(
   gameTitle: string,
-  keywords: string[]
+  keywords: string[] | { characters?: string[]; locations?: string[]; items?: string[]; topics?: string[] }
 ): string | null {
   const cache = loadImageSearchCache();
   const normalizedGame = normalizeGameTitle(gameTitle);
-  const normalizedKeywords = normalizeKeywords(keywords);
+  
+  // Normalize keywords (handle both formats)
+  let normalizedKeywords: string;
+  if (Array.isArray(keywords)) {
+    // Phase 1 format
+    normalizedKeywords = normalizeKeywords(keywords);
+  } else {
+    // Phase 2 format - combine all keywords
+    const allKeywords = [
+      ...(keywords.characters || []),
+      ...(keywords.locations || []),
+      ...(keywords.items || []),
+      ...(keywords.topics || [])
+    ];
+    normalizedKeywords = normalizeKeywords(allKeywords);
+  }
   
   if (cache.cache[normalizedGame] && cache.cache[normalizedGame][normalizedKeywords]) {
     const cachedPath = cache.cache[normalizedGame][normalizedKeywords];
+    
+    // Check if cached path is from a YouTube thumbnail (invalidate if so)
+    // This handles cases where old YouTube thumbnails were cached before filtering was added
+    const pathLower = cachedPath.toLowerCase();
+    if (pathLower.includes('ytimg') || pathLower.includes('youtube') || pathLower.includes('youtu.be')) {
+      console.log(`[IMAGE SEARCH] Invalidating cached YouTube thumbnail: ${cachedPath}`);
+      delete cache.cache[normalizedGame][normalizedKeywords];
+      saveImageSearchCache(cache);
+      return null;
+    }
     
     // Verify file exists (if local path)
     if (cachedPath.startsWith('/') || cachedPath.startsWith('./')) {
       const fullPath = path.join(process.cwd(), 'public', cachedPath);
       if (fs.existsSync(fullPath)) {
+        // Additional check: verify the filename doesn't suggest it's from a problematic source
+        const filename = path.basename(cachedPath).toLowerCase();
+        
+        // If filename contains indicators of let's play content, invalidate
+        const problematicPatterns = [
+          /part\s*\d+/i,
+          /episode\s*\d+/i,
+          /ep\s*\d+/i
+        ];
+        
+        let shouldInvalidate = false;
+        for (const pattern of problematicPatterns) {
+          if (pattern.test(filename)) {
+            console.log(`[IMAGE SEARCH] Invalidating cached image with let's play indicator in filename: ${cachedPath}`);
+            shouldInvalidate = true;
+            break;
+          }
+        }
+        
+        // If searching for locations (Phase 2), check if cached image is character-focused
+        if (!shouldInvalidate && !Array.isArray(keywords) && keywords.locations && keywords.locations.length > 0 && !keywords.characters?.length) {
+          // Check if filename suggests character/unlock content
+          const characterIndicators = ['character', 'unlock', 'guide', 'how-to', 'tutorial'];
+          const hasCharacterIndicator = characterIndicators.some(indicator => filename.includes(indicator));
+          
+          if (hasCharacterIndicator) {
+            // Check if location is mentioned in filename
+            let locationMentioned = false;
+            for (const location of keywords.locations) {
+              const locLower = location.toLowerCase().replace(/\s+/g, '-');
+              if (filename.includes(locLower)) {
+                locationMentioned = true;
+                break;
+              }
+            }
+            
+            // If location not mentioned but character indicators present, invalidate
+            if (!locationMentioned) {
+              console.log(`[IMAGE SEARCH] Invalidating cached character-focused image for location search: ${cachedPath}`);
+              shouldInvalidate = true;
+            }
+          }
+        }
+        
+        if (shouldInvalidate) {
+          delete cache.cache[normalizedGame][normalizedKeywords];
+          saveImageSearchCache(cache);
+          return null;
+        }
+        
         cache.metadata.cacheHits++;
         saveImageSearchCache(cache);
         return cachedPath;
@@ -130,6 +206,14 @@ export function getCachedImageSearch(
         saveImageSearchCache(cache);
       }
     } else {
+      // Cloud URL - check if it's a YouTube URL
+      if (cachedPath.includes('ytimg.com') || cachedPath.includes('youtube.com') || cachedPath.includes('youtu.be')) {
+        console.log(`[IMAGE SEARCH] Invalidating cached YouTube thumbnail URL: ${cachedPath}`);
+        delete cache.cache[normalizedGame][normalizedKeywords];
+        saveImageSearchCache(cache);
+        return null;
+      }
+      
       // Cloud URL, assume it's valid
       cache.metadata.cacheHits++;
       saveImageSearchCache(cache);
@@ -144,15 +228,31 @@ export function getCachedImageSearch(
 
 /**
  * Cache successful search result
+ * Supports both Phase 1 (string array) and Phase 2 (structured keywords)
  */
 export function cacheImageSearch(
   gameTitle: string,
-  keywords: string[],
+  keywords: string[] | { characters?: string[]; locations?: string[]; items?: string[]; topics?: string[] },
   imagePath: string
 ): void {
   const cache = loadImageSearchCache();
   const normalizedGame = normalizeGameTitle(gameTitle);
-  const normalizedKeywords = normalizeKeywords(keywords);
+  
+  // Normalize keywords (handle both formats)
+  let normalizedKeywords: string;
+  if (Array.isArray(keywords)) {
+    // Phase 1 format
+    normalizedKeywords = normalizeKeywords(keywords);
+  } else {
+    // Phase 2 format - combine all keywords
+    const allKeywords = [
+      ...(keywords.characters || []),
+      ...(keywords.locations || []),
+      ...(keywords.items || []),
+      ...(keywords.topics || [])
+    ];
+    normalizedKeywords = normalizeKeywords(allKeywords);
+  }
   
   if (!cache.cache[normalizedGame]) {
     cache.cache[normalizedGame] = {};
@@ -169,17 +269,57 @@ export function cacheImageSearch(
 
 /**
  * Construct search query from game title and keywords
+ * Phase 1: Simple concatenation
+ * Phase 2: Enhanced with intelligent keyword prioritization
+ * Excludes let's play terms to avoid YouTube thumbnails
  */
-function constructSearchQuery(gameTitle: string, keywords: string[]): string {
-  const keywordStr = keywords.length > 0 ? keywords.join(' ') : '';
-  const query = `${gameTitle} ${keywordStr} screenshot`.trim();
-  return query;
+function constructSearchQuery(
+  gameTitle: string,
+  keywords: string[] | { characters?: string[]; locations?: string[]; items?: string[]; topics?: string[] }
+): string {
+  // If keywords is an array (Phase 1 format), use simple construction
+  if (Array.isArray(keywords)) {
+    const keywordStr = keywords.length > 0 ? keywords.join(' ') : '';
+    // Exclude let's play terms
+    const excludeTerms = '-let\'s play -lets play -walkthrough -playthrough -part -episode -youtube';
+    return `${gameTitle} ${keywordStr} screenshot ${excludeTerms}`.trim();
+  }
+  
+  // Phase 2: Use enhanced query building (already includes exclusions)
+  const { buildSearchQuery } = require('./imageRelevanceVerifier');
+  return buildSearchQuery(gameTitle, keywords);
 }
 
 /**
  * Calculate relevance score for an image result
+ * Phase 2: Enhanced scoring with structured keywords
  */
 function calculateRelevanceScore(
+  result: any,
+  gameTitle: string,
+  keywords: string[] | { characters?: string[]; locations?: string[]; items?: string[]; topics?: string[] }
+): number {
+  // If keywords is an array (Phase 1 format), use simple scoring
+  if (Array.isArray(keywords)) {
+    return calculateRelevanceScoreSimple(result, gameTitle, keywords);
+  }
+  
+  // Phase 2: Use enhanced verification
+  const { verifyImageRelevance } = require('./imageRelevanceVerifier');
+  const verification = verifyImageRelevance(
+    result.link || result.url || '',
+    result.title || '',
+    gameTitle,
+    keywords
+  );
+  
+  return verification.confidence;
+}
+
+/**
+ * Simple relevance scoring (Phase 1 fallback)
+ */
+function calculateRelevanceScoreSimple(
   result: any,
   gameTitle: string,
   keywords: string[]
@@ -188,9 +328,37 @@ function calculateRelevanceScore(
   const titleLower = (result.title || '').toLowerCase();
   const linkLower = (result.link || '').toLowerCase();
   const snippetLower = (result.snippet || '').toLowerCase();
-  const combinedText = `${titleLower} ${linkLower} ${snippetLower}`;
   
   const gameTitleLower = gameTitle.toLowerCase();
+  
+  // Penalize YouTube thumbnails and let's play videos (strong penalty)
+  const youtubeIndicators = [
+    'i.ytimg.com', 'ytimg.com', 'youtube.com', 'youtu.be',
+    'part ', 'episode ', 'ep ', 'let\'s play', 'lets play', 'walkthrough',
+    'playthrough', 'gameplay video'
+  ];
+  for (const indicator of youtubeIndicators) {
+    if (linkLower.includes(indicator) || titleLower.includes(indicator)) {
+      score -= 50; // Strong penalty
+      break;
+    }
+  }
+  
+  // Check for let's play patterns in title
+  const letsPlayPatterns = [
+    /\bpart\s+\d+/i,
+    /\bepisode\s+\d+/i,
+    /\bep\s+\d+/i,
+    /\blet'?s\s+play/i,
+    /\bwalkthrough/i,
+    /\bplaythrough/i
+  ];
+  for (const pattern of letsPlayPatterns) {
+    if (pattern.test(titleLower)) {
+      score -= 40; // Penalty
+      break;
+    }
+  }
   
   // Game title in title: +50 points
   if (titleLower.includes(gameTitleLower)) {
@@ -267,7 +435,69 @@ export async function searchGameImage(
     
     if (!response.data || !response.data.items || response.data.items.length === 0) {
       console.log(`[IMAGE SEARCH] No results found for: "${searchQuery}"`);
-      return null;
+      
+      // Try progressively simpler queries if the first one fails
+      const fallbackQueries: string[] = [];
+      
+      if (!Array.isArray(keywords)) {
+        // Phase 2: Try simpler queries
+        if (keywords.locations && keywords.locations.length > 0 && !keywords.characters?.length) {
+          fallbackQueries.push(
+            `${gameTitle} ${keywords.locations[0]} landscape screenshot`,
+            `${gameTitle} ${keywords.locations[0]} screenshot`,
+            `${gameTitle} ${keywords.locations[0]}`
+          );
+        } else if (keywords.characters && keywords.characters.length > 0) {
+          fallbackQueries.push(
+            `${gameTitle} ${keywords.characters[0]} screenshot`,
+            `${gameTitle} ${keywords.characters[0]}`
+          );
+        }
+      } else {
+        // Phase 1: Try simpler queries
+        if (keywords.length > 0) {
+          fallbackQueries.push(
+            `${gameTitle} ${keywords[0]} screenshot`,
+            `${gameTitle} ${keywords[0]}`
+          );
+        }
+      }
+      
+      // Always try the simplest query as last resort
+      fallbackQueries.push(`${gameTitle} screenshot`);
+      
+      // Try fallback queries in order
+      for (const fallbackQuery of fallbackQueries) {
+        console.log(`[IMAGE SEARCH] Trying fallback query: "${fallbackQuery}"`);
+        
+        try {
+          const fallbackParams = {
+            ...params,
+            q: fallbackQuery
+          };
+          
+          const fallbackResponse = await axios.get(searchUrl, {
+            params: fallbackParams,
+            timeout: 5000,
+          });
+          
+          if (fallbackResponse.data && fallbackResponse.data.items && fallbackResponse.data.items.length > 0) {
+            console.log(`[IMAGE SEARCH] Fallback query "${fallbackQuery}" found ${fallbackResponse.data.items.length} results`);
+            // Continue with the fallback query results
+            response.data = fallbackResponse.data;
+            break; // Use first successful fallback
+          }
+        } catch (fallbackError) {
+          console.log(`[IMAGE SEARCH] Fallback query "${fallbackQuery}" failed, trying next...`);
+          continue;
+        }
+      }
+      
+      // If all fallback queries failed, return null
+      if (!response.data || !response.data.items || response.data.items.length === 0) {
+        console.log(`[IMAGE SEARCH] All queries failed, returning null`);
+        return null;
+      }
     }
     
     // Score and sort results by relevance
@@ -276,17 +506,129 @@ export async function searchGameImage(
       score: calculateRelevanceScore(item, gameTitle, keywords)
     }));
     
+    // Filter out YouTube thumbnails and let's play videos
+    const filteredResults = scoredResults.filter((result: { item: any; score: number }) => {
+      const url = (result.item.link || result.item.url || '').toLowerCase();
+      const title = (result.item.title || '').toLowerCase();
+      
+      // Don't completely exclude YouTube - allow if content is relevant
+      // YouTube screenshots can be acceptable if the main content is prominent
+      // The relevance scoring will handle penalties for YouTube content
+      
+      // Exclude let's play indicators in title
+      const letsPlayPatterns = [
+        /\bpart\s+\d+/i,  // "Part 76", "Part 1"
+        /\bepisode\s+\d+/i,  // "Episode 5"
+        /\bep\s+\d+/i,  // "EP 10"
+        /\blet'?s\s+play/i,
+        /\bwalkthrough/i,
+        /\bplaythrough/i
+      ];
+      
+      for (const pattern of letsPlayPatterns) {
+        if (pattern.test(title)) {
+          console.log(`[IMAGE SEARCH] Filtered out let's play video: ${result.item.title}`);
+          return false;
+        }
+      }
+      
+      // If searching for locations (Phase 2 with structured keywords), filter out guide sites
+      // But allow Fandom wikis and map images (maps are still pictures of the region)
+      if (!Array.isArray(keywords) && keywords.locations && keywords.locations.length > 0 && !keywords.characters?.length) {
+        // Don't filter out map images - they're still pictures of the region
+        // The relevance scoring will handle prioritizing landscapes over maps
+        
+        // Exclude specific guide sites that often have UI overlays (but not Fandom wikis)
+        const problematicGuideSites = [
+          'gamewith', 'game8', 'gamefaqs', 'strategywiki'
+        ];
+        
+        // Check for problematic guide sites
+        for (const site of problematicGuideSites) {
+          if (url.includes(site)) {
+            // Only exclude if location is not mentioned in the URL/title
+            let locationMentioned = false;
+            for (const location of keywords.locations) {
+              if (url.includes(location.toLowerCase().replace(/\s+/g, '-')) || 
+                  title.includes(location.toLowerCase())) {
+                locationMentioned = true;
+                break;
+              }
+            }
+            
+            if (!locationMentioned) {
+              console.log(`[IMAGE SEARCH] Filtered out guide site (likely has UI overlays): ${result.item.link}`);
+              return false;
+            }
+          }
+        }
+        
+        // For other guide indicators, be more selective - only exclude if they're clearly character/unlock guides
+        const characterGuideIndicators = [
+          'how to unlock', 'character guide', 'unlock guide', 'character unlock'
+        ];
+        
+        for (const indicator of characterGuideIndicators) {
+          if (title.includes(indicator)) {
+            // Only exclude if location is not mentioned
+            let locationMentioned = false;
+            for (const location of keywords.locations) {
+              if (url.includes(location.toLowerCase().replace(/\s+/g, '-')) || 
+                  title.includes(location.toLowerCase())) {
+                locationMentioned = true;
+                break;
+              }
+            }
+            
+            if (!locationMentioned) {
+              console.log(`[IMAGE SEARCH] Filtered out character unlock guide: ${result.item.title}`);
+              return false;
+            }
+          }
+        }
+      }
+      
+      return true;
+    });
+    
+    if (filteredResults.length === 0) {
+      console.log(`[IMAGE SEARCH] All results filtered out (YouTube/let's play). No clean screenshots found for "${searchQuery}"`);
+      return null;
+    }
+    
     // Sort by score (highest first)
-    scoredResults.sort((a: { item: any; score: number }, b: { item: any; score: number }) => b.score - a.score);
+    filteredResults.sort((a: { item: any; score: number }, b: { item: any; score: number }) => b.score - a.score);
+    
+    // For Phase 2 (structured keywords), filter out results below threshold
+    // For Phase 1 (array keywords), we'll still return low scores as fallback
+    const isPhase2 = !Array.isArray(keywords);
+    if (isPhase2) {
+      // Filter to only results that meet minimum threshold
+      const thresholdResults = filteredResults.filter((result: { item: any; score: number }) => result.score >= 40);
+      
+      if (thresholdResults.length === 0) {
+        console.log(`[IMAGE SEARCH] No results meet minimum relevance threshold (40) for "${searchQuery}"`);
+        return null;
+      }
+      
+      // Use threshold-filtered results
+      filteredResults.length = 0;
+      filteredResults.push(...thresholdResults);
+    }
     
     // Get best result
-    const bestResult = scoredResults[0];
+    const bestResult = filteredResults[0];
     const item = bestResult.item;
     
-    // Minimum relevance threshold: 50 points
-    if (bestResult.score < 50) {
+    // Minimum relevance threshold: 40 points
+    if (bestResult.score < 40) {
       console.log(`[IMAGE SEARCH] Best result has low relevance score: ${bestResult.score} for "${searchQuery}"`);
-      // Still return it, but log the low score
+      // For Phase 1, still return it as fallback
+      // For Phase 2, this shouldn't happen due to filtering above
+      if (isPhase2) {
+        console.log(`[IMAGE SEARCH] Warning: Phase 2 result below threshold was not filtered (this shouldn't happen)`);
+        return null;
+      }
     }
     
     const result: ImageSearchResult = {

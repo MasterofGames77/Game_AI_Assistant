@@ -183,8 +183,27 @@ export async function initializeTwitchBot(): Promise<boolean> {
       }
     });
 
-    client.on('disconnected', (reason) => {
+    client.on('disconnected', async (reason) => {
       console.log(`⚠️ Twitch bot disconnected: ${reason}`);
+      
+      // If disconnected due to authentication failure, try to refresh token
+      if (reason && (reason.includes('Login authentication failed') || reason.includes('authentication failed'))) {
+        console.log('🔄 Authentication failure detected. Attempting to refresh token...');
+        try {
+          const refreshToken = process.env.TWITCH_BOT_REFRESH_TOKEN;
+          if (refreshToken) {
+            const { refreshBotToken, updateBotTokenAndReconnect } = await import('./twitchBotTokenRefresh');
+            const refreshResult = await refreshBotToken(refreshToken);
+            await updateBotTokenAndReconnect(refreshResult.accessToken, refreshResult.refreshToken);
+            console.log('✅ Token refreshed. Bot will reconnect automatically.');
+          } else {
+            console.error('❌ No refresh token available. Please refresh the token manually using /api/twitchBotRefreshToken');
+          }
+        } catch (refreshError: any) {
+          console.error('❌ Failed to refresh token after authentication failure:', refreshError.message);
+          console.error('Please refresh the token manually using /api/twitchBotRefreshToken');
+        }
+      }
     });
 
     client.on('reconnect', () => {
@@ -219,12 +238,55 @@ export async function initializeTwitchBot(): Promise<boolean> {
       console.log('🔄 Attempting to connect to Twitch IRC...');
     }
     
-    await client.connect();
-    console.log('✅ Twitch bot connection initiated successfully');
-    
-    isInitialized = true;
-    isInitializing = false;
-    return true;
+    try {
+      await client.connect();
+      console.log('✅ Twitch bot connection initiated successfully');
+      
+      isInitialized = true;
+      isInitializing = false;
+      return true;
+    } catch (connectError: any) {
+      // Handle connection errors specifically
+      const connectErrorMessage = connectError?.message || String(connectError);
+      
+      // Check if it's an authentication error
+      if (connectErrorMessage.includes('Login authentication failed') || 
+          connectErrorMessage.includes('authentication failed') ||
+          connectErrorMessage.includes('Invalid login')) {
+        console.error('❌ Twitch bot authentication failed during connection');
+        console.error('This usually means the OAuth token is invalid or expired.');
+        
+        // Try to refresh token if available
+        const refreshToken = process.env.TWITCH_BOT_REFRESH_TOKEN;
+        if (refreshToken) {
+          console.log('🔄 Attempting to refresh token and reconnect...');
+          try {
+            const { refreshBotToken, updateBotTokenAndReconnect } = await import('./twitchBotTokenRefresh');
+            const refreshResult = await refreshBotToken(refreshToken);
+            await updateBotTokenAndReconnect(refreshResult.accessToken, refreshResult.refreshToken);
+            
+            // Token updated, but connection already failed - will retry on next initialization
+            console.log('✅ Token refreshed. Bot will reconnect on next initialization attempt.');
+          } catch (refreshError: any) {
+            console.error('❌ Failed to refresh token:', refreshError.message);
+            console.error('Please refresh the token manually using /api/twitchBotRefreshToken');
+          }
+        } else {
+          console.error('❌ No refresh token available. Cannot auto-refresh.');
+          console.error('Please refresh the token manually using /api/twitchBotRefreshToken');
+        }
+      } else {
+        console.error('❌ Twitch bot connection failed:', connectErrorMessage);
+      }
+      
+      // Clean up on failure
+      client = null;
+      botHandler = null;
+      engagementTracker = null;
+      isInitialized = false;
+      isInitializing = false;
+      return false;
+    }
   } catch (error) {
     // Log error but don't throw - server should continue even if bot fails
     const errorMessage = error instanceof Error ? error.message : String(error);

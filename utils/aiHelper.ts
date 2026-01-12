@@ -14,7 +14,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') }); // Also load
 // Only initializes when actually needed
 let openaiInstance: OpenAI | null = null;
 
-function getOpenAIClient(): OpenAI {
+export function getOpenAIClient(): OpenAI {
   if (!openaiInstance) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {

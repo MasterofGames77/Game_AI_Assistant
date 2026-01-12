@@ -1,9 +1,13 @@
 {
-  "cache": {},
+  "cache": {
+    "xenoblade-chronicles-3": {
+      "ashera-story": "/uploads/automated-images/xenoblade-chronicles-3/xenoblade-chronicles-3-ashera-story-1768250596403.jpg"
+    }
+  },
   "metadata": {
-    "lastUpdated": "2024-01-15T00:00:00.000Z",
-    "totalCached": 0,
+    "lastUpdated": "2026-01-12T20:43:16.464Z",
+    "totalCached": 1,
     "cacheHits": 0,
-    "cacheMisses": 0
+    "cacheMisses": 2
   }
 }

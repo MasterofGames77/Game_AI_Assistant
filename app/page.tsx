@@ -2113,6 +2113,7 @@ export default function Home() {
             <form
               onSubmit={handleUsernameSubmit}
               className="space-y-4 w-full mt-2"
+              noValidate
             >
               <div>
                 <input
@@ -2503,7 +2504,7 @@ export default function Home() {
                   }}
                 />
 
-                <form onSubmit={handleSubmit} className="w-full max-w-md mt-2">
+                <form onSubmit={handleSubmit} className="w-full max-w-md mt-2" noValidate>
                   <input
                     type="text"
                     value={question}
