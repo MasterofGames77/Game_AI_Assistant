@@ -22,7 +22,7 @@ export function getOpenAIClient(): OpenAI {
     }
     openaiInstance = new OpenAI({
       apiKey: apiKey,
-      timeout: 20000, // 20 seconds - well under Heroku's 30s limit to prevent H12 timeouts
+      timeout: 28000, // 28 seconds - slightly under application timeout of 30s to allow for processing overhead
       maxRetries: 1, // Reduce retries to avoid compounding delays
     });
   }
@@ -2355,6 +2355,7 @@ async function searchGameInIGDB(candidateTitle: string): Promise<string | null> 
       
       // If candidate has distinctive words, require them in the match
       // This prevents "Resident Evil 4 Remake" from matching "Resident Evil Archives"
+      // CRITICAL: Also prevents "Super Smash Bros. Ultimate" from matching "Super Smash Bros. Deluxe"
       const matchesWithDistinctive = response.data.filter((g: any) => {
         const gameName = g.name.toLowerCase();
         const hasBasicMatch = gameName.includes(lowerCandidate) || lowerCandidate.includes(gameName);
@@ -2370,6 +2371,26 @@ async function searchGameInIGDB(candidateTitle: string): Promise<string | null> 
             }
             return true;
           });
+          
+          // CRITICAL: Also check that the result doesn't have conflicting distinctive words
+          // For example, if candidate has "ultimate", reject results with "deluxe" (and vice versa)
+          const conflictingWords = [
+            ['ultimate', 'deluxe'],
+            ['deluxe', 'ultimate'],
+            ['remake', 'remaster'],
+            ['remaster', 'remake']
+          ];
+          
+          const hasConflictingWord = conflictingWords.some(([word1, word2]) => {
+            const candidateHasWord1 = candidateDistinctiveWords.some(dw => dw === word1.replace(/[^a-z0-9]/g, ''));
+            const resultHasWord2 = new RegExp(`\\b${word2}\\b`, 'i').test(gameName);
+            return candidateHasWord1 && resultHasWord2;
+          });
+          
+          if (hasConflictingWord) {
+            return false; // Reject matches with conflicting distinctive words
+          }
+          
           return allDistinctivePresent;
         }
         
@@ -2450,6 +2471,7 @@ async function searchGameInRAWG(candidateTitle: string): Promise<string | null> 
       }
       
       // If candidate has distinctive words, require them in the match
+      // CRITICAL: Also prevents "Super Smash Bros. Ultimate" from matching "Super Smash Bros. Deluxe"
       const matchesWithDistinctive = response.data.results.filter((g: any) => {
         const normalizedGameName = g.name.toLowerCase().trim();
         const hasBasicMatch = normalizedGameName === lowerCandidate || 
@@ -2467,7 +2489,33 @@ async function searchGameInRAWG(candidateTitle: string): Promise<string | null> 
             }
             return true;
           });
-          return allDistinctivePresent;
+          
+          // CRITICAL: Also check that the result doesn't have conflicting distinctive words
+          // For example, if candidate has "ultimate", reject results with "deluxe" (and vice versa)
+          const conflictingWords = [
+            ['ultimate', 'deluxe'],
+            ['deluxe', 'ultimate'],
+            ['remake', 'remaster'],
+            ['remaster', 'remake']
+          ];
+          
+          const hasConflictingWord = conflictingWords.some(([word1, word2]) => {
+            const candidateHasWord1 = candidateDistinctiveWords.some(dw => dw === word1.replace(/[^a-z0-9]/g, ''));
+            const resultHasWord2 = new RegExp(`\\b${word2}\\b`, 'i').test(normalizedGameName);
+            return candidateHasWord1 && resultHasWord2;
+          });
+          
+          if (hasConflictingWord) {
+            console.log(`[Game Title] Rejecting RAWG result "${normalizedGameName}" - conflicting distinctive word detected (candidate: "${lowerCandidate}")`);
+            return false; // Reject matches with conflicting distinctive words
+          }
+          
+          if (!allDistinctivePresent) {
+            console.log(`[Game Title] Rejecting RAWG result "${normalizedGameName}" - missing distinctive words from candidate "${lowerCandidate}"`);
+            return false;
+          }
+          
+          return true;
         }
         
         return true;
@@ -2486,6 +2534,7 @@ async function searchGameInRAWG(candidateTitle: string): Promise<string | null> 
       
       // If no matches with distinctive words and candidate has distinctive words, return null
       if (candidateDistinctiveWords.length > 0) {
+        console.log(`[Game Title] No RAWG matches with required distinctive words for candidate: "${lowerCandidate}"`);
         return null; // Don't return a match if distinctive words are missing
       }
       
@@ -2554,7 +2603,10 @@ function extractGameTitleCandidates(question: string): string[] {
   // The pattern captures everything from "in" until a question mark, period, or end of string
   // For questions ending with "?", capture everything up to the "?" (e.g., "in Super Mario Bros. Wonder?")
   // Use greedy matching to capture the full title including subtitles (change +? to + for greedy)
-  const inGamePattern = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s'&\-:]+)(?=\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)\b|[?.!]|$)/gi;
+  // Updated pattern to capture version indicators like "Ultimate", "Deluxe", etc. in the main capture group
+  // CRITICAL: Include period (.) in character class to capture "Super Smash Bros. Ultimate" (not just "Super Smash Bros")
+  // CRITICAL: Use greedy matching (+) to capture full titles including version indicators
+  const inGamePattern = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s'&\-:\.]+(?:\s+(?:Ultimate|Deluxe|Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|Complete|Collection|2|II|3|III|4|IV|World\s*2|World\s*II))?)(?=\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)\b|[?.!]|$)/gi;
   let match: RegExpExecArray | null;
   while ((match = inGamePattern.exec(question)) !== null) {
     if (match[1]) {
@@ -2563,6 +2615,9 @@ function extractGameTitleCandidates(question: string): string[] {
       candidate = candidate.replace(/^(?:what|which|where|when|why|how|who|the|a|an)\s+/i, '');
       // Remove trailing verbs and question words
       candidate = candidate.replace(/\s+(?:has|have|is|are|does|do|can|could|would|should|was|were|will|did)$/i, '');
+      // CRITICAL: Remove trailing "for [platform/console]" patterns (e.g., "for Nintendo Switch", "for PC")
+      // But preserve version indicators like "Ultimate", "Deluxe" that might come before "for"
+      candidate = candidate.replace(/\s+for\s+(?:Nintendo\s+Switch|PlayStation|Xbox|PC|Steam|Epic|Windows|Mac|Linux|iOS|Android|mobile)$/i, '');
       // Remove any text before "in" if it was accidentally captured (e.g., "kart has" before "in")
       const inIndex = candidate.toLowerCase().indexOf(' in ');
       if (inIndex > 0) {
@@ -3423,9 +3478,95 @@ function extractConsoleFromQuestion(question: string): string | undefined {
 }
 
 /**
+ * Use OpenAI to extract game title from question when IGDB/RAWG fail or return incorrect results
+ * This is a fallback for cases where API data is out of date or incorrect
+ */
+async function extractGameTitleWithOpenAI(question: string, candidates: string[]): Promise<string | undefined> {
+  try {
+    const openai = getOpenAIClient();
+    
+    // Build context about candidates we've already tried
+    const candidatesContext = candidates.length > 0 
+      ? `\n\nPotential game titles found in the question: ${candidates.slice(0, 3).join(', ')}`
+      : '';
+    
+    const prompt = `Extract the exact game title from this question. Return ONLY the game title, nothing else. If no game title is present, return "NONE".
+
+Question: "${question}"${candidatesContext}
+
+Examples:
+- "Which character is best in Super Smash Bros. Ultimate?" → "Super Smash Bros. Ultimate"
+- "How do I beat the final boss in The Legend of Zelda: Breath of the Wild?" → "The Legend of Zelda: Breath of the Wild"
+- "What are the best games for Switch?" → "NONE"
+- "Tell me about Mario" → "NONE" (too vague, could be character or game series)
+
+Game title:`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini', // Use cheaper model for simple extraction
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a game title extraction assistant. Extract only the specific game title from questions. Return "NONE" if the question is too vague or doesn\'t mention a specific game.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.1, // Low temperature for consistent extraction
+      max_tokens: 100,
+    });
+
+    const extractedTitle = completion.choices[0]?.message?.content?.trim();
+    
+    if (!extractedTitle || extractedTitle === 'NONE' || extractedTitle.toLowerCase().includes('none')) {
+      return undefined;
+    }
+
+    // Clean up the response (remove quotes, extra text)
+    let cleanedTitle = extractedTitle
+      .replace(/^["']|["']$/g, '') // Remove surrounding quotes
+      .replace(/^Game title:\s*/i, '') // Remove "Game title:" prefix if present
+      .trim();
+
+    // Basic validation: should be reasonable length and format
+    if (cleanedTitle.length < 3 || cleanedTitle.length > 100) {
+      return undefined;
+    }
+
+    // Try to validate against IGDB/RAWG if possible
+    try {
+      const igdbMatch = await searchGameInIGDB(cleanedTitle);
+      if (igdbMatch) {
+        console.log(`[Game Title] OpenAI extracted "${cleanedTitle}", validated with IGDB: "${igdbMatch}"`);
+        return normalizeGameTitle(igdbMatch);
+      }
+      
+      const rawgMatch = await searchGameInRAWG(cleanedTitle);
+      if (rawgMatch) {
+        console.log(`[Game Title] OpenAI extracted "${cleanedTitle}", validated with RAWG: "${rawgMatch}"`);
+        return normalizeGameTitle(rawgMatch);
+      }
+    } catch (validationError) {
+      // If validation fails, still return the OpenAI result (it's better than nothing)
+      console.log(`[Game Title] OpenAI extracted "${cleanedTitle}" but validation failed, using OpenAI result`);
+    }
+
+    // Return OpenAI result even if validation failed (it's likely correct)
+    console.log(`[Game Title] Using OpenAI-extracted title: "${cleanedTitle}"`);
+    return normalizeGameTitle(cleanedTitle);
+  } catch (error) {
+    console.error('[Game Title] OpenAI extraction failed:', error instanceof Error ? error.message : 'Unknown error');
+    return undefined;
+  }
+}
+
+/**
  * Extract game title from question text using IGDB and RAWG APIs for verification
  * This eliminates the need for hardcoded game title lists
  * Also detects consoles if the question is about a console, not a game
+ * Falls back to OpenAI extraction if IGDB/RAWG fail or return incorrect results
  */
 export async function extractGameTitleFromQuestion(question: string): Promise<string | undefined> {
   if (!question || question.length < 3) {
@@ -3460,14 +3601,14 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
     let candidates = extractGameTitleCandidates(question);
     
     if (candidates.length === 0) {
-      // console.log('[Game Title] No candidates extracted from question');
+      console.log('[Game Title] No candidates extracted from question');
       return undefined;
     }
 
     // Candidates are already prioritized by extractGameTitleCandidates
     // (prioritizes "in [Game Title]" patterns, penalizes character names, etc.)
     
-    // console.log(`[Game Title] Extracted ${candidates.length} candidate(s):`, candidates);
+    console.log(`[Game Title] Extracted ${candidates.length} candidate(s):`, candidates);
 
     // Try each candidate against IGDB and RAWG APIs
     // Validate candidates before API calls to avoid unnecessary requests
@@ -3477,7 +3618,9 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
     // These should be tried FIRST, before any other candidates
     // IMPORTANT: Updated regex to capture full game titles including colons (e.g., "The Legend of Zelda: Breath of the Wild")
     const inGamePatternCandidates = new Set<string>();
-    const inGamePatternRegex = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?(?:\s*:\s*[A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?)?(?:\s+(?:Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|2|II|3|III|4|IV|World\s*2|World\s*II))?)(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)|$|[?.!])/gi;
+    // Updated to include "Ultimate" and "Deluxe" in version indicators to ensure they're captured
+    // CRITICAL: Include period (.) in character class to capture "Super Smash Bros. Ultimate"
+    const inGamePatternRegex = /\b(?:in|for|from|on|of)\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-\.]+?(?:\s*:\s*[A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-\.]+?)?(?:\s+(?:Ultimate|Deluxe|Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|Complete|Collection|2|II|3|III|4|IV|World\s*2|World\s*II))?)(?:\s+(?:how|what|where|when|why|which|who|is|does|do|has|have|can|could|would|should|was|were|will|did)|$|[?.!])/gi;
     let inGameMatch: RegExpExecArray | null;
     while ((inGameMatch = inGamePatternRegex.exec(question)) !== null) {
       if (inGameMatch[1]) {
@@ -3534,7 +3677,8 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
       if (firstCandidateIndex >= 0 && !inGamePatternCandidates.has(firstCandidate)) {
         const textAfter = question.substring(firstCandidateIndex + firstCandidate.length);
         // Updated regex to capture full game titles including colons
-        const inGamePatternAfter = /\bin\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?(?:\s*:\s*[A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?)?)/i;
+        // Include period (.) to capture full titles like "Super Smash Bros. Ultimate"
+        const inGamePatternAfter = /\bin\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-\.]+?(?:\s*:\s*[A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-\.]+?)?(?:\s+(?:Ultimate|Deluxe|Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|Complete|Collection|2|II|3|III|4|IV|World\s*2|World\s*II))?)/i;
         const afterMatch = textAfter.match(inGamePatternAfter);
         
         // If first candidate is short (1-3 words) and there's a longer candidate after "in",
@@ -3552,7 +3696,7 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
     }
     
     for (const candidate of validCandidates) {
-      // console.log(`[Game Title] Trying candidate: "${candidate}"`);
+      console.log(`[Game Title] Trying candidate: "${candidate}"`);
       
       // CRITICAL: If this candidate appears before an "in [Game Title]" pattern and is short,
       // and we have an "in [Game Title]" candidate available, skip this candidate entirely
@@ -3563,7 +3707,8 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
         if (candidateIndex >= 0) {
           const textAfter = question.substring(candidateIndex + candidate.length);
           // Updated regex to capture full game titles including colons
-          const inGamePatternAfter = /\bin\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?(?:\s*:\s*[A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-]+?)?)/i;
+          // Include period (.) to capture full titles like "Super Smash Bros. Ultimate"
+        const inGamePatternAfter = /\bin\s+(?:the\s+)?([A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-\.]+?(?:\s*:\s*[A-ZÀ-ÿĀ-ž][A-Za-z0-9À-ÿĀ-ž\s:'&\-\.]+?)?(?:\s+(?:Ultimate|Deluxe|Remake|Remaster|Reimagined|HD|4K|Definitive|Edition|Complete|Collection|2|II|3|III|4|IV|World\s*2|World\s*II))?)/i;
           const afterMatch = textAfter.match(inGamePatternAfter);
           
           if (afterMatch && afterMatch[1] && inGamePatternCandidates.size > 0) {
@@ -3581,7 +3726,9 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
       
       // Try IGDB first
       try {
+        console.log(`[Game Title] Searching IGDB for candidate: "${candidate}"`);
         const igdbMatch = await searchGameInIGDB(candidate);
+        console.log(`[Game Title] IGDB returned: "${igdbMatch}" for candidate: "${candidate}"`);
         if (igdbMatch) {
           // CRITICAL: If this is a short candidate and we have "in [Game Title]" candidates,
           // validate that the API result is actually a game, not game content
@@ -3685,7 +3832,7 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
               }
             }
           }
-          // console.log(`[Game Title] Found match in IGDB: "${candidate}" -> "${igdbMatch}"`);
+          console.log(`[Game Title] Found match in IGDB: "${candidate}" -> "${igdbMatch}"`);
           // Normalize the title (e.g., ensure "The Legend of Zelda" has "The")
           return normalizeGameTitle(igdbMatch);
         }
@@ -3810,7 +3957,17 @@ export async function extractGameTitleFromQuestion(question: string): Promise<st
       }
     }
 
-    // If no API matches, try to find the best candidate
+    // If no API matches, try OpenAI as a fallback before using regex candidates
+    // This helps when IGDB/RAWG data is out of date or incorrect
+    if (candidates.length > 0) {
+      console.log(`[Game Title] IGDB/RAWG failed for all candidates, trying OpenAI extraction...`);
+      const openaiTitle = await extractGameTitleWithOpenAI(question, candidates);
+      if (openaiTitle) {
+        return openaiTitle;
+      }
+    }
+
+    // If no API matches and OpenAI failed, try to find the best candidate
     // Filter out candidates that look like they contain question text, not game titles
     const fallbackCandidates = candidates.filter(c => {
       const lower = c.toLowerCase();
@@ -5040,7 +5197,7 @@ export async function shouldRunAnalysis(username: string): Promise<boolean> {
     if (shouldRun) {
       console.log(`[Performance Safeguards] Rate limit CHECK for ${username}: ALLOWED (${hoursSinceLastAnalysis.toFixed(2)}h since last, threshold: 3h)`);
     } else {
-      console.log(`[Performance Safeguards] Rate limit CHECK for ${username}: BLOCKED (${hoursSinceLastAnalysis.toFixed(2)}h since last, threshold: 3h)`);
+      console.log(`[Performance Safeguards] Pattern analysis SKIPPED for ${username} (${hoursSinceLastAnalysis.toFixed(2)}h since last analysis, threshold: 3h) - question still processed normally`);
     }
     
     return shouldRun;

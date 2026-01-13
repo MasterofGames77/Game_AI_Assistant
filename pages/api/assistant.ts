@@ -1301,12 +1301,13 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
       return { promise: safePromise, cancel, id };
     };
     
-    // Reduced timeouts to provide better buffer under Heroku's 30-second H12 limit
-    // 20s for text-only (10s buffer), 25s for vision (5s buffer)
-    const timeoutWrapper = createTimeoutPromise(20000, 'Request timeout');
+    // Increased timeouts to 30 seconds to give more time for API responses
+    // Note: Heroku has a 30-second H12 limit, so this is at the edge - requests may still timeout
+    // if they exceed 30 seconds due to network latency or processing overhead
+    const timeoutWrapper = createTimeoutPromise(30000, 'Request timeout');
     const timeoutPromise = timeoutWrapper.promise;
     
-    const visionTimeoutWrapper = createTimeoutPromise(25000, 'Vision API request timeout');
+    const visionTimeoutWrapper = createTimeoutPromise(30000, 'Vision API request timeout');
     const visionTimeoutPromise = visionTimeoutWrapper.promise;
     
     // Helper function to clear timeouts
@@ -1792,6 +1793,13 @@ CRITICAL INSTRUCTIONS:
               } catch (error) {
                 // Cancel timeout on error too (synchronously)
                 visionTimeoutWrapper.cancel();
+                // Enhanced error logging for debugging
+                console.error('Error in vision API call:', {
+                  error: error instanceof Error ? error.message : String(error),
+                  question: questionToProcess.substring(0, 100),
+                  hasImage: !!imageForVision,
+                  stack: error instanceof Error ? error.stack : undefined
+                });
                 throw error;
               }
             } else {
@@ -1816,8 +1824,8 @@ CRITICAL INSTRUCTIONS:
             clearTimeouts();
             // Fallback to text-only API
             try {
-              // Create a new timeout for the fallback (reduced to 20s to match main timeout)
-              const fallbackTimeout = createTimeoutPromise(20000, 'Request timeout');
+              // Create a new timeout for the fallback (30s to match main timeout)
+              const fallbackTimeout = createTimeoutPromise(30000, 'Request timeout');
               baseAnswer = await Promise.race([
                 deduplicateRequest(cacheKey, () => getChatCompletion(questionToProcess, systemMessage)),
                 fallbackTimeout.promise
@@ -1826,6 +1834,11 @@ CRITICAL INSTRUCTIONS:
               fallbackTimeout.cancel();
             } catch (error) {
               // Cancel timeout on error too
+              console.error('Error in fallback text-only API call:', {
+                error: error instanceof Error ? error.message : String(error),
+                question: questionToProcess.substring(0, 100),
+                stack: error instanceof Error ? error.stack : undefined
+              });
               throw error;
             }
           }
@@ -1842,12 +1855,28 @@ CRITICAL INSTRUCTIONS:
           } catch (error) {
             // Cancel timeout on error too (synchronously)
             timeoutWrapper.cancel();
+            // Enhanced error logging for debugging
+            console.error('Error in text-only API call:', {
+              error: error instanceof Error ? error.message : String(error),
+              question: questionToProcess.substring(0, 100),
+              stack: error instanceof Error ? error.stack : undefined
+            });
             throw error;
           }
         }
 
         if (!baseAnswer) {
-          throw new Error('Failed to generate response');
+          // Enhanced error message for failed response generation
+          const errorDetails = {
+            question: questionToProcess.substring(0, 100),
+            hasImage: !!(imageUrl || imageFilePath),
+            timestamp: new Date().toISOString()
+          };
+          console.error('Failed to generate response from AI:', errorDetails);
+          throw new AssistantError(
+            'Unable to generate a response. The AI service may be temporarily unavailable. Please try again in a moment.',
+            503 // Service Unavailable
+          );
         }
 
         try {
@@ -2071,7 +2100,8 @@ CRITICAL INSTRUCTIONS:
           
           if (!shouldRun) {
             // Skip analysis if rate limit hasn't been reached
-            console.log(`[Pattern Analysis] Skipping analysis for ${authenticatedUsername} due to rate limiting`);
+            // Note: This does NOT affect the user's question - it only skips optional background pattern analysis
+            console.log(`[Pattern Analysis] Skipping optional background analysis for ${authenticatedUsername} (rate limit: once per 3 hours) - question was already answered successfully`);
             return;
           }
 
@@ -2131,15 +2161,26 @@ CRITICAL INSTRUCTIONS:
     metrics.totalTime = endTime - startTime;
     metrics.aiCacheMetrics = aiCache.getMetrics();
     
+    // Check if this is a timeout error
+    const isTimeoutError = error instanceof Error && (
+      error.message.includes('timeout') || 
+      error.message.includes('Request timeout') ||
+      error.message.includes('Vision API request timeout') ||
+      error.message.includes('ECONNABORTED') ||
+      error.message.includes('ETIMEDOUT')
+    );
+    
     // Enhanced error logging
     logger.error('API request failed', {
       username: username || 'unknown',
       error: error instanceof Error ? {
         name: error.name,
         message: error.message,
-        stack: error.stack
+        stack: error.stack,
+        isTimeout: isTimeoutError
       } : 'Unknown error',
-      metrics
+      metrics,
+      requestDuration: metrics.totalTime
     });
     
     if (error instanceof AssistantError) {
@@ -2148,11 +2189,24 @@ CRITICAL INSTRUCTIONS:
         details: 'An error occurred while processing your request',
         metrics
       });
+    } else if (isTimeoutError) {
+      // Special handling for timeout errors
+      res.status(504).json({ 
+        error: "Request Timeout",
+        details: 'The request took too long to process. This may happen with complex questions or when the AI service is slow. Please try again with a simpler question or wait a moment.',
+        metrics,
+        timeout: true
+      });
     } else {
       res.status(500).json({ 
         error: "Internal Server Error",
-        details: 'An unexpected error occurred',
-        metrics
+        details: error instanceof Error ? error.message : 'An unexpected error occurred',
+        metrics,
+        // Include error type in development for debugging
+        ...(process.env.NODE_ENV === 'development' && error instanceof Error ? {
+          errorType: error.name,
+          errorStack: error.stack
+        } : {})
       });
     }
   }
