@@ -1,5 +1,6 @@
 import { logger } from '../logger';
 import { connectToWingmanDB } from '../databaseConnections';
+import TwitchBotAnalytics from '../../models/TwitchBotAnalytics';
 
 /**
  * Performance thresholds configuration
@@ -75,12 +76,15 @@ export interface PerformanceMetric {
  * Performance alert
  */
 export interface PerformanceAlert {
+  id: string; // Unique identifier for the alert
   timestamp: Date;
   channelName?: string;
   alertType: 'threshold_exceeded' | 'error_rate_high' | 'performance_degradation' | 'anomaly_detected';
   severity: 'warning' | 'critical';
   message: string;
   metrics: PerformanceMetric[];
+  acknowledged: boolean; // Whether the alert has been acknowledged
+  acknowledgedAt?: Date; // When the alert was acknowledged
   metadata?: Record<string, any>;
 }
 
@@ -116,6 +120,7 @@ class PerformanceMonitor {
   private readonly MAX_ALERTS_HISTORY = 100; // Keep last 100 alerts in memory
   private readonly ALERT_COOLDOWN = 60000; // 1 minute cooldown between similar alerts
   private lastAlertTimes: Map<string, number> = new Map();
+  private alertIdCounter: number = 0; // Counter for generating unique alert IDs
 
   constructor(thresholds?: Partial<PerformanceThresholds>) {
     this.thresholds = {
@@ -132,6 +137,13 @@ class PerformanceMonitor {
       ...this.thresholds,
       ...thresholds
     };
+  }
+
+  /**
+   * Get current thresholds
+   */
+  getThresholds(): PerformanceThresholds {
+    return { ...this.thresholds };
   }
 
   /**
@@ -247,6 +259,60 @@ class PerformanceMonitor {
   }
 
   /**
+   * Wrap a database query with performance tracking
+   * Convenience method for tracking database operations
+   */
+  async trackDatabaseQuery<T>(
+    operation: string,
+    query: () => Promise<T>,
+    channelName?: string
+  ): Promise<T> {
+    const startTime = Date.now();
+    try {
+      const result = await query();
+      const queryTime = Date.now() - startTime;
+      this.recordDBQueryTime(operation, queryTime, channelName, {
+        success: true,
+      });
+      return result;
+    } catch (error) {
+      const queryTime = Date.now() - startTime;
+      this.recordDBQueryTime(operation, queryTime, channelName, {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Wrap an API call with performance tracking
+   * Convenience method for tracking API operations
+   */
+  async trackApiCall<T>(
+    apiName: string,
+    apiCall: () => Promise<T>,
+    channelName?: string
+  ): Promise<T> {
+    const startTime = Date.now();
+    try {
+      const result = await apiCall();
+      const callTime = Date.now() - startTime;
+      this.recordAPICallTime(apiName, callTime, channelName, {
+        success: true,
+      });
+      return result;
+    } catch (error) {
+      const callTime = Date.now() - startTime;
+      this.recordAPICallTime(apiName, callTime, channelName, {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Record error rate
    */
   recordErrorRate(
@@ -341,12 +407,14 @@ class PerformanceMonitor {
     // Create alert
     const thresholdLevel: 'warning' | 'critical' = metric.threshold === 'critical' ? 'critical' : 'warning';
     const alert: PerformanceAlert = {
+      id: `alert-${++this.alertIdCounter}-${Date.now()}`,
       timestamp: new Date(),
       channelName: metric.channelName,
       alertType: 'threshold_exceeded',
       severity: thresholdLevel,
       message: `${metric.operation} ${metric.metricType} exceeded ${metric.threshold} threshold: ${metric.value}ms (threshold: ${this.getThresholdValue(metric.metricType, thresholdLevel)}ms)`,
       metrics: [metric],
+      acknowledged: false,
       metadata: metric.metadata
     };
 
@@ -511,6 +579,53 @@ class PerformanceMonitor {
   }
 
   /**
+   * Get unacknowledged alerts
+   */
+  getUnacknowledgedAlerts(channelName?: string): PerformanceAlert[] {
+    let alerts = this.alerts.filter(a => !a.acknowledged);
+    
+    if (channelName) {
+      alerts = alerts.filter(a => a.channelName === channelName);
+    }
+
+    return alerts
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  }
+
+  /**
+   * Acknowledge an alert by ID
+   */
+  acknowledgeAlert(alertId: string): boolean {
+    const alert = this.alerts.find(a => a.id === alertId);
+    if (alert && !alert.acknowledged) {
+      alert.acknowledged = true;
+      alert.acknowledgedAt = new Date();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Acknowledge all alerts for a channel
+   */
+  acknowledgeAllAlerts(channelName?: string): number {
+    let count = 0;
+    const now = new Date();
+    
+    for (const alert of this.alerts) {
+      if (!alert.acknowledged) {
+        if (!channelName || alert.channelName === channelName) {
+          alert.acknowledged = true;
+          alert.acknowledgedAt = now;
+          count++;
+        }
+      }
+    }
+    
+    return count;
+  }
+
+  /**
    * Get recent metrics
    */
   getRecentMetrics(count: number = 100, channelName?: string): PerformanceMetric[] {
@@ -537,7 +652,7 @@ class PerformanceMonitor {
   }
 
   /**
-   * Generate performance report
+   * Generate performance report from in-memory metrics
    */
   generatePerformanceReport(
     channelName?: string,
@@ -548,6 +663,116 @@ class PerformanceMonitor {
     startDate.setDate(startDate.getDate() - days);
 
     return this.getPerformanceStats(startDate, endDate, channelName);
+  }
+
+  /**
+   * Generate performance report from database analytics
+   * Useful for historical data beyond what's stored in memory
+   */
+  async generateReport(
+    channelName: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<PerformanceStats> {
+    try {
+      await connectToWingmanDB();
+
+      // Query analytics data for the period
+      const analytics = await TwitchBotAnalytics.find({
+        channelName: channelName.toLowerCase().trim(),
+        receivedAt: {
+          $gte: startDate,
+          $lte: endDate,
+        },
+      }).lean();
+
+      if (analytics.length === 0) {
+        // Return empty stats if no data
+        return {
+          channelName,
+          startDate,
+          endDate,
+          totalOperations: 0,
+          avgResponseTime: 0,
+          avgAIResponseTime: 0,
+          avgDBQueryTime: 0,
+          errorRate: 0,
+          cacheHitRate: 0,
+          thresholdViolations: {
+            warning: 0,
+            critical: 0,
+          },
+          alerts: [],
+        };
+      }
+
+      // Calculate metrics from analytics data
+      const responseTimes = analytics
+        .map(a => a.totalTimeMs)
+        .filter(t => t > 0);
+      
+      const aiResponseTimes = analytics
+        .map(a => a.aiResponseTimeMs)
+        .filter(t => t > 0);
+
+      const totalMessages = analytics.length;
+      const failedMessages = analytics.filter(a => !a.success).length;
+      const errorRate = totalMessages > 0 ? failedMessages / totalMessages : 0;
+
+      // Calculate averages
+      const avgResponseTime = responseTimes.length > 0
+        ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length)
+        : 0;
+      
+      const avgAIResponseTime = aiResponseTimes.length > 0
+        ? Math.round(aiResponseTimes.reduce((a, b) => a + b, 0) / aiResponseTimes.length)
+        : 0;
+
+      // Count threshold violations
+      const responseTimeViolations = analytics.filter(
+        a => a.aiResponseTimeMs >= this.thresholds.aiResponseTime.warning
+      ).length;
+
+      const errorRateViolations = errorRate >= this.thresholds.errorRate.warning ? 1 : 0;
+
+      // Get alerts for the period
+      const periodAlerts = this.alerts.filter(
+        a => a.channelName === channelName &&
+        a.timestamp >= startDate &&
+        a.timestamp <= endDate
+      );
+
+      // Calculate cache hit rate
+      const cacheHits = analytics.filter(a => a.cacheHit).length;
+      const cacheHitRate = totalMessages > 0 ? cacheHits / totalMessages : 0;
+
+      return {
+        channelName,
+        startDate,
+        endDate,
+        totalOperations: totalMessages,
+        avgResponseTime,
+        avgAIResponseTime,
+        avgDBQueryTime: 0, // Would need separate tracking in analytics
+        errorRate,
+        cacheHitRate,
+        thresholdViolations: {
+          warning: responseTimeViolations + (errorRateViolations > 0 ? 1 : 0),
+          critical: analytics.filter(
+            a => a.aiResponseTimeMs >= this.thresholds.aiResponseTime.critical
+          ).length + (errorRate >= this.thresholds.errorRate.critical ? 1 : 0),
+        },
+        alerts: periodAlerts,
+      };
+    } catch (error) {
+      logger.error('Error generating performance report from database', {
+        error: error instanceof Error ? error.message : String(error),
+        channelName,
+        startDate,
+        endDate,
+      });
+      throw error;
+    }
   }
 }
 

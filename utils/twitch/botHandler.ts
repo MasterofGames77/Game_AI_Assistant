@@ -4,7 +4,6 @@ import { getChatCompletion } from '../aiHelper';
 import { checkProAccess } from '../proAccessUtil';
 import { logger } from '../logger';
 import { connectToWingmanDB } from '../databaseConnections';
-import connectToMongoDB from '../mongodb';
 import User from '../../models/User';
 import TwitchBotChannel from '../../models/TwitchBotChannel';
 import { RateLimit } from '../../types';
@@ -431,7 +430,6 @@ export class TwitchBotHandler {
     let moderationAction: string | undefined;
     let responseLength = 0;
     let messageType: 'command' | 'question' | 'other' = 'question';
-    let command: string | undefined;
     
     try {
       processedAt = new Date();
@@ -463,22 +461,25 @@ export class TwitchBotHandler {
         // Log analytics for banned user
         respondedAt = new Date();
         totalTimeMs = respondedAt.getTime() - receivedAt.getTime();
+        messageType = 'other';
+        wasModerated = true;
+        moderationAction = 'banned';
         await logMessageEvent({
           channelName: normalizedChannel,
           twitchUsername: username,
           displayName: displayName,
-          messageType: 'other',
+          messageType,
           questionLength: question.length,
           responseLength: 0,
           processingTimeMs,
           aiResponseTimeMs: 0,
           totalTimeMs,
-          cacheHit: false,
-          success: false,
+          cacheHit,
+          success,
           errorType: 'moderation',
           errorMessage: 'User is banned',
-          wasModerated: true,
-          moderationAction: 'banned',
+          wasModerated,
+          moderationAction,
           receivedAt,
           processedAt,
           respondedAt
@@ -510,21 +511,22 @@ export class TwitchBotHandler {
         // Log analytics for moderated message
         respondedAt = new Date();
         totalTimeMs = respondedAt.getTime() - receivedAt.getTime();
+        messageType = 'other';
         await logMessageEvent({
           channelName: normalizedChannel,
           twitchUsername: username,
           displayName: displayName,
-          messageType: 'other',
+          messageType,
           questionLength: question.length,
           responseLength: 0,
           processingTimeMs,
           aiResponseTimeMs: 0,
           totalTimeMs,
-          cacheHit: false,
-          success: false,
+          cacheHit,
+          success,
           errorType: 'moderation',
           errorMessage: moderationCheck.reason,
-          wasModerated: true,
+          wasModerated,
           moderationAction,
           receivedAt,
           processedAt,
@@ -650,14 +652,14 @@ export class TwitchBotHandler {
           channelName: normalizedChannel,
           twitchUsername: username,
           displayName: displayName,
-          messageType: 'question',
+          messageType,
           questionLength: question.length,
           responseLength,
           processingTimeMs,
           aiResponseTimeMs: 0,
           totalTimeMs,
-          cacheHit: false,
-          success: false,
+          cacheHit,
+          success,
           errorType: 'pro_access_denied',
           errorMessage: 'Pro access required',
           receivedAt,
@@ -696,14 +698,14 @@ export class TwitchBotHandler {
           channelName: normalizedChannel,
           twitchUsername: username,
           displayName: displayName,
-          messageType: 'question',
+          messageType,
           questionLength: question.length,
           responseLength,
           processingTimeMs,
           aiResponseTimeMs: 0, // Cache hit - no AI processing
           totalTimeMs,
-          cacheHit: true,
-          success: true,
+          cacheHit,
+          success,
           receivedAt,
           processedAt: processedAt || receivedAt,
           respondedAt
@@ -761,8 +763,13 @@ export class TwitchBotHandler {
         
         logger.info('Response sent successfully', { username });
 
-        // Update message count for this channel
-        await this.updateChannelMessageCount(channel);
+        // Update message count for this channel (track database query)
+        await measureDBQuery(
+          'updateChannelMessageCount',
+          () => this.updateChannelMessageCount(channel),
+          normalizedChannel,
+          { username }
+        );
         
         // Record successful response performance
         monitor.recordResponseTime('message_processing', totalTimeMs, normalizedChannel, {
@@ -776,14 +783,14 @@ export class TwitchBotHandler {
           channelName: normalizedChannel,
           twitchUsername: username,
           displayName: displayName,
-          messageType: 'question',
+          messageType,
           questionLength: question.length,
           responseLength,
           processingTimeMs,
           aiResponseTimeMs,
           totalTimeMs,
-          cacheHit: false,
-          success: true,
+          cacheHit,
+          success,
           receivedAt,
           processedAt: processedAt || receivedAt,
           respondedAt
@@ -811,14 +818,14 @@ export class TwitchBotHandler {
           channelName: normalizedChannel,
           twitchUsername: username,
           displayName: displayName,
-          messageType: 'question',
+          messageType,
           questionLength: question.length,
           responseLength: 0,
           processingTimeMs,
           aiResponseTimeMs,
           totalTimeMs,
-          cacheHit: false,
-          success: false,
+          cacheHit,
+          success,
           errorType,
           errorMessage,
           receivedAt,
@@ -866,14 +873,14 @@ export class TwitchBotHandler {
         channelName: normalizedChannel,
         twitchUsername: username,
         displayName: displayName,
-        messageType: 'question',
+        messageType,
         questionLength: question.length,
         responseLength: 0,
         processingTimeMs,
         aiResponseTimeMs,
         totalTimeMs,
-        cacheHit: false,
-        success: false,
+        cacheHit,
+        success,
         errorType,
         errorMessage,
         wasModerated,

@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { connectToWingmanDB } from '../../utils/databaseConnections';
 import User from '../../models/User';
 import Question from '../../models/Question';
+import { getSession } from '../../utils/session';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -9,10 +10,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { username } = req.body;
+    let { username } = req.body;
+
+    // If username not provided in body, try to get it from session
+    if (!username) {
+      try {
+        const session = await getSession(req);
+        if (session && session.username) {
+          username = session.username;
+        }
+      } catch (error) {
+        // Session check failed, will require username in body
+        console.error('Error getting session:', error);
+      }
+    }
 
     if (!username) {
-      return res.status(400).json({ message: 'Username is required' });
+      return res.status(400).json({ message: 'Username is required. Please provide username in request body or sign in.' });
     }
 
     await connectToWingmanDB();

@@ -168,22 +168,66 @@ export default function AccountPage() {
   }, []);
 
   useEffect(() => {
+    // Ensure we're on the client side
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    console.log("[Account Page] Starting to fetch account data...");
+
     const fetchAccountData = async () => {
       try {
         setLoading(true);
-        const username = localStorage.getItem("username");
-
+        console.log("[Account Page] Loading state set to true");
+        
+        // First, try to get username from session (more reliable)
+        let username: string | null = null;
+        try {
+          console.log("[Account Page] Attempting to verify session...");
+          const verifyResponse = await fetch("/api/auth/verify", {
+            method: "GET",
+            credentials: "include",
+          });
+          
+          console.log("[Account Page] Verify response status:", verifyResponse.status);
+          
+          // Try to parse response even if status is not OK (might still have username)
+          const verifyData = await verifyResponse.json().catch(() => null);
+          
+          if (verifyResponse.ok && verifyData?.authenticated && verifyData.user?.username) {
+            username = verifyData.user.username;
+            console.log("[Account Page] Username from session:", username);
+            // Update localStorage to keep it in sync
+            if (username) {
+              localStorage.setItem("username", username);
+            }
+          } else if (verifyResponse.status === 401 || verifyResponse.status === 403) {
+            // Session exists but might not have Pro access - try localStorage
+            console.log("Session verification returned:", verifyResponse.status, verifyData?.message || "Unknown");
+          }
+        } catch (error) {
+          console.error("Error verifying session:", error);
+        }
+        
+        // Fall back to localStorage if session verification failed
         if (!username) {
-          setError("No user found. Please sign in.");
-          return;
+          username = localStorage.getItem("username");
+          if (username) {
+            console.log("Using username from localStorage:", username);
+          }
         }
 
+        // If we don't have username, try calling API without it (API will get from session)
         // Fetch user data
+        console.log("[Account Page] Fetching account data, username:", username || "none (will use session)");
         const userResponse = await fetch("/api/accountData", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username }),
+          credentials: "include", // Ensure cookies are sent
+          body: JSON.stringify(username ? { username } : {}), // Send empty object if no username
         });
+        
+        console.log("[Account Page] Account data response status:", userResponse.status);
 
         if (!userResponse.ok) {
           throw new Error("Failed to fetch user data");
@@ -191,11 +235,24 @@ export default function AccountPage() {
 
         const userData = await userResponse.json();
 
-        // Fetch subscription status
+        // Update username from API response if we didn't have it
+        if (!username && userData?.user?.username) {
+          username = userData.user.username;
+          if (username) {
+            localStorage.setItem("username", username);
+          }
+        }
+
+        // Fetch subscription status (use username from response if available)
+        const usernameForProCheck = username || userData?.user?.username;
+        if (!usernameForProCheck) {
+          throw new Error("Unable to determine username");
+        }
+
         const subscriptionResponse = await fetch("/api/checkProAccess", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username }),
+          body: JSON.stringify({ username: usernameForProCheck }),
         });
 
         if (!subscriptionResponse.ok) {

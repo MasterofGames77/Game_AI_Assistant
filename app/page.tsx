@@ -27,6 +27,7 @@ import DailyChallengeBanner from "../components/DailyChallengeBanner";
 import MyGuides from "../components/MyGuides";
 import { isLongGuide, extractGuideTitle } from "../utils/guideDetection";
 import { trackQuestionAsked } from "../utils/analytics";
+import { getSourceName } from "../utils/linkShortener";
 // import { useRouter } from "next/navigation";
 
 export default function Home() {
@@ -40,7 +41,6 @@ export default function Home() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [totalConversations, setTotalConversations] = useState<number>(0);
   const [metrics, setMetrics] = useState<any>({});
-  const [usageStatus, setUsageStatus] = useState<any>(null);
   const [recommendations, setRecommendations] = useState<any>(null);
   const [recommendationsLoading, setRecommendationsLoading] = useState(false);
   const [recommendationsMessage, setRecommendationsMessage] = useState<
@@ -69,7 +69,6 @@ export default function Home() {
   const [showPassword, setShowPassword] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showPasswordSetupModal, setShowPasswordSetupModal] = useState(false);
-  const [isLegacyUser, setIsLegacyUser] = useState(false);
   const [accountLocked, setAccountLocked] = useState(false);
   const [lockoutMessage, setLockoutMessage] = useState("");
   const [lockedUntil, setLockedUntil] = useState<Date | null>(null);
@@ -641,28 +640,11 @@ export default function Home() {
     };
   }, [username, fetchHealthSettings]);
 
-  // function to get usage status
-  const fetchUsageStatus = useCallback(async () => {
-    if (typeof window === "undefined") return;
-    const storedUsername = localStorage.getItem("username");
-    if (!storedUsername) return;
-
-    try {
-      const res = await axios.post("/api/usageStatus", {
-        username: storedUsername,
-      });
-      setUsageStatus(res.data.usageStatus);
-    } catch (error) {
-      console.error("Error fetching usage status:", error);
-    }
-  }, []);
-
   useEffect(() => {
     if (userId) {
       fetchConversations();
-      fetchUsageStatus();
     }
-  }, [userId, fetchConversations, fetchUsageStatus]);
+  }, [userId, fetchConversations]);
 
   // Listen for localStorage changes to handle user switching (cross-tab or splash login)
   useEffect(() => {
@@ -720,7 +702,6 @@ export default function Home() {
                 // but we also call it directly to ensure it happens
                 setTimeout(() => {
                   fetchConversations();
-                  fetchUsageStatus();
                 }, 0);
               }
             } catch (err: any) {
@@ -771,7 +752,7 @@ export default function Home() {
       window.removeEventListener("storage", handleNativeStorage);
       window.removeEventListener("localStorageChange", handleCustomStorage);
     };
-  }, [username, fetchConversations, fetchUsageStatus]);
+  }, [username, fetchConversations]);
 
   // Listen for session expiration events and handle token refresh
   useEffect(() => {
@@ -1335,78 +1316,6 @@ export default function Home() {
     }
   };
 
-  // Extract domain name from URL for display
-  const getSourceName = (url: string): string => {
-    try {
-      const urlObj = new URL(url);
-      const hostname = urlObj.hostname.replace(/^www\./, "");
-
-      // Map common domains to friendly names
-      const domainMap: { [key: string]: string } = {
-        "wikipedia.org": "Wikipedia",
-        "en.wikipedia.org": "Wikipedia",
-        "gamesradar.com": "GamesRadar+",
-        "gameinformer.com": "GameInformer",
-        "tomsguide.com": "Tom's Guide",
-        "techradar.com": "TechRadar",
-        "gamespot.com": "GameSpot",
-        "pcgamer.com": "PC Gamer",
-        "ign.com": "IGN",
-        "polygon.com": "Polygon",
-        "kotaku.com": "Kotaku",
-        "theverge.com": "The Verge",
-        "engadget.com": "Engadget",
-        "nintendo.com": "Nintendo",
-        "playstation.com": "PlayStation",
-        "xbox.com": "Xbox",
-        "steamdeck.com": "Steam Deck",
-        "popularmechanics.com": "Popular Mechanics",
-        "nintendolife.com": "Nintendo Life",
-        "nintendoeverything.com": "Nintendo Everything",
-        "gamerant.com": "Gamerant",
-        "videogamechronicles.com": "VGC",
-        "thegamer.com": "The Gamer",
-        "game8.co": "Game8",
-        "eurogamer.net": "Eurogamer",
-        "gamefaqs.gamespot.com": "GameFAQs",
-        "youtube.com": "YouTube",
-        "nintendowire.com": "Nintendo Wire",
-        "store.steampowered.com": "Steam",
-        "epicgames.com": "Epic Games",
-        "currently.att.yahoo.com": "Yahoo",
-        "pushsquare.com": "Push Square",
-        "powerpyx.com": "PowerPyx",
-      };
-
-      // Check for exact match first
-      if (domainMap[hostname]) {
-        return domainMap[hostname];
-      }
-
-      // Check for partial matches (e.g., subdomains)
-      for (const [domain, name] of Object.entries(domainMap)) {
-        if (hostname.includes(domain) || domain.includes(hostname)) {
-          return name;
-        }
-      }
-
-      // Extract main domain name (e.g., "example.com" from "subdomain.example.com")
-      const parts = hostname.split(".");
-      if (parts.length >= 2) {
-        const mainDomain = parts.slice(-2).join(".");
-        // Capitalize first letter of each word
-        return mainDomain
-          .split(".")
-          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-          .join(".");
-      }
-
-      return hostname;
-    } catch {
-      return url;
-    }
-  };
-
   // Shorten URL for inline display (e.g., "youtube.com/watch?v=abc123...")
   const shortenUrl = (url: string, maxLength: number = 40): string => {
     try {
@@ -1828,7 +1737,6 @@ export default function Home() {
 
         // Check if user needs to set up password (legacy user)
         if (res.data.requiresPasswordSetup && res.data.isLegacyUser) {
-          setIsLegacyUser(true);
           setShowPasswordSetupModal(true);
         }
       }
@@ -1950,7 +1858,6 @@ export default function Home() {
       setError("");
       setPasswordInput("");
       setShowPasswordSetupModal(false);
-      setIsLegacyUser(false);
       setShowEarlyAccessSetupModal(false);
       setIsEarlyAccessUser(false);
       setEarlyAccessUserData(null);
