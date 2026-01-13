@@ -3503,7 +3503,7 @@ Examples:
 Game title:`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // Use cheaper model for simple extraction
+      model: 'gpt-4o',
       messages: [
         {
           role: 'system',
@@ -3514,8 +3514,8 @@ Game title:`;
           content: prompt
         }
       ],
-      temperature: 0.1, // Low temperature for consistent extraction
-      max_tokens: 100,
+      temperature: 0.2, // Low temperature for consistent extraction
+      max_tokens: 200,
     });
 
     const extractedTitle = completion.choices[0]?.message?.content?.trim();
