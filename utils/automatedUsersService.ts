@@ -1287,9 +1287,20 @@ export async function createForumPost(
     // Check if image search is enabled
     const imageSearchEnabled = process.env.IMAGE_SEARCH_ENABLED !== 'false'; // Default to true
     
+    console.log(`[IMAGE SEARCH] Starting image search for forum post`, {
+      username,
+      gameTitle: actualGameTitle,
+      forumCategory,
+      imageSearchEnabled,
+      hasGoogleAPIKey: !!process.env.GOOGLE_CUSTOM_SEARCH_API_KEY,
+      hasGoogleEngineId: !!process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID,
+      postContentLength: postContent.length
+    });
+    
     if (imageSearchEnabled) {
       try {
         // Phase 2: Extract keywords using AI-powered extraction
+        console.log(`[IMAGE SEARCH] Extracting keywords from post content...`);
         const extractedKeywords = await extractKeywordsFromPost(postContent, actualGameTitle, forumCategory);
         console.log(`[IMAGE SEARCH] Extracted keywords for ${actualGameTitle}:`, {
           characters: extractedKeywords.characters,
@@ -1314,8 +1325,10 @@ export async function createForumPost(
         } else {
           // Build optimized search query
           const searchQuery = buildSearchQuery(actualGameTitle, extractedKeywords);
+          console.log(`[IMAGE SEARCH] Built search query: "${searchQuery}"`);
           
           // Search for image using Google Custom Search API
+          console.log(`[IMAGE SEARCH] Calling searchGameImage API...`);
           const searchResult = await searchGameImage({
             gameTitle: actualGameTitle,
             keywords: extractedKeywords, // Pass structured keywords
@@ -1323,6 +1336,8 @@ export async function createForumPost(
             forumCategory: forumCategory,
             maxResults: 10
           });
+          
+          console.log(`[IMAGE SEARCH] Search result:`, searchResult ? 'Found image' : 'No results');
           
           // Verify relevance with enhanced verification
           if (searchResult) {

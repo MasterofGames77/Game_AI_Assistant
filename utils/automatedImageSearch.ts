@@ -396,6 +396,8 @@ function calculateRelevanceScoreSimple(
 export async function searchGameImage(
   options: ImageSearchOptions
 ): Promise<ImageSearchResult | null> {
+  console.log(`[IMAGE SEARCH] searchGameImage called for game: "${options.gameTitle}"`);
+  
   const {
     gameTitle,
     keywords,
@@ -405,8 +407,18 @@ export async function searchGameImage(
   const apiKey = process.env.GOOGLE_CUSTOM_SEARCH_API_KEY;
   const engineId = process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID;
   
+  console.log(`[IMAGE SEARCH] API configuration check:`, {
+    hasApiKey: !!apiKey,
+    hasEngineId: !!engineId,
+    apiKeyLength: apiKey ? apiKey.length : 0,
+    engineIdLength: engineId ? engineId.length : 0
+  });
+  
   if (!apiKey || !engineId) {
-    console.warn('[IMAGE SEARCH] Google Custom Search API not configured. Missing API key or Engine ID.');
+    console.warn('[IMAGE SEARCH] Google Custom Search API not configured. Missing API key or Engine ID.', {
+      missingApiKey: !apiKey,
+      missingEngineId: !engineId
+    });
     return null;
   }
   
