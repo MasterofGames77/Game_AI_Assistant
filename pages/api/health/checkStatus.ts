@@ -8,12 +8,12 @@ export default async function handler(
   res: NextApiResponse<HealthStatusResponse>
 ) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ 
+    return res.status(405).json({
       shouldShowBreak: false,
       timeSinceLastBreak: 0,
       breakCount: 0,
       showReminder: false,
-      error: 'Method not allowed' 
+      error: 'Method not allowed'
     });
   }
 
@@ -21,12 +21,12 @@ export default async function handler(
     const { username } = req.body;
 
     if (!username) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         shouldShowBreak: false,
         timeSinceLastBreak: 0,
         breakCount: 0,
         showReminder: false,
-        error: 'Username is required' 
+        error: 'Username is required'
       });
     }
 
@@ -36,18 +36,18 @@ export default async function handler(
     // Find user
     const user = await User.findOne({ username });
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         shouldShowBreak: false,
         timeSinceLastBreak: 0,
         breakCount: 0,
         showReminder: false,
-        error: 'User not found' 
+        error: 'User not found'
       });
     }
 
     // Initialize session start time if not set or if it's been more than 24 hours
     const now = new Date();
-    
+
     // Initialize health monitoring if it doesn't exist
     if (!user.healthMonitoring) {
       user.healthMonitoring = {
@@ -61,7 +61,7 @@ export default async function handler(
       };
     }
     const lastSessionStart = user.healthMonitoring.lastSessionStart;
-    const shouldResetSession = !lastSessionStart || 
+    const shouldResetSession = !lastSessionStart ||
       (now.getTime() - lastSessionStart.getTime()) > 24 * 60 * 60 * 1000; // 24 hours
 
     if (shouldResetSession) {
@@ -83,7 +83,7 @@ export default async function handler(
 
     // Check if user needs a break reminder
     const breakStatus = user.shouldShowBreakReminder();
-    
+
     // Get health tips if user has tips enabled (independent of break reminders)
     // Uses session-based time tracking - timer pauses when page closes/signs out
     // Timer resets after 24 hours (when session resets)
@@ -91,28 +91,49 @@ export default async function handler(
     let shouldShowHealthTips = false;
     if (user.healthMonitoring?.healthTipsEnabled && lastSessionStart) {
       const lastHealthTipTime = user.healthMonitoring?.lastHealthTipTime;
-      
-      // Calculate time since last health tip based on session time, not wall-clock time
+
+      // Calculate time since last health tip based on ACTIVE session time only
       // This ensures the timer pauses when user closes page or signs out
+      // IMPORTANT: If user logged out and back in, we need to detect this and reset the timer
       let timeSinceLastHealthTip = Infinity;
+
+      const sessionAgeMinutes = Math.floor((now.getTime() - lastSessionStart.getTime()) / (1000 * 60));
+
       if (lastHealthTipTime) {
         const lastHealthTipDate = new Date(lastHealthTipTime);
-        // If health tip was shown after session started, calculate from session start
+        // If health tip was shown after session started, calculate from health tip time
         if (lastHealthTipDate >= lastSessionStart) {
-          // Health tip was shown during current session - calculate session time since then
+          // Health tip was shown during current active session - calculate time since then
           timeSinceLastHealthTip = Math.floor((now.getTime() - lastHealthTipDate.getTime()) / (1000 * 60));
         } else {
-          // Health tip was shown before current session started - count from session start
-          timeSinceLastHealthTip = Math.floor((now.getTime() - lastSessionStart.getTime()) / (1000 * 60));
+          // Health tip was shown before current session started
+          // This means the session was reset (user logged out and back in)
+          // Only count time if session is relatively recent (user was actually active)
+          // If session is very old (more than 10 minutes), assume user just logged back in
+          if (sessionAgeMinutes > 10) {
+            // User likely just logged back in - reset timer, don't show tip immediately
+            timeSinceLastHealthTip = 0;
+          } else {
+            // Session is recent - count from session start (user was active)
+            timeSinceLastHealthTip = Math.floor((now.getTime() - lastSessionStart.getTime()) / (1000 * 60));
+          }
         }
       } else {
-        // No health tip shown yet in this session - count from session start
-        timeSinceLastHealthTip = Math.floor((now.getTime() - lastSessionStart.getTime()) / (1000 * 60));
+        // No health tip shown yet in this session
+        // If session is very old (more than 10 minutes), assume user just logged back in
+        // Otherwise, count from session start (user has been active)
+        if (sessionAgeMinutes > 10) {
+          // User likely just logged back in - reset timer, don't show tip immediately
+          timeSinceLastHealthTip = 0;
+        } else {
+          // Session is recent - count from session start
+          timeSinceLastHealthTip = sessionAgeMinutes;
+        }
       }
-      
-      // Show health tips every 30 minutes of active session time
+
+      // Show health tips every 60 minutes (1 hour) of active session time
       // Timer pauses when disabled or when page closes, resumes when re-enabled or page reopens
-      if (timeSinceLastHealthTip >= 30) {
+      if (timeSinceLastHealthTip >= 60) {
         // Check if method exists (handles hot-reload caching issues in development)
         if (typeof user.getHealthTips === 'function') {
           healthTips = user.getHealthTips();
@@ -127,9 +148,9 @@ export default async function handler(
 
 
     // Determine if we should show a break reminder
-    const showReminder = breakStatus.shouldShow && 
-      (!user.healthMonitoring?.lastBreakReminder || 
-       (new Date().getTime() - user.healthMonitoring.lastBreakReminder.getTime()) > 5 * 60 * 1000);
+    const showReminder = breakStatus.shouldShow &&
+      (!user.healthMonitoring?.lastBreakReminder ||
+        (new Date().getTime() - user.healthMonitoring.lastBreakReminder.getTime()) > 5 * 60 * 1000);
 
     return res.status(200).json({
       shouldShowBreak: breakStatus.shouldShow,
@@ -149,12 +170,12 @@ export default async function handler(
 
   } catch (error) {
     console.error('Error checking health status:', error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       shouldShowBreak: false,
       timeSinceLastBreak: 0,
       breakCount: 0,
       showReminder: false,
-      error: 'Internal server error' 
+      error: 'Internal server error'
     });
   }
 }

@@ -1,8 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { requireAuth, AuthenticatedRequest } from '../../../middleware/auth';
 import { getTokenFromCookies, REFRESH_TOKEN_COOKIE } from '../../../utils/session';
-import { getUserSessions } from '../../../utils/sessionManagement';
+import { getUserSessions, createOrUpdateSession } from '../../../utils/sessionManagement';
 import { hashToken } from '../../../utils/tokenBlacklist';
+import User from '../../../models/User';
 
 /**
  * Sessions Endpoint
@@ -18,7 +19,7 @@ export default async function handler(req: AuthenticatedRequest, res: NextApiRes
   try {
     // Require authentication
     const authResult = await requireAuth(req, res);
-    
+
     if (!authResult.authenticated || !authResult.userId) {
       // Log for debugging (production-safe - no sensitive data)
       if (process.env.NODE_ENV === 'development') {
@@ -40,15 +41,45 @@ export default async function handler(req: AuthenticatedRequest, res: NextApiRes
       const currentRefreshToken = getTokenFromCookies(req.headers.cookie, REFRESH_TOKEN_COOKIE);
       const currentRefreshTokenHash = currentRefreshToken ? hashToken(currentRefreshToken) : undefined;
 
-      // Get all active sessions
-      const sessions = await getUserSessions(userId, currentRefreshTokenHash);
+      // Get all active sessions first
+      let sessions = await getUserSessions(userId, currentRefreshTokenHash);
+
+      // If we have a refresh token but no active sessions, try to create/update the session
+      // This handles cases where session creation failed during login but user is still authenticated
+      // SAFETY: createOrUpdateSession will:
+      // - Update existing session if found by refreshTokenHash (prevents duplicates)
+      // - NOT reactivate inactive sessions (they stay inactive after logout)
+      // - Create new session only if none exists with this token hash
+      if (currentRefreshToken && currentRefreshTokenHash && sessions.length === 0) {
+        try {
+          const user = await User.findOne({ userId });
+          if (user && user.username) {
+            // Try to create/update session if it doesn't exist
+            // This uses the current refresh token, so it will only match/create a session for THIS token
+            // Old sessions from previous logins remain inactive and won't be reactivated
+            await createOrUpdateSession(req, userId, user.username, currentRefreshToken);
+            // Re-fetch sessions after creating
+            sessions = await getUserSessions(userId, currentRefreshTokenHash);
+          }
+        } catch (error) {
+          // Log but don't fail - session creation is non-blocking
+          console.error('[Sessions API] Error ensuring session exists:', error);
+        }
+      }
 
       // Debug logging (development only)
       if (process.env.NODE_ENV === 'development') {
         console.log('[Sessions API]', {
           userId,
           hasRefreshToken: !!currentRefreshToken,
+          hasRefreshTokenHash: !!currentRefreshTokenHash,
           sessionsFound: sessions.length,
+          sessionDetails: sessions.map((s: any) => ({
+            sessionId: s.sessionId?.substring(0, 8) + '...',
+            isActive: s.isActive,
+            isCurrentSession: s.isCurrentSession,
+            lastActivity: s.lastActivity,
+          })),
         });
       }
 
@@ -70,7 +101,7 @@ export default async function handler(req: AuthenticatedRequest, res: NextApiRes
     } else if (req.method === 'DELETE') {
       // Revoke all sessions except current one
       const currentRefreshToken = getTokenFromCookies(req.headers.cookie, REFRESH_TOKEN_COOKIE);
-      
+
       const { revokeAllUserSessions } = await import('../../../utils/sessionManagement');
       const revokedCount = await revokeAllUserSessions(
         userId,
@@ -87,7 +118,7 @@ export default async function handler(req: AuthenticatedRequest, res: NextApiRes
     }
   } catch (error) {
     console.error('Error in sessions API:', error);
-    
+
     return res.status(500).json({
       error: 'Error processing request',
       message: 'An error occurred while processing your request. Please try again.',

@@ -214,11 +214,47 @@ async function fetchReleaseDateFromRAWG(gameTitle: string): Promise<Date | null>
 }
 
 /**
+ * Normalize game title for cache key to handle variations
+ * Removes leading "the", normalizes whitespace, and standardizes formatting
+ * This ensures "The Legend of Zelda: Breath of the Wild" and "Legend of Zelda: Breath of the Wild"
+ * map to the same cache key
+ */
+function normalizeCacheKey(gameTitle: string): string {
+  if (!gameTitle) return '';
+  
+  let normalized = gameTitle
+    .toLowerCase()
+    .trim();
+  
+  // Remove leading "the" (case-insensitive) to handle variations
+  // This handles: "The Legend of Zelda" vs "Legend of Zelda"
+  normalized = normalized.replace(/^the\s+/i, '');
+  
+  // Normalize whitespace (multiple spaces/tabs/newlines to single space)
+  normalized = normalized.replace(/\s+/g, ' ');
+  
+  // Normalize punctuation spacing (standardize spacing around colons)
+  // "Title: Subtitle" and "Title : Subtitle" both become "title: subtitle"
+  normalized = normalized.replace(/\s*:\s*/g, ': ');
+  
+  // Normalize periods (remove spaces before periods, standardize after)
+  // "Super Mario Bros. Wonder" stays as is, but "Super Mario Bros . Wonder" becomes "Super Mario Bros. Wonder"
+  normalized = normalized.replace(/\s+\./g, '.');
+  normalized = normalized.replace(/\.\s+/g, '. ');
+  
+  // Remove trailing spaces and punctuation artifacts
+  normalized = normalized.trim();
+  
+  return normalized;
+}
+
+/**
  * Get release date for a game with caching
  * Checks cache first, then tries IGDB, then RAWG
  */
 export async function getGameReleaseDate(gameTitle: string): Promise<Date | null> {
-  const cacheKey = gameTitle.toLowerCase().trim();
+  // Use normalized cache key to handle title variations
+  const cacheKey = normalizeCacheKey(gameTitle);
   
   // Check cache first
   const cached = releaseDateCache.get(cacheKey);
@@ -235,8 +271,16 @@ export async function getGameReleaseDate(gameTitle: string): Promise<Date | null
   }
   
   // Cache the result if we got one
+  // Also try to cache with alternative keys if the API returned a different title format
   if (releaseDate) {
     releaseDateCache.set(cacheKey, releaseDate, RELEASE_DATE_CACHE_TTL);
+    
+    // Also cache with the original title format (in case it's different)
+    // This helps catch cases where the input title format differs from what we normalized
+    const originalKey = gameTitle.toLowerCase().trim();
+    if (originalKey !== cacheKey) {
+      releaseDateCache.set(originalKey, releaseDate, RELEASE_DATE_CACHE_TTL);
+    }
   }
   
   return releaseDate;

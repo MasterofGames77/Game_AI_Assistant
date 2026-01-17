@@ -224,12 +224,19 @@ export async function getUserSessions(
       .sort({ lastActivity: -1 })
       .lean();
 
+    // Also check for any sessions (active or inactive) for debugging
+    const allSessions = await Session.find({ userId }).lean();
+    const inactiveSessions = allSessions.filter((s: any) => !s.isActive);
+
     // Debug logging (development only)
     if (process.env.NODE_ENV === 'development') {
       console.log('[getUserSessions]', {
         userId,
-        sessionsFound: sessions.length,
+        activeSessionsFound: sessions.length,
+        totalSessionsFound: allSessions.length,
+        inactiveSessionsFound: inactiveSessions.length,
         sessionIds: sessions.map((s: any) => s.sessionId?.substring(0, 8) + '...'),
+        hasCurrentTokenHash: !!currentRefreshTokenHash,
       });
     }
 
