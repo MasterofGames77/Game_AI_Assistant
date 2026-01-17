@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import { ImageSearchCache } from '../types';
+import { buildSearchQuery, verifyImageRelevance } from './imageRelevanceVerifier';
 
 // Load environment variables
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
@@ -286,7 +287,6 @@ function constructSearchQuery(
   }
   
   // Phase 2: Use enhanced query building (already includes exclusions)
-  const { buildSearchQuery } = require('./imageRelevanceVerifier');
   return buildSearchQuery(gameTitle, keywords);
 }
 
@@ -305,7 +305,6 @@ function calculateRelevanceScore(
   }
   
   // Phase 2: Use enhanced verification
-  const { verifyImageRelevance } = require('./imageRelevanceVerifier');
   const verification = verifyImageRelevance(
     result.link || result.url || '',
     result.title || '',
