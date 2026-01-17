@@ -735,7 +735,8 @@ class AutomatedUsersScheduler {
         return;
       }
 
-      console.log(`Executing forum post activity for ${username}...`);
+      console.log(`[FORUM POST] Executing forum post activity for ${username}...`);
+      console.log(`[FORUM POST] This will trigger image search if enabled`);
       const result = await createForumPost(username, preferences);
 
       if (result.success) {

@@ -29,6 +29,9 @@ function getOpenAIClient(): OpenAI {
  * - GPT-5.2 for games released 2024+ (better knowledge cutoff - Aug 2025 vs Oct 2023)
  * - GPT-4o for games released before 2024 (proven quality, cost-effective)
  * 
+ * CRITICAL: If release date cannot be determined, default to GPT-5.2 for safety
+ * (newer games may not be in databases yet, and GPT-4o won't know about them)
+ * 
  * This matches the logic used by the main Video Game Wingman assistant
  * 
  * @param gameTitle - Game title to check release date for
@@ -36,7 +39,8 @@ function getOpenAIClient(): OpenAI {
  */
 async function selectModelForAutomatedUser(gameTitle: string): Promise<string> {
   const CUTOFF_YEAR = 2024; // Games released 2024+ use GPT-5.2
-  const DEFAULT_MODEL = 'gpt-4o'; // Default for automated users (not search-preview)
+  const DEFAULT_MODEL = 'gpt-4o'; // Default for older games
+  const SAFE_DEFAULT_MODEL = 'gpt-5.2'; // Safe default when release date unavailable (for newer games)
   
   try {
     const releaseDate = await getGameReleaseDate(gameTitle);
@@ -45,20 +49,22 @@ async function selectModelForAutomatedUser(gameTitle: string): Promise<string> {
       const releaseYear = releaseDate.getFullYear();
       
       if (releaseYear >= CUTOFF_YEAR) {
-        console.log(`[Automated User] Using GPT-5.2 for ${gameTitle} (released ${releaseYear})`);
+        console.log(`[Automated User] ✅ Using GPT-5.2 for ${gameTitle} (released ${releaseYear}, after cutoff)`);
         return 'gpt-5.2';
       } else {
-        console.log(`[Automated User] Using GPT-4o for ${gameTitle} (released ${releaseYear})`);
+        console.log(`[Automated User] ✅ Using GPT-4o for ${gameTitle} (released ${releaseYear}, before cutoff)`);
         return DEFAULT_MODEL;
       }
     }
   } catch (error) {
-    console.error(`[Automated User] Error determining model for ${gameTitle}:`, error);
+    console.error(`[Automated User] ⚠️ Error determining release date for ${gameTitle}:`, error);
   }
   
-  // Default to GPT-4o if we can't determine release date
-  console.log(`[Automated User] Using default GPT-4o for ${gameTitle} (release date unavailable)`);
-  return DEFAULT_MODEL;
+  // CRITICAL FIX: Default to GPT-5.2 if we can't determine release date
+  // This is safer for newer games that may not be in databases yet
+  // GPT-4o has knowledge cutoff of Oct 2023, so it won't know about newer games
+  console.log(`[Automated User] ⚠️ Release date unavailable for ${gameTitle} - using GPT-5.2 (safer for newer games)`);
+  return SAFE_DEFAULT_MODEL;
 }
 
 export interface UserPreferences {
@@ -257,37 +263,66 @@ Generate ONLY the direct question, nothing else:`;
 
   try {
     // Select model based on game release date (GPT-5.2 for 2024+ games, GPT-4o for older)
-    const selectedModel = await selectModelForAutomatedUser(gameTitle);
+    let selectedModel = await selectModelForAutomatedUser(gameTitle);
+    let lastError: Error | null = null;
     
-    const completion = await getOpenAIClient().chat.completions.create({
-      model: selectedModel,
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        {
-          role: 'user',
-          content: `Generate a direct, factual question about ${gameTitle} that Video Game Wingman can answer with specific game information.`
+    // Retry logic: if GPT-4o fails (e.g., doesn't know about the game), try GPT-5.2
+    const maxAttempts = 2;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        console.log(`[Question Generation] Attempt ${attempt}/${maxAttempts} using ${selectedModel} for ${gameTitle}`);
+        
+        const completion = await getOpenAIClient().chat.completions.create({
+          model: selectedModel,
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: `Generate a direct, factual question about ${gameTitle} that Video Game Wingman can answer with specific game information.`
+            }
+          ],
+          temperature: 0.8, // Slightly higher temperature for more variation in questions
+          max_tokens: 150
+        });
+
+        const generatedQuestion = completion.choices[0]?.message?.content?.trim();
+        
+        if (!generatedQuestion) {
+          throw new Error('Empty response from model');
         }
-      ],
-      temperature: 0.8, // Slightly higher temperature for more variation in questions
-      max_tokens: 150
-    });
 
-    const generatedQuestion = completion.choices[0]?.message?.content?.trim();
-    
-    if (!generatedQuestion) {
-      throw new Error('Failed to generate question');
+        // Clean up the response (remove quotes if wrapped, remove "Question:" prefix, etc.)
+        let cleanedQuestion = generatedQuestion
+          .replace(/^["']|["']$/g, '') // Remove surrounding quotes
+          .replace(/^(Question:|Q:)\s*/i, '') // Remove "Question:" prefix
+          .trim();
+
+        if (cleanedQuestion.length < 10) {
+          throw new Error('Generated question is too short or invalid');
+        }
+
+        console.log(`[Question Generation] ✅ Successfully generated question using ${selectedModel}`);
+        return cleanedQuestion;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Question Generation] ❌ Attempt ${attempt} failed with ${selectedModel}:`, lastError.message);
+        
+        // If we're using GPT-4o and it fails, retry with GPT-5.2 (might be a newer game)
+        if (attempt < maxAttempts && selectedModel === 'gpt-4o') {
+          console.log(`[Question Generation] ⚠️ GPT-4o failed, retrying with GPT-5.2 (game might be too new)`);
+          selectedModel = 'gpt-5.2';
+        } else {
+          // If GPT-5.2 also fails or we've exhausted retries, throw
+          break;
+        }
+      }
     }
-
-    // Clean up the response (remove quotes if wrapped, remove "Question:" prefix, etc.)
-    let cleanedQuestion = generatedQuestion
-      .replace(/^["']|["']$/g, '') // Remove surrounding quotes
-      .replace(/^(Question:|Q:)\s*/i, '') // Remove "Question:" prefix
-      .trim();
-
-    return cleanedQuestion;
+    
+    // If we get here, all attempts failed
+    throw new Error(`Failed to generate question after ${maxAttempts} attempts: ${lastError?.message || 'Unknown error'}`);
   } catch (error) {
     console.error('Error generating question:', error);
     throw new Error(`Failed to generate question: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -657,37 +692,66 @@ Generate ONLY the post content, nothing else:`;
 
   try {
     // Select model based on game release date (GPT-5.2 for 2024+ games, GPT-4o for older)
-    const selectedModel = await selectModelForAutomatedUser(gameTitle);
+    let selectedModel = await selectModelForAutomatedUser(gameTitle);
+    let lastError: Error | null = null;
     
-    const completion = await getOpenAIClient().chat.completions.create({
-      model: selectedModel,
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        {
-          role: 'user',
-          content: `Generate a natural forum post about ${gameTitle} that a real gamer would write.`
+    // Retry logic: if GPT-4o fails (e.g., doesn't know about the game), try GPT-5.2
+    const maxAttempts = 2;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        console.log(`[Forum Post Generation] Attempt ${attempt}/${maxAttempts} using ${selectedModel} for ${gameTitle}`);
+        
+        const completion = await getOpenAIClient().chat.completions.create({
+          model: selectedModel,
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: `Generate a natural forum post about ${gameTitle} that a real gamer would write.`
+            }
+          ],
+          temperature: 1.0, // Maximum temperature for maximum variation and uniqueness
+          max_tokens: 250
+        });
+
+        const generatedPost = completion.choices[0]?.message?.content?.trim();
+        
+        if (!generatedPost) {
+          throw new Error('Empty response from model');
         }
-      ],
-      temperature: 1.0, // Maximum temperature for maximum variation and uniqueness
-      max_tokens: 250
-    });
 
-    const generatedPost = completion.choices[0]?.message?.content?.trim();
-    
-    if (!generatedPost) {
-      throw new Error('Failed to generate forum post');
+        // Clean up the response (remove quotes if wrapped, remove "Post:" prefix, etc.)
+        let cleanedPost = generatedPost
+          .replace(/^["']|["']$/g, '') // Remove surrounding quotes
+          .replace(/^(Post:|Message:)\s*/i, '') // Remove "Post:" prefix
+          .trim();
+
+        if (cleanedPost.length < 20) {
+          throw new Error('Generated post is too short or invalid');
+        }
+
+        console.log(`[Forum Post Generation] ✅ Successfully generated post using ${selectedModel}`);
+        return cleanedPost;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Forum Post Generation] ❌ Attempt ${attempt} failed with ${selectedModel}:`, lastError.message);
+        
+        // If we're using GPT-4o and it fails, retry with GPT-5.2 (might be a newer game)
+        if (attempt < maxAttempts && selectedModel === 'gpt-4o') {
+          console.log(`[Forum Post Generation] ⚠️ GPT-4o failed, retrying with GPT-5.2 (game might be too new)`);
+          selectedModel = 'gpt-5.2';
+        } else {
+          // If GPT-5.2 also fails or we've exhausted retries, throw
+          break;
+        }
+      }
     }
-
-    // Clean up the response (remove quotes if wrapped, remove "Post:" prefix, etc.)
-    let cleanedPost = generatedPost
-      .replace(/^["']|["']$/g, '') // Remove surrounding quotes
-      .replace(/^(Post:|Message:)\s*/i, '') // Remove "Post:" prefix
-      .trim();
-
-    return cleanedPost;
+    
+    // If we get here, all attempts failed
+    throw new Error(`Failed to generate forum post after ${maxAttempts} attempts: ${lastError?.message || 'Unknown error'}`);
   } catch (error) {
     console.error('Error generating forum post:', error);
     throw new Error(`Failed to generate forum post: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -754,37 +818,66 @@ Generate ONLY the reply content, nothing else:`;
 
   try {
     // Select model based on game release date (GPT-5.2 for 2024+ games, GPT-4o for older)
-    const selectedModel = await selectModelForAutomatedUser(gameTitle);
+    let selectedModel = await selectModelForAutomatedUser(gameTitle);
+    let lastError: Error | null = null;
     
-    const completion = await getOpenAIClient().chat.completions.create({
-      model: selectedModel,
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        {
-          role: 'user',
-          content: `Generate a natural, helpful reply to ${originalPostAuthor}'s post about ${gameTitle}. Make sure to reference specific game elements and respond directly to what they said.`
+    // Retry logic: if GPT-4o fails (e.g., doesn't know about the game), try GPT-5.2
+    const maxAttempts = 2;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        console.log(`[Post Reply Generation] Attempt ${attempt}/${maxAttempts} using ${selectedModel} for ${gameTitle}`);
+        
+        const completion = await getOpenAIClient().chat.completions.create({
+          model: selectedModel,
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: `Generate a natural, helpful reply to ${originalPostAuthor}'s post about ${gameTitle}. Make sure to reference specific game elements and respond directly to what they said.`
+            }
+          ],
+          temperature: 0.8, // Higher temperature for more natural variation
+          max_tokens: 300
+        });
+
+        const generatedReply = completion.choices[0]?.message?.content?.trim();
+        
+        if (!generatedReply) {
+          throw new Error('Empty response from model');
         }
-      ],
-      temperature: 0.8, // Higher temperature for more natural variation
-      max_tokens: 300
-    });
 
-    const generatedReply = completion.choices[0]?.message?.content?.trim();
-    
-    if (!generatedReply) {
-      throw new Error('Failed to generate post reply');
+        // Clean up the response (remove quotes if wrapped, remove "Reply:" prefix, etc.)
+        let cleanedReply = generatedReply
+          .replace(/^["']|["']$/g, '') // Remove surrounding quotes
+          .replace(/^(Reply:|Response:)\s*/i, '') // Remove "Reply:" prefix
+          .trim();
+
+        if (cleanedReply.length < 20) {
+          throw new Error('Generated reply is too short or invalid');
+        }
+
+        console.log(`[Post Reply Generation] ✅ Successfully generated reply using ${selectedModel}`);
+        return cleanedReply;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Post Reply Generation] ❌ Attempt ${attempt} failed with ${selectedModel}:`, lastError.message);
+        
+        // If we're using GPT-4o and it fails, retry with GPT-5.2 (might be a newer game)
+        if (attempt < maxAttempts && selectedModel === 'gpt-4o') {
+          console.log(`[Post Reply Generation] ⚠️ GPT-4o failed, retrying with GPT-5.2 (game might be too new)`);
+          selectedModel = 'gpt-5.2';
+        } else {
+          // If GPT-5.2 also fails or we've exhausted retries, throw
+          break;
+        }
+      }
     }
-
-    // Clean up the response (remove quotes if wrapped, remove "Reply:" prefix, etc.)
-    let cleanedReply = generatedReply
-      .replace(/^["']|["']$/g, '') // Remove surrounding quotes
-      .replace(/^(Reply:|Response:)\s*/i, '') // Remove "Reply:" prefix
-      .trim();
-
-    return cleanedReply;
+    
+    // If we get here, all attempts failed
+    throw new Error(`Failed to generate post reply after ${maxAttempts} attempts: ${lastError?.message || 'Unknown error'}`);
   } catch (error) {
     console.error('Error generating post reply:', error);
     throw new Error(`Failed to generate post reply: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -864,36 +957,65 @@ Generate ONLY the post content, nothing else:`;
 
   try {
     // Select model based on game release date (GPT-5.2 for 2024+ games, GPT-4o for older)
-    const selectedModel = await selectModelForAutomatedUser(gameTitle);
+    let selectedModel = await selectModelForAutomatedUser(gameTitle);
+    let lastError: Error | null = null;
     
-    const completion = await getOpenAIClient().chat.completions.create({
-      model: selectedModel,
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        {
-          role: 'user',
-          content: `Generate a forum post about struggling with ${gameTitle}.`
+    // Retry logic: if GPT-4o fails (e.g., doesn't know about the game), try GPT-5.2
+    const maxAttempts = 2;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        console.log(`[Common Gamer Post] Attempt ${attempt}/${maxAttempts} using ${selectedModel} for ${gameTitle}`);
+        
+        const completion = await getOpenAIClient().chat.completions.create({
+          model: selectedModel,
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: `Generate a forum post about struggling with ${gameTitle}.`
+            }
+          ],
+          temperature: 0.9,
+          max_tokens: 250
+        });
+
+        const generatedPost = completion.choices[0]?.message?.content?.trim();
+        
+        if (!generatedPost) {
+          throw new Error('Empty response from model');
         }
-      ],
-      temperature: 0.9,
-      max_tokens: 250
-    });
 
-    const generatedPost = completion.choices[0]?.message?.content?.trim();
-    
-    if (!generatedPost) {
-      throw new Error('Failed to generate COMMON gamer post');
+        let cleanedPost = generatedPost
+          .replace(/^["']|["']$/g, '')
+          .replace(/^(Post:|Message:)\s*/i, '')
+          .trim();
+
+        if (cleanedPost.length < 20) {
+          throw new Error('Generated post is too short or invalid');
+        }
+
+        console.log(`[Common Gamer Post] ✅ Successfully generated post using ${selectedModel}`);
+        return cleanedPost;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Common Gamer Post] ❌ Attempt ${attempt} failed with ${selectedModel}:`, lastError.message);
+        
+        // If we're using GPT-4o and it fails, retry with GPT-5.2 (might be a newer game)
+        if (attempt < maxAttempts && selectedModel === 'gpt-4o') {
+          console.log(`[Common Gamer Post] ⚠️ GPT-4o failed, retrying with GPT-5.2 (game might be too new)`);
+          selectedModel = 'gpt-5.2';
+        } else {
+          // If GPT-5.2 also fails or we've exhausted retries, throw
+          break;
+        }
+      }
     }
-
-    let cleanedPost = generatedPost
-      .replace(/^["']|["']$/g, '')
-      .replace(/^(Post:|Message:)\s*/i, '')
-      .trim();
-
-    return cleanedPost;
+    
+    // If we get here, all attempts failed
+    throw new Error(`Failed to generate COMMON gamer post after ${maxAttempts} attempts: ${lastError?.message || 'Unknown error'}`);
   } catch (error) {
     console.error('Error generating COMMON gamer post:', error);
     throw new Error(`Failed to generate COMMON gamer post: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -972,36 +1094,65 @@ Generate ONLY the reply content, nothing else:`;
 
   try {
     // Select model based on game release date (GPT-5.2 for 2024+ games, GPT-4o for older)
-    const selectedModel = await selectModelForAutomatedUser(gameTitle);
+    let selectedModel = await selectModelForAutomatedUser(gameTitle);
+    let lastError: Error | null = null;
     
-    const completion = await getOpenAIClient().chat.completions.create({
-      model: selectedModel,
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        {
-          role: 'user',
-          content: `Generate a helpful solution reply to ${originalPostAuthor}'s post about struggling with ${gameTitle}.`
+    // Retry logic: if GPT-4o fails (e.g., doesn't know about the game), try GPT-5.2
+    const maxAttempts = 2;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        console.log(`[Expert Gamer Reply] Attempt ${attempt}/${maxAttempts} using ${selectedModel} for ${gameTitle}`);
+        
+        const completion = await getOpenAIClient().chat.completions.create({
+          model: selectedModel,
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: `Generate a helpful solution reply to ${originalPostAuthor}'s post about struggling with ${gameTitle}.`
+            }
+          ],
+          temperature: 0.8,
+          max_tokens: 350
+        });
+
+        const generatedReply = completion.choices[0]?.message?.content?.trim();
+        
+        if (!generatedReply) {
+          throw new Error('Empty response from model');
         }
-      ],
-      temperature: 0.8,
-      max_tokens: 350
-    });
 
-    const generatedReply = completion.choices[0]?.message?.content?.trim();
-    
-    if (!generatedReply) {
-      throw new Error('Failed to generate EXPERT gamer reply');
+        let cleanedReply = generatedReply
+          .replace(/^["']|["']$/g, '')
+          .replace(/^(Reply:|Response:)\s*/i, '')
+          .trim();
+
+        if (cleanedReply.length < 20) {
+          throw new Error('Generated reply is too short or invalid');
+        }
+
+        console.log(`[Expert Gamer Reply] ✅ Successfully generated reply using ${selectedModel}`);
+        return cleanedReply;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`[Expert Gamer Reply] ❌ Attempt ${attempt} failed with ${selectedModel}:`, lastError.message);
+        
+        // If we're using GPT-4o and it fails, retry with GPT-5.2 (might be a newer game)
+        if (attempt < maxAttempts && selectedModel === 'gpt-4o') {
+          console.log(`[Expert Gamer Reply] ⚠️ GPT-4o failed, retrying with GPT-5.2 (game might be too new)`);
+          selectedModel = 'gpt-5.2';
+        } else {
+          // If GPT-5.2 also fails or we've exhausted retries, throw
+          break;
+        }
+      }
     }
-
-    let cleanedReply = generatedReply
-      .replace(/^["']|["']$/g, '')
-      .replace(/^(Reply:|Response:)\s*/i, '')
-      .trim();
-
-    return cleanedReply;
+    
+    // If we get here, all attempts failed
+    throw new Error(`Failed to generate EXPERT gamer reply after ${maxAttempts} attempts: ${lastError?.message || 'Unknown error'}`);
   } catch (error) {
     console.error('Error generating EXPERT gamer reply:', error);
     throw new Error(`Failed to generate EXPERT gamer reply: ${error instanceof Error ? error.message : 'Unknown error'}`);

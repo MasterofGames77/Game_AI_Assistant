@@ -20,21 +20,21 @@ import mongoose from 'mongoose';
  */
 function isRetryableError(error: unknown): boolean {
   if (!error) return false;
-  
+
   // Check for axios error structure
   if (axios.isAxiosError(error)) {
     const axiosError = error as AxiosError;
     const responseStatus = axiosError.response?.status;
-    
+
     // Don't retry on client errors (4xx)
     if (responseStatus && responseStatus >= 400 && responseStatus < 500) {
       return false; // Client errors are not retryable
     }
-    
+
     // Retry on network errors, timeouts, and server errors
     const errorCode = axiosError.code || '';
     const errorMessage = axiosError.message?.toLowerCase() || '';
-    
+
     if (
       errorCode === 'ECONNABORTED' ||
       errorCode === 'ETIMEDOUT' ||
@@ -48,7 +48,7 @@ function isRetryableError(error: unknown): boolean {
       return true;
     }
   }
-  
+
   // Check for error code in generic errors
   if (typeof error === 'object' && 'code' in error) {
     const code = String((error as any).code || '').toLowerCase();
@@ -62,7 +62,7 @@ function isRetryableError(error: unknown): boolean {
       return true;
     }
   }
-  
+
   // Default: don't retry on unknown errors (could be client errors)
   return false;
 }
@@ -82,11 +82,11 @@ async function withRetry<T>(
   operation: string = 'operation'
 ): Promise<T> {
   let lastError: Error | unknown;
-  
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const result = await fn();
-      
+
       // If this is a retry attempt, log success
       if (attempt > 0) {
         console.log(`[Automated Users Retry] ${operation} succeeded on attempt ${attempt + 1}/${maxRetries + 1}`, {
@@ -96,19 +96,19 @@ async function withRetry<T>(
           timestamp: new Date().toISOString()
         });
       }
-      
+
       return result;
     } catch (error) {
       lastError = error;
-      
+
       // Don't retry on last attempt
       if (attempt >= maxRetries) {
         break;
       }
-      
+
       // Determine if error is retryable
       const isRetryable = isRetryableError(error);
-      
+
       if (!isRetryable) {
         // Non-retryable error (e.g., 4xx client errors)
         console.error(`[Automated Users Retry] ${operation} failed with non-retryable error:`, {
@@ -119,10 +119,10 @@ async function withRetry<T>(
         });
         throw error;
       }
-      
+
       // Calculate delay with exponential backoff
       const delay = baseDelayMs * Math.pow(2, attempt);
-      
+
       console.warn(`[Automated Users Retry] ${operation} failed, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`, {
         operation,
         error: error instanceof Error ? error.message : String(error),
@@ -131,12 +131,12 @@ async function withRetry<T>(
         delay,
         timestamp: new Date().toISOString()
       });
-      
+
       // Wait before retrying
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
-  
+
   // All retries exhausted
   throw lastError;
 }
@@ -177,23 +177,23 @@ function logApiError(
   }
 ): void {
   const errorMessage = error instanceof Error ? error.message : String(error);
-  const isTimeout = errorMessage.includes('timeout') || 
-                   errorMessage.includes('ECONNABORTED') ||
-                   errorMessage.includes('ETIMEDOUT');
-  
+  const isTimeout = errorMessage.includes('timeout') ||
+    errorMessage.includes('ECONNABORTED') ||
+    errorMessage.includes('ETIMEDOUT');
+
   const logData: any = {
     operation: context.operation,
     error: errorMessage,
     timestamp: new Date().toISOString(),
     isTimeout
   };
-  
+
   // Add context fields
   if (context.username) logData.username = context.username;
   if (context.url) logData.url = context.url;
   if (context.method) logData.method = context.method;
   if (context.timeout) logData.timeout = `${context.timeout}ms`;
-  
+
   // Add axios-specific error details
   if (axios.isAxiosError(error)) {
     const axiosError = error as AxiosError;
@@ -207,17 +207,17 @@ function logApiError(
       timeout: axiosError.config?.timeout
     };
   }
-  
+
   // Add stack trace for errors
   if (error instanceof Error) {
     logData.stack = error.stack;
   }
-  
+
   // Add timeout-specific message
   if (isTimeout) {
     logData.timeoutMessage = `Request timed out after ${context.timeout || 'unknown'}ms. The server may be overloaded or the network connection is slow.`;
   }
-  
+
   // Log with appropriate level
   if (isTimeout) {
     console.error(`[Automated Users API] ${context.operation} - TIMEOUT`, logData);
@@ -261,31 +261,31 @@ function normalizeGameTitle(title: string): string {
  */
 function loadGameList(userPreferences: UserPreferences): { games: string[]; genres: string[] } {
   // Check if this is InterdimensionalHipster (has both single-player and multiplayer genres)
-  const isInterdimensionalHipster = userPreferences.genres.length > 5 && 
+  const isInterdimensionalHipster = userPreferences.genres.length > 5 &&
     userPreferences.genres.some(g => ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer', 'Action', 'Horror', 'Stealth', 'Metroidvania'].includes(g)) &&
     userPreferences.genres.some(g => ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox', 'FPS', 'MOBA', 'MMORPG', 'Sports'].includes(g));
-  
+
   if (isInterdimensionalHipster) {
     // Load both single-player and multiplayer games
     try {
       const singlePlayerPath = path.join(process.cwd(), 'data', 'automated-users', 'single-player.json');
       const multiplayerPath = path.join(process.cwd(), 'data', 'automated-users', 'multiplayer.json');
-      
+
       const singlePlayerContent = fs.readFileSync(singlePlayerPath, 'utf-8');
       const multiplayerContent = fs.readFileSync(multiplayerPath, 'utf-8');
-      
+
       const singlePlayerList: GameList = JSON.parse(singlePlayerContent);
       const multiplayerList: GameList = JSON.parse(multiplayerContent);
-      
+
       const allGames: string[] = [];
       const genres: string[] = [];
-      
+
       // Add single-player games
       for (const [genre, games] of Object.entries(singlePlayerList)) {
         genres.push(genre);
         allGames.push(...games);
       }
-      
+
       // Add multiplayer games
       for (const [genre, games] of Object.entries(multiplayerList)) {
         if (!genres.includes(genre)) {
@@ -293,32 +293,32 @@ function loadGameList(userPreferences: UserPreferences): { games: string[]; genr
         }
         allGames.push(...games);
       }
-      
+
       return { games: allGames, genres };
     } catch (error) {
       console.error('Error loading game lists for InterdimensionalHipster:', error);
       return { games: [], genres: [] };
     }
   }
-  
+
   // For other users, use the standard logic
   const isSinglePlayer = userPreferences.focus === 'single-player';
   const gameListFile = isSinglePlayer ? 'single-player.json' : 'multiplayer.json';
   const gameListPath = path.join(process.cwd(), 'data', 'automated-users', gameListFile);
-  
+
   try {
     const content = fs.readFileSync(gameListPath, 'utf-8');
     const gameList: GameList = JSON.parse(content);
-    
+
     // Flatten all games from all genres
     const allGames: string[] = [];
     const genres: string[] = [];
-    
+
     for (const [genre, games] of Object.entries(gameList)) {
       genres.push(genre);
       allGames.push(...games);
     }
-    
+
     return { games: allGames, genres };
   } catch (error) {
     console.error(`Error loading game list from ${gameListFile}:`, error);
@@ -331,38 +331,38 @@ function loadGameList(userPreferences: UserPreferences): { games: string[]; genr
  */
 function selectRandomGame(userPreferences: UserPreferences): { gameTitle: string; genre: string } | null {
   const { games, genres } = loadGameList(userPreferences);
-  
+
   if (games.length === 0) {
     return null;
   }
-  
+
   const randomGame = games[Math.floor(Math.random() * games.length)];
-  
+
   // Find which genre this game belongs to
   // Check if this is InterdimensionalHipster (has both single-player and multiplayer genres)
-  const isInterdimensionalHipster = userPreferences.genres.length > 5 && 
+  const isInterdimensionalHipster = userPreferences.genres.length > 5 &&
     userPreferences.genres.some(g => ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer', 'Action', 'Horror', 'Stealth', 'Metroidvania'].includes(g)) &&
     userPreferences.genres.some(g => ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox', 'FPS', 'MOBA', 'Sports'].includes(g));
-  
+
   if (isInterdimensionalHipster) {
     // Check both game lists
     try {
       const singlePlayerPath = path.join(process.cwd(), 'data', 'automated-users', 'single-player.json');
       const multiplayerPath = path.join(process.cwd(), 'data', 'automated-users', 'multiplayer.json');
-      
+
       const singlePlayerContent = fs.readFileSync(singlePlayerPath, 'utf-8');
       const multiplayerContent = fs.readFileSync(multiplayerPath, 'utf-8');
-      
+
       const singlePlayerList: GameList = JSON.parse(singlePlayerContent);
       const multiplayerList: GameList = JSON.parse(multiplayerContent);
-      
+
       // Check single-player games first
       for (const [genre, genreGames] of Object.entries(singlePlayerList)) {
         if (genreGames.includes(randomGame)) {
           return { gameTitle: randomGame, genre };
         }
       }
-      
+
       // Check multiplayer games
       for (const [genre, genreGames] of Object.entries(multiplayerList)) {
         if (genreGames.includes(randomGame)) {
@@ -380,11 +380,11 @@ function selectRandomGame(userPreferences: UserPreferences): { gameTitle: string
       'automated-users',
       userPreferences.focus === 'single-player' ? 'single-player.json' : 'multiplayer.json'
     );
-    
+
     try {
       const content = fs.readFileSync(gameListPath, 'utf-8');
       const gameList: GameList = JSON.parse(content);
-      
+
       for (const [genre, genreGames] of Object.entries(gameList)) {
         if (genreGames.includes(randomGame)) {
           return { gameTitle: randomGame, genre };
@@ -394,7 +394,7 @@ function selectRandomGame(userPreferences: UserPreferences): { gameTitle: string
       console.error('Error finding game genre:', error);
     }
   }
-  
+
   // Fallback: return game with first genre
   return { gameTitle: randomGame, genre: genres[0] || 'unknown' };
 }
@@ -408,44 +408,44 @@ export async function askQuestion(
 ): Promise<ActivityResult> {
   try {
     await connectToMongoDB();
-    
+
     // Fetch previous questions from ALL automated users to ensure variety
     const automatedUsers = ['MysteriousMrEnter', 'WaywardJammer', 'InterdimensionalHipster'];
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    
+
     let previousQuestions: Array<{ question: string; gameTitle: string; timestamp: Date; username: string }> = [];
     let gamesAskedAbout: { [gameTitle: string]: number } = {};
     let questionTypes: { [type: string]: number } = {};
-    
+
     try {
       const Question = (await import('../models/Question')).default;
       const questionDocs = await Question.find({
         username: { $in: automatedUsers },
         timestamp: { $gte: thirtyDaysAgo }
       })
-      .sort({ timestamp: -1 })
-      .limit(100)
-      .lean() as any[];
-      
+        .sort({ timestamp: -1 })
+        .limit(100)
+        .lean() as any[];
+
       previousQuestions = questionDocs.map(q => ({
         question: q.question || '',
         gameTitle: q.detectedGame || 'Unknown',
         timestamp: new Date(q.timestamp),
         username: q.username
       }));
-      
+
       // Track which games have been asked about and how many times
       previousQuestions.forEach(q => {
         const gameLower = q.gameTitle.toLowerCase();
         gamesAskedAbout[gameLower] = (gamesAskedAbout[gameLower] || 0) + 1;
-        
+
         // Track question types (How, What, When, Which, Who, Where)
         const firstWord = q.question.trim().split(' ')[0]?.toLowerCase() || '';
         if (['how', 'what', 'when', 'which', 'who', 'where'].includes(firstWord)) {
           questionTypes[firstWord] = (questionTypes[firstWord] || 0) + 1;
         }
       });
-      
+
       console.log(`[ASK QUESTION] Found ${previousQuestions.length} previous questions from automated users`);
       console.log(`[ASK QUESTION] Games asked about: ${Object.keys(gamesAskedAbout).length} unique games`);
       console.log(`[ASK QUESTION] Question types: ${JSON.stringify(questionTypes)}`);
@@ -453,17 +453,17 @@ export async function askQuestion(
       console.error('[ASK QUESTION] Error fetching previous questions:', error);
       // Continue even if we can't fetch previous questions
     }
-    
+
     // Load available games from JSON files
     const { games } = loadGameList(userPreferences);
     console.log(`[ASK QUESTION] Loaded ${games.length} games from JSON files for ${username}`);
-    
+
     // Prioritize games that haven't been asked about recently (80% chance)
     // Or games that have been asked about fewer times
     const shouldPrioritizeNewGames = Math.random() < 0.8;
-    
+
     let gameSelection: { gameTitle: string; genre: string } | null = null;
-    
+
     if (shouldPrioritizeNewGames && games.length > 0) {
       // Find games that haven't been asked about (or asked about less frequently)
       // Normalize both the game list and the asked-about games for comparison
@@ -479,9 +479,9 @@ export async function askQuestion(
         // Prioritize games with 0-2 questions (not asked about much)
         return askCount < 3;
       });
-      
+
       console.log(`[ASK QUESTION] Games not asked about much: ${gamesNotAskedAbout.length} out of ${games.length}`);
-      
+
       if (gamesNotAskedAbout.length > 0) {
         // Select from games that haven't been asked about much
         const randomGame = gamesNotAskedAbout[Math.floor(Math.random() * gamesNotAskedAbout.length)];
@@ -494,7 +494,7 @@ export async function askQuestion(
         console.log(`[ASK QUESTION] All games have been asked about recently, will select from all games`);
       }
     }
-    
+
     // Fallback: select random game from preferences
     if (!gameSelection) {
       gameSelection = selectRandomGame(userPreferences);
@@ -507,23 +507,23 @@ export async function askQuestion(
       }
       console.log(`[ASK QUESTION] Selected game from preferences: ${gameSelection.gameTitle} (genre: ${gameSelection.genre})`);
     }
-    
+
     const { gameTitle, genre } = gameSelection;
-    
+
     // Filter previous questions to get relevant context
     // Include questions about the same game (for uniqueness) and questions about other games (for variety)
     const sameGameQuestions = previousQuestions
       .filter(q => q.gameTitle.toLowerCase() === gameTitle.toLowerCase())
       .map(q => q.question)
       .slice(0, 10); // Last 10 questions about this game
-    
+
     const otherGameQuestions = previousQuestions
       .filter(q => q.gameTitle.toLowerCase() !== gameTitle.toLowerCase())
       .map(q => q.question)
       .slice(0, 5); // Last 5 questions about other games
-    
+
     const allPreviousQuestions = [...sameGameQuestions, ...otherGameQuestions];
-    
+
     // Determine question type variety - try to use less common question types
     const questionTypeOrder = ['how', 'what', 'when', 'which', 'who', 'where'];
     const leastUsedTypes = questionTypeOrder
@@ -531,10 +531,10 @@ export async function askQuestion(
       .sort((a, b) => a.count - b.count)
       .slice(0, 3)
       .map(t => t.type);
-    
+
     console.log(`[ASK QUESTION] Previous questions about ${gameTitle}: ${sameGameQuestions.length}`);
     console.log(`[ASK QUESTION] Encouraging question types: ${leastUsedTypes.join(', ')}`);
-    
+
     // Generate natural question with previous questions context
     const question = await generateQuestion({
       gameTitle,
@@ -543,7 +543,7 @@ export async function askQuestion(
       previousQuestions: allPreviousQuestions,
       preferredQuestionTypes: leastUsedTypes
     });
-    
+
     // Check content moderation
     const contentCheck = await containsOffensiveContent(question, username);
     if (contentCheck.isOffensive) {
@@ -554,7 +554,7 @@ export async function askQuestion(
         details: { offendingWords: contentCheck.offendingWords }
       };
     }
-    
+
     // Call assistant API with retry logic and improved error handling
     const baseUrl = getBaseUrl();
     const apiUrl = `${baseUrl}/api/assistant`;
@@ -564,9 +564,9 @@ export async function askQuestion(
       question,
       userId: `auto-${username.toLowerCase()}-${Date.now()}`
     };
-    
+
     console.log(`[ASK QUESTION] Using baseUrl: ${baseUrl} for ${username}`);
-    
+
     try {
       const response = await withRetry(
         async () => {
@@ -589,7 +589,7 @@ export async function askQuestion(
         2000, // Base delay 2 seconds
         `askQuestion for ${username}`
       );
-      
+
       return {
         success: true,
         message: 'Question asked successfully',
@@ -610,17 +610,17 @@ export async function askQuestion(
         requestData: { ...requestData, question: question.substring(0, 100) + '...' }, // Truncate question for logging
         timeout: timeoutMs
       });
-      
+
       // Provide timeout-specific error message
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const isTimeout = errorMessage.includes('timeout') || 
-                       errorMessage.includes('ECONNABORTED') ||
-                       errorMessage.includes('ETIMEDOUT');
-      
+      const isTimeout = errorMessage.includes('timeout') ||
+        errorMessage.includes('ECONNABORTED') ||
+        errorMessage.includes('ETIMEDOUT');
+
       if (isTimeout) {
         throw new Error(`Request to assistant API timed out after ${timeoutMs}ms. The server may be overloaded or processing is taking longer than expected.`);
       }
-      
+
       throw error; // Re-throw to be caught by outer catch
     }
   } catch (error) {
@@ -647,10 +647,10 @@ async function createForumForGame(
 ): Promise<{ forumId: string; forumTitle: string; category: string } | null> {
   try {
     await connectToMongoDB();
-    
+
     // Available categories: speedruns, gameplay, mods, general, help
     const allCategories = ['speedruns', 'gameplay', 'mods', 'general', 'help'];
-    
+
     // Determine category: use preferredCategory if provided, otherwise select randomly
     let selectedCategory: string;
     if (preferredCategory && allCategories.includes(preferredCategory.toLowerCase())) {
@@ -666,12 +666,12 @@ async function createForumForGame(
         'help': 0.12,          // 12% - for questions/help
         'mods': 0.08           // 8% - less common, mainly for PC games
       };
-      
+
       // Select category based on weighted random
       const random = Math.random();
       let cumulative = 0;
       selectedCategory = 'gameplay'; // default
-      
+
       for (const [cat, weight] of Object.entries(categoryWeights)) {
         cumulative += weight;
         if (random <= cumulative) {
@@ -680,24 +680,24 @@ async function createForumForGame(
         }
       }
     }
-    
+
     // CRITICAL: Check if a forum with the same game AND category already exists
     // This prevents duplicate forums like "Story of Seasons - General Discussion" being created multiple times
     // BUT allows multiple forums per game as long as they have different categories
     const gameTitleNormalized = normalizeGameTitle(gameTitle);
-    
+
     // Find all active forums for this game (case-insensitive)
     const existingForums = await Forum.find({
       gameTitle: { $regex: new RegExp(`^${gameTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }, // Escape special regex chars, case-insensitive
       'metadata.status': 'active'
     }).lean() as any[];
-    
+
     // Check if any existing forum has the same category
     const existingForumWithCategory = existingForums.find((f: any) => {
       const forumCategory = (f.category || 'general').toLowerCase();
       return forumCategory === selectedCategory.toLowerCase();
     });
-    
+
     if (existingForumWithCategory) {
       console.log(`[FORUM CREATION] Forum already exists for ${gameTitle} with category ${selectedCategory}. Forum ID: ${existingForumWithCategory.forumId}`);
       // Return the existing forum info instead of creating a duplicate
@@ -707,10 +707,10 @@ async function createForumForGame(
         category: selectedCategory
       };
     }
-    
+
     // No forum exists for this game+category combination - we can create a new one
     console.log(`[FORUM CREATION] No forum exists for ${gameTitle} with category ${selectedCategory}. Found ${existingForums.length} forum(s) with other categories.`);
-    
+
     // Generate forum title based on category
     const categoryTitles: { [key: string]: string } = {
       'speedruns': `${gameTitle} - Speedruns`,
@@ -719,14 +719,14 @@ async function createForumForGame(
       'general': `${gameTitle} - General Discussion`,
       'help': `${gameTitle} - Help & Support`
     };
-    
+
     const forumTitle = categoryTitles[selectedCategory] || `${gameTitle} - General Discussion`;
-    
+
     console.log(`[FORUM CREATION] Creating forum for ${gameTitle} with category: ${selectedCategory}, title: ${forumTitle}`);
-    
+
     // Create forum directly in database (more reliable than HTTP)
     const forumId = `forum_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-    
+
     const newForum = new Forum({
       forumId,
       gameTitle,
@@ -744,11 +744,11 @@ async function createForumForGame(
         status: 'active'
       }
     });
-    
+
     await newForum.save();
-    
+
     console.log(`[FORUM CREATION] Successfully created forum ${forumId} in database`);
-    
+
     return {
       forumId,
       forumTitle,
@@ -783,8 +783,8 @@ function findSuitableForum(
   const gameTitleMatches = (forumGameTitle: string | undefined, targetGameTitle: string): boolean => {
     if (!forumGameTitle) return false;
     return forumGameTitle.toLowerCase() === targetGameTitle.toLowerCase() ||
-           forumGameTitle.toLowerCase().includes(targetGameTitle.toLowerCase()) ||
-           targetGameTitle.toLowerCase().includes(forumGameTitle.toLowerCase());
+      forumGameTitle.toLowerCase().includes(targetGameTitle.toLowerCase()) ||
+      targetGameTitle.toLowerCase().includes(forumGameTitle.toLowerCase());
   };
 
   // Helper function to check if categories match
@@ -796,7 +796,7 @@ function findSuitableForum(
 
   // Priority 1: Forums created by this user for the preferred game AND category
   if (preferredGameTitle) {
-    const userCreatedForumForGameAndCategory = forums.find((f: any) => 
+    const userCreatedForumForGameAndCategory = forums.find((f: any) =>
       f.createdBy === username &&
       gameTitleMatches(f.gameTitle, preferredGameTitle) &&
       categoryMatches(f.category, preferredCategory)
@@ -808,7 +808,7 @@ function findSuitableForum(
 
   // Priority 2: Any forum for the preferred game AND category (created by anyone)
   if (preferredGameTitle) {
-    const forumForGameAndCategory = forums.find((f: any) => 
+    const forumForGameAndCategory = forums.find((f: any) =>
       gameTitleMatches(f.gameTitle, preferredGameTitle) &&
       categoryMatches(f.category, preferredCategory)
     );
@@ -819,7 +819,7 @@ function findSuitableForum(
 
   // Priority 3: Forums created by this user for the preferred game (any category)
   if (preferredGameTitle) {
-    const userCreatedForumForGame = forums.find((f: any) => 
+    const userCreatedForumForGame = forums.find((f: any) =>
       f.createdBy === username &&
       gameTitleMatches(f.gameTitle, preferredGameTitle)
     );
@@ -830,7 +830,7 @@ function findSuitableForum(
 
   // Priority 4: Any forum for the preferred game (any category, created by anyone)
   if (preferredGameTitle) {
-    const forumForGame = forums.find((f: any) => 
+    const forumForGame = forums.find((f: any) =>
       gameTitleMatches(f.gameTitle, preferredGameTitle)
     );
     if (forumForGame) {
@@ -841,8 +841,8 @@ function findSuitableForum(
   // Priority 5: Any active forum (to encourage participation in existing discussions)
   // This includes forums created by others, promoting diversity
   // Filter to only include forums that are active and have some activity
-  const activeForums = forums.filter((f: any) => 
-    f.metadata?.status === 'active' && 
+  const activeForums = forums.filter((f: any) =>
+    f.metadata?.status === 'active' &&
     (f.metadata?.totalPosts > 0 || f.posts?.length > 0)
   );
   if (activeForums.length > 0) {
@@ -877,7 +877,7 @@ export async function createForumPost(
   try {
     // Connect to database and get forums directly (more reliable than HTTP calls)
     await connectToMongoDB();
-    
+
     // Get list of active forums directly from database
     let forums: any[] = [];
     try {
@@ -888,10 +888,10 @@ export async function createForumPost(
         ],
         'metadata.status': 'active'
       })
-      .sort({ 'metadata.lastActivityAt': -1 })
-      .limit(100)
-      .lean(); // Use lean() for better performance
-      
+        .sort({ 'metadata.lastActivityAt': -1 })
+        .limit(100)
+        .lean(); // Use lean() for better performance
+
       forums = forumDocs.map(forum => ({
         ...forum,
         metadata: {
@@ -901,25 +901,25 @@ export async function createForumPost(
           status: forum.metadata?.status || 'active'
         }
       }));
-      
+
       console.log(`[FORUM POST] Fetched ${forums.length} forums from database`);
     } catch (error) {
       console.error('[FORUM POST] Error fetching forums from database:', error);
       forums = [];
     }
-    
+
     // NEW LOGIC: Prioritize creating forums for games that DON'T have forums yet
     // Track which games already have forums (by game title, case-insensitive)
     // Also track which game+category combinations exist
     const gamesWithForums = new Set<string>();
     const forumCountsByGame: { [gameTitle: string]: number } = {};
     const gameCategoryCombinations = new Set<string>(); // Format: "gametitle|category"
-    
+
     // Normalize game title for consistent comparison
     const normalizeGameTitle = (title: string): string => {
       return title.toLowerCase().trim();
     };
-    
+
     forums.forEach((f: any) => {
       if (f.gameTitle && f.metadata?.status === 'active') {
         const gameTitleLower = normalizeGameTitle(f.gameTitle);
@@ -930,25 +930,25 @@ export async function createForumPost(
         gameCategoryCombinations.add(`${gameTitleLower}|${category}`);
       }
     });
-    
+
     console.log(`[FORUM POST] Games with existing forums: ${gamesWithForums.size}`);
     console.log(`[FORUM POST] Forum counts: ${JSON.stringify(forumCountsByGame)}`);
     console.log(`[FORUM POST] Game+category combinations: ${gameCategoryCombinations.size}`);
-    
+
     // Strategy: 70% chance to prioritize games WITHOUT forums or games missing specific categories (to create new forums)
     // 30% chance to post in existing forums (to maintain activity)
     const shouldPrioritizeNewForums = Math.random() < 0.7;
-    
+
     let gameSelection: { gameTitle: string; genre: string } | null = null;
     let selectedFromExistingForums = false;
     let shouldCreateNewForum = false;
-    
+
     if (shouldPrioritizeNewForums) {
       // PRIORITY: Find games from user preferences that DON'T have forums yet
       // OR games that don't have forums with all categories yet
       const { games } = loadGameList(userPreferences);
       console.log(`[FORUM POST] Available games from JSON files: ${games.length}`);
-      
+
       // Filter games that either:
       // 1. Don't have any forums yet, OR
       // 2. Have forums but are missing some categories (allows creating forums with different categories)
@@ -956,20 +956,20 @@ export async function createForumPost(
         const gameLower = normalizeGameTitle(game);
         const hasAnyForum = gamesWithForums.has(gameLower);
         const forumCount = forumCountsByGame[gameLower] || 0;
-        
+
         // If game has no forums at all, it needs a forum
         if (!hasAnyForum) {
           return true;
         }
-        
+
         // If game has forums but less than 5 (one per category), it can still get more forums
         // This allows multiple forums per game with different categories
         // We have 5 categories: speedruns, gameplay, mods, general, help
         return forumCount < 5;
       });
-      
+
       console.log(`[FORUM POST] Games needing forums: ${gamesNeedingForums.length} out of ${games.length}`);
-      
+
       if (gamesNeedingForums.length > 0) {
         // Select a random game that needs a forum
         const randomGame = gamesNeedingForums[Math.floor(Math.random() * gamesNeedingForums.length)];
@@ -983,7 +983,7 @@ export async function createForumPost(
         }
       }
     }
-    
+
     // If we didn't find a game without forums, try existing forums (40% chance or fallback)
     if (!gameSelection && forums.length > 0) {
       // Select a random game from existing forums
@@ -999,7 +999,7 @@ export async function createForumPost(
         }
       }
     }
-    
+
     // Final fallback: use user preferences (but still check if we should create a forum)
     if (!gameSelection) {
       gameSelection = selectRandomGame(userPreferences);
@@ -1017,9 +1017,9 @@ export async function createForumPost(
         console.log(`[FORUM POST] Selected game from preferences without forum: ${gameSelection.gameTitle} (will create new forum)`);
       }
     }
-    
+
     const { gameTitle, genre } = gameSelection;
-    
+
     // CRITICAL: Determine the category FIRST before checking for existing forums
     // This ensures we check for forums with the same game AND category
     // Available categories: speedruns, gameplay, mods, general, help
@@ -1031,12 +1031,12 @@ export async function createForumPost(
       'help': 0.12,          // 12% - for questions/help
       'mods': 0.08           // 8% - less common, mainly for PC games
     };
-    
+
     // Select category based on weighted random
     const random = Math.random();
     let cumulative = 0;
     let selectedCategory = 'gameplay'; // default
-    
+
     for (const [cat, weight] of Object.entries(categoryWeights)) {
       cumulative += weight;
       if (random <= cumulative) {
@@ -1044,21 +1044,21 @@ export async function createForumPost(
         break;
       }
     }
-    
+
     console.log(`[FORUM POST] Selected category: ${selectedCategory} for game: ${gameTitle}`);
-    
+
     // Now check if a forum exists for this game AND category
     // This prevents duplicate forums like "Story of Seasons - General Discussion" being created multiple times
     // BUT allows multiple forums per game as long as they have different categories
     let targetForum: any | null = null;
-    
+
     // Normalize game title for comparison
     const gameTitleNormalized = normalizeGameTitle(gameTitle);
     const categoryKey = `${gameTitleNormalized}|${selectedCategory}`;
-    
+
     // Check if this exact game+category combination already exists
     const hasExactMatch = gameCategoryCombinations.has(categoryKey);
-    
+
     if (hasExactMatch) {
       // Forum with this exact game+category already exists, find it and post to it
       targetForum = findSuitableForum(forums, username, gameTitle, selectedCategory);
@@ -1082,13 +1082,13 @@ export async function createForumPost(
         console.log(`[FORUM POST] No forum found for ${gameTitle} with category ${selectedCategory}, will create new forum`);
       }
     }
-    
+
     let forumId: string;
     let forumTitle: string;
     let actualGameTitle: string;
     let actualGenre: string;
     let forumCategory = selectedCategory; // Use the selected category
-    
+
     if (targetForum && !shouldCreateNewForum) {
       // Use existing forum
       forumId = targetForum.forumId || targetForum._id;
@@ -1106,7 +1106,7 @@ export async function createForumPost(
       // Create a new forum with the selected category
       console.log(`Creating new forum for ${gameTitle} with category ${selectedCategory}...`);
       const newForum = await createForumForGame(username, gameTitle, selectedCategory);
-      
+
       if (!newForum) {
         console.error(`[FORUM POST] Failed to create forum for ${gameTitle}. Check logs above for details.`);
         return {
@@ -1115,34 +1115,34 @@ export async function createForumPost(
           error: 'Forum creation failed - check server logs for details'
         };
       }
-      
+
       // If createForumForGame returned an existing forum (duplicate prevention), use that
       forumId = newForum.forumId;
       forumTitle = newForum.forumTitle;
       forumCategory = newForum.category;
       actualGameTitle = gameTitle;
       actualGenre = genre;
-      
+
       console.log(`Created new forum: ${forumTitle} (category: ${forumCategory})`);
     }
-    
+
     // IMPROVED: Fetch previous posts by ALL automated users to ensure uniqueness
     // This prevents similar content across different automated users
     const previousPosts: string[] = [];
     const previousPostsWithTimestamps: Array<{ post: string; timestamp: Date; gameTitle: string; username: string }> = [];
     const automatedUsers = ['MysteriousMrEnter', 'WaywardJammer', 'InterdimensionalHipster'];
-    
+
     try {
       // Collect all posts by ALL automated users from ALL forums (within last 30 days)
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      
+
       for (const forum of forums) {
         if (forum.posts && Array.isArray(forum.posts)) {
           const forumGameTitle = forum.gameTitle || '';
           const allAutomatedPosts = forum.posts
-            .filter((p: any) => 
+            .filter((p: any) =>
               automatedUsers.includes(p.username) && // Include ALL automated users
-              p.message && 
+              p.message &&
               p.message.trim().length > 0 &&
               p.metadata?.status === 'active' &&
               new Date(p.timestamp) > thirtyDaysAgo
@@ -1156,10 +1156,10 @@ export async function createForumPost(
           previousPostsWithTimestamps.push(...allAutomatedPosts);
         }
       }
-      
+
       // Sort by timestamp (most recent first)
       previousPostsWithTimestamps.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-      
+
       // Prioritize posts about the same game, but include all recent posts from all automated users
       const sameGamePosts = previousPostsWithTimestamps
         .filter(p => p.gameTitle.toLowerCase() === actualGameTitle.toLowerCase())
@@ -1167,15 +1167,15 @@ export async function createForumPost(
       const otherGamePosts = previousPostsWithTimestamps
         .filter(p => p.gameTitle.toLowerCase() !== actualGameTitle.toLowerCase())
         .map(p => p.post);
-      
+
       // Include up to 20 posts about the same game (from all automated users), and 10 posts about other games
       // This ensures we check for similarity across ALL automated users, not just the current one
       previousPosts.push(...sameGamePosts.slice(0, 20));
       previousPosts.push(...otherGamePosts.slice(0, 10));
-      
+
       const userPostsCount = previousPostsWithTimestamps.filter(p => p.username === username).length;
       const otherUsersPostsCount = previousPostsWithTimestamps.length - userPostsCount;
-      
+
       console.log(`Found ${previousPosts.length} recent posts by ALL automated users (${userPostsCount} by ${username}, ${otherUsersPostsCount} by others)`);
       console.log(`Posts about ${actualGameTitle}: ${sameGamePosts.length}, other games: ${otherGamePosts.length}`);
       if (previousPosts.length > 0) {
@@ -1185,31 +1185,129 @@ export async function createForumPost(
       console.error('Error fetching previous posts:', error);
       // Continue even if we can't fetch previous posts
     }
-    
+
     // Generate natural forum post using the actual game title from the forum
     // Note: forumCategory is already set above in the if/else block
+    // CRITICAL: We MUST generate a post - forums should never be created empty
     let postContent = '';
     let attempts = 0;
-    const maxAttempts = 3;
-    
-    // Try to generate a unique post (retry if it's too similar to previous posts)
-    while (attempts < maxAttempts) {
+    const maxAttempts = 5; // Increased attempts to ensure we get a post
+    let generationError: Error | null = null;
+    let foundUniquePost = false;
+
+    // Try to generate a unique post (retry if it's too similar to previous posts or if generation fails)
+    while (attempts < maxAttempts && !foundUniquePost) {
       attempts++;
-      
-      // Check if this is a COMMON gamer - use specialized function for issue posts
-      if (userPreferences.gamerProfile && userPreferences.gamerProfile.type === 'common') {
-        postContent = await generateCommonGamerPost({
-          gameTitle: actualGameTitle,
-          genre: actualGenre,
-          userPreferences,
-          forumTopic: forumTitle,
-          forumCategory: forumCategory,
-          previousPosts: previousPosts,
-          gamerProfile: userPreferences.gamerProfile,
-          username: username
-        });
-      } else {
-        // Use standard forum post generation for other users
+      postContent = ''; // Reset for each attempt
+
+      try {
+        // Check if this is a COMMON gamer - use specialized function for issue posts
+        if (userPreferences.gamerProfile && userPreferences.gamerProfile.type === 'common') {
+          postContent = await generateCommonGamerPost({
+            gameTitle: actualGameTitle,
+            genre: actualGenre,
+            userPreferences,
+            forumTopic: forumTitle,
+            forumCategory: forumCategory,
+            previousPosts: previousPosts,
+            gamerProfile: userPreferences.gamerProfile,
+            username: username
+          });
+        } else {
+          // Use standard forum post generation for other users
+          postContent = await generateForumPost({
+            gameTitle: actualGameTitle,
+            genre: actualGenre,
+            userPreferences,
+            forumTopic: forumTitle,
+            forumCategory: forumCategory,
+            previousPosts: previousPosts
+          });
+        }
+
+        // Validate the generated post
+        if (!postContent || postContent.trim().length < 20) {
+          console.warn(`[FORUM POST] Generated post is too short or empty (attempt ${attempts}/${maxAttempts}), retrying...`);
+          continue;
+        }
+      } catch (error) {
+        generationError = error instanceof Error ? error : new Error(String(error));
+        console.error(`[FORUM POST] Post generation failed (attempt ${attempts}/${maxAttempts}):`, generationError.message);
+
+        // If this is the last attempt, we'll use a fallback
+        if (attempts >= maxAttempts) {
+          break;
+        }
+
+        // Wait a bit before retrying (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+        continue;
+      }
+
+      // Check if the generated post is too similar to any previous post
+      // Use stricter similarity checking - check both word overlap and topic similarity
+      const isDuplicate = previousPosts.some((prevPost: string) => {
+        const similarity = calculateSimilarity(postContent.toLowerCase(), prevPost.toLowerCase());
+
+        // Also check for topic overlap (same game, similar themes)
+        const postWords = postContent.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+        const prevWords = prevPost.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+        const commonWords = postWords.filter(w => prevWords.includes(w));
+        const topicOverlap = commonWords.length / Math.max(postWords.length, prevWords.length);
+
+        // Check for specific topic/keyword overlap (chapters, mechanics, etc.)
+        const topicKeywords = ['chapter', 'level', 'area', 'boss', 'mechanic', 'tip', 'strategy', 'soundtrack', 'music', 'visual', 'atmosphere', 'vibe'];
+        const postHasTopicKeywords = topicKeywords.some(keyword => postContent.toLowerCase().includes(keyword));
+        const prevHasTopicKeywords = topicKeywords.some(keyword => prevPost.toLowerCase().includes(keyword));
+        const sameTopicKeywords = topicKeywords.filter(keyword =>
+          postContent.toLowerCase().includes(keyword) && prevPost.toLowerCase().includes(keyword)
+        );
+
+        // If both posts mention the same topic keywords, they're likely too similar
+        const hasSameTopicFocus = sameTopicKeywords.length > 0 && postHasTopicKeywords && prevHasTopicKeywords;
+
+        // Extract chapter/level numbers if mentioned
+        const postChapterMatch = postContent.match(/(?:chapter|level|area)\s*(\d+)/i);
+        const prevChapterMatch = prevPost.match(/(?:chapter|level|area)\s*(\d+)/i);
+        const sameChapter = postChapterMatch && prevChapterMatch && postChapterMatch[1] === prevChapterMatch[1];
+
+        // If similarity is high OR topic overlap is high OR same chapter/topic focus, consider it duplicate
+        // Lower thresholds for stricter uniqueness: 0.60 similarity, 0.30 topic overlap
+        return similarity > 0.60 || topicOverlap > 0.30 || (hasSameTopicFocus && similarity > 0.50) || sameChapter;
+      });
+
+      if (!isDuplicate) {
+        foundUniquePost = true; // Found a unique post
+        break;
+      }
+
+      console.warn(`[FORUM POST] Generated post is too similar to previous posts (attempt ${attempts}/${maxAttempts}), retrying...`);
+      console.warn(`[FORUM POST] Similarity check: post length=${postContent.length}, previous posts count=${previousPosts.length}`);
+
+      // Add the failed attempt to previous posts to avoid generating similar content
+      if (attempts < maxAttempts) {
+        previousPosts.push(postContent);
+      }
+
+      // Wait a bit before retrying
+      await new Promise(resolve => setTimeout(resolve, 500 * attempts));
+    }
+
+    // CRITICAL: If we still don't have a post after all attempts, try one final time with GPT-5.2
+    // This ensures we use the model with the best knowledge before falling back to a generic post
+    if (!postContent || postContent.trim().length < 20) {
+      console.error(`[FORUM POST] ⚠️ CRITICAL: Failed to generate post after ${maxAttempts} attempts!`);
+      console.error(`[FORUM POST] Last error:`, generationError?.message || 'Unknown error');
+      console.error(`[FORUM POST] Game: ${actualGameTitle}, Category: ${forumCategory}`);
+
+      // Final attempt: Try once more with generateForumPost (which will use GPT-5.2 if needed)
+      // This gives us one more chance with the full retry logic before falling back to generic post
+      console.log(`[FORUM POST] Making final attempt with generateForumPost to ensure game-specific content...`);
+      try {
+        const { generateForumPost } = await import('./automatedContentGenerator');
+
+        // Call generateForumPost one more time - it has built-in retry logic that will try GPT-5.2
+        // if GPT-4o fails, giving us the best chance for game-specific content
         postContent = await generateForumPost({
           gameTitle: actualGameTitle,
           genre: actualGenre,
@@ -1218,57 +1316,50 @@ export async function createForumPost(
           forumCategory: forumCategory,
           previousPosts: previousPosts
         });
+
+        if (postContent && postContent.trim().length >= 20) {
+          console.log(`[FORUM POST] ✅ Final GPT-5.2 attempt succeeded!`);
+        } else {
+          throw new Error('Final attempt returned empty or too short content');
+        }
+      } catch (finalError) {
+        console.error(`[FORUM POST] Final GPT-5.2 attempt also failed:`, finalError instanceof Error ? finalError.message : String(finalError));
+
+        // Last resort: Generate a safe, generic fallback that:
+        // 1. Mentions the correct game title (actualGameTitle)
+        // 2. Is relevant to the forum category (forumCategory)
+        // 3. Doesn't make up any game-specific details (no characters, items, mechanics, etc.)
+        // 4. Is clearly a discussion starter/question rather than making claims
+        // 5. Uses only the game title and category - no other game information
+
+        const categoryFallbacks: { [key: string]: string } = {
+          'gameplay': `I've been playing ${actualGameTitle} and wanted to discuss the gameplay. What are your thoughts on the game mechanics?`,
+          'speedruns': `Anyone here interested in speedrunning ${actualGameTitle}? I'd love to hear about different strategies and routes.`,
+          'mods': `I'm curious about mods for ${actualGameTitle}. Has anyone tried any interesting modifications?`,
+          'general': `Just started playing ${actualGameTitle} and wanted to share my experience. What do you all think about the game?`,
+          'help': `I'm playing ${actualGameTitle} and could use some help. Has anyone encountered similar issues or have tips to share?`
+        };
+
+        // Ensure we use the correct game title and category
+        const fallbackPost = categoryFallbacks[forumCategory] || categoryFallbacks['general'];
+
+        // Double-check: The fallback should only contain the game title, no other game-specific info
+        if (!fallbackPost.includes(actualGameTitle)) {
+          console.error(`[FORUM POST] ⚠️ FALLBACK ERROR: Fallback post doesn't include game title!`);
+          // Emergency fallback that definitely includes the game title
+          postContent = `I'm playing ${actualGameTitle} and wanted to discuss it here. What are your thoughts?`;
+        } else {
+          postContent = fallbackPost;
+        }
+
+        console.warn(`[FORUM POST] ⚠️ Using safe generic fallback post`);
+        console.warn(`[FORUM POST] Game: ${actualGameTitle}, Category: ${forumCategory}`);
+        console.warn(`[FORUM POST] This fallback is intentionally generic (no game-specific details) to ensure accuracy`);
       }
-      
-      // Check if the generated post is too similar to any previous post
-      // Use stricter similarity checking - check both word overlap and topic similarity
-      const isDuplicate = previousPosts.some((prevPost: string) => {
-        const similarity = calculateSimilarity(postContent.toLowerCase(), prevPost.toLowerCase());
-        
-        // Also check for topic overlap (same game, similar themes)
-        const postWords = postContent.toLowerCase().split(/\s+/).filter(w => w.length > 4);
-        const prevWords = prevPost.toLowerCase().split(/\s+/).filter(w => w.length > 4);
-        const commonWords = postWords.filter(w => prevWords.includes(w));
-        const topicOverlap = commonWords.length / Math.max(postWords.length, prevWords.length);
-        
-        // Check for specific topic/keyword overlap (chapters, mechanics, etc.)
-        const topicKeywords = ['chapter', 'level', 'area', 'boss', 'mechanic', 'tip', 'strategy', 'soundtrack', 'music', 'visual', 'atmosphere', 'vibe'];
-        const postHasTopicKeywords = topicKeywords.some(keyword => postContent.toLowerCase().includes(keyword));
-        const prevHasTopicKeywords = topicKeywords.some(keyword => prevPost.toLowerCase().includes(keyword));
-        const sameTopicKeywords = topicKeywords.filter(keyword => 
-          postContent.toLowerCase().includes(keyword) && prevPost.toLowerCase().includes(keyword)
-        );
-        
-        // If both posts mention the same topic keywords, they're likely too similar
-        const hasSameTopicFocus = sameTopicKeywords.length > 0 && postHasTopicKeywords && prevHasTopicKeywords;
-        
-        // Extract chapter/level numbers if mentioned
-        const postChapterMatch = postContent.match(/(?:chapter|level|area)\s*(\d+)/i);
-        const prevChapterMatch = prevPost.match(/(?:chapter|level|area)\s*(\d+)/i);
-        const sameChapter = postChapterMatch && prevChapterMatch && postChapterMatch[1] === prevChapterMatch[1];
-        
-        // If similarity is high OR topic overlap is high OR same chapter/topic focus, consider it duplicate
-        // Lower thresholds for stricter uniqueness: 0.60 similarity, 0.30 topic overlap
-        return similarity > 0.60 || topicOverlap > 0.30 || (hasSameTopicFocus && similarity > 0.50) || sameChapter;
-      });
-      
-      if (!isDuplicate) {
-        break; // Found a unique post
-      }
-      
-      console.warn(`Generated post is too similar to previous posts (attempt ${attempts}/${maxAttempts}), retrying...`);
-      console.warn(`Similarity check: post length=${postContent.length}, previous posts count=${previousPosts.length}`);
-      
-      // Add the failed attempt to previous posts to avoid generating similar content
-      if (attempts < maxAttempts) {
-        previousPosts.push(postContent);
-      }
+    } else if (attempts >= maxAttempts) {
+      console.warn(`[FORUM POST] Generated post after ${maxAttempts} attempts (may have similarity issues, but using it)`);
     }
-    
-    if (attempts >= maxAttempts) {
-      console.warn(`Failed to generate unique post after ${maxAttempts} attempts, using generated content anyway`);
-    }
-    
+
     // Check content moderation
     const contentCheck = await containsOffensiveContent(postContent, username);
     if (contentCheck.isOffensive) {
@@ -1279,14 +1370,14 @@ export async function createForumPost(
         details: { offendingWords: contentCheck.offendingWords }
       };
     }
-    
+
     // NEW: Search for relevant image from internet, with fallback to static images
     let imageUrl: string | null = null;
     let attachments: any[] = [];
-    
+
     // Check if image search is enabled
     const imageSearchEnabled = process.env.IMAGE_SEARCH_ENABLED !== 'false'; // Default to true
-    
+
     console.log(`[IMAGE SEARCH] Starting image search for forum post`, {
       username,
       gameTitle: actualGameTitle,
@@ -1296,7 +1387,7 @@ export async function createForumPost(
       hasGoogleEngineId: !!process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID,
       postContentLength: postContent.length
     });
-    
+
     if (imageSearchEnabled) {
       try {
         // Phase 2: Extract keywords using AI-powered extraction
@@ -1308,7 +1399,7 @@ export async function createForumPost(
           items: extractedKeywords.items,
           topics: extractedKeywords.topics
         });
-        
+
         // Build search keywords array for cache lookup (use all keywords)
         const allKeywords = [
           ...extractedKeywords.characters,
@@ -1316,7 +1407,7 @@ export async function createForumPost(
           ...extractedKeywords.items,
           ...extractedKeywords.topics
         ];
-        
+
         // Check cache first
         const cachedImage = getCachedImageSearch(actualGameTitle, allKeywords);
         if (cachedImage) {
@@ -1326,7 +1417,7 @@ export async function createForumPost(
           // Build optimized search query
           const searchQuery = buildSearchQuery(actualGameTitle, extractedKeywords);
           console.log(`[IMAGE SEARCH] Built search query: "${searchQuery}"`);
-          
+
           // Search for image using Google Custom Search API
           console.log(`[IMAGE SEARCH] Calling searchGameImage API...`);
           const searchResult = await searchGameImage({
@@ -1336,9 +1427,9 @@ export async function createForumPost(
             forumCategory: forumCategory,
             maxResults: 10
           });
-          
+
           console.log(`[IMAGE SEARCH] Search result:`, searchResult ? 'Found image' : 'No results');
-          
+
           // Verify relevance with enhanced verification
           if (searchResult) {
             const verification = verifyImageRelevance(
@@ -1347,7 +1438,7 @@ export async function createForumPost(
               actualGameTitle,
               extractedKeywords
             );
-            
+
             if (verification.isRelevant && verification.confidence >= 40) {
               // Download and store the image
               const downloadedPath = await downloadAndStoreImage(
@@ -1356,7 +1447,7 @@ export async function createForumPost(
                 allKeywords,
                 true // uploadToCloud
               );
-              
+
               if (downloadedPath) {
                 imageUrl = downloadedPath;
                 // Cache the result
@@ -1371,7 +1462,7 @@ export async function createForumPost(
           } else {
             console.log(`[IMAGE SEARCH] No search results found, trying fallback...`);
           }
-          
+
           // Fallback to Unsplash if Google search failed or had low relevance
           if (!imageUrl) {
             const unsplashResult = await searchGameImageUnsplash({
@@ -1381,7 +1472,7 @@ export async function createForumPost(
               forumCategory: forumCategory,
               maxResults: 10
             });
-            
+
             if (unsplashResult) {
               const downloadedPath = await downloadAndStoreImage(
                 unsplashResult.url,
@@ -1389,7 +1480,7 @@ export async function createForumPost(
                 allKeywords,
                 true
               );
-              
+
               if (downloadedPath) {
                 imageUrl = downloadedPath;
                 cacheImageSearch(actualGameTitle, allKeywords, downloadedPath);
@@ -1403,7 +1494,7 @@ export async function createForumPost(
         // Fall through to static image fallback
       }
     }
-    
+
     // Fallback to static images if search failed or is disabled
     if (!imageUrl) {
       console.log(`[IMAGE SEARCH] Using static image fallback for ${actualGameTitle}`);
@@ -1413,7 +1504,7 @@ export async function createForumPost(
         imageUrl = gameImage;
       }
     }
-    
+
     // Add image to attachments if found
     if (imageUrl) {
       // Record usage if it's a static image (internet images are already recorded)
@@ -1423,7 +1514,7 @@ export async function createForumPost(
       } else {
         recordImageUsage(username, actualGameTitle, imageUrl);
       }
-      
+
       // Add to attachments
       attachments.push({
         type: 'image',
@@ -1431,7 +1522,7 @@ export async function createForumPost(
         name: path.basename(imageUrl)
       });
     }
-    
+
     // Post to forum directly via database (more reliable than HTTP)
     try {
       const forum = await Forum.findOne({ forumId });
@@ -1442,7 +1533,7 @@ export async function createForumPost(
           error: 'Forum not found in database'
         };
       }
-      
+
       // Create new post
       const newPost = {
         _id: new mongoose.Types.ObjectId(),
@@ -1460,15 +1551,15 @@ export async function createForumPost(
           status: 'active'
         }
       };
-      
+
       // Add post to forum
       forum.posts.push(newPost);
       forum.metadata.totalPosts = (forum.metadata.totalPosts || 0) + 1;
       forum.metadata.lastActivityAt = new Date();
       await forum.save();
-      
+
       console.log(`[FORUM POST] Successfully added post to forum ${forumId}`);
-      
+
       return {
         success: true,
         message: 'Forum post created successfully',
@@ -1519,7 +1610,7 @@ export async function likePost(
       postId,
       username
     };
-    
+
     const response = await withRetry(
       async () => {
         return await withTimeout(
@@ -1541,7 +1632,7 @@ export async function likePost(
       1000, // Base delay 1 second
       `likePost for ${username}`
     );
-    
+
     return {
       success: true,
       message: 'Post liked successfully',
@@ -1561,17 +1652,17 @@ export async function likePost(
       requestData: { forumId, postId, username },
       timeout: 30000
     });
-    
+
     // Provide timeout-specific error message
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const isTimeout = errorMessage.includes('timeout') || 
-                     errorMessage.includes('ECONNABORTED') ||
-                     errorMessage.includes('ETIMEDOUT');
-    
+    const isTimeout = errorMessage.includes('timeout') ||
+      errorMessage.includes('ECONNABORTED') ||
+      errorMessage.includes('ETIMEDOUT');
+
     const userFriendlyMessage = isTimeout
       ? `Request to like post timed out after 30s. The server may be overloaded.`
       : `Failed to like post: ${errorMessage}`;
-    
+
     return {
       success: false,
       message: 'Failed to like post',
@@ -1608,7 +1699,7 @@ async function findPostToRespondTo(
   const priorityUsers = ['MysteriousMrEnter', 'WaywardJammer'];
   // Automated users list (to identify but not exclude real users)
   const automatedUsers = ['MysteriousMrEnter', 'WaywardJammer', 'InterdimensionalHipster'];
-  
+
   // Get list of COMMON gamers if responding user is EXPERT
   let commonGamers: string[] = [];
   if (isExpertGamer) {
@@ -1624,26 +1715,26 @@ async function findPostToRespondTo(
       console.error('[POST REPLY] Error getting COMMON gamers:', error);
     }
   }
-  
+
   // Filter forums that have posts
-  const forumsWithPosts = forums.filter((f: any) => 
+  const forumsWithPosts = forums.filter((f: any) =>
     f.posts && Array.isArray(f.posts) && f.posts.length > 0 &&
     f.metadata?.status === 'active'
   );
-  
+
   if (forumsWithPosts.length === 0) {
     return null;
   }
-  
+
   // PRIORITY 0 (HIGHEST): Find posts that @mention the responding user OR are replies to their posts
   // This ensures common/expert gamers respond to ALL users (real and automated) who mention them or reply to them
   for (const forum of forumsWithPosts) {
     const posts = forum.posts || [];
-    
+
     // Check for @mentions of the responding user
     const mentionPattern = new RegExp(`@${respondingUsername}\\b`, 'i');
     const mentionedPosts = posts
-      .filter((p: any) => 
+      .filter((p: any) =>
         p.username !== respondingUsername &&
         p.metadata?.status === 'active' &&
         p.message && mentionPattern.test(p.message)
@@ -1653,22 +1744,22 @@ async function findPostToRespondTo(
         const bTime = new Date(b.timestamp || 0).getTime();
         return bTime - aTime; // Most recent first
       });
-    
+
     if (mentionedPosts.length > 0) {
       // Check if we've already replied to this post
       const unrespondedMentions = mentionedPosts.filter((post: any) => {
-        const hasReplied = posts.some((p: any) => 
-          p.username === respondingUsername && 
+        const hasReplied = posts.some((p: any) =>
+          p.username === respondingUsername &&
           p.replyTo && p.replyTo.toString() === post._id?.toString()
         );
         return !hasReplied;
       });
-      
+
       if (unrespondedMentions.length > 0) {
         const post = unrespondedMentions[0]; // Most recent unresponded mention
         const postTime = new Date(post.timestamp);
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        
+
         if (postTime > sevenDaysAgo) {
           const genre = determineGenreFromGame(forum.gameTitle || forum.title);
           console.log(`[POST REPLY] ${respondingUsername} found @mention from ${post.username}`);
@@ -1681,17 +1772,17 @@ async function findPostToRespondTo(
         }
       }
     }
-    
+
     // Check for replies to posts made by the responding user
-    const userPosts = posts.filter((p: any) => 
+    const userPosts = posts.filter((p: any) =>
       p.username === respondingUsername &&
       p.metadata?.status === 'active'
     );
-    
+
     for (const userPost of userPosts) {
       // Find replies to this user's post
       const repliesToUserPost = posts
-        .filter((p: any) => 
+        .filter((p: any) =>
           p.username !== respondingUsername &&
           p.metadata?.status === 'active' &&
           p.replyTo && p.replyTo.toString() === userPost._id?.toString()
@@ -1701,23 +1792,23 @@ async function findPostToRespondTo(
           const bTime = new Date(b.timestamp || 0).getTime();
           return bTime - aTime; // Most recent first
         });
-      
+
       if (repliesToUserPost.length > 0) {
         // Check if we've already replied to this reply
         const unrespondedReplies = repliesToUserPost.filter((reply: any) => {
-          const hasReplied = posts.some((p: any) => 
-            p.username === respondingUsername && 
+          const hasReplied = posts.some((p: any) =>
+            p.username === respondingUsername &&
             p.replyTo && p.replyTo.toString() === reply._id?.toString() &&
             new Date(p.timestamp) > new Date(reply.timestamp)
           );
           return !hasReplied;
         });
-        
+
         if (unrespondedReplies.length > 0) {
           const reply = unrespondedReplies[0]; // Most recent unresponded reply
           const replyTime = new Date(reply.timestamp);
           const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-          
+
           if (replyTime > sevenDaysAgo) {
             const genre = determineGenreFromGame(forum.gameTitle || forum.title);
             console.log(`[POST REPLY] ${respondingUsername} found reply to their post from ${reply.username}`);
@@ -1732,22 +1823,22 @@ async function findPostToRespondTo(
       }
     }
   }
-  
+
   // Priority 1 (for EXPERT gamers): Find posts from COMMON gamers
   // This ensures EXPERT gamers help COMMON gamers with their issues
   if (isExpertGamer && commonGamers.length > 0) {
     for (const forum of forumsWithPosts) {
       const posts = forum.posts || [];
-      
+
       // Prioritize the COMMON gamer this EXPERT is mapped to help
-      const priorityCommonGamers = expertHelpsCommonGamer 
+      const priorityCommonGamers = expertHelpsCommonGamer
         ? [expertHelpsCommonGamer, ...commonGamers.filter(g => g !== expertHelpsCommonGamer)]
         : commonGamers;
-      
+
       for (const commonGamer of priorityCommonGamers) {
         // Find recent posts from this COMMON gamer
         const commonGamerPosts = posts
-          .filter((p: any) => 
+          .filter((p: any) =>
             p.username === commonGamer &&
             p.username !== respondingUsername &&
             p.metadata?.status === 'active'
@@ -1757,19 +1848,19 @@ async function findPostToRespondTo(
             const bTime = new Date(b.timestamp || 0).getTime();
             return bTime - aTime; // Most recent first
           });
-        
+
         for (const post of commonGamerPosts) {
           // Check if responding user has already replied to this post
-          const hasReplied = posts.some((p: any) => 
-            p.username === respondingUsername && 
+          const hasReplied = posts.some((p: any) =>
+            p.username === respondingUsername &&
             p.replyTo && p.replyTo.toString() === post._id?.toString()
           );
-          
+
           if (!hasReplied) {
             // Check if post is recent (within last 7 days)
             const postTime = new Date(post.timestamp);
             const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-            
+
             if (postTime > sevenDaysAgo) {
               const genre = determineGenreFromGame(forum.gameTitle || forum.title);
               console.log(`[POST REPLY] EXPERT ${respondingUsername} found COMMON gamer post from ${commonGamer}`);
@@ -1790,7 +1881,7 @@ async function findPostToRespondTo(
   // that haven't been responded to by the responding user
   for (const forum of forumsWithPosts) {
     const posts = forum.posts || [];
-    
+
     // Find posts from priority users that the responding user hasn't replied to
     for (const post of posts) {
       if (
@@ -1799,11 +1890,11 @@ async function findPostToRespondTo(
         post.metadata?.status === 'active'
       ) {
         // Check if responding user has already replied in this forum
-        const hasReplied = posts.some((p: any) => 
-          p.username === respondingUsername && 
+        const hasReplied = posts.some((p: any) =>
+          p.username === respondingUsername &&
           p.timestamp > post.timestamp
         );
-        
+
         if (!hasReplied) {
           // Try to determine genre from forum or game title
           const genre = determineGenreFromGame(forum.gameTitle || forum.title);
@@ -1817,7 +1908,7 @@ async function findPostToRespondTo(
       }
     }
   }
-  
+
   // Priority 2: Find any recent posts from other users (including real users, not just automated)
   // Sort forums by last activity
   const sortedForums = [...forumsWithPosts].sort((a: any, b: any) => {
@@ -1825,14 +1916,14 @@ async function findPostToRespondTo(
     const bTime = new Date(b.metadata?.lastActivityAt || 0).getTime();
     return bTime - aTime;
   });
-  
+
   for (const forum of sortedForums) {
     const posts = forum.posts || [];
-    
+
     // Get recent posts from other users (including real users)
     // Filter out posts from the responding user and inactive posts
     const recentPosts = posts
-      .filter((p: any) => 
+      .filter((p: any) =>
         p.username !== respondingUsername &&
         p.metadata?.status === 'active' &&
         p.message && p.message.trim().length > 0 // Ensure post has content
@@ -1843,31 +1934,31 @@ async function findPostToRespondTo(
         return bTime - aTime;
       })
       .slice(0, 20); // Check more posts to find good candidates
-    
+
     if (recentPosts.length > 0) {
       // Prefer posts from real users (not automated users) if available
       const realUserPosts = recentPosts.filter((p: any) => !automatedUsers.includes(p.username));
       const postsToConsider = realUserPosts.length > 0 ? realUserPosts : recentPosts;
-      
+
       // Pick a random post from the candidates
       const selectedPost = postsToConsider[Math.floor(Math.random() * postsToConsider.length)];
-      
+
       // Check if responding user has already replied to this specific post
       // Use a 12-hour window instead of 24 to allow more frequent engagement
       const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
       const postTime = new Date(selectedPost.timestamp);
-      
+
       // Allow responding to posts from the last 7 days (not just 12 hours)
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      
+
       if (postTime > sevenDaysAgo) {
         // Check if we've replied recently to this specific post (within 12 hours)
-        const hasRepliedRecently = posts.some((p: any) => 
-          p.username === respondingUsername && 
+        const hasRepliedRecently = posts.some((p: any) =>
+          p.username === respondingUsername &&
           new Date(p.timestamp) > postTime &&
           new Date(p.timestamp) > twelveHoursAgo
         );
-        
+
         if (!hasRepliedRecently) {
           const genre = determineGenreFromGame(forum.gameTitle || forum.title);
           return {
@@ -1880,7 +1971,7 @@ async function findPostToRespondTo(
       }
     }
   }
-  
+
   return null;
 }
 
@@ -1893,23 +1984,23 @@ function calculateSimilarity(str1: string, str2: string): number {
   const normalize = (s: string) => s.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
   const norm1 = normalize(str1);
   const norm2 = normalize(str2);
-  
+
   // Exact match check
   if (norm1 === norm2) {
     return 1.0;
   }
-  
+
   // Word-based similarity check
   const words1 = norm1.split(/\s+/).filter(w => w.length > 3); // Only consider words longer than 3 chars
   const words2 = norm2.split(/\s+/).filter(w => w.length > 3);
-  
+
   if (words1.length === 0 || words2.length === 0) {
     return 0;
   }
-  
+
   // Count common words (exact match)
   const commonWords = words1.filter(w => words2.includes(w));
-  
+
   // Also check for similar phrases (2-3 word sequences)
   const getPhrases = (words: string[], length: number) => {
     const phrases: string[] = [];
@@ -1918,20 +2009,20 @@ function calculateSimilarity(str1: string, str2: string): number {
     }
     return phrases;
   };
-  
+
   const phrases1_2 = getPhrases(words1, 2);
   const phrases2_2 = getPhrases(words2, 2);
   const commonPhrases = phrases1_2.filter(p => phrases2_2.includes(p));
-  
+
   // Calculate similarity with both word and phrase overlap
   const wordSimilarity = (commonWords.length * 2) / (words1.length + words2.length);
   const phraseSimilarity = phrases1_2.length > 0 && phrases2_2.length > 0
     ? (commonPhrases.length * 2) / (phrases1_2.length + phrases2_2.length)
     : 0;
-  
+
   // Weighted combination (phrases are more indicative of similarity)
   const similarity = (wordSimilarity * 0.4) + (phraseSimilarity * 0.6);
-  
+
   return Math.min(similarity, 1.0);
 }
 
@@ -1943,16 +2034,16 @@ function determineGenreFromGame(gameTitle: string): string {
   if (!gameTitle || gameTitle.trim().length === 0) {
     return 'adventure'; // Default fallback
   }
-  
+
   try {
     // Normalize game title for comparison (case-insensitive, trim whitespace)
     const normalizedTitle = gameTitle.trim().toLowerCase();
-    
+
     // Check single-player games FIRST (most games are single-player)
     const singlePlayerPath = path.join(process.cwd(), 'data', 'automated-users', 'single-player.json');
     const singlePlayerContent = fs.readFileSync(singlePlayerPath, 'utf-8');
     const singlePlayerGames: GameList = JSON.parse(singlePlayerContent);
-    
+
     for (const [genre, games] of Object.entries(singlePlayerGames)) {
       // Check for exact match first
       if (games.some(g => g.trim().toLowerCase() === normalizedTitle)) {
@@ -1968,12 +2059,12 @@ function determineGenreFromGame(gameTitle: string): string {
         return genre;
       }
     }
-    
+
     // Check multiplayer games SECOND (only if not found in single-player)
     const multiplayerPath = path.join(process.cwd(), 'data', 'automated-users', 'multiplayer.json');
     const multiplayerContent = fs.readFileSync(multiplayerPath, 'utf-8');
     const multiplayerGames: GameList = JSON.parse(multiplayerContent);
-    
+
     for (const [genre, games] of Object.entries(multiplayerGames)) {
       // Check for exact match first
       if (games.some(g => g.trim().toLowerCase() === normalizedTitle)) {
@@ -1992,7 +2083,7 @@ function determineGenreFromGame(gameTitle: string): string {
   } catch (error) {
     console.error('Error determining genre from game:', error);
   }
-  
+
   // Default to 'rpg' for unknown games (most common genre in our lists)
   console.warn(`Could not determine genre for game: ${gameTitle}, defaulting to 'rpg'`);
   return 'rpg';
@@ -2009,7 +2100,7 @@ export async function respondToForumPost(
   try {
     // Connect to database and get forums directly (more reliable than HTTP calls)
     await connectToMongoDB();
-    
+
     // Get list of active forums directly from database
     let forums: any[] = [];
     try {
@@ -2020,10 +2111,10 @@ export async function respondToForumPost(
         ],
         'metadata.status': 'active'
       })
-      .sort({ 'metadata.lastActivityAt': -1 })
-      .limit(100)
-      .lean();
-      
+        .sort({ 'metadata.lastActivityAt': -1 })
+        .limit(100)
+        .lean();
+
       forums = forumDocs.map(forum => ({
         ...forum,
         metadata: {
@@ -2033,7 +2124,7 @@ export async function respondToForumPost(
           status: forum.metadata?.status || 'active'
         }
       }));
-      
+
       console.log(`[POST REPLY] Fetched ${forums.length} forums from database`);
     } catch (error) {
       console.error('[POST REPLY] Error fetching forums from database:', error);
@@ -2043,12 +2134,12 @@ export async function respondToForumPost(
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
-    
+
     // Filter to only forums with posts
-    const forumsWithPosts = forums.filter((f: any) => 
+    const forumsWithPosts = forums.filter((f: any) =>
       f.metadata?.totalPosts > 0 || (f.posts && Array.isArray(f.posts) && f.posts.length > 0)
     );
-    
+
     if (forumsWithPosts.length === 0) {
       return {
         success: false,
@@ -2056,17 +2147,17 @@ export async function respondToForumPost(
         error: 'No posts available'
       };
     }
-    
+
     // Fetch full forum details with posts directly from database
     // Limit to first 10 forums to avoid too many database queries
     const forumsToCheck = forumsWithPosts.slice(0, 10);
     const forumsWithFullPosts: any[] = [];
-    
+
     for (const forum of forumsToCheck) {
       try {
         const forumId = forum.forumId || forum._id;
         const forumDoc = await Forum.findOne({ forumId }).lean() as any;
-        
+
         if (forumDoc && forumDoc.posts && Array.isArray(forumDoc.posts) && forumDoc.posts.length > 0) {
           forumsWithFullPosts.push({
             ...forumDoc,
@@ -2083,7 +2174,7 @@ export async function respondToForumPost(
         // Continue to next forum if this one fails
       }
     }
-    
+
     // If we don't have posts from database queries, try using posts from initial forums response
     if (forumsWithFullPosts.length === 0) {
       // Use forums that might have posts in the response
@@ -2093,7 +2184,7 @@ export async function respondToForumPost(
         }
       }
     }
-    
+
     if (forumsWithFullPosts.length === 0) {
       return {
         success: false,
@@ -2101,10 +2192,10 @@ export async function respondToForumPost(
         error: 'No posts available'
       };
     }
-    
+
     // Find a post to respond to
     const postToRespondTo = await findPostToRespondTo(forumsWithFullPosts, username);
-    
+
     if (!postToRespondTo) {
       return {
         success: false,
@@ -2112,16 +2203,16 @@ export async function respondToForumPost(
         error: 'No posts available'
       };
     }
-    
+
     const { forum, post, gameTitle, genre } = postToRespondTo;
     const forumId = forum.forumId || forum._id;
     const forumTitle = forum.title || forum.gameTitle || 'General Discussion';
     const forumCategory = forum.category || 'general';
     const originalPostAuthor = post.createdBy || post.username || 'Unknown';
     const originalPostContent = post.message;
-    
+
     console.log(`Responding to post by ${originalPostAuthor} in forum: ${forumTitle} (${gameTitle})`);
-    
+
     // Check if original post author is a COMMON gamer
     let isReplyingToCommonGamer = false;
     let commonGamerUsername = originalPostAuthor;
@@ -2135,10 +2226,10 @@ export async function respondToForumPost(
     } catch (error) {
       console.error('[POST REPLY] Error checking original author:', error);
     }
-    
+
     // Generate relevant reply
     let replyContent: string;
-    
+
     // If this is an EXPERT gamer replying to a COMMON gamer, use specialized function
     if (userPreferences.gamerProfile?.type === 'expert' && isReplyingToCommonGamer) {
       replyContent = await generateExpertGamerReply({
@@ -2163,13 +2254,13 @@ export async function respondToForumPost(
         forumCategory: forumCategory
       });
     }
-    
+
     // Prepend @mention if not already present (same logic as manual replies)
     const mentionPattern = new RegExp(`^@${originalPostAuthor}\\s+`, "i");
     if (!mentionPattern.test(replyContent.trim())) {
       replyContent = `@${originalPostAuthor} ${replyContent.trim()}`;
     }
-    
+
     // Check content moderation
     const contentCheck = await containsOffensiveContent(replyContent, username);
     if (contentCheck.isOffensive) {
@@ -2180,7 +2271,7 @@ export async function respondToForumPost(
         details: { offendingWords: contentCheck.offendingWords }
       };
     }
-    
+
     // Post reply to forum directly via database (more reliable than HTTP)
     try {
       const forumDoc = await Forum.findOne({ forumId });
@@ -2191,7 +2282,7 @@ export async function respondToForumPost(
           error: 'Forum not found in database'
         };
       }
-      
+
       // Create reply post
       // Find the original post in the forum document to get the proper ObjectId
       // This ensures we have the correct _id even if the post came from a lean() query
@@ -2206,7 +2297,7 @@ export async function respondToForumPost(
             const pIdStr = p._id.toString();
             return pIdStr === postIdStr;
           });
-          
+
           if (originalPost && originalPost._id) {
             // Use the ObjectId from the forum document (guaranteed to be correct)
             replyToId = originalPost._id;
@@ -2214,18 +2305,18 @@ export async function respondToForumPost(
           } else {
             // Fallback: try to convert the post._id we have
             // If it's already an ObjectId, use it; if it's a string, convert it
-            replyToId = typeof post._id === 'string' 
+            replyToId = typeof post._id === 'string'
               ? new mongoose.Types.ObjectId(post._id)
               : post._id instanceof mongoose.Types.ObjectId
-              ? post._id
-              : new mongoose.Types.ObjectId(post._id.toString());
+                ? post._id
+                : new mongoose.Types.ObjectId(post._id.toString());
             console.log(`[POST REPLY] Original post not found in forum, converted _id: ${replyToId.toString()}`);
           }
         } catch (error) {
           console.error(`[POST REPLY] Error finding/converting post._id: ${post._id}`, error);
           // Last resort: try to find by username, message, and timestamp
-          const originalPost = forumDoc.posts.find((p: any) => 
-            p.username === post.username && 
+          const originalPost = forumDoc.posts.find((p: any) =>
+            p.username === post.username &&
             p.message === post.message &&
             Math.abs(new Date(p.timestamp).getTime() - new Date(post.timestamp).getTime()) < 5000
           );
@@ -2237,7 +2328,7 @@ export async function respondToForumPost(
           }
         }
       }
-      
+
       const replyPost = {
         _id: new mongoose.Types.ObjectId(),
         username,
@@ -2254,17 +2345,17 @@ export async function respondToForumPost(
           status: 'active'
         }
       };
-      
+
       console.log(`[POST REPLY] Creating reply to post by ${originalPostAuthor}, replyTo ID: ${replyToId ? replyToId.toString() : 'null'}`);
-      
+
       // Add reply to forum
       forumDoc.posts.push(replyPost);
       forumDoc.metadata.totalPosts = (forumDoc.metadata.totalPosts || 0) + 1;
       forumDoc.metadata.lastActivityAt = new Date();
       await forumDoc.save();
-      
+
       console.log(`[POST REPLY] Successfully added reply to forum ${forumId}`);
-      
+
       return {
         success: true,
         message: 'Forum post reply created successfully',
@@ -2413,29 +2504,29 @@ export async function getUserPreferences(username: string): Promise<UserPreferen
   try {
     // Connect to database
     await connectToWingmanDB();
-    
+
     // Try to find user in database
     const user = await User.findOne({ username });
-    
+
     if (user && user.gamerProfile) {
       // User has a gamer profile - extract genres and focus from favorite games
       const genres: string[] = user.gamerProfile.favoriteGames.map((game: any) => String(game.genre));
       const uniqueGenresSet = new Set<string>(genres);
       const uniqueGenres: string[] = Array.from(uniqueGenresSet);
-      
+
       // Determine focus based on genres (single-player genres vs multiplayer genres)
       const singlePlayerGenres = ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer', 'Action', 'Horror', 'Stealth', 'Metroidvania'];
       const multiplayerGenres = ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox', 'FPS', 'MOBA', 'Sports'];
-      
+
       const hasSinglePlayer = uniqueGenres.some((g: string) => singlePlayerGenres.includes(g));
       const hasMultiplayer = uniqueGenres.some((g: string) => multiplayerGenres.includes(g));
-      
-      const focus = hasSinglePlayer && !hasMultiplayer 
-        ? 'single-player' 
-        : hasMultiplayer && !hasSinglePlayer 
-        ? 'multiplayer' 
-        : 'single-player'; // Default to single-player if mixed
-      
+
+      const focus = hasSinglePlayer && !hasMultiplayer
+        ? 'single-player'
+        : hasMultiplayer && !hasSinglePlayer
+          ? 'multiplayer'
+          : 'single-player'; // Default to single-player if mixed
+
       return {
         genres: uniqueGenres,
         focus: focus as 'single-player' | 'multiplayer',
@@ -2447,7 +2538,7 @@ export async function getUserPreferences(username: string): Promise<UserPreferen
             genre: game.genre,
             hoursPlayed: game.hoursPlayed,
             achievements: game.achievements || [],
-            ...(user.gamerProfile.type === 'common' 
+            ...(user.gamerProfile.type === 'common'
               ? { currentStruggles: game.currentStruggles || [] }
               : { expertise: game.expertise || [] }
             )
@@ -2456,14 +2547,14 @@ export async function getUserPreferences(username: string): Promise<UserPreferen
             traits: user.gamerProfile.personality.traits,
             communicationStyle: user.gamerProfile.personality.communicationStyle
           },
-          ...(user.gamerProfile.helpsCommonGamer 
+          ...(user.gamerProfile.helpsCommonGamer
             ? { helpsCommonGamer: user.gamerProfile.helpsCommonGamer }
             : {}
           )
         }
       };
     }
-    
+
     // Fallback to hardcoded preferences for original automated users
     if (username === 'MysteriousMrEnter') {
       return {
@@ -2482,7 +2573,7 @@ export async function getUserPreferences(username: string): Promise<UserPreferen
         focus: 'single-player' // Default focus, but can respond to both types
       };
     }
-    
+
     return null;
   } catch (error) {
     console.error('Error getting user preferences:', error);
