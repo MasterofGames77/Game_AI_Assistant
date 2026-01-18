@@ -200,6 +200,7 @@ const UserSchema = new Schema<IUser>({
     rhythmMaster: { type: Number, default: 0 },
     sandboxBuilder: { type: Number, default: 0 },
     shootemUpSniper: { type: Number, default: 0 },
+    rogueRenegade: { type: Number, default: 0 },
     totalQuestions: { type: Number, default: 0 },
     dailyExplorer: { type: Number, default: 0 },
     speedrunner: { type: Number, default: 0 },
@@ -246,8 +247,8 @@ const UserSchema = new Schema<IUser>({
   },
   // New subscription schema
   subscription: {
-    status: { 
-      type: String, 
+    status: {
+      type: String,
       enum: ['free_period', 'active', 'canceled', 'past_due', 'unpaid', 'expired', 'trialing'],
       default: 'expired'
     },
@@ -330,10 +331,10 @@ const UserSchema = new Schema<IUser>({
   // Challenge milestone rewards
   challengeRewards: [{
     milestone: { type: Number, required: true },
-    type: { 
-      type: String, 
+    type: {
+      type: String,
       enum: ['badge', 'title', 'icon', 'special'],
-      required: true 
+      required: true
     },
     name: { type: String, required: true },
     description: { type: String, required: true },
@@ -386,14 +387,14 @@ const UserSchema = new Schema<IUser>({
   },
   // Gamer profile for automated COMMON/EXPERT gamers
   gamerProfile: {
-    type: { 
-      type: String, 
+    type: {
+      type: String,
       enum: ['common', 'expert'],
       required: false
     },
-    skillLevel: { 
-      type: Number, 
-      min: 0, 
+    skillLevel: {
+      type: Number,
+      min: 0,
       max: 10,
       required: false
     },
@@ -446,7 +447,7 @@ UserSchema.index({ 'passwordResetCode': 1 });
 UserSchema.index({ 'lastPasswordResetRequest': 1 });
 
 // Method to check if user has active Pro access
-UserSchema.methods.hasActiveProAccess = function(): boolean {
+UserSchema.methods.hasActiveProAccess = function (): boolean {
   const now = new Date();
   const subscription = this.subscription;
   const currentPeriodEnd = subscription?.currentPeriodEnd;
@@ -482,9 +483,9 @@ UserSchema.methods.hasActiveProAccess = function(): boolean {
 };
 
 // Method to get subscription status for display
-UserSchema.methods.getSubscriptionStatus = function() {
+UserSchema.methods.getSubscriptionStatus = function () {
   const now = new Date();
-  
+
   // Check if user has Pro access (legacy or subscription-based)
   if (this.hasProAccess) {
     if (this.subscription?.earlyAccessGranted) {
@@ -492,7 +493,7 @@ UserSchema.methods.getSubscriptionStatus = function() {
         const daysUntilExpiration = Math.ceil(
           (this.subscription.earlyAccessEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
         );
-        
+
         return {
           type: 'free_period',
           status: 'Free Period Active',
@@ -510,10 +511,10 @@ UserSchema.methods.getSubscriptionStatus = function() {
         };
       }
     }
-    
-    if (this.subscription?.status === 'active' && 
-        this.subscription?.currentPeriodEnd && 
-        this.subscription.currentPeriodEnd > now) {
+
+    if (this.subscription?.status === 'active' &&
+      this.subscription?.currentPeriodEnd &&
+      this.subscription.currentPeriodEnd > now) {
       return {
         type: 'paid_active',
         status: 'Paid Subscription Active',
@@ -521,11 +522,11 @@ UserSchema.methods.getSubscriptionStatus = function() {
         canCancel: true
       };
     }
-    
-    if (this.subscription?.status === 'canceled' && 
-        this.subscription?.cancelAtPeriodEnd && 
-        this.subscription?.currentPeriodEnd && 
-        this.subscription.currentPeriodEnd > now) {
+
+    if (this.subscription?.status === 'canceled' &&
+      this.subscription?.cancelAtPeriodEnd &&
+      this.subscription?.currentPeriodEnd &&
+      this.subscription.currentPeriodEnd > now) {
       return {
         type: 'canceled_active',
         status: 'Subscription Canceled (Active Until Period End)',
@@ -533,7 +534,7 @@ UserSchema.methods.getSubscriptionStatus = function() {
         canReactivate: true
       };
     }
-    
+
     // If user has Pro access but no specific subscription data, show as active
     if (this.subscription?.status === 'active') {
       return {
@@ -543,7 +544,7 @@ UserSchema.methods.getSubscriptionStatus = function() {
         canCancel: true
       };
     }
-    
+
     // Legacy Pro users or users with Pro access but no subscription details
     return {
       type: 'paid_active',
@@ -552,7 +553,7 @@ UserSchema.methods.getSubscriptionStatus = function() {
       canCancel: true
     };
   }
-  
+
   return {
     type: 'no_subscription',
     status: 'No Active Subscription',
@@ -561,7 +562,7 @@ UserSchema.methods.getSubscriptionStatus = function() {
 };
 
 // Method to check if user can ask a question (usage limit check)
-UserSchema.methods.canAskQuestion = function(): {
+UserSchema.methods.canAskQuestion = function (): {
   allowed: boolean;
   reason?: string;
   questionsRemaining?: number;
@@ -575,13 +576,13 @@ UserSchema.methods.canAskQuestion = function(): {
 };
 
 // Method to record question usage
-UserSchema.methods.recordQuestionUsage = function(): void {
+UserSchema.methods.recordQuestionUsage = function (): void {
   // Question usage tracking is no longer needed now that all users have unlimited access.
   return;
 };
 
 // Method to get usage status for display
-UserSchema.methods.getUsageStatus = function(): {
+UserSchema.methods.getUsageStatus = function (): {
   questionsUsed: number;
   questionsRemaining: number;
   questionsLimit: number;
@@ -602,31 +603,31 @@ UserSchema.methods.getUsageStatus = function(): {
 };
 
 // Method to check if user needs a break reminder
-UserSchema.methods.shouldShowBreakReminder = function(): {
+UserSchema.methods.shouldShowBreakReminder = function (): {
   shouldShow: boolean;
   timeSinceLastBreak: number;
   timeSinceLastReminder: number;
   nextBreakIn?: number;
 } {
   const now = new Date();
-  
+
   // If health monitoring is disabled, don't show reminders
   if (!this.healthMonitoring?.breakReminderEnabled) {
     return { shouldShow: false, timeSinceLastBreak: 0, timeSinceLastReminder: 0 };
   }
-  
+
   const health = this.healthMonitoring;
   const breakInterval = health.breakIntervalMinutes || 45;
-  
+
   // If user is currently on a break, don't show reminders
   if (health.isOnBreak) {
     return { shouldShow: false, timeSinceLastBreak: 0, timeSinceLastReminder: 0 };
   }
-  
+
   // Calculate active session time since last break
   // Use session-based time tracking instead of wall clock time
   let timeSinceLastBreak = 0;
-  
+
   if (health.lastBreakTime) {
     // If user has taken a break, calculate time since then
     // But only count time when the application was actually active
@@ -645,16 +646,16 @@ UserSchema.methods.shouldShowBreakReminder = function(): {
     // No session start time, can't calculate
     return { shouldShow: false, timeSinceLastBreak: 0, timeSinceLastReminder: 0 };
   }
-  
+
   // Calculate time since last reminder
   const lastReminderTime = health.lastBreakReminder || new Date(0);
   const timeSinceLastReminder = Math.floor((now.getTime() - lastReminderTime.getTime()) / (1000 * 60));
-  
+
   // Show reminder if:
   // 1. It's been longer than the break interval since last break
   // 2. It's been at least 5 minutes since last reminder (to avoid spam)
   const shouldShow = timeSinceLastBreak >= breakInterval && timeSinceLastReminder >= 5;
-  
+
   return {
     shouldShow,
     timeSinceLastBreak,
@@ -664,9 +665,9 @@ UserSchema.methods.shouldShowBreakReminder = function(): {
 };
 
 // Method to start a break
-UserSchema.methods.startBreak = function(): void {
+UserSchema.methods.startBreak = function (): void {
   const now = new Date();
-  
+
   if (!this.healthMonitoring) {
     this.healthMonitoring = {
       breakReminderEnabled: true,
@@ -676,45 +677,45 @@ UserSchema.methods.startBreak = function(): void {
       healthTipsEnabled: true
     };
   }
-  
+
   // Initialize session start time if not set
   if (!this.healthMonitoring.lastSessionStart) {
     this.healthMonitoring.lastSessionStart = now;
   }
-  
+
   // Start break state
   this.healthMonitoring.isOnBreak = true;
   this.healthMonitoring.breakStartTime = now;
   this.healthMonitoring.lastBreakReminder = now;
-  
+
   // Don't update breakCount or lastBreakTime yet - that happens when break ends
 };
 
 // Method to end a break
-UserSchema.methods.endBreak = function(): void {
+UserSchema.methods.endBreak = function (): void {
   const now = new Date();
-  
+
   if (!this.healthMonitoring || !this.healthMonitoring.isOnBreak) {
     return; // Not on a break, nothing to do
   }
-  
+
   // End break state and record the completed break
   this.healthMonitoring.isOnBreak = false;
   this.healthMonitoring.lastBreakTime = now;
   this.healthMonitoring.breakCount += 1;
   this.healthMonitoring.breakStartTime = undefined;
-  
+
   // Don't reset session start time - the session continues after the break
   // Only reset session start if it's been more than 24 hours (handled in checkStatus)
 };
 
 // Legacy method for backward compatibility - now starts a break instead of completing one
-UserSchema.methods.recordBreak = function(): void {
+UserSchema.methods.recordBreak = function (): void {
   this.startBreak();
 };
 
 // Method to get health tips
-UserSchema.methods.getHealthTips = function(): string[] {
+UserSchema.methods.getHealthTips = function (): string[] {
   const tips = [
     "💡 Try the 20-20-20 rule: every 20 minutes, look at something 20 feet away for 20 seconds to give your eyes a break",
     "🤲 Don't forget to stretch your hands, wrists, and arms during breaks - your body will thank you later",
@@ -732,17 +733,17 @@ UserSchema.methods.getHealthTips = function(): string[] {
     "👥 Don't forget to maintain friendships and activities outside of gaming - real-world connections matter too",
     "🏃 Try to balance gaming with other hobbies and physical activities - variety keeps life interesting"
   ];
-  
+
   // Return 2-3 random tips
   const shuffled = tips.sort(() => 0.5 - Math.random());
   return shuffled.slice(0, 3);
 };
 
 // Method to update daily streak
-UserSchema.methods.updateStreak = function(): void {
+UserSchema.methods.updateStreak = function (): void {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  
+
   // Initialize streak if it doesn't exist
   if (!this.streak) {
     this.streak = {
@@ -752,11 +753,11 @@ UserSchema.methods.updateStreak = function(): void {
     };
     return;
   }
-  
-  const lastActivity = this.streak.lastActivityDate 
+
+  const lastActivity = this.streak.lastActivityDate
     ? new Date(this.streak.lastActivityDate)
     : null;
-  
+
   if (!lastActivity) {
     // First time tracking - start streak at 1
     this.streak.lastActivityDate = today;
@@ -764,10 +765,10 @@ UserSchema.methods.updateStreak = function(): void {
     this.streak.longestStreak = Math.max(this.streak.longestStreak || 0, 1);
     return;
   }
-  
+
   const lastActivityDate = new Date(lastActivity.getFullYear(), lastActivity.getMonth(), lastActivity.getDate());
   const daysDifference = Math.floor((today.getTime() - lastActivityDate.getTime()) / (1000 * 60 * 60 * 24));
-  
+
   if (daysDifference === 0) {
     // Same day - no change to streak
     return;
@@ -779,13 +780,13 @@ UserSchema.methods.updateStreak = function(): void {
     // Streak broken - reset to 1
     this.streak.currentStreak = 1;
   }
-  
+
   // Update last activity date
   this.streak.lastActivityDate = today;
 };
 
 // Method to ensure streak accurately reflects recent activity
-UserSchema.methods.syncStreakStatus = async function() {
+UserSchema.methods.syncStreakStatus = async function () {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 

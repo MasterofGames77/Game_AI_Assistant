@@ -80,6 +80,13 @@ export const DAILY_CHALLENGES: DailyChallenge[] = [
     criteria: { type: "genre", value: "fightingFanatic" },
     icon: "🥊",
   },
+  {
+    id: "rogue_renegade",
+    title: "Rogue Renegade",
+    description: "Ask about a rogue-like game",
+    criteria: { type: "genre", value: "rogueRenegade" },
+    icon: "🔥",
+  },
 
   // Interaction-based challenges
   {

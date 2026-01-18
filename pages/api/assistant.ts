@@ -1,4 +1,4 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import axios from 'axios';
 import connectToMongoDB from '../../utils/mongodb';
 import Question from '../../models/Question';
@@ -28,12 +28,14 @@ const measureLatency = async (operation: string, callback: () => Promise<any>, e
   const result = await callback();
   const end = performance.now();
   const latency = end - start;
-  
+
   // Only log if explicitly enabled or in development
   if (enableLogging || process.env.NODE_ENV === 'development') {
     // console.log(`${operation} latency: ${latency.toFixed(2)}ms`); // Commented out for production
+    // `operation` is intentionally included for log context (even when console logging is disabled).
+    void operation;
   }
-  
+
   return { result, latency };
 };
 
@@ -64,10 +66,10 @@ cacheManager.registerCache('GenreMappingCache', GENRE_MAPPING_CACHE);
 // Cache for user achievements to reduce database calls with LRU eviction
 const ACHIEVEMENT_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
 const ACHIEVEMENT_CACHE_MAX_SIZE = 2000; // Max 2000 users
-const userAchievementCache = new LRUCache<{ 
-  achievements: any[], 
+const userAchievementCache = new LRUCache<{
+  achievements: any[],
   hasProAccess: boolean,
-  lastChecked: number 
+  lastChecked: number
 }>(
   ACHIEVEMENT_CACHE_MAX_SIZE,
   ACHIEVEMENT_CACHE_TTL,
@@ -83,7 +85,7 @@ const REQUEST_DEDUP_TTL = 30 * 1000; // 30 seconds
 
 // Generic request deduplication function
 const deduplicateRequest = async <T>(
-  cacheKey: string, 
+  cacheKey: string,
   requestFn: () => Promise<T>,
   ttl: number = REQUEST_DEDUP_TTL
 ): Promise<T> => {
@@ -92,7 +94,7 @@ const deduplicateRequest = async <T>(
     // console.log(`Request deduplication: reusing pending request for ${cacheKey}`); // Commented out for production
     return pendingRequests.get(cacheKey) as Promise<T>;
   }
-  
+
   // Create new request
   const requestPromise = (async () => {
     try {
@@ -110,7 +112,7 @@ const deduplicateRequest = async <T>(
       }, ttl);
     }
   })();
-  
+
   pendingRequests.set(cacheKey, requestPromise);
   return requestPromise;
 };
@@ -128,7 +130,7 @@ const getCSVData = async () => {
     // console.log('CSV data served from cache'); // Commented out for production
     return csvDataCache;
   }
-  
+
   try {
     // console.log('CSV data loaded from file'); // Commented out for production
     const data = await readCSVFile(CSV_FILE_PATH);
@@ -208,7 +210,7 @@ const initializeGenreCache = () => {
     "No Man's Sky": "Survival",
     "Among Us": "Social Deduction",
   };
-  
+
   Object.entries(genreMapping).forEach(([game, genre]) => {
     GENRE_MAPPING_CACHE.set(game.toLowerCase(), genre);
   });
@@ -220,22 +222,22 @@ initializeGenreCache();
 // Cache cleanup function to prevent memory leaks
 const cleanupCache = () => {
   const now = Date.now();
-  
+
   // Clean up CSV cache (single value cache)
   if (csvDataCache && (now - csvDataCacheTime) > CSV_CACHE_TTL * 2) {
     csvDataCache = null;
     csvDataCacheTime = 0;
     // console.log('CSV cache cleaned up'); // Commented out for production
   }
-  
+
   // LRU caches handle their own cleanup, but we can trigger manual cleanup
   const genreRemoved = GENRE_MAPPING_CACHE.cleanup();
   const achievementRemoved = userAchievementCache.cleanup();
-  
+
   if (genreRemoved > 0 || achievementRemoved > 0) {
     // console.log(`Cache cleanup: ${genreRemoved} genre mappings, ${achievementRemoved} achievements removed`); // Commented out for production
   }
-  
+
   // Clean up request deduplication cache (remove completed requests)
   const pendingKeysToDelete: string[] = [];
   pendingRequests.forEach((promise, key) => {
@@ -244,9 +246,9 @@ const cleanupCache = () => {
       pendingKeysToDelete.push(key);
     });
   });
-  
+
   pendingKeysToDelete.forEach(key => pendingRequests.delete(key));
-  
+
   if (pendingKeysToDelete.length > 0) {
     // console.log(`Request deduplication cache cleaned up ${pendingKeysToDelete.length} entries`); // Commented out for production
   }
@@ -274,55 +276,55 @@ interface IGDBGame {
 // Function to fetch game information from IGDB API
 const fetchGamesFromIGDB = async (query: string): Promise<string | null> => {
   const cacheKey = `igdb:${query.toLowerCase().trim()}`;
-  
+
   return deduplicateRequest(cacheKey, async () => {
-  try {
-    const accessToken = await getClientCredentialsAccessToken();
-    // console.log('IGDB Access Token obtained:', accessToken ? 'Yes' : 'No'); // Commented out for production
+    try {
+      const accessToken = await getClientCredentialsAccessToken();
+      // console.log('IGDB Access Token obtained:', accessToken ? 'Yes' : 'No'); // Commented out for production
 
-    const headers = {
-      'Client-ID': process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID,
-      'Authorization': `Bearer ${accessToken}`
-    };
+      const headers = {
+        'Client-ID': process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID,
+        'Authorization': `Bearer ${accessToken}`
+      };
 
-    // Limit query to 255 characters (IGDB API limit)
-    const limitedQuery = query.length > 255 ? query.substring(0, 252) + '...' : query;
-    
-    // Sanitize the query to prevent injection
-    const sanitizedQuery = limitedQuery.replace(/['"\\]/g, '');
-    
-    // Modified IGDB query
-    const body = `
+      // Limit query to 255 characters (IGDB API limit)
+      const limitedQuery = query.length > 255 ? query.substring(0, 252) + '...' : query;
+
+      // Sanitize the query to prevent injection
+      const sanitizedQuery = limitedQuery.replace(/['"\\]/g, '');
+
+      // Modified IGDB query
+      const body = `
       search "${sanitizedQuery}";
       fields name,genres.name,platforms.name,release_dates.date,involved_companies.company.name,involved_companies.publisher,involved_companies.developer;
       limit 5;
     `;
 
-    // console.log('IGDB Request:', {
-    //   headers: {
-    //     'Client-ID': 'present',
-    //     'Authorization': 'Bearer present'
-    //   },
-    //   body: body
-    // }); // Commented out for production
+      // console.log('IGDB Request:', {
+      //   headers: {
+      //     'Client-ID': 'present',
+      //     'Authorization': 'Bearer present'
+      //   },
+      //   body: body
+      // }); // Commented out for production
 
-    const response = await axios.post('https://api.igdb.com/v4/games', body, { headers });
-    
-    if (response.data.length > 0) {
-      // Use the IGDBGame interface to type the response data
-      const games = response.data as IGDBGame[];
-      return `Found ${games.length} games matching your query.`;
-    } else {
-      return `No games found matching "${sanitizedQuery}"`;
+      const response = await axios.post('https://api.igdb.com/v4/games', body, { headers });
+
+      if (response.data.length > 0) {
+        // Use the IGDBGame interface to type the response data
+        const games = response.data as IGDBGame[];
+        return `Found ${games.length} games matching your query.`;
+      } else {
+        return `No games found matching "${sanitizedQuery}"`;
+      }
+    } catch (error: any) {
+      console.error('IGDB Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      return null; // Return null instead of throwing error to allow fallback to other sources
     }
-  } catch (error: any) {
-    console.error('IGDB Error details:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status
-    });
-    return null; // Return null instead of throwing error to allow fallback to other sources
-  }
   });
 };
 
@@ -338,36 +340,36 @@ interface RAWGGame {
 // Function to fetch game information from RAWG API
 const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
   const cacheKey = `rawg:${searchQuery.toLowerCase().trim()}`;
-  
-  return deduplicateRequest(cacheKey, async () => {
-  const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&search=${encodeURIComponent(searchQuery)}`;
-  try {
-    const response = await axios.get(url);
-    //console.log("RAWG API Response:", response.data); // Log the RAWG response data - commented out for production
-    if (response.data && response.data.results.length > 0) {
-      const games = response.data.results.map((game: RAWGGame) => ({
-        name: game.name,
-        released: game.released,
-        genres: game.genres?.map((genre: { name: string }) => genre.name).join(', ') || 'Genres not available',
-        platforms: game.platforms?.map((platform: { platform: { name: string } }) => platform.platform.name).join(', ') || 'Platforms not available',
-        url: `https://rawg.io/games/${game.slug}` // Construct the URL using the slug
-      }));
 
-      // Explicitly typing 'game' parameter here
-      return games.map((game: {
-        name: string;
-        released?: string;
-        genres: string;
-        platforms: string;
-        url: string;
-      }) => `${game.name} (Released: ${game.released ? new Date(game.released).toLocaleDateString() : 'N/A'}, Genres: ${game.genres}, Platforms: ${game.platforms}, URL: ${game.url})`).join('\n');
-    } else {
-      return `No games found related to ${searchQuery}.`;
+  return deduplicateRequest(cacheKey, async () => {
+    const url = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&search=${encodeURIComponent(searchQuery)}`;
+    try {
+      const response = await axios.get(url);
+      //console.log("RAWG API Response:", response.data); // Log the RAWG response data - commented out for production
+      if (response.data && response.data.results.length > 0) {
+        const games = response.data.results.map((game: RAWGGame) => ({
+          name: game.name,
+          released: game.released,
+          genres: game.genres?.map((genre: { name: string }) => genre.name).join(', ') || 'Genres not available',
+          platforms: game.platforms?.map((platform: { platform: { name: string } }) => platform.platform.name).join(', ') || 'Platforms not available',
+          url: `https://rawg.io/games/${game.slug}` // Construct the URL using the slug
+        }));
+
+        // Explicitly typing 'game' parameter here
+        return games.map((game: {
+          name: string;
+          released?: string;
+          genres: string;
+          platforms: string;
+          url: string;
+        }) => `${game.name} (Released: ${game.released ? new Date(game.released).toLocaleDateString() : 'N/A'}, Genres: ${game.genres}, Platforms: ${game.platforms}, URL: ${game.url})`).join('\n');
+      } else {
+        return `No games found related to ${searchQuery}.`;
+      }
+    } catch (error: any) {
+      console.error("Error fetching data from RAWG:", error.message);
+      return "Failed to fetch data from RAWG.";
     }
-  } catch (error: any) {
-    console.error("Error fetching data from RAWG:", error.message);
-    return "Failed to fetch data from RAWG.";
-  }
   });
 };
 
@@ -375,7 +377,7 @@ const fetchGamesFromRAWG = async (searchQuery: string): Promise<string> => {
 const fetchAndCombineGameData = async (question: string, answer: string): Promise<string> => {
   // Extract game name from question - handle both simple and enhanced questions
   let gameName = question.replace(/when (was|did) (.*?) (released|come out)/i, "$2").trim();
-  
+
   // If the question is enhanced (contains image context markers), extract just the game title part
   // Enhanced questions have format like: "Question\n\n[Context for identification: ...]"
   if (gameName.includes('\n\n[') || gameName.length > 200) {
@@ -389,7 +391,7 @@ const fetchAndCombineGameData = async (question: string, answer: string): Promis
       gameName = questionPart.replace(/when (was|did) (.*?) (released|come out)/i, "$2").trim();
     }
   }
-  
+
   // Limit game name to 100 characters (safety limit, IGDB will further limit to 255)
   if (gameName.length > 100) {
     gameName = gameName.substring(0, 97) + '...';
@@ -416,6 +418,32 @@ const fetchAndCombineGameData = async (question: string, answer: string): Promis
       return `${answer}\n\nAdditional details from our library:\n${formattedInfo}`;
     }
 
+    // Fallback enrichment: if our local CSV didn't match, use external sources (already fetched above).
+    const enrichmentParts: string[] = [];
+
+    if (
+      typeof rawgResponse === "string" &&
+      rawgResponse.trim() &&
+      !rawgResponse.toLowerCase().includes("failed to fetch")
+    ) {
+      // Keep this bounded so answers don't explode in size.
+      enrichmentParts.push(
+        `From RAWG:\n${rawgResponse.trim().slice(0, 1200)}${rawgResponse.length > 1200 ? "…" : ""}`
+      );
+    }
+
+    if (
+      typeof igdbResponse === "string" &&
+      igdbResponse.trim() &&
+      !igdbResponse.toLowerCase().includes("error")
+    ) {
+      enrichmentParts.push(`From IGDB:\n${igdbResponse.trim().slice(0, 600)}${igdbResponse.length > 600 ? "…" : ""}`);
+    }
+
+    if (enrichmentParts.length > 0) {
+      return `${answer}\n\nAdditional details from external sources:\n${enrichmentParts.join("\n\n")}`;
+    }
+
     return answer;
   } catch (error) {
     console.error("Error combining game data:", error);
@@ -432,12 +460,12 @@ const getGenreFromMapping = (gameTitle: string): string | null => {
 const extractGameTitle = (question: string): string => {
   // First, handle titles with colons and apostrophes
   const fullTitleMatch = question.match(/["']([^"']+)["']|[:]?\s([^:?]+?)(?:\s(?:chapter|level|stage|part|area|boss|item|character|section|location|quest)|\?|$)/i);
-  
+
   if (fullTitleMatch) {
     // Return the first captured group that isn't undefined
     return (fullTitleMatch[1] || fullTitleMatch[2]).trim();
   }
-  
+
   // Fallback to the original pattern if no match
   const match = question.match(/(?:guide|walkthrough|progress|unlock|strategy|find).*?\s(.*?)(?:\s(?:chapter|level|stage|part|area|boss|item|character|section|location|quest))/i);
   return match ? match[1].trim() : '';
@@ -447,17 +475,41 @@ const extractGameTitle = (question: string): string => {
 export const checkQuestionType = (question: string): string[] => {
   const lowerQuestion = question.toLowerCase();
   const detectedGenres = new Set<string>(); // Use Set for automatic deduplication
-  
+  // Track which specific terms triggered each achievement (for disambiguation)
+  const matchEvidence: Record<string, string[]> = {};
+
+  const escapeRegExp = (value: string) =>
+    value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  /**
+   * Keyword matching that avoids substring false positives.
+   * - For simple alphanumeric tokens: use word boundaries and allow common suffixes (s/es/ed/ing)
+   * - For multi-word / punctuation-heavy keywords: fall back to substring match
+   */
+  const hasKeyword = (text: string, keyword: string): boolean => {
+    const k = (keyword || "").toLowerCase().trim();
+    if (!k) return false;
+
+    // Phrases / punctuated tokens: substring match
+    if (!/^[a-z0-9]+$/i.test(k)) {
+      return text.includes(k);
+    }
+
+    // Single token: word boundary match + common suffixes
+    const re = new RegExp(`\\b${escapeRegExp(k)}(?:s|es|ed|ing)?\\b`, "i");
+    return re.test(text);
+  };
+
   // Early return for very short questions (less than 10 characters)
   if (lowerQuestion.length < 10) {
     // console.log('Question too short for genre detection:', question); // Commented out for production
     return [];
   }
-  
+
   // Comprehensive game title to genre mapping
   const platformerGames = [
-    'super mario bros', 'super mario world', 'super mario 64', 'super mario sunshine', 
-    'super mario galaxy', 'super mario odyssey', 'new super mario bros', 'donkey kong', 
+    'super mario bros', 'super mario world', 'super mario 64', 'super mario sunshine',
+    'super mario galaxy', 'super mario odyssey', 'new super mario bros', 'donkey kong',
     'crash bandicoot', 'spyro', 'rayman', 'sonic the hedgehog', 'sonic adventure',
     'hollow knight', 'celeste', 'ori', 'little big planet', 'ratchet', 'clank',
     'jak', 'daxter', 'sly cooper', 'banjo', 'kazooie', 'metroid',
@@ -472,10 +524,10 @@ export const checkQuestionType = (question: string): string[] => {
     'fallout', 'witcher', 'dark souls', 'elden ring', 'bloodborne', 'sekiro',
     'tales of', 'kingdom hearts', 'ni no kuni', 'dragon age', 'baldur\'s gate',
     'pillars of eternity', 'divinity', 'octopath traveler', 'bravely default',
-    'fire emblem', 'xenogears', 'xenosaga', 'saga', 'star ocean', 'ys', 'paper mario', 
+    'fire emblem', 'xenogears', 'xenosaga', 'saga', 'star ocean', 'ys', 'paper mario',
     'mario & luigi', 'triangle strategy', 'mega man battle network', 'mega man star force',
     'hades', 'mana', 'rune factory', 'skies of arcadia', 'shining force', 'phantasy star',
-    'lufia', 'mother', 'earthbound', 'super mario rpg'
+    'lufia', 'mother', 'earthbound', 'super mario rpg', 'mystery dungeon'
   ];
 
   const actionGames = [
@@ -590,13 +642,31 @@ export const checkQuestionType = (question: string): string[] => {
     'sayonara wild hearts', 'fuser'
   ];
 
-  const sandboxGames = [ 'minecraft', 'garry\'s mod', 'roblox', 'lego', 'terraria', 'teardown',
+  const sandboxGames = ['minecraft', 'garry\'s mod', 'roblox', 'lego', 'terraria', 'teardown',
     'no man\'s sky', 'valheim', 'astroneer', 'besiege', 'unturned'
   ];
 
-  const shootemUpGames = [ 'Gunstar Heroes', 'gradius', 'Enter the Gungeon', 'Ikaruga', 'Radiant Silvergun', 'DoDonPachi',
+  const shootemUpGames = ['Gunstar Heroes', 'gradius', 'Enter the Gungeon', 'Ikaruga', 'Radiant Silvergun', 'DoDonPachi',
     'Thunder Force', 'Fantasy Zone', 'Magical Chase', 'Centipede', 'Galaxian', 'Metal Slug', 'Contra', 'Steel Empire',
     'Paradius', 'Darius', 'Space Invaders', 'Raiden', 'Shock Troopers'
+  ];
+
+  const roguelikeGames = [
+    'hades',
+    'hades ii',
+    'the binding of isaac',
+    'binding of isaac',
+    'risk of rain',
+    'dead cells',
+    'balatro',
+    'slay the spire',
+    'into the breach',
+    'ftl: faster than light',
+    'vampire survivors',
+    'against the storm',
+    // Roguelike dungeon-crawler RPGs
+    'pokemon mystery dungeon',
+    'mystery dungeon',
   ];
 
   // Check for genre keywords in the question
@@ -609,7 +679,8 @@ export const checkQuestionType = (question: string): string[] => {
     actionAficionado: ['action', 'combat', 'combo', 'fight', 'hack and slash', 'battle system'],
     battleRoyaleMaster: ['battle royale', 'fortnite', 'pubg', 'last man standing', 'battle pass'],
     sportsChampion: ['sports', 'score', 'tournament', 'championship', 'league', 'competition', 'event'],
-    adventureAddict: ['adventure', 'explore', 'open world', 'quest', 'story'],
+    // include variants since hasKeyword() uses word boundaries
+    adventureAddict: ['adventure', 'explore', 'exploring', 'exploration', 'open world', 'quest', 'quests', 'story', 'stories'],
     shooterSpecialist: ['shooter', 'fps', 'first person shooter', 'third person shooter', 'aim', 'gun', 'shooting'],
     simulationSpecialist: ['simulation', 'sim', 'management', 'construction', 'management simulation', 'town', 'city'],
     fightingFanatic: ['fighting', 'combo', 'cancel', 'air dodge', 'frame', 'mixup', 'throw', 'hit stun', 'stun lock', 'block'],
@@ -622,7 +693,23 @@ export const checkQuestionType = (question: string): string[] => {
     beatEmUpBrawler: ['brawler', 'side-scrolling', 'frame advantage', 'belt-scroll', 'pressure', 'dash'],
     rhythmMaster: ['rhythm', 'music', 'beat', 'dance', 'song', 'beatmap', 'notes', 'streams', 'beats per minute'],
     sandboxBuilder: ['sandbox', 'build', 'construct', 'create', 'world', 'craft', 'creative', 'free-form gameplay', 'design', 'materials'],
-    shootemUpSniper: ['fixed shooter, side-scrolling shooter, vertical shooter, top-down shooter, run and gun', 'multidirectional shooter']
+    shootemUpSniper: ['fixed shooter, side-scrolling shooter, vertical shooter, top-down shooter, run and gun', 'multidirectional shooter'],
+    rogueRenegade: [
+      'roguelike',
+      'rogue-like',
+      'roguelite',
+      'rogue-lite',
+      'dungeon crawler',
+      'procedural',
+      'procedurally generated',
+      'randomized',
+      'randomly generated',
+      'permadeath',
+      'perma-death',
+      'run-based',
+      'run based',
+      'replayability'
+    ]
   };
 
   // Check all game genres and collect all matches
@@ -646,18 +733,28 @@ export const checkQuestionType = (question: string): string[] => {
     { games: rhythmGames, achievement: 'rhythmMaster' },
     { games: platformerGames, achievement: 'platformerPro' },
     { games: sandboxGames, achievement: 'sandboxBuilder' },
-    { games: shootemUpGames, achievement: 'shootemUpSniper' }
+    { games: shootemUpGames, achievement: 'shootemUpSniper' },
+    { games: roguelikeGames, achievement: 'rogueRenegade' }
   ];
 
   for (const check of genreChecks) {
-    if (check.games.some((game: string) => lowerQuestion.includes(game))) {
+    let matchedTerm: string | undefined;
+    for (const game of check.games) {
+      const gameLower = String(game).toLowerCase();
+      if (gameLower && lowerQuestion.includes(gameLower)) {
+        matchedTerm = gameLower;
+        break;
+      }
+    }
+    if (matchedTerm) {
       detectedGenres.add(check.achievement);
+      (matchEvidence[check.achievement] ||= []).push(matchedTerm);
     }
   }
 
   // Check for genre keywords and add them
   for (const [achievement, keywords] of Object.entries(genreKeywords)) {
-    if (keywords.some(keyword => lowerQuestion.includes(keyword))) {
+    if (keywords.some((keyword) => hasKeyword(lowerQuestion, keyword))) {
       detectedGenres.add(achievement);
     }
   }
@@ -676,6 +773,59 @@ export const checkQuestionType = (question: string): string[] => {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Disambiguation safeguards
+  //
+  // Problem: some single-word game names (e.g. "destiny") can appear as common
+  // nouns inside other games’ locations/items (e.g. "Destiny Tower" in PMD).
+  // That can incorrectly award genre achievements (and thus daily challenges).
+  //
+  // Solution: if a genre match was triggered *only* by ambiguous terms, and we
+  // also detected another "core genre" signal, drop the ambiguous one.
+  // ---------------------------------------------------------------------------
+  const CORE_GENRE_ACHIEVEMENTS = new Set([
+    'platformerPro',
+    'rpgEnthusiast',
+    'strategySpecialist',
+    'actionAficionado',
+    'survivalSpecialist',
+    'sportsChampion',
+    'adventureAddict',
+    'fightingFanatic',
+    'shooterSpecialist',
+    'simulationSpecialist',
+    'puzzlePro',
+    'racingRenegade',
+    'stealthExpert',
+    'horrorHero',
+    'storySeeker',
+    'beatEmUpBrawler',
+    'rhythmMaster',
+    'sandboxBuilder',
+    'battleRoyaleMaster',
+    'shootemUpSniper',
+    'rogueRenegade'
+  ]);
+
+  const hasOtherCoreGenre = Array.from(detectedGenres).some(
+    (g) => g !== 'shooterSpecialist' && CORE_GENRE_ACHIEVEMENTS.has(g)
+  );
+
+  const shooterEvidence = matchEvidence['shooterSpecialist'] || [];
+  const AMBIGUOUS_SHOOTER_TERMS = new Set([
+    // "Destiny Tower" is a Pokémon Mystery Dungeon location; "destiny" alone is ambiguous.
+    'destiny',
+    // Portal is a puzzle game; the word can also be used generically.
+    'portal',
+  ]);
+  const shooterIsAmbiguousOnly =
+    shooterEvidence.length > 0 &&
+    shooterEvidence.every((t) => AMBIGUOUS_SHOOTER_TERMS.has(t));
+
+  if (shooterIsAmbiguousOnly && hasOtherCoreGenre) {
+    detectedGenres.delete('shooterSpecialist');
+  }
+
   // Remove duplicates and return
   const uniqueGenres: string[] = Array.from(detectedGenres);
   return uniqueGenres;
@@ -689,16 +839,16 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
   const now = Date.now();
   const cacheKey = username;
   const cached = userAchievementCache.get(cacheKey);
-  
+
   // Use cache if available (LRU cache handles TTL automatically)
   if (cached && (now - cached.lastChecked) < ACHIEVEMENT_CACHE_TTL) {
     // console.log('Using cached achievement data for user:', username); // Commented out for production
     const currentAchievements = cached.achievements;
     const hasProAccess = cached.hasProAccess;
-    
+
     // Check if any new achievements can be earned with current progress
     const newAchievements: { name: string; dateEarned: Date }[] = [];
-    
+
     // Check each achievement condition using cached data
     const achievementChecks = [
       { name: 'RPG Enthusiast', field: 'rpgEnthusiast', threshold: 5 },
@@ -722,17 +872,18 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
       { name: 'Beat Em Up Brawler', field: 'beatEmUpBrawler', threshold: 5 },
       { name: 'Rhythm Master', field: 'rhythmMaster', threshold: 5 },
       { name: 'Sandbox Builder', field: 'sandboxBuilder', threshold: 5 },
-      { name: 'Shootem Up Sniper', field: 'shootemUpSniper', threshold: 5 }
+      { name: 'Shootem Up Sniper', field: 'shootemUpSniper', threshold: 5 },
+      { name: 'Rogue Renegade', field: 'rogueRenegade', threshold: 5 }
     ];
 
     // Check each achievement
     for (const check of achievementChecks) {
       const progressValue = progress[check.field] || 0;
-      if (progressValue >= check.threshold && 
-          !currentAchievements.some((a: { name: string; }) => a.name === check.name)) {
-        newAchievements.push({ 
-          name: check.name, 
-          dateEarned: new Date() 
+      if (progressValue >= check.threshold &&
+        !currentAchievements.some((a: { name: string; }) => a.name === check.name)) {
+        newAchievements.push({
+          name: check.name,
+          dateEarned: new Date()
         });
         // console.log(`Achievement earned: ${check.name}`); // Commented out for production
       }
@@ -741,9 +892,9 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
     // Check Pro achievements if user has Pro access
     if (hasProAccess) {
       const proAchievementChecks = [
-        { 
-          name: 'Game Master', 
-          field: 'proAchievements.gameMaster', 
+        {
+          name: 'Game Master',
+          field: 'proAchievements.gameMaster',
           threshold: 10,
           condition: () => {
             const genreCounts = Object.entries(progress)
@@ -753,39 +904,39 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
             return genreCounts >= 5;
           }
         },
-        { 
-          name: 'Speed Demon', 
-          field: 'proAchievements.speedDemon', 
+        {
+          name: 'Speed Demon',
+          field: 'proAchievements.speedDemon',
           threshold: 20,
           condition: () => progress.totalQuestions >= 100
         },
-        { 
-          name: 'Community Leader', 
-          field: 'proAchievements.communityLeader', 
+        {
+          name: 'Community Leader',
+          field: 'proAchievements.communityLeader',
           threshold: 15,
           condition: () => progress.totalQuestions >= 200
         },
-        { 
-          name: 'Achievement Hunter', 
-          field: 'proAchievements.achievementHunter', 
+        {
+          name: 'Achievement Hunter',
+          field: 'proAchievements.achievementHunter',
           threshold: 1,
           condition: () => currentAchievements.length >= 15
         },
-        { 
-          name: 'Pro Streak', 
-          field: 'proAchievements.proStreak', 
+        {
+          name: 'Pro Streak',
+          field: 'proAchievements.proStreak',
           threshold: 7,
           condition: () => progress.dailyExplorer >= 7
         },
-        { 
-          name: 'Expert Advisor', 
-          field: 'proAchievements.expertAdvisor', 
+        {
+          name: 'Expert Advisor',
+          field: 'proAchievements.expertAdvisor',
           threshold: 50,
           condition: () => progress.totalQuestions >= 500
         },
-        { 
-          name: 'Genre Specialist', 
-          field: 'proAchievements.genreSpecialist', 
+        {
+          name: 'Genre Specialist',
+          field: 'proAchievements.genreSpecialist',
           threshold: 1,
           condition: () => {
             const maxGenre = Object.entries(progress)
@@ -794,20 +945,20 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
             return maxGenre >= 20;
           }
         },
-        { 
-          name: 'Pro Contributor', 
-          field: 'proAchievements.proContributor', 
+        {
+          name: 'Pro Contributor',
+          field: 'proAchievements.proContributor',
           threshold: 1,
           condition: () => progress.totalQuestions >= 1000
         }
       ];
 
       for (const check of proAchievementChecks) {
-        if (check.condition() && 
-            !currentAchievements.some((a: { name: string; }) => a.name === check.name)) {
-          newAchievements.push({ 
-            name: check.name, 
-            dateEarned: new Date() 
+        if (check.condition() &&
+          !currentAchievements.some((a: { name: string; }) => a.name === check.name)) {
+          newAchievements.push({
+            name: check.name,
+            dateEarned: new Date()
           });
           // console.log(`Pro achievement earned: ${check.name}`); // Commented out for production
         }
@@ -861,19 +1012,20 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
     { name: 'Beat Em Up Brawler', field: 'beatEmUpBrawler', threshold: 5 },
     { name: 'Rhythm Master', field: 'rhythmMaster', threshold: 5 },
     { name: 'Sandbox Builder', field: 'sandboxBuilder', threshold: 5 },
-    { name: 'Shootem Up Sniper', field: 'shootemUpSniper', threshold: 5 }
+    { name: 'Shootem Up Sniper', field: 'shootemUpSniper', threshold: 5 },
+    { name: 'Rogue Renegade', field: 'rogueRenegade', threshold: 5 }
   ];
 
   // Check each achievement
   for (const check of achievementChecks) {
     const progressValue = progress[check.field] || 0;
     // console.log(`Checking ${check.name}: ${progressValue}/${check.threshold}`); // Commented out for production
-    
-    if (progressValue >= check.threshold && 
-        !currentAchievements.some((a: { name: string; }) => a.name === check.name)) {
-      newAchievements.push({ 
-        name: check.name, 
-        dateEarned: new Date() 
+
+    if (progressValue >= check.threshold &&
+      !currentAchievements.some((a: { name: string; }) => a.name === check.name)) {
+      newAchievements.push({
+        name: check.name,
+        dateEarned: new Date()
       });
       // console.log(`Achievement earned: ${check.name}`); // Commented out for production
     }
@@ -882,9 +1034,9 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
   // Check Pro achievements if user has Pro access
   if (user?.hasProAccess) {
     const proAchievementChecks = [
-      { 
-        name: 'Game Master', 
-        field: 'proAchievements.gameMaster', 
+      {
+        name: 'Game Master',
+        field: 'proAchievements.gameMaster',
         threshold: 10,
         condition: () => {
           const genreCounts = Object.entries(progress)
@@ -894,39 +1046,39 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
           return genreCounts >= 5;
         }
       },
-      { 
-        name: 'Speed Demon', 
-        field: 'proAchievements.speedDemon', 
+      {
+        name: 'Speed Demon',
+        field: 'proAchievements.speedDemon',
         threshold: 20,
         condition: () => progress.totalQuestions >= 100
       },
-      { 
-        name: 'Community Leader', 
-        field: 'proAchievements.communityLeader', 
+      {
+        name: 'Community Leader',
+        field: 'proAchievements.communityLeader',
         threshold: 15,
         condition: () => progress.totalQuestions >= 200
       },
-      { 
-        name: 'Achievement Hunter', 
-        field: 'proAchievements.achievementHunter', 
+      {
+        name: 'Achievement Hunter',
+        field: 'proAchievements.achievementHunter',
         threshold: 1,
         condition: () => currentAchievements.length >= 15
       },
-      { 
-        name: 'Pro Streak', 
-        field: 'proAchievements.proStreak', 
+      {
+        name: 'Pro Streak',
+        field: 'proAchievements.proStreak',
         threshold: 7,
         condition: () => progress.dailyExplorer >= 7
       },
-      { 
-        name: 'Expert Advisor', 
-        field: 'proAchievements.expertAdvisor', 
+      {
+        name: 'Expert Advisor',
+        field: 'proAchievements.expertAdvisor',
         threshold: 50,
         condition: () => progress.totalQuestions >= 500
       },
-      { 
-        name: 'Genre Specialist', 
-        field: 'proAchievements.genreSpecialist', 
+      {
+        name: 'Genre Specialist',
+        field: 'proAchievements.genreSpecialist',
         threshold: 1,
         condition: () => {
           const maxGenre = Object.entries(progress)
@@ -935,20 +1087,20 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
           return maxGenre >= 20;
         }
       },
-      { 
-        name: 'Pro Contributor', 
-        field: 'proAchievements.proContributor', 
+      {
+        name: 'Pro Contributor',
+        field: 'proAchievements.proContributor',
         threshold: 1,
         condition: () => progress.totalQuestions >= 1000
       }
     ];
 
     for (const check of proAchievementChecks) {
-      if (check.condition() && 
-          !currentAchievements.some((a: { name: string; }) => a.name === check.name)) {
-        newAchievements.push({ 
-          name: check.name, 
-          dateEarned: new Date() 
+      if (check.condition() &&
+        !currentAchievements.some((a: { name: string; }) => a.name === check.name)) {
+        newAchievements.push({
+          name: check.name,
+          dateEarned: new Date()
         });
         // console.log(`Pro achievement earned: ${check.name}`); // Commented out for production
       }
@@ -961,7 +1113,7 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
     // Update the user with the new achievements
     await User.findOneAndUpdate(
       { username },
-      { 
+      {
         $set: { progress },
         $push: { achievements: { $each: newAchievements } }
       },
@@ -973,8 +1125,8 @@ export const checkAndAwardAchievements = async (username: string, progress: any,
       try {
         const io = getIO();
         if (io) {
-          io.emit('achievementEarned', { 
-            username, 
+          io.emit('achievementEarned', {
+            username,
             achievements: newAchievements,
             isPro: user?.hasProAccess || false,
             message: `Congratulations! You've earned ${newAchievements.length} new achievement${newAchievements.length > 1 ? 's' : ''}!`,
@@ -1014,12 +1166,12 @@ const MEMORY_CACHE_TTL = 1000; // 1 second cache
 
 const measureMemoryUsage = (forceRefresh: boolean = false) => {
   const now = Date.now();
-  
+
   // Return cached data if recent and not forcing refresh
   if (!forceRefresh && memoryCache && (now - memoryCache.timestamp) < MEMORY_CACHE_TTL) {
     return memoryCache.data;
   }
-  
+
   const used = process.memoryUsage();
   const data = {
     heapTotal: Math.round(used.heapTotal / 1024 / 1024 * 100) / 100 + 'MB',
@@ -1027,7 +1179,7 @@ const measureMemoryUsage = (forceRefresh: boolean = false) => {
     rss: Math.round(used.rss / 1024 / 1024 * 100) / 100 + 'MB',
     external: Math.round(used.external / 1024 / 1024 * 100) / 100 + 'MB'
   };
-  
+
   // Cache the result
   memoryCache = { data, timestamp: now };
   return data;
@@ -1044,7 +1196,7 @@ const measureResponseSize = (data: any, estimateOnly: boolean = false) => {
       estimated: true
     };
   }
-  
+
   const size = Buffer.byteLength(JSON.stringify(data));
   return {
     bytes: size,
@@ -1056,27 +1208,27 @@ const measureResponseSize = (data: any, estimateOnly: boolean = false) => {
 // Optimized database query measurement
 const measureDBQuery = async (operation: string, query: () => Promise<any>, enableDetailedMetrics: boolean = false) => {
   const startTime = performance.now();
-  
+
   // Only measure memory if detailed metrics are enabled
   const startMemory = enableDetailedMetrics ? process.memoryUsage().heapUsed : 0;
-  
+
   const result = await query();
-  
+
   const endTime = performance.now();
   const executionTime = endTime - startTime;
-  
+
   const metrics: any = {
     operation,
     executionTime: `${executionTime.toFixed(2)}ms`,
     result
   };
-  
+
   // Only add memory metrics if detailed monitoring is enabled
   if (enableDetailedMetrics) {
     const endMemory = process.memoryUsage().heapUsed;
     metrics.memoryUsed = `${((endMemory - startMemory) / 1024 / 1024).toFixed(2)}MB`;
   }
-  
+
   return metrics;
 };
 
@@ -1094,22 +1246,22 @@ class RequestMonitor {
 
   getRequestRate() {
     const now = Date.now();
-    
+
     // Return cached rate if recent
     if (this.cachedRate && (now - this.lastRateCalculation) < this.RATE_CACHE_TTL) {
       return this.cachedRate;
     }
-    
+
     const elapsed = (now - this.startTime) / 1000; // seconds
     const rate = {
       totalRequests: this.requests,
       requestsPerSecond: (this.requests / elapsed).toFixed(2)
     };
-    
+
     // Cache the result
     this.cachedRate = rate;
     this.lastRateCalculation = now;
-    
+
     return rate;
   }
 }
@@ -1128,9 +1280,9 @@ const logger = winston.createLogger({
   format: winston.format.json(),
   defaultMeta: { service: 'game-assistant' },
   transports: [
-    new winston.transports.Console({ 
+    new winston.transports.Console({
       format: winston.format.simple(),
-      silent: !PERFORMANCE_CONFIG.enableLogging 
+      silent: !PERFORMANCE_CONFIG.enableLogging
     }),
     ...(PERFORMANCE_CONFIG.enableFileLogging ? [
       new winston.transports.File({ filename: 'performance-metrics.log' })
@@ -1161,11 +1313,11 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
   const requestMonitor = new RequestMonitor();
   const aiCache = getAICache();
   let username: string | undefined; // Declare outside try block for error handling
-  
+
   try {
     // Authenticate user - get username from authenticated session
     const authResult = await requireAuth(req, res);
-    
+
     if (!authResult.authenticated || !authResult.username) {
       return res.status(401).json({
         error: 'Authentication required',
@@ -1194,7 +1346,7 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
           metrics
         });
       }
-      
+
       if (contentCheck.violationResult?.action === 'warning') {
         logger.warn('A warning has been issued for offensive content', { username, question, warningCount: contentCheck.violationResult.count });
         return res.status(400).json({
@@ -1212,13 +1364,13 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
       await connectToMongoDB();
     }, PERFORMANCE_CONFIG.enableLogging);
     metrics.dbConnection = dbLatency;
-    
+
     // Load the user to update streak/usage data later
     const user = await User.findOne({ username });
 
     // Track request
     requestMonitor.incrementRequest();
-    
+
     // Measure memory at start (only if detailed metrics enabled)
     if (PERFORMANCE_CONFIG.enableDetailedMetrics) {
       metrics.initialMemory = measureMemoryUsage();
@@ -1230,14 +1382,14 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
     // Track cancellation for telemetry/debug visibility
     let timeoutCancelled = false;
     let visionTimeoutCancelled = false;
-    
+
     // Create cancellable timeout promises that won't reject if cancelled
     const createTimeoutPromise = (ms: number, errorMessage: string): { promise: Promise<never>, cancel: () => void, id: NodeJS.Timeout | null } => {
       let id: NodeJS.Timeout | null = null;
       // Use an object to ensure the reference is shared correctly in closures
       const state = { cancelled: false };
       let rejectFn: ((error: Error) => void) | null = null;
-      
+
       // Create a promise that will be rejected on timeout, but can be cancelled
       const promise = new Promise<never>((_, reject) => {
         rejectFn = reject;
@@ -1257,7 +1409,7 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
           }
         }, ms);
       });
-      
+
       // CRITICAL: Attach catch handler IMMEDIATELY and SYNCHRONOUSLY to prevent unhandled rejections
       // This must happen before any await or async operations
       const catchHandler = (err: any) => {
@@ -1265,7 +1417,7 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
         // This prevents "unhandledRejection" errors
       };
       promise.catch(catchHandler);
-      
+
       // We use a wrapper that only rejects if not cancelled
       // This ensures Promise.race works correctly while preventing unhandled rejections
       const safePromise = new Promise<never>((resolve, reject) => {
@@ -1280,13 +1432,13 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
           }
         );
       });
-      
+
       // CRITICAL: Also attach catch handler to safePromise to prevent any unhandled rejections
       // This is a safety net in case the rejection propagates
       safePromise.catch(() => {
         // Silently handle - this prevents unhandled rejection warnings
       });
-      
+
       const cancel = () => {
         // Set cancelled flag in shared state object (must be first to prevent race conditions)
         state.cancelled = true;
@@ -1297,19 +1449,19 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
           id = null;
         }
       };
-      
+
       return { promise: safePromise, cancel, id };
     };
-    
+
     // Increased timeouts to 30 seconds to give more time for API responses
     // Note: Heroku has a 30-second H12 limit, so this is at the edge - requests may still timeout
     // if they exceed 30 seconds due to network latency or processing overhead
     const timeoutWrapper = createTimeoutPromise(30000, 'Request timeout');
     const timeoutPromise = timeoutWrapper.promise;
-    
+
     const visionTimeoutWrapper = createTimeoutPromise(30000, 'Vision API request timeout');
     const visionTimeoutPromise = visionTimeoutWrapper.promise;
-    
+
     // Helper function to clear timeouts
     const clearTimeouts = () => {
       timeoutWrapper.cancel();
@@ -1321,21 +1473,21 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
     // If image is provided, analyze it first and enhance the question
     let imageAnalysisData: any = null;
     let imageEnhancedQuestion = question;
-    
+
     if (imageFilePath || imageUrl) {
       try {
         // Directly use Google Vision API for image analysis (more efficient than API call)
         const { ImageAnnotatorClient } = await import('@google-cloud/vision');
-        const credentials = process.env.GOOGLE_CREDENTIALS 
-          ? JSON.parse(process.env.GOOGLE_CREDENTIALS) 
+        const credentials = process.env.GOOGLE_CREDENTIALS
+          ? JSON.parse(process.env.GOOGLE_CREDENTIALS)
           : null;
-        
+
         if (credentials) {
           const client = new ImageAnnotatorClient({ credentials });
-          
+
           // Determine image path - download from URL if needed
           let imagePath: string | null = null;
-          
+
           if (imageUrl && imageUrl.startsWith('http')) {
             // Download cloud image temporarily for analysis with timeout protection
             try {
@@ -1343,7 +1495,7 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
               const downloadTimeout = new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error('Image download timeout after 5 seconds')), 5000)
               );
-              
+
               const response = await Promise.race([downloadPromise, downloadTimeout]);
               if (response.ok) {
                 const buffer = await response.arrayBuffer();
@@ -1362,44 +1514,44 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
           } else if (imageFilePath) {
             imagePath = path.join(process.cwd(), 'public', imageFilePath);
           }
-          
+
           if (imagePath && fs.existsSync(imagePath)) {
             // Get labels and text from image
             const [labelResult] = await client.labelDetection(imagePath);
             const [textResult] = await client.textDetection(imagePath);
-            
+
             // Get all labels with their confidence scores
             const allLabels = (labelResult.labelAnnotations || [])
-              .map(l => ({ 
-                description: l?.description || '', 
-                score: l?.score || 0 
+              .map(l => ({
+                description: l?.description || '',
+                score: l?.score || 0
               }))
               .filter(l => l.description)
               .sort((a, b) => (b.score || 0) - (a.score || 0)); // Sort by confidence
-            
+
             // Use top labels by confidence (up to 20 for detailed analysis)
             const topLabels = allLabels.slice(0, 20).map(l => l.description);
-            const labels = topLabels.length > 0 ? topLabels : 
+            const labels = topLabels.length > 0 ? topLabels :
               (labelResult.labelAnnotations?.map(l => l?.description).filter((desc): desc is string => Boolean(desc)) || []) as string[];
-            
+
             const detectedText = textResult.textAnnotations?.[0]?.description || '';
-            
+
             imageAnalysisData = { labels, detectedText, labelCount: labels.length };
-            
+
             // Extract game title from question and/or image context
             const gameTitle = await extractGameTitleFromImageContext(
               question,
               labels.length > 0 ? labels : undefined,
               detectedText || undefined
             );
-            
+
             console.log('Image analysis:', {
               topLabels: labels.slice(0, 10),
               textPreview: detectedText.substring(0, 150),
               detectedGameTitle: gameTitle,
               totalLabelsFound: allLabels.length
             });
-            
+
             // Enhance question with game context and image analysis
             imageEnhancedQuestion = await enhanceQuestionWithGameContext(
               question,
@@ -1407,7 +1559,7 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
               labels,
               detectedText
             );
-            
+
             // Clean up temp file if it was downloaded
             if (imagePath.startsWith(path.join(process.cwd(), 'tmp'))) {
               try {
@@ -1429,16 +1581,16 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
     const { result: processedAnswer, latency: processingLatency } = await measureLatency('Question Processing', async () => {
       // Handle recommendation questions - check these BEFORE trying to extract a specific game
       const lowerQuestion = questionToProcess.toLowerCase();
-      
+
       // Detect "best X games" patterns (e.g., "best platformer games for beginners")
       const isBestGamesQuestion = /best\s+.*?\s+games?\s+(for|right now|currently|to play|that|which)/i.test(questionToProcess) ||
-                                  /what\s+(are|is)\s+the\s+best\s+.*?\s+games?/i.test(questionToProcess) ||
-                                  /recommend.*?\s+(me\s+)?(some|a|the\s+best)\s+.*?\s+games?/i.test(questionToProcess);
-      
+        /what\s+(are|is)\s+the\s+best\s+.*?\s+games?/i.test(questionToProcess) ||
+        /recommend.*?\s+(me\s+)?(some|a|the\s+best)\s+.*?\s+games?/i.test(questionToProcess);
+
       if (isBestGamesQuestion) {
         // Extract genre from question - handle multiple patterns
         let genreText = '';
-        
+
         // Pattern 1: "best [genre] games" or "the best [genre] games"
         const pattern1 = questionToProcess.match(/(?:the\s+)?best\s+([a-z\s]+?)\s+games?/i);
         if (pattern1 && pattern1[1]) {
@@ -1446,7 +1598,7 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
           // Remove trailing words like "right now", "currently", "for beginners", etc.
           genreText = genreText.replace(/\s+(right\s+now|currently|to\s+play|that|which|for\s+.*?)$/i, '').trim();
         }
-        
+
         // Pattern 2: "what are the best [genre] games"
         if (!genreText) {
           const pattern2 = questionToProcess.match(/what\s+(are|is)\s+the\s+best\s+([a-z\s]+?)\s+games?/i);
@@ -1456,9 +1608,9 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
             genreText = genreText.replace(/\s+(right\s+now|currently|to\s+play|that|which|for\s+.*?)$/i, '').trim();
           }
         }
-        
+
         let detectedGenre = 'Action-Adventure'; // Default genre
-        
+
         if (genreText) {
           // Map common genre terms
           const genreMap: { [key: string]: string } = {
@@ -1484,7 +1636,7 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
             'single-player': 'Single-player',
             'single player': 'Single-player'
           };
-          
+
           // Check for exact matches first, then partial matches
           for (const [key, value] of Object.entries(genreMap)) {
             if (genreText === key || genreText.includes(key)) {
@@ -1493,23 +1645,23 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
             }
           }
         }
-        
+
         // Check if it's asking for beginners
         const isForBeginners = /for\s+beginners?|beginner|new to|starting|first time/i.test(questionToProcess);
-        
+
         // Check if asking for current/popular games
         const isCurrentPopular = /right now|currently|popular|trending|recent|what.*best.*now/i.test(questionToProcess);
-        
+
         // Fetch recommendations for the detected genre with appropriate options
         const cacheKey = `recommendations:${detectedGenre}:${isForBeginners ? 'beginners' : isCurrentPopular ? 'current' : 'general'}`;
-        const recommendations = await deduplicateRequest(cacheKey, () => 
+        const recommendations = await deduplicateRequest(cacheKey, () =>
           fetchRecommendations(detectedGenre, {
             forBeginners: isForBeginners,
             currentPopular: isCurrentPopular,
             userQuery: questionToProcess
           })
         );
-        
+
         if (recommendations.length > 0) {
           const gameList = recommendations.slice(0, 5).join(', ');
           if (isForBeginners) {
@@ -1523,7 +1675,7 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
           return `I'd be happy to recommend some ${detectedGenre.toLowerCase()} games! What aspects are you most interested in - story, gameplay mechanics, or something else?`;
         }
       }
-      
+
       // Handle "What should I play?" with personalized recommendations based on user history
       if (lowerQuestion.includes("what should i play") || lowerQuestion.includes("what game should i play") || lowerQuestion.includes("recommend me a game")) {
         // Fetch user's question history
@@ -1538,56 +1690,56 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
             detectedGenre?: string[];
             timestamp: Date;
           }>;
-        
+
         if (previousQuestionsRaw.length === 0) {
           // No history - give a general recommendation
           const cacheKey = `recommendations:new-user:default`;
           const recommendations = await deduplicateRequest(cacheKey, () => fetchRecommendations('Action-Adventure'));
-          return recommendations.length > 0 
-            ? `Since you're new here, here are some great games to get started: ${recommendations.slice(0, 3).join(', ')}. Feel free to ask me about any game you're interested in!` 
+          return recommendations.length > 0
+            ? `Since you're new here, here are some great games to get started: ${recommendations.slice(0, 3).join(', ')}. Feel free to ask me about any game you're interested in!`
             : "I'd love to help you find a game! What types of games do you enjoy? Action, RPG, strategy, or something else?";
         }
-        
+
         // Extract games and genres from user's history
         const gamesAskedAbout = previousQuestionsRaw
           .filter(q => q.detectedGame)
           .map(q => q.detectedGame!)
           .filter((game, index, self) => self.indexOf(game) === index) // Remove duplicates
           .slice(0, 10); // Top 10 unique games
-        
+
         // Map to expected format for analyzeUserQuestions
         const questionsForAnalysis = previousQuestionsRaw.map(q => ({
           question: q.question,
           response: q.response
         }));
-        
+
         const genres = analyzeUserQuestions(questionsForAnalysis);
         const topGenres = genres.slice(0, 3); // Top 3 genres
-        
+
         // Build context for AI recommendation
         let contextMessage = `Based on your gaming history, I can see you've asked about ${previousQuestionsRaw.length} games. `;
-        
+
         if (gamesAskedAbout.length > 0) {
           contextMessage += `You've shown interest in games like: ${gamesAskedAbout.slice(0, 5).join(', ')}. `;
         }
-        
+
         if (topGenres.length > 0) {
           contextMessage += `Your favorite genres seem to be: ${topGenres.join(', ')}. `;
         }
-        
+
         contextMessage += `Based on this, what game would you recommend I play next? Please suggest 2-3 specific games with brief reasons why they'd be a good fit for me.`;
-        
+
         // Use AI to generate personalized recommendation
         const cacheKey = `personalized-recommendation:${username}:${topGenres[0] || 'default'}`;
         const personalizedRecommendation = await deduplicateRequest(cacheKey, async () => {
           return await getChatCompletion(contextMessage);
         });
-        
+
         return personalizedRecommendation || "Based on your gaming history, I'd recommend exploring games similar to what you've enjoyed before. What genres interest you most?";
       } else if (lowerQuestion.includes("daily gaming tip") || lowerQuestion.includes("daily tip") || lowerQuestion.includes("give me a tip")) {
         // Handle personalized daily gaming tip based on user history
         const Forum = (await import('../../models/Forum')).default;
-        
+
         // Fetch user's question history
         const previousQuestionsRaw = await Question.find({ username })
           .sort({ timestamp: -1 })
@@ -1599,7 +1751,7 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
             detectedGenre?: string[];
             timestamp: Date;
           }>;
-        
+
         // Fetch user's forum activity (forums they created or posted in)
         const userForums = await Forum.find({
           $or: [
@@ -1612,23 +1764,23 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
             gameTitle: string;
             posts: Array<{ username: string; message: string }>;
           }>;
-        
+
         // Extract games from questions
         const gamesFromQuestions = previousQuestionsRaw
           .filter(q => q.detectedGame)
           .map(q => q.detectedGame!)
           .filter((game, index, self) => self.indexOf(game) === index)
           .slice(0, 5);
-        
+
         // Extract games from forums
         const gamesFromForums = userForums
           .map(f => f.gameTitle)
           .filter((game, index, self) => self.indexOf(game) === index)
           .slice(0, 5);
-        
+
         // Combine and deduplicate
         const allGames = Array.from(new Set([...gamesFromQuestions, ...gamesFromForums])).slice(0, 5);
-        
+
         // Get genres from questions
         const questionsForAnalysis = previousQuestionsRaw.map(q => ({
           question: q.question,
@@ -1636,39 +1788,39 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
         }));
         const genres = analyzeUserQuestions(questionsForAnalysis);
         const topGenres = genres.slice(0, 2);
-        
+
         // Build personalized tip context
         let tipContext = `Generate a helpful, practical daily gaming tip. `;
-        
+
         if (allGames.length > 0) {
           tipContext += `The user has been asking about or discussing these games: ${allGames.join(', ')}. `;
         }
-        
+
         if (topGenres.length > 0) {
           tipContext += `They seem to enjoy ${topGenres.join(' and ')} games. `;
         }
-        
+
         if (allGames.length === 0 && topGenres.length === 0) {
           tipContext += `The user is new or hasn't asked about specific games yet. `;
         }
-        
+
         tipContext += `Provide a useful, actionable gaming tip that would be relevant to their interests. Make it specific and practical, not generic. Keep it to 2-3 sentences.`;
-        
+
         // Generate personalized tip
         const cacheKey = `daily-tip:${username}:${allGames[0] || topGenres[0] || 'default'}`;
         const personalizedTip = await deduplicateRequest(cacheKey, async () => {
           return await getChatCompletion(tipContext);
         });
-        
+
         return personalizedTip || "Here's a daily gaming tip: Take regular breaks every 45-60 minutes to keep your mind sharp and avoid fatigue. Your performance actually improves when you give yourself time to rest!";
       } else if (questionToProcess.toLowerCase().includes("recommendations")) {
         const previousQuestions = await Question.find({ username });
         const genres = analyzeUserQuestions(previousQuestions);
         const cacheKey = `recommendations:${username}:${genres[0] || 'default'}`;
         const recommendations = genres.length > 0 ? await deduplicateRequest(cacheKey, () => fetchRecommendations(genres[0])) : [];
-        
-        return recommendations.length > 0 
-          ? `Based on your previous questions, I recommend these games: ${recommendations.join(', ')}.` 
+
+        return recommendations.length > 0
+          ? `Based on your previous questions, I recommend these games: ${recommendations.join(', ')}.`
           : "I couldn't find any recommendations based on your preferences.";
 
       } else if (questionToProcess.toLowerCase().includes("when was") || questionToProcess.toLowerCase().includes("when did")) {
@@ -1706,42 +1858,42 @@ const assistantHandler = async (req: AuthenticatedRequest, res: NextApiResponse)
         const codeValue = Array.isArray(code) ? code[0] : code;
         const accessTokenCacheKey = `twitch_token:${codeValue}`;
         const accessToken = await deduplicateRequest(accessTokenCacheKey, () => getAccessToken(codeValue));
-        
+
         const userDataCacheKey = `twitch_user:${accessToken}`;
         const userData = await deduplicateRequest(userDataCacheKey, () => getTwitchUserData(accessToken));
         return `Twitch User Data: ${JSON.stringify(userData)}`;
-      } else if (questionToProcess.toLowerCase().includes("genre") && 
-                 !questionToProcess.toLowerCase().includes("level") &&
-                 !questionToProcess.toLowerCase().includes("stage") &&
-                 !questionToProcess.toLowerCase().includes("item")) {
+      } else if (questionToProcess.toLowerCase().includes("genre") &&
+        !questionToProcess.toLowerCase().includes("level") &&
+        !questionToProcess.toLowerCase().includes("stage") &&
+        !questionToProcess.toLowerCase().includes("item")) {
         // Existing genre logic - only if it's actually a genre question
         const gameTitle = extractGameTitle(questionToProcess);
         // Only proceed if we got a valid game title (not empty or just question words)
         if (gameTitle && gameTitle.length > 2 && !gameTitle.toLowerCase().match(/^(what|which|is|the|name|of|in|this|image|from|a|an)$/i)) {
           const genre = getGenreFromMapping(gameTitle);
-          return genre 
-            ? `${gameTitle} is categorized as ${genre}.` 
+          return genre
+            ? `${gameTitle} is categorized as ${genre}.`
             : `I couldn't find genre information for ${gameTitle}.`;
         }
         // If extractGameTitle failed, fall through to general question handling
       } else {
         // General questions - use OpenAI Vision API if image is provided (ChatGPT-style analysis)
         const cacheKey = `chat:${questionToProcess.toLowerCase().trim()}:${imageUrl || imageFilePath || 'no-image'}`;
-        
+
         // Create enhanced system message for image-based questions
         let systemMessage: string | undefined;
-        const isLevelQuestion = questionToProcess.toLowerCase().includes('level') || 
-                               questionToProcess.toLowerCase().includes('stage') ||
-                               questionToProcess.toLowerCase().includes('area') ||
-                               questionToProcess.toLowerCase().includes('chapter');
+        const isLevelQuestion = questionToProcess.toLowerCase().includes('level') ||
+          questionToProcess.toLowerCase().includes('stage') ||
+          questionToProcess.toLowerCase().includes('area') ||
+          questionToProcess.toLowerCase().includes('chapter');
         const isItemQuestion = questionToProcess.toLowerCase().includes('item') ||
-                              questionToProcess.toLowerCase().includes('weapon') ||
-                              questionToProcess.toLowerCase().includes('equipment');
+          questionToProcess.toLowerCase().includes('weapon') ||
+          questionToProcess.toLowerCase().includes('equipment');
         const isGameQuestion = questionToProcess.toLowerCase().includes('what game') ||
-                              questionToProcess.toLowerCase().includes('which game') ||
-                              questionToProcess.toLowerCase().includes('character') ||
-                              questionToProcess.toLowerCase().includes('what is this from');
-        
+          questionToProcess.toLowerCase().includes('which game') ||
+          questionToProcess.toLowerCase().includes('character') ||
+          questionToProcess.toLowerCase().includes('what is this from');
+
         if (isLevelQuestion || isItemQuestion || isGameQuestion) {
           systemMessage = `You are an expert video game assistant specializing in identifying games, levels, stages, items, and locations from screenshots. When analyzing images:
 
@@ -1754,15 +1906,15 @@ CRITICAL INSTRUCTIONS:
 6. Be precise and base your answer on the actual visual content shown, not general patterns
 7. If you can identify specific visual features (like "neon pink Eggman face Ferris wheel" or "tall green-lit industrial towers"), use those to pinpoint the exact level`;
         }
-        
+
         let baseAnswer: string;
-        
+
         // Use OpenAI Vision API if image is available (ChatGPT-style direct image analysis)
         if (imageUrl || imageFilePath) {
           try {
             // Convert local image to base64 if needed, or use URL
             let imageForVision: string | undefined;
-            
+
             if (imageUrl && imageUrl.startsWith('http')) {
               // Use URL directly (works for cloud storage)
               imageForVision = imageUrl;
@@ -1775,7 +1927,7 @@ CRITICAL INSTRUCTIONS:
                 imageForVision = `data:image/jpeg;base64,${base64Image}`;
               }
             }
-            
+
             if (imageForVision) {
               try {
                 const raceResult = await Promise.race([
@@ -1887,11 +2039,11 @@ CRITICAL INSTRUCTIONS:
         }
       }
     });
-    
+
     answer = processedAnswer;
     metrics.questionProcessing = processingLatency;
 
-        // Measure database operations with enhanced metrics
+    // Measure database operations with enhanced metrics
     const dbMetrics = await measureDBQuery('Create Question', async () => {
       try {
         // Start a session for transaction
@@ -1903,9 +2055,9 @@ CRITICAL INSTRUCTIONS:
             // Create question with proper username handling
             // Include imageUrl if provided (use imageUrl from cloud storage, fallback to imageFilePath)
             const questionImageUrl = imageUrl || (imageFilePath ? `/uploads/question-images/${path.basename(imageFilePath)}` : undefined);
-            const questionData = { 
-              username: username || 'anonymous', 
-              question, 
+            const questionData = {
+              username: username || 'anonymous',
+              question,
               response: answer,
               imageUrl: questionImageUrl // Save image URL with the question
             };
@@ -1925,7 +2077,7 @@ CRITICAL INSTRUCTIONS:
 
             // Check if user exists first to determine update strategy
             const existingUser = await User.findOne({ username }).session(session);
-            
+
             if (existingUser) {
               // User exists - use $inc for progress fields
               const updateOperations: any = {
@@ -1940,8 +2092,8 @@ CRITICAL INSTRUCTIONS:
               }
 
               // Single database operation for existing user
-            const userDoc = await User.findOneAndUpdate(
-              { username },
+              const userDoc = await User.findOneAndUpdate(
+                { username },
                 updateOperations,
                 { new: true, session }
               );
@@ -1950,49 +2102,50 @@ CRITICAL INSTRUCTIONS:
             } else {
               // User doesn't exist - create with initial structure
               const initialProgress = {
-                    firstQuestion: 0,
-                    frequentAsker: 0,
-                    rpgEnthusiast: 0,
-                    bossBuster: 0,
-                    platformerPro: 0,
-                    survivalSpecialist: 0,
-                    strategySpecialist: 0,
-                    actionAficionado: 0,
-                    battleRoyaleMaster: 0,
-                    sportsChampion: 0,
-                    adventureAddict: 0,
-                    shooterSpecialist: 0,
-                    puzzlePro: 0,
-                    racingRenegade: 0,
-                    stealthExpert: 0,
-                    horrorHero: 0,
-                    triviaMaster: 0,
-                    storySeeker: 0,
-                    beatEmUpBrawler: 0,
-                    rhythmMaster: 0,
-                    sandboxBuilder: 0,
-                    shootemUpSniper: 0,
-                    totalQuestions: 0,
-                    dailyExplorer: 0,
-                    speedrunner: 0,
-                    collectorPro: 0,
-                    dataDiver: 0,
-                    performanceTweaker: 0,
-                    conversationalist: 0,
-                    proAchievements: {
-                      gameMaster: 0,
-                      speedDemon: 0,
-                      communityLeader: 0,
-                      achievementHunter: 0,
-                      proStreak: 0,
-                      expertAdvisor: 0,
-                      genreSpecialist: 0,
-                      proContributor: 0
-                    }
+                firstQuestion: 0,
+                frequentAsker: 0,
+                rpgEnthusiast: 0,
+                bossBuster: 0,
+                platformerPro: 0,
+                survivalSpecialist: 0,
+                strategySpecialist: 0,
+                actionAficionado: 0,
+                battleRoyaleMaster: 0,
+                sportsChampion: 0,
+                adventureAddict: 0,
+                shooterSpecialist: 0,
+                puzzlePro: 0,
+                racingRenegade: 0,
+                stealthExpert: 0,
+                horrorHero: 0,
+                triviaMaster: 0,
+                storySeeker: 0,
+                beatEmUpBrawler: 0,
+                rhythmMaster: 0,
+                sandboxBuilder: 0,
+                shootemUpSniper: 0,
+                rogueRenegade: 0,
+                totalQuestions: 0,
+                dailyExplorer: 0,
+                speedrunner: 0,
+                collectorPro: 0,
+                dataDiver: 0,
+                performanceTweaker: 0,
+                conversationalist: 0,
+                proAchievements: {
+                  gameMaster: 0,
+                  speedDemon: 0,
+                  communityLeader: 0,
+                  achievementHunter: 0,
+                  proStreak: 0,
+                  expertAdvisor: 0,
+                  genreSpecialist: 0,
+                  proContributor: 0
+                }
               };
 
               // Add genre increments to initial progress
-            if (questionType.length > 0) {
+              if (questionType.length > 0) {
                 questionType.forEach(genre => {
                   if (genre in initialProgress) {
                     (initialProgress as any)[genre] = 1;
@@ -2044,26 +2197,26 @@ CRITICAL INSTRUCTIONS:
 
     // Measure final memory usage
     metrics.finalMemory = measureMemoryUsage();
-    
+
     // Add cache metrics to response
     metrics.aiCacheMetrics = aiCache.getMetrics();
-    
+
     // Measure response size
     const responseData = { answer, metrics };
     metrics.responseSize = measureResponseSize(responseData);
-    
+
     // Add request rate
     metrics.requestRate = requestMonitor.getRequestRate();
-    
+
     // Log performance metrics
     const endTime = performance.now();
     metrics.totalTime = endTime - startTime;
-    logger.info('API request completed', { 
+    logger.info('API request completed', {
       username,
       questionLength: question.length,
       metrics
     });
-    
+
     // Phase 2 Step 1: Question Metadata Analysis
     // Extract and update question metadata asynchronously after response is sent
     // This runs in the background and doesn't affect user experience
@@ -2074,7 +2227,7 @@ CRITICAL INSTRUCTIONS:
           // console.log('[Background Metadata] Starting background metadata extraction...');
           // Extract metadata using the existing checkQuestionType function
           const metadata = await extractQuestionMetadata(question, checkQuestionType);
-          
+
           // Update the question document with metadata
           await updateQuestionMetadata(questionId, metadata);
           // console.log('[Background Metadata] Background metadata extraction completed successfully');
@@ -2097,7 +2250,7 @@ CRITICAL INSTRUCTIONS:
         try {
           // Phase 4.3: Check if analysis should run (rate limiting)
           const shouldRun = await shouldRunAnalysis(authenticatedUsername);
-          
+
           if (!shouldRun) {
             // Skip analysis if rate limit hasn't been reached
             // Note: This does NOT affect the user's question - it only skips optional background pattern analysis
@@ -2108,11 +2261,11 @@ CRITICAL INSTRUCTIONS:
           // Phase 4.1: Run pattern analysis with caching (getOrCalculatePatterns handles caching internally)
           // This will use cached results if available, or calculate and cache new results
           const patterns = await analyzeGameplayPatterns(authenticatedUsername);
-          
+
           // Log patterns for debugging (commented out for production)
           // console.log('[Pattern Analysis] Completed pattern analysis for user:', authenticatedUsername);
           // console.log('[Pattern Analysis] Results:', JSON.stringify(patterns, null, 2));
-          
+
           // Store patterns in User model for future use in recommendations
           // Only store if we have meaningful data (at least some questions analyzed)
           if (patterns.frequency.totalQuestions > 0) {
@@ -2136,7 +2289,7 @@ CRITICAL INSTRUCTIONS:
           // Generate recommendations with current question as context
           // Don't force show - respect progressive disclosure
           await generatePersonalizedRecommendations(authenticatedUsername, question, false);
-          
+
           // Note: updateRecommendationHistory is called inside generatePersonalizedRecommendations
           // if recommendations are actually shown (progressive disclosure passed)
         } catch (error) {
@@ -2145,31 +2298,31 @@ CRITICAL INSTRUCTIONS:
         }
       });
     }
-    
+
     // Return just the base answer
     // Recommendations are generated in background and can be fetched separately
-    return res.status(200).json({ 
+    return res.status(200).json({
       answer: answer,
       metrics,
       // Include a flag to indicate recommendations may be available
       recommendationsAvailable: !!username
     });
-    
+
   } catch (error) {
     console.error("Error in API route:", error);
     const endTime = performance.now();
     metrics.totalTime = endTime - startTime;
     metrics.aiCacheMetrics = aiCache.getMetrics();
-    
+
     // Check if this is a timeout error
     const isTimeoutError = error instanceof Error && (
-      error.message.includes('timeout') || 
+      error.message.includes('timeout') ||
       error.message.includes('Request timeout') ||
       error.message.includes('Vision API request timeout') ||
       error.message.includes('ECONNABORTED') ||
       error.message.includes('ETIMEDOUT')
     );
-    
+
     // Enhanced error logging
     logger.error('API request failed', {
       username: username || 'unknown',
@@ -2182,23 +2335,23 @@ CRITICAL INSTRUCTIONS:
       metrics,
       requestDuration: metrics.totalTime
     });
-    
+
     if (error instanceof AssistantError) {
-      res.status(error.statusCode).json({ 
+      res.status(error.statusCode).json({
         error: error.message,
         details: 'An error occurred while processing your request',
         metrics
       });
     } else if (isTimeoutError) {
       // Special handling for timeout errors
-      res.status(504).json({ 
+      res.status(504).json({
         error: "Request Timeout",
         details: 'The request took too long to process. This may happen with complex questions or when the AI service is slow. Please try again with a simpler question or wait a moment.',
         metrics,
         timeout: true
       });
     } else {
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Internal Server Error",
         details: error instanceof Error ? error.message : 'An unexpected error occurred',
         metrics,

@@ -464,6 +464,7 @@ export interface Progress {
   rhythmMaster?: number;
   sandboxBuilder?: number;
   shootemUpSniper?: number;
+  rogueRenegade?: number;
   totalQuestions?: number;
   dailyExplorer?: number;
   speedrunner?: number;

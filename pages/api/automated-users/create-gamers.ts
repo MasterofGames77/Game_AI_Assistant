@@ -75,6 +75,7 @@ const createGamerUser = async (
       rhythmMaster: 0,
       sandboxBuilder: 0,
       shootemUpSniper: 0,
+      rogueRenegade: 0,
       totalQuestions: 0,
       dailyExplorer: 0,
       speedrunner: 0,

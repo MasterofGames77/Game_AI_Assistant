@@ -5,8 +5,8 @@
  */
 
 import User from '../models/User';
-import { 
-  analyzeGameplayPatterns, 
+import {
+  analyzeGameplayPatterns,
   extractQuestionMetadata,
   getPersonalizedStrategyTip,
   TemplateContext
@@ -20,9 +20,9 @@ import {
  */
 function mapGenreToTemplateKey(genreName: string): string {
   if (!genreName) return '';
-  
+
   const lowerGenre = genreName.toLowerCase();
-  
+
   // First, map internal genre names (from checkQuestionType) to template keys
   // These are the internal genre identifiers used in the system
   const internalGenreMap: { [key: string]: string } = {
@@ -62,13 +62,13 @@ function mapGenreToTemplateKey(genreName: string): string {
     'battle royale': 'battle-royale',
     'battle royale master': 'battle-royale',
   };
-  
+
   // Check internal genre names first (remove spaces and check)
   const normalizedInternal = lowerGenre.replace(/\s+/g, '');
   if (internalGenreMap[normalizedInternal]) {
     return internalGenreMap[normalizedInternal];
   }
-  
+
   // Direct mappings for full genre names
   const genreMap: { [key: string]: string } = {
     'role-playing game': 'rpg',
@@ -101,19 +101,19 @@ function mapGenreToTemplateKey(genreName: string): string {
     'battle royale': 'battle-royale',
     'battle-royale': 'battle-royale',
   };
-  
+
   // Check for exact match first
   if (genreMap[lowerGenre]) {
     return genreMap[lowerGenre];
   }
-  
+
   // Check for partial matches (e.g., "Role-Playing Game" contains "rpg")
   for (const [key, value] of Object.entries(genreMap)) {
     if (lowerGenre.includes(key) || key.includes(lowerGenre)) {
       return value;
     }
   }
-  
+
   // Check for common genre keywords
   if (lowerGenre.includes('rpg') || lowerGenre.includes('role-playing')) return 'rpg';
   if (lowerGenre.includes('shooter') || lowerGenre.includes('fps')) return 'shooter';
@@ -132,7 +132,7 @@ function mapGenreToTemplateKey(genreName: string): string {
   if (lowerGenre.includes('roguelike') || lowerGenre.includes('rogue-like')) return 'roguelike';
   if (lowerGenre.includes('sandbox')) return 'sandbox';
   if (lowerGenre.includes('battle-royale') || lowerGenre.includes('battleroyale') || lowerGenre.includes('battle royale')) return 'battle-royale';
-  
+
   // Return original genre name (will use fallback in template system)
   return lowerGenre;
 }
@@ -152,10 +152,10 @@ function buildTemplateContext(
   const difficulty = context.difficultyHint || patterns.difficulty.currentLevel;
   const playstyleTags = preferences?.playstyleTags || [];
   const questionCategory = context.questionCategory;
-  
+
   // Extract genre-specific context based on top genre
   const genreKey = mapGenreToTemplateKey(topGenre);
-  
+
   // RPG context
   if (genreKey === 'rpg') {
     if (difficulty === 'beginner') {
@@ -171,7 +171,7 @@ function buildTemplateContext(
       templateContext.minMaxTips = 'focusing on one primary stat and optimizing gear synergies for maximum efficiency';
     }
   }
-  
+
   // Shooter context
   if (genreKey === 'shooter' || genreKey === 'action') {
     if (difficulty === 'beginner') {
@@ -189,7 +189,7 @@ function buildTemplateContext(
       templateContext.reasoning = 'they provide the best time-to-kill and competitive advantage';
     }
   }
-  
+
   // Strategy context
   if (genreKey === 'strategy') {
     if (difficulty === 'beginner') {
@@ -207,7 +207,7 @@ function buildTemplateContext(
       templateContext.complexStrategy = 'meta compositions with optimal unit combinations';
     }
   }
-  
+
   // Action context (for non-shooter action games)
   // Note: Shooter context is handled above, this is for melee/combat action games
   if (genreKey === 'action') {
@@ -222,7 +222,7 @@ function buildTemplateContext(
       }
     }
   }
-  
+
   // Adventure context
   if (genreKey === 'adventure') {
     if (difficulty === 'beginner') {
@@ -233,7 +233,7 @@ function buildTemplateContext(
       templateContext.efficientPath = 'sequence breaking and route optimization';
     }
   }
-  
+
   // Platformer context
   if (genreKey === 'platformer') {
     if (difficulty === 'beginner') {
@@ -244,7 +244,7 @@ function buildTemplateContext(
       templateContext.speedrunTech = 'wave dashing and frame-perfect inputs';
     }
   }
-  
+
   // Survival context
   if (genreKey === 'survival') {
     if (difficulty === 'beginner') {
@@ -255,7 +255,7 @@ function buildTemplateContext(
       templateContext.advancedSurvival = 'optimizing resource gathering and crafting efficiency';
     }
   }
-  
+
   // Horror context
   if (genreKey === 'horror') {
     if (difficulty === 'beginner') {
@@ -266,7 +266,7 @@ function buildTemplateContext(
       templateContext.advancedHorror = 'mastering enemy patterns and optimal routing';
     }
   }
-  
+
   // Stealth context
   if (genreKey === 'stealth') {
     if (difficulty === 'beginner') {
@@ -277,7 +277,7 @@ function buildTemplateContext(
       templateContext.advancedStealth = 'perfecting timing and route optimization for ghost runs';
     }
   }
-  
+
   // Simulation context
   if (genreKey === 'simulation') {
     if (difficulty === 'beginner') {
@@ -288,7 +288,7 @@ function buildTemplateContext(
       templateContext.advancedSimulation = 'min-maxing efficiency and mastering complex mechanics';
     }
   }
-  
+
   // Roguelike context
   if (genreKey === 'roguelike') {
     if (difficulty === 'beginner') {
@@ -299,7 +299,7 @@ function buildTemplateContext(
       templateContext.advancedRoguelike = 'mastering optimal routes and build optimization';
     }
   }
-  
+
   // Sandbox context
   if (genreKey === 'sandbox') {
     if (difficulty === 'beginner') {
@@ -310,7 +310,7 @@ function buildTemplateContext(
       templateContext.advancedSandbox = 'mastering advanced building techniques and optimization';
     }
   }
-  
+
   // Battle Royale context
   if (genreKey === 'battle-royale' || genreKey === 'battleroyale') {
     if (difficulty === 'beginner') {
@@ -321,7 +321,7 @@ function buildTemplateContext(
       templateContext.advancedBr = 'mastering hot drops and end-game positioning';
     }
   }
-  
+
   return templateContext;
 }
 
@@ -335,7 +335,7 @@ async function generateQuickTips(
   context?: Awaited<ReturnType<typeof extractQuestionContext>>
 ): Promise<string[]> {
   const tips: string[] = [];
-  
+
   if (!currentQuestion) {
     return tips;
   }
@@ -520,7 +520,7 @@ async function generateOptimizationSuggestions(
 
   // Check if game has achievements (async)
   const hasAchievementSystem = await hasAchievements(detectedGenres, detectedGame, detectedPlatform);
-  
+
   // Check if game is multiplayer/competitive
   const isMultiplayer = isMultiplayerGame(detectedGenres);
 
@@ -581,26 +581,26 @@ async function generateOptimizationSuggestions(
   for (const suggestion of suggestions) {
     // Extract the core message (remove emoji and "Optimization:" prefix)
     const coreMessage = suggestion.replace(/^[^\s]+\s+Optimization:\s*/i, '').toLowerCase();
-    
+
     // Check if this suggestion is too similar to any existing one
     const isSimilar = uniqueSuggestions.some(existing => {
       const existingCore = existing.replace(/^[^\s]+\s+Optimization:\s*/i, '').toLowerCase();
-      
+
       // Check for key overlapping words (more than 3 shared meaningful words = similar)
       const suggestionWords = coreMessage.split(/\s+/).filter(w => w.length > 4);
       const existingWords = existingCore.split(/\s+/).filter(w => w.length > 4);
       const sharedWords = suggestionWords.filter(w => existingWords.includes(w));
-      
+
       // If they share many key words, they're likely redundant
       if (sharedWords.length >= 2) {
         return true;
       }
-      
+
       // Also check for very similar phrasing
       const similarity = sharedWords.length / Math.max(suggestionWords.length, existingWords.length);
       return similarity > 0.5;
     });
-    
+
     if (!isSimilar) {
       uniqueSuggestions.push(suggestion);
     }
@@ -617,14 +617,14 @@ function isMultiplayerGame(detectedGenres?: string[]): boolean {
   if (!detectedGenres || detectedGenres.length === 0) {
     return false;
   }
-  
+
   const multiplayerKeywords = [
     'mmo', 'massively multiplayer', 'multiplayer online',
     'battle royale', 'battle-royale', 'moba',
     'multiplayer online battle arena', 'competitive',
     'online', 'multiplayer', 'pvp', 'player vs player'
   ];
-  
+
   const genreString = detectedGenres.join(' ').toLowerCase();
   return multiplayerKeywords.some(keyword => genreString.includes(keyword));
 }
@@ -650,7 +650,7 @@ async function generateCommonMistakes(
 
   // Check if game has achievements (async)
   const hasAchievementSystem = await hasAchievements(detectedGenres, detectedGame, detectedPlatform);
-  
+
   // Check if game is multiplayer/competitive
   const isMultiplayer = isMultiplayerGame(detectedGenres);
 
@@ -722,7 +722,7 @@ export const generatePersonalizedTips = async (
 }> => {
   try {
     const user = await User.findOne({ username }).lean() as any;
-    
+
     if (!user || !user?.progress?.personalized) {
       // Even without stored data, we can provide quick tips from current question
       if (currentQuestion) {
@@ -735,7 +735,7 @@ export const generatePersonalizedTips = async (
           };
         }
       }
-      
+
       return {
         tips: [],
         basedOn: 'No personalized data available',
@@ -801,25 +801,25 @@ export const generatePersonalizedTips = async (
       if (uniqueTips.includes(tip)) {
         continue;
       }
-      
+
       // Check for semantic similarity (similar meaning even if different wording)
       const tipCore = tip.replace(/^[^\s]+\s+(?:Insight|Optimization|Quick tip|Pro tip|Avoid):\s*/i, '').toLowerCase();
       const isSimilar = uniqueTips.some(existing => {
         const existingCore = existing.replace(/^[^\s]+\s+(?:Insight|Optimization|Quick tip|Pro tip|Avoid):\s*/i, '').toLowerCase();
-        
+
         // Extract meaningful words (length > 4)
         const tipWords = tipCore.split(/\s+/).filter(w => w.length > 4 && !['this', 'that', 'your', 'you\'re', 'which', 'shows'].includes(w));
         const existingWords = existingCore.split(/\s+/).filter(w => w.length > 4 && !['this', 'that', 'your', 'you\'re', 'which', 'shows'].includes(w));
-        
+
         // Count shared meaningful words
         const sharedWords = tipWords.filter(w => existingWords.includes(w));
-        
+
         // If they share many key words, they're likely redundant
         // For insights about completion/completionist, be more strict
         if (tipCore.includes('completion') && existingCore.includes('completion')) {
           return sharedWords.length >= 2; // More strict for completion-related
         }
-        
+
         // For optimization tips, check for similar concepts
         if (tipCore.includes('optimization') || tipCore.includes('optimize') || tipCore.includes('improve')) {
           if (existingCore.includes('optimization') || existingCore.includes('optimize') || existingCore.includes('improve')) {
@@ -832,11 +832,11 @@ export const generatePersonalizedTips = async (
             }
           }
         }
-        
+
         // General similarity check: if they share 3+ meaningful words, likely redundant
         return sharedWords.length >= 3;
       });
-      
+
       if (!isSimilar) {
         uniqueTips.push(tip);
       }
@@ -844,26 +844,26 @@ export const generatePersonalizedTips = async (
 
     // Generate basedOn description - more natural wording
     const basedOnParts: string[] = [];
-    
+
     // Build natural description
     if (preferences?.learningStyle && preferences?.difficultyPreference) {
       // Format: "Your [learningStyle] style and [difficultyPreference] preferences"
-      const styleLabel = preferences.learningStyle === 'tactical' ? 'tactical' : 
-                        preferences.learningStyle === 'exploratory' ? 'exploratory' : 
-                        'gaming';
+      const styleLabel = preferences.learningStyle === 'tactical' ? 'tactical' :
+        preferences.learningStyle === 'exploratory' ? 'exploratory' :
+          'gaming';
       const difficultyLabel = preferences.difficultyPreference === 'prefers_challenge' ? 'challenge-seeking' :
-                             preferences.difficultyPreference === 'casual' ? 'casual' :
-                             preferences.difficultyPreference === 'balanced' ? 'balanced' : '';
-      
+        preferences.difficultyPreference === 'casual' ? 'casual' :
+          preferences.difficultyPreference === 'balanced' ? 'balanced' : '';
+
       if (currentQuestion) {
         basedOnParts.push(`Your ${styleLabel} style, ${difficultyLabel} preferences, and current question`);
       } else {
         basedOnParts.push(`Your ${styleLabel} style and ${difficultyLabel} preferences`);
       }
     } else if (preferences?.learningStyle) {
-      const styleLabel = preferences.learningStyle === 'tactical' ? 'tactical' : 
-                        preferences.learningStyle === 'exploratory' ? 'exploratory' : 
-                        'gaming';
+      const styleLabel = preferences.learningStyle === 'tactical' ? 'tactical' :
+        preferences.learningStyle === 'exploratory' ? 'exploratory' :
+          'gaming';
       if (currentQuestion) {
         basedOnParts.push(`Your ${styleLabel} style and current question`);
       } else {
@@ -871,8 +871,8 @@ export const generatePersonalizedTips = async (
       }
     } else if (preferences?.difficultyPreference) {
       const difficultyLabel = preferences.difficultyPreference === 'prefers_challenge' ? 'challenge-seeking' :
-                             preferences.difficultyPreference === 'casual' ? 'casual' :
-                             preferences.difficultyPreference === 'balanced' ? 'balanced' : '';
+        preferences.difficultyPreference === 'casual' ? 'casual' :
+          preferences.difficultyPreference === 'balanced' ? 'balanced' : '';
       if (currentQuestion) {
         basedOnParts.push(`Your ${difficultyLabel} preferences and current question`);
       } else {
@@ -883,7 +883,7 @@ export const generatePersonalizedTips = async (
     } else {
       basedOnParts.push('Your gaming style and preferences');
     }
-    
+
     const basedOn = basedOnParts[0] || 'Your gaming preferences';
 
     return {
@@ -916,7 +916,7 @@ async function fetchGameGenresFromRAWG(gameTitle: string): Promise<string[]> {
   try {
     const axios = (await import('axios')).default;
     const searchUrl = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&search=${encodeURIComponent(gameTitle)}&page_size=1`;
-    
+
     const searchResponse = await axios.get(searchUrl);
     if (!searchResponse.data?.results || searchResponse.data.results.length === 0) {
       return [];
@@ -935,7 +935,7 @@ async function fetchGameGenresFromRAWG(gameTitle: string): Promise<string[]> {
     // Get genres (slugs)
     const genreSlugs = gameDetails.genres?.map((g: any) => g.slug).filter(Boolean) || [];
     const genreNames = gameDetails.genres?.map((g: any) => g.name).filter(Boolean) || [];
-    
+
     // Get gameplay-specific tags (filter out generic tags)
     const allTags = gameDetails.tags?.map((t: any) => t.slug).filter(Boolean) || [];
     const genericTags = [
@@ -947,11 +947,11 @@ async function fetchGameGenresFromRAWG(gameTitle: string): Promise<string[]> {
       'mods', 'moddable', 'level-editor', 'cross-platform-multiplayer',
       'cooperative', '2d', 'funny', 'difficult', 'retro' // These are too generic
     ];
-    
+
     // Keep only gameplay-specific tags that indicate game mechanics/style
     const gameplayTags = allTags.filter((tag: string) => {
       if (genericTags.includes(tag)) return false;
-      
+
       // Include tags that clearly indicate gameplay mechanics
       // These are specific gameplay styles, not just descriptive words
       const gameplayStyleTags = [
@@ -963,30 +963,30 @@ async function fetchGameGenresFromRAWG(gameTitle: string): Promise<string[]> {
         'survival', 'survival-horror', 'stealth', 'stealth-action',
         'open-world', 'sandbox', 'simulation', 'city-builder', 'tycoon'
       ];
-      
+
       // Check for exact matches or partial matches with gameplay keywords
       const isGameplayStyle = gameplayStyleTags.some(styleTag => tag === styleTag || tag.includes(styleTag));
-      
+
       // Also check for compound tags that include gameplay keywords
       const gameplayKeywords = ['run', 'gun', 'boss', 'fight', 'bullet', 'hell', 'shoot', 'shmup',
-                                'rogue', 'metroid', 'souls', 'tactical', 'strategy', 'rts',
-                                'puzzle', 'platform', 'racing', 'fighting', 'rpg', 'adventure',
-                                'survival', 'stealth', 'sandbox', 'simulation'];
+        'rogue', 'metroid', 'souls', 'tactical', 'strategy', 'rts',
+        'puzzle', 'platform', 'racing', 'fighting', 'rpg', 'adventure',
+        'survival', 'stealth', 'sandbox', 'simulation'];
       const hasGameplayKeyword = gameplayKeywords.some(keyword => tag.includes(keyword));
-      
+
       return isGameplayStyle || hasGameplayKeyword;
     });
-    
+
     // Combine genres and gameplay tags
     const allGenres = [...genreSlugs, ...gameplayTags.slice(0, 3)]; // Limit gameplay tags to top 3
-    
+
     console.log(`[extractQuestionContext] Fetched genres for "${gameTitle}":`, {
       slugs: genreSlugs,
       names: genreNames,
       gameplayTags: gameplayTags.slice(0, 5),
       combined: allGenres,
     });
-    
+
     return allGenres;
   } catch (error) {
     console.error(`[extractQuestionContext] Error fetching genres for "${gameTitle}":`, error);
@@ -1000,7 +1000,7 @@ async function fetchGameGenresFromRAWG(gameTitle: string): Promise<string[]> {
  */
 function extractPlatformFromQuestion(question: string): string | undefined {
   const lowerQuestion = question.toLowerCase();
-  
+
   // Platform keywords
   const platformPatterns: { [key: string]: string[] } = {
     'nintendo switch': ['switch', 'nintendo switch 2', 'nsw'],
@@ -1017,13 +1017,13 @@ function extractPlatformFromQuestion(question: string): string | undefined {
     'wii': ['wii'],
     'gamecube': ['gamecube', 'game cube'],
   };
-  
+
   for (const [platform, keywords] of Object.entries(platformPatterns)) {
     if (keywords.some(keyword => lowerQuestion.includes(keyword))) {
       return platform;
     }
   }
-  
+
   return undefined;
 }
 
@@ -1037,10 +1037,10 @@ async function extractQuestionContext(question: string): Promise<{
 }> {
   try {
     // console.log('[extractQuestionContext] Starting extraction for question:', question.substring(0, 100));
-    
+
     // Import checkQuestionType function for genre detection
     const { analyzeUserQuestions } = await import('./aiHelper');
-    
+
     // Use existing extractQuestionMetadata function with genre detection
     // Pass a simple genre detection function based on analyzeUserQuestions
     const checkQuestionTypeFn = (q: string) => {
@@ -1049,7 +1049,7 @@ async function extractQuestionContext(question: string): Promise<{
       const genres = analyzeUserQuestions([{ question: q, response: '' }]);
       return genres;
     };
-    
+
     // console.log('[extractQuestionContext] Calling extractQuestionMetadata...');
     const metadata = await extractQuestionMetadata(question, checkQuestionTypeFn);
     // console.log('[extractQuestionContext] extractQuestionMetadata returned:', {
@@ -1062,14 +1062,14 @@ async function extractQuestionContext(question: string): Promise<{
     //   hasDifficultyHint: !!metadata.difficultyHint,
     //   difficultyHint: metadata.difficultyHint,
     // });
-    
+
     // Validate detectedGame - ensure it's a non-empty string
-    const validDetectedGame = metadata.detectedGame && 
-                              typeof metadata.detectedGame === 'string' && 
-                              metadata.detectedGame.trim().length > 0
-                              ? metadata.detectedGame.trim()
-                              : undefined;
-    
+    const validDetectedGame = metadata.detectedGame &&
+      typeof metadata.detectedGame === 'string' &&
+      metadata.detectedGame.trim().length > 0
+      ? metadata.detectedGame.trim()
+      : undefined;
+
     // If we detected a game but no genres, fetch genres from RAWG API
     let detectedGenres = metadata.detectedGenre;
     if (validDetectedGame && (!detectedGenres || detectedGenres.length === 0)) {
@@ -1080,10 +1080,10 @@ async function extractQuestionContext(question: string): Promise<{
         // console.log(`[extractQuestionContext] Fetched ${apiGenres.length} genres from RAWG:`, apiGenres);
       }
     }
-    
+
     // Extract platform from question if mentioned
     const detectedPlatform = extractPlatformFromQuestion(question);
-    
+
     const result = {
       detectedGame: validDetectedGame,
       detectedGenre: detectedGenres,
@@ -1092,7 +1092,7 @@ async function extractQuestionContext(question: string): Promise<{
       interactionType: metadata.interactionType,
       detectedPlatform,
     };
-    
+
     // console.log('[extractQuestionContext] Returning context:', {
     //   hasDetectedGame: !!result.detectedGame,
     //   detectedGame: result.detectedGame || 'undefined',
@@ -1101,7 +1101,7 @@ async function extractQuestionContext(question: string): Promise<{
     //   hasDetectedGenre: !!result.detectedGenre && result.detectedGenre.length > 0,
     //   detectedGenre: result.detectedGenre,
     // });
-    
+
     return result;
   } catch (error) {
     console.error('[Recommendations] Error extracting question context:', error);
@@ -1126,18 +1126,18 @@ function generateLoadoutSuggestions(
   const topGenre = patterns.genreAnalysis.topGenres[0]?.genre || '';
   const difficulty = context.difficultyHint || patterns.difficulty.currentLevel;
   const detectedGame = context?.detectedGame; // Only use if validated by extractQuestionContext
-  
+
   // Map genre to template key
   const genreKey = mapGenreToTemplateKey(topGenre);
-  
+
   // Build template context from patterns and preferences
   const templateContext = buildTemplateContext(patterns, context, preferences);
-  
+
   // Generate template-based suggestions for supported genres
   // Templates are available for: rpg, shooter, strategy, action, adventure, platformer, puzzle, fighting, racing, sports
   if (genreKey) {
     const templateTip = getPersonalizedStrategyTip(genreKey, difficulty, templateContext);
-    
+
     if (templateTip && !templateTip.includes('[')) { // Only add if no unfilled placeholders
       // Add appropriate emoji based on genre
       const emojiMap: { [key: string]: string } = {
@@ -1171,11 +1171,11 @@ function generateLoadoutSuggestions(
       }
     }
   }
-  
+
   // Add genre-specific additional suggestions that complement templates
   // These provide extra context beyond what templates can offer
   // Include game name when available
-  
+
   // RPG additional suggestions
   if (genreKey === 'rpg') {
     if (difficulty === 'beginner') {
@@ -1201,7 +1201,7 @@ function generateLoadoutSuggestions(
       }
     }
   }
-  
+
   // Shooter/Action additional suggestions
   if (genreKey === 'shooter' || genreKey === 'action') {
     if (difficulty === 'beginner') {
@@ -1227,7 +1227,7 @@ function generateLoadoutSuggestions(
       }
     }
   }
-  
+
   // Strategy additional suggestions
   if (genreKey === 'strategy') {
     if (difficulty === 'beginner') {
@@ -1250,22 +1250,22 @@ function generateLoadoutSuggestions(
       }
     }
   }
-  
+
   // Fallback: If no template suggestions were generated, use genre-specific tips
   // Include game name when available and make tips specific to game type
   if (suggestions.length === 0 && topGenre) {
     const detectedGenres = context?.detectedGenre || [];
-    const isBossRush = detectedGenres.some(g => 
-      ['boss-fight', 'boss-rush', 'boss-battle'].some(tag => 
+    const isBossRush = detectedGenres.some(g =>
+      ['boss-fight', 'boss-rush', 'boss-battle'].some(tag =>
         g.toLowerCase().includes(tag.toLowerCase())
       )
     );
-    const isRunAndGun = detectedGenres.some(g => 
-      ['run-and-gun', 'shoot-em-up', 'bullet-hell'].some(tag => 
+    const isRunAndGun = detectedGenres.some(g =>
+      ['run-and-gun', 'shoot-em-up', 'bullet-hell'].some(tag =>
         g.toLowerCase().includes(tag.toLowerCase())
       )
     );
-    
+
     if (difficulty === 'beginner') {
       if (detectedGame) {
         if (isBossRush || isRunAndGun) {
@@ -1318,7 +1318,7 @@ function generateLoadoutSuggestions(
       }
     }
   }
-  
+
   return suggestions;
 }
 
@@ -1343,17 +1343,17 @@ function generateCombatStrategies(
   // (genre-based tips will be used instead)
   if (hasCurrentQuestion) {
     const detectedGenres = context?.detectedGenre || [];
-    const isBossRush = detectedGenres.some(g => 
-      ['boss-fight', 'boss-rush', 'boss-battle'].some(tag => 
+    const isBossRush = detectedGenres.some(g =>
+      ['boss-fight', 'boss-rush', 'boss-battle'].some(tag =>
         g.toLowerCase().includes(tag.toLowerCase())
       )
     );
-    const isRunAndGun = detectedGenres.some(g => 
-      ['run-and-gun', 'shoot-em-up', 'bullet-hell'].some(tag => 
+    const isRunAndGun = detectedGenres.some(g =>
+      ['run-and-gun', 'shoot-em-up', 'bullet-hell'].some(tag =>
         g.toLowerCase().includes(tag.toLowerCase())
       )
     );
-    
+
     // Combat strategies based on current question category
     // Include game name when available and make tips specific to game type
     if (category === 'boss_fight') {
@@ -1363,7 +1363,7 @@ function generateCombatStrategies(
           strategies.push(`💪 In ${detectedGame}, study each boss's attack patterns: each one has unique telegraphs and safe zones`);
           strategies.push(`⚔️ In ${detectedGame}, experiment with different weapon and charm combinations: some loadouts work better for specific bosses`);
           strategies.push(`⏱️ In ${detectedGame}, master parrying and dodge timing: these are essential for surviving bullet-hell sections`);
-          
+
           if (patterns.difficulty.challengeSeeking === 'seeking_challenge') {
             strategies.push(`🔥 In ${detectedGame}, try S-rank or no-hit runs: perfect your execution for maximum challenge`);
           }
@@ -1372,7 +1372,7 @@ function generateCombatStrategies(
           strategies.push(`💪 In ${detectedGame}, study attack patterns: learn boss telegraphs and safe positioning`);
           strategies.push(`⏱️ Master dodge timing in ${detectedGame}: practice i-frames and perfect dodges`);
           strategies.push(`🔄 Adapt your strategy in ${detectedGame}: switch between aggressive and defensive play based on boss phase`);
-          
+
           if (patterns.difficulty.challengeSeeking === 'seeking_challenge') {
             strategies.push(`🔥 Try no-hit runs in ${detectedGame}: perfect your timing for maximum challenge`);
           }
@@ -1382,7 +1382,7 @@ function generateCombatStrategies(
           strategies.push('💪 Study each boss\'s attack patterns: each one has unique telegraphs and safe zones');
           strategies.push('⚔️ Experiment with different weapon and charm combinations: some loadouts work better for specific bosses');
           strategies.push('⏱️ Master parrying and dodge timing: these are essential for surviving bullet-hell sections');
-          
+
           if (patterns.difficulty.challengeSeeking === 'seeking_challenge') {
             strategies.push('🔥 Try S-rank or no-hit runs: perfect your execution for maximum challenge');
           }
@@ -1390,7 +1390,7 @@ function generateCombatStrategies(
           strategies.push('💪 Study attack patterns: learn boss telegraphs and safe positioning');
           strategies.push('⏱️ Master dodge timing: practice i-frames and perfect dodges');
           strategies.push('🔄 Adapt your strategy: switch between aggressive and defensive play based on boss phase');
-          
+
           if (patterns.difficulty.challengeSeeking === 'seeking_challenge') {
             strategies.push('🔥 Try no-hit runs: perfect your timing for maximum challenge');
           }
@@ -1403,7 +1403,7 @@ function generateCombatStrategies(
         strategies.push(`📊 In ${detectedGame}, analyze your playstyle: identify strengths and build around them`);
         strategies.push(`⚔️ Learn combo systems in ${detectedGame}: master attack chains and optimal rotations`);
         strategies.push(`🛡️ Balance offense and defense in ${detectedGame}: know when to be aggressive vs. defensive`);
-        
+
         if (patterns.behavior.learningSpeed === 'fast') {
           strategies.push(`🚀 Experiment with advanced techniques in ${detectedGame}: frame-perfect inputs and optimization`);
         }
@@ -1411,7 +1411,7 @@ function generateCombatStrategies(
         strategies.push('📊 Analyze your playstyle: identify strengths and build around them');
         strategies.push('⚔️ Learn combo systems: master attack chains and optimal rotations');
         strategies.push('🛡️ Balance offense and defense: know when to be aggressive vs. defensive');
-        
+
         if (patterns.behavior.learningSpeed === 'fast') {
           strategies.push('🚀 Experiment with advanced techniques: frame-perfect inputs and optimization');
         }
@@ -1464,8 +1464,8 @@ function isExplorationGame(
   ];
 
   // Check if any detected genres/tags indicate non-exploration gameplay
-  const hasNonExplorationTag = detectedGenres.some(genre => 
-    nonExplorationTags.some(tag => 
+  const hasNonExplorationTag = detectedGenres.some(genre =>
+    nonExplorationTags.some(tag =>
       genre.toLowerCase().includes(tag.toLowerCase())
     )
   );
@@ -1528,23 +1528,23 @@ function generateExplorationTips(
     if (detectedGame) {
       tips.push(`🗺️ In ${detectedGame}, take your time: explore every corner - hidden areas often contain valuable rewards`);
       tips.push(`💡 Look for visual clues in ${detectedGame}: environmental storytelling often hints at secrets`);
-      
+
       // Only show "check behind waterfalls" tip for games that actually have exploration areas
       if (isExploration) {
         tips.push(`🔍 Check behind waterfalls, under bridges, and in corners in ${detectedGame} - developers love hiding things there`);
       }
-      
+
       if (patterns.difficulty.currentLevel === 'advanced') {
         tips.push(`🎯 Master sequence breaking in ${detectedGame}: find ways to access areas early for speedrun routes`);
       }
     } else {
       tips.push('🗺️ Take your time: explore every corner - hidden areas often contain valuable rewards');
       tips.push('💡 Look for visual clues: environmental storytelling often hints at secrets');
-      
+
       if (isExploration) {
         tips.push('🔍 Check behind waterfalls, under bridges, and in corners - developers love hiding things there');
       }
-      
+
       if (patterns.difficulty.currentLevel === 'advanced') {
         tips.push('🎯 Master sequence breaking: find ways to access areas early for speedrun routes');
       }
@@ -1604,7 +1604,7 @@ async function fetchGameMetadataForAchievements(gameTitle: string): Promise<{
   try {
     const axios = (await import('axios')).default;
     const searchUrl = `https://api.rawg.io/api/games?key=${process.env.RAWG_API_KEY}&search=${encodeURIComponent(gameTitle)}&page_size=1`;
-    
+
     const searchResponse = await axios.get(searchUrl);
     if (!searchResponse.data?.results || searchResponse.data.results.length === 0) {
       return { hasAchievements: true }; // Default to true if we can't determine
@@ -1639,23 +1639,23 @@ async function fetchGameMetadataForAchievements(gameTitle: string): Promise<{
       'pc', 'steam', 'epic games store', 'gog',
       'ios', 'android' // Mobile platforms often have achievements
     ];
-    
+
     // Nintendo platforms that do NOT have achievements
     const nintendoPlatforms = [
-      'nintendo switch', 'switch', 'nsw',
+      'nintendo switch 2', 'nintendo switch', 'switch', 'nsw',
       'wii u', 'wii',
       'gamecube', 'game cube',
       'nintendo 64', 'n64',
       'super nintendo', 'snes',
       'nes', 'nintendo entertainment system',
-      'game boy', 'gameboy'
+      'game boy', 'gameboy', 'nintendo ds', 'nintendo 3ds'
     ];
-    const hasAchievementPlatform = platforms.some((p: string) => 
+    const hasAchievementPlatform = platforms.some((p: string) =>
       achievementPlatforms.some(ap => p.includes(ap))
     );
-    
+
     // Check if any platform is a Nintendo platform (no achievements)
-    const hasNintendoPlatform = platforms.some((p: string) => 
+    const hasNintendoPlatform = platforms.some((p: string) =>
       nintendoPlatforms.some(np => p.includes(np))
     );
 
@@ -1663,9 +1663,9 @@ async function fetchGameMetadataForAchievements(gameTitle: string): Promise<{
     const noAchievementPlatforms = [
       'playstation', 'ps1', 'ps2', 'psx', 'playstation 1', 'playstation 2',
       'sega genesis', 'sega saturn', 'sega dreamcast',
-      'atari', 'neo geo', 'turbografx'
+      'atari', 'neo geo', 'turbografx', 'commodore 64'
     ];
-    const hasNoAchievementPlatform = platforms.some((p: string) => 
+    const hasNoAchievementPlatform = platforms.some((p: string) =>
       noAchievementPlatforms.some(nap => p.includes(nap))
     );
 
@@ -1724,11 +1724,11 @@ async function determineAchievementsWithAI(
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    const platformInfo = platforms && platforms.length > 0 
-      ? `Available platforms: ${platforms.join(', ')}. ` 
+    const platformInfo = platforms && platforms.length > 0
+      ? `Available platforms: ${platforms.join(', ')}. `
       : '';
-    const specificPlatformInfo = specificPlatform 
-      ? `The user is asking about the ${specificPlatform} version specifically. ` 
+    const specificPlatformInfo = specificPlatform
+      ? `The user is asking about the ${specificPlatform} version specifically. `
       : '';
     const releaseInfo = releaseDate ? `Released: ${releaseDate}. ` : '';
 
@@ -1798,14 +1798,15 @@ async function hasAchievements(
     if (detectedPlatform) {
       const lowerPlatform = detectedPlatform.toLowerCase();
       const nintendoPlatforms = [
-        'nintendo switch', 'switch', 'nsw',
+        'nintendo switch 2', 'nintendo switch', 'switch', 'nsw',
+        'nintendo ds', 'nintendo 3ds',
         'wii u', 'wii',
         'gamecube', 'game cube',
         'nintendo 64', 'n64',
         'super nintendo', 'snes',
         'nes', 'nintendo entertainment system'
       ];
-      
+
       if (nintendoPlatforms.some(np => lowerPlatform.includes(np))) {
         // Nintendo platforms don't have platform-tracked achievements
         return false;
@@ -1814,34 +1815,34 @@ async function hasAchievements(
 
     // First, try to get metadata from RAWG API
     const metadata = await fetchGameMetadataForAchievements(detectedGame);
-    
+
     // If specific platform is mentioned, check if that platform supports achievements
     if (detectedPlatform && metadata.platforms) {
       const lowerPlatform = detectedPlatform.toLowerCase();
-      const platformMatches = metadata.platforms.some(p => 
+      const platformMatches = metadata.platforms.some(p =>
         p.toLowerCase().includes(lowerPlatform)
       );
-      
+
       if (platformMatches) {
         // Use OpenAI to determine if this specific platform version has achievements
         return await determineAchievementsWithAI(
-          detectedGame, 
-          metadata.releaseDate, 
+          detectedGame,
+          metadata.releaseDate,
           metadata.platforms,
           detectedPlatform
         );
       }
     }
-    
+
     // If we have clear platform/tag information, use it
     if (metadata.platforms && metadata.platforms.length > 0) {
       // Check if all platforms are Nintendo (no achievements)
       const allNintendoPlatforms = metadata.platforms.every(p => {
         const pLower = p.toLowerCase();
-        return ['nintendo switch', 'switch', 'wii u', 'wii', 'gamecube', 
-                'nintendo 64', 'n64', 'snes', 'nes'].some(nintendo => pLower.includes(nintendo));
+        return ['nintendo switch 2', 'nintendo switch', 'switch', 'wii u', 'wii', 'gamecube',
+          'nintendo 64', 'n64', 'snes', 'nes', 'nintendo ds', 'nintendo 3ds'].some(nintendo => pLower.includes(nintendo));
       });
-      
+
       if (allNintendoPlatforms) {
         return false; // Nintendo-only = no achievements
       }
@@ -1851,7 +1852,7 @@ async function hasAchievements(
         const pLower = p.toLowerCase();
         return ['playstation', 'ps1', 'ps2', 'sega genesis', 'atari'].some(old => pLower.includes(old));
       });
-      
+
       if (allOldPlatforms) {
         return false;
       }
@@ -1859,10 +1860,10 @@ async function hasAchievements(
       // Check if any platform supports achievements (and not Nintendo-only)
       const hasAchievementPlatform = metadata.platforms.some(p => {
         const pLower = p.toLowerCase();
-        return ['xbox 360', 'xbox one', 'xbox series', 'ps3', 'ps4', 'ps5', 
-                'steam', 'pc', 'epic', 'gog'].some(mod => pLower.includes(mod));
+        return ['xbox 360', 'xbox one', 'xbox series', 'ps3', 'ps4', 'ps5',
+          'steam', 'pc', 'epic', 'gog'].some(mod => pLower.includes(mod));
       });
-      
+
       // If it's multi-platform with both achievement and non-achievement platforms
       // Use OpenAI to determine based on context
       if (hasAchievementPlatform) {
@@ -1870,17 +1871,17 @@ async function hasAchievements(
           const pLower = p.toLowerCase();
           return ['nintendo switch', 'switch', 'wii'].some(nintendo => pLower.includes(nintendo));
         });
-        
+
         if (hasNintendoPlatform && !detectedPlatform) {
           // Multi-platform game with Nintendo version - use AI to determine
           return await determineAchievementsWithAI(
-            detectedGame, 
-            metadata.releaseDate, 
+            detectedGame,
+            metadata.releaseDate,
             metadata.platforms,
             detectedPlatform
           );
         }
-        
+
         return true; // Has achievement platform and not Nintendo-only
       }
     }
@@ -1891,8 +1892,8 @@ async function hasAchievements(
       if (releaseYear < 2005 && (!metadata.platforms || metadata.platforms.length === 0)) {
         // Use OpenAI as fallback to be sure
         return await determineAchievementsWithAI(
-          detectedGame, 
-          metadata.releaseDate, 
+          detectedGame,
+          metadata.releaseDate,
           metadata.platforms,
           detectedPlatform
         );
@@ -1920,8 +1921,8 @@ async function hasAchievements(
     // If metadata suggests no achievements, use OpenAI to confirm
     if (!metadata.hasAchievements && metadata.releaseDate) {
       const aiResult = await determineAchievementsWithAI(
-        detectedGame, 
-        metadata.releaseDate, 
+        detectedGame,
+        metadata.releaseDate,
         metadata.platforms,
         detectedPlatform
       );
@@ -1935,12 +1936,12 @@ async function hasAchievements(
         const pLower = p.toLowerCase();
         return ['nintendo switch', 'switch', 'wii'].some(nintendo => pLower.includes(nintendo));
       });
-      
+
       if (hasNintendo && !detectedPlatform) {
         // Multi-platform with Nintendo - verify with AI
         return await determineAchievementsWithAI(
-          detectedGame, 
-          metadata.releaseDate, 
+          detectedGame,
+          metadata.releaseDate,
           metadata.platforms,
           detectedPlatform
         );
@@ -2029,23 +2030,23 @@ async function generateAchievementStrategies(
     if (detectedGame) {
       strategies.push(`🏆 For ${detectedGame}, plan your route: identify achievements that can be completed together`);
       strategies.push(`📋 Create a checklist for ${detectedGame}: track which achievements you've completed`);
-      
+
       // Only mention multiple playthroughs if it makes sense for the game type
       if (hasFreeRoam || patterns.difficulty.currentLevel === 'advanced') {
         strategies.push(`⏱️ Some achievements in ${detectedGame} require multiple playthroughs - plan accordingly`);
       }
-      
+
       if (patterns.difficulty.currentLevel === 'advanced') {
         strategies.push(`⚡ Optimize achievement runs in ${detectedGame}: combine speedrun techniques with achievement hunting`);
       }
     } else {
       strategies.push('🏆 Plan your route: identify achievements that can be completed together');
       strategies.push('📋 Create a checklist: track which achievements you\'ve completed');
-      
+
       if (hasFreeRoam || patterns.difficulty.currentLevel === 'advanced') {
         strategies.push('⏱️ Some achievements require multiple playthroughs - plan accordingly');
       }
-      
+
       if (patterns.difficulty.currentLevel === 'advanced') {
         strategies.push('⚡ Optimize achievement runs: combine speedrun techniques with achievement hunting');
       }
@@ -2062,16 +2063,16 @@ async function generateAchievementStrategies(
       } else {
         strategies.push(`🎯 In ${detectedGame}, focus on missable achievements first: some may be locked after certain story points`);
       }
-      
+
       strategies.push(`💡 Check achievement descriptions in ${detectedGame}: many have hidden requirements or conditions`);
-      
+
       // Only mention saving if the game has save mechanics (not arcade-style)
-      const isArcadeStyle = detectedGenres.some(g => 
-        ['arcade', 'boss-rush', 'run-and-gun', 'shoot-em-up'].some(tag => 
+      const isArcadeStyle = detectedGenres.some(g =>
+        ['arcade', 'boss-rush', 'run-and-gun', 'shoot-em-up'].some(tag =>
           g.toLowerCase().includes(tag.toLowerCase())
         )
       );
-      
+
       if (!isArcadeStyle) {
         strategies.push(`🔄 Save before challenging achievements in ${detectedGame}: allows retries without full restarts`);
       }
@@ -2081,15 +2082,15 @@ async function generateAchievementStrategies(
       } else {
         strategies.push('🎯 Focus on missable achievements first: some may be locked after certain story points');
       }
-      
+
       strategies.push('💡 Check achievement descriptions: many have hidden requirements or conditions');
-      
-      const isArcadeStyle = detectedGenres.some(g => 
-        ['arcade', 'boss-rush', 'run-and-gun', 'shoot-em-up'].some(tag => 
+
+      const isArcadeStyle = detectedGenres.some(g =>
+        ['arcade', 'boss-rush', 'run-and-gun', 'shoot-em-up'].some(tag =>
           g.toLowerCase().includes(tag.toLowerCase())
         )
       );
-      
+
       if (!isArcadeStyle) {
         strategies.push('🔄 Save before challenging achievements: allows retries without full restarts');
       }
@@ -2132,7 +2133,7 @@ async function generateStrategyTips(
     const topGenre = patterns.genreAnalysis.topGenres[0]?.genre || '';
     const currentLevel = patterns.difficulty.currentLevel;
     const playstyleTags = preferences?.playstyleTags || [];
-    
+
     // Genre-specific general tips (prioritize these)
     // Include game name if detected
     if (topGenre.includes('platformer') || topGenre.includes('Platformer')) {
@@ -2168,11 +2169,11 @@ async function generateStrategyTips(
         tips.push('📊 Pro tip: Experiment with different character builds early on. Finding a playstyle that matches your preferences makes the game much more enjoyable.');
       }
     }
-    
+
     // Add loadout suggestions if relevant to genre
     const loadoutSuggestions = generateLoadoutSuggestions(patterns, context, preferences);
     tips.push(...loadoutSuggestions);
-    
+
     // Difficulty-based general tips
     if (currentLevel === 'intermediate') {
       if (detectedGame) {
@@ -2187,7 +2188,7 @@ async function generateStrategyTips(
         tips.push('🔥 As an advanced player, focus on optimization and efficiency. Study high-level play to discover techniques you might not have considered.');
       }
     }
-    
+
     // Playstyle-based general tips
     if (playstyleTags.includes('explorer')) {
       if (detectedGame) {
@@ -2203,11 +2204,11 @@ async function generateStrategyTips(
         tips.push('📊 Your strategic mindset means you enjoy planning. Take time to analyze game mechanics and plan your approach before diving in.');
       }
     }
-    
+
     // Add exploration and achievement tips (these are always relevant)
     const explorationTips = generateExplorationTips(patterns, preferences, context);
     tips.push(...explorationTips);
-    
+
     const achievementStrategies = await generateAchievementStrategies(patterns, preferences, context);
     tips.push(...achievementStrategies);
   } else {
@@ -2326,7 +2327,7 @@ async function generateStrategyTips(
 
   // Remove duplicates and limit to 8 tips (increased from 5 for more comprehensive suggestions)
   const uniqueTips = Array.from(new Set(tips));
-  
+
   return {
     tips: uniqueTips.slice(0, 8),
     category,
@@ -2351,19 +2352,19 @@ function generateGameProgression(
   const detectedGame = context?.detectedGame;
   const questionCategory = context?.questionCategory;
   const detectedGenres = context?.detectedGenre || [];
-  
+
   // Use detected genres from context if available, otherwise use historical patterns
-  const genreToUse = detectedGenres.length > 0 
-    ? detectedGenres[0] 
+  const genreToUse = detectedGenres.length > 0
+    ? detectedGenres[0]
     : topGenre;
 
   // Context-aware progression based on current question
   if (detectedGame && questionCategory) {
     // For dungeon/temple questions (level_walkthrough)
     if (questionCategory === 'level_walkthrough') {
-      if (currentQuestion && (currentQuestion.toLowerCase().includes('temple') || 
-                              currentQuestion.toLowerCase().includes('dungeon') ||
-                              currentQuestion.toLowerCase().includes('level'))) {
+      if (currentQuestion && (currentQuestion.toLowerCase().includes('temple') ||
+        currentQuestion.toLowerCase().includes('dungeon') ||
+        currentQuestion.toLowerCase().includes('level'))) {
         progression.push(`🗺️ In ${detectedGame}, practice dungeon navigation: learn to read maps and remember layouts`);
         progression.push(`🧩 Master puzzle-solving patterns in ${detectedGame}: many dungeons reuse similar mechanics`);
         progression.push(`🔍 In ${detectedGame}, develop your observation skills: secrets and switches are often hidden in plain sight`);
@@ -2420,7 +2421,7 @@ function generateGameProgression(
       progression.push('⚔️ Try games with multiple difficulty settings: gradually increase challenge');
       progression.push('🏆 Move from single-player to multiplayer modes to test your skills');
       progression.push('📈 Progress through game series in order: build on mechanics you\'ve learned');
-      
+
       if (playstyleTags.includes('completionist')) {
         progression.push('🏅 Complete games 100% before moving on: builds mastery and understanding');
       }
@@ -2468,7 +2469,7 @@ function generateSkillBuilding(
   const questionCategory = context?.questionCategory;
 
   const detectedGame = context?.detectedGame;
-  
+
   // Context-aware skill building based on current question
   if (questionCategory === 'boss_fight') {
     if (detectedGame) {
@@ -2633,7 +2634,7 @@ function generatePracticeAreas(
   const questionCategory = context?.questionCategory;
 
   const detectedGame = context?.detectedGame;
-  
+
   // Context-aware practice areas based on current question
   if (questionCategory === 'boss_fight') {
     if (detectedGame) {
@@ -2755,8 +2756,8 @@ function generateLearningPath(
       suggestions.push(`Test your strategy in different situations - see how well it adapts in ${detectedGame}`);
     } else if (questionCategory === 'level_walkthrough' || questionCategory === 'item_lookup') {
       // Check if question mentions temple, dungeon, or specific area
-      if (lowerQuestion.includes('temple') || lowerQuestion.includes('dungeon') || 
-          lowerQuestion.includes('clear') || lowerQuestion.includes('complete')) {
+      if (lowerQuestion.includes('temple') || lowerQuestion.includes('dungeon') ||
+        lowerQuestion.includes('clear') || lowerQuestion.includes('complete')) {
         suggestions.push(`In ${detectedGame}, take your time navigating this area - rushing can cause you to miss important switches or keys`);
         suggestions.push(`For ${detectedGame}, practice reading maps and remembering layouts - dungeons often require backtracking`);
         suggestions.push(`In ${detectedGame}, look for visual patterns - many puzzles use similar mechanics you can recognize`);
@@ -2768,9 +2769,9 @@ function generateLearningPath(
       }
     } else if (questionCategory === 'general_gameplay' && detectedGame) {
       // For general gameplay questions, check if it mentions temple/dungeon/area
-      if (lowerQuestion.includes('temple') || lowerQuestion.includes('dungeon') || 
-          lowerQuestion.includes('clear') || lowerQuestion.includes('complete') ||
-          lowerQuestion.includes('area') || lowerQuestion.includes('level')) {
+      if (lowerQuestion.includes('temple') || lowerQuestion.includes('dungeon') ||
+        lowerQuestion.includes('clear') || lowerQuestion.includes('complete') ||
+        lowerQuestion.includes('area') || lowerQuestion.includes('level')) {
         suggestions.push(`In ${detectedGame}, take your time navigating this area - rushing can cause you to miss important switches or keys`);
         suggestions.push(`For ${detectedGame}, practice reading maps and remembering layouts - dungeons often require backtracking`);
         suggestions.push(`In ${detectedGame}, look for visual patterns - many puzzles use similar mechanics you can recognize`);
@@ -2807,14 +2808,14 @@ function generateLearningPath(
   // 3. Suggested progression for games (context-aware)
   // Always try to get contextual progression, but use it to supplement or replace generic suggestions
   const gameProgression = generateGameProgression(patterns, preferences, context, currentQuestion);
-  
+
   if (suggestions.length === 0) {
     // No contextual suggestions yet - use progression
     suggestions.push(...gameProgression);
   } else if (suggestions.length < 4) {
     // We have some contextual suggestions, but need more - add contextual progression
     // Filter out generic ones that don't mention the game
-    const contextualProgression = gameProgression.filter(p => 
+    const contextualProgression = gameProgression.filter(p =>
       detectedGame ? p.includes(detectedGame) : true
     );
     suggestions.push(...contextualProgression.slice(0, 4 - suggestions.length));
@@ -2823,30 +2824,30 @@ function generateLearningPath(
   // 4. Skill building recommendations (contextualized) - only add if relevant to context
   // If we have good contextual suggestions, be very selective about adding skill building
   const skillBuilding = generateSkillBuilding(patterns, preferences, context);
-  
+
   if (detectedGame && questionCategory && suggestions.length >= 3) {
     // We have good contextual suggestions - only add skill building if it's highly relevant
     const relevantSkills = skillBuilding.filter(skill => {
       const skillLower = skill.toLowerCase();
       // For boss fights, prefer skills about patterns, dodging, timing
       if (questionCategory === 'boss_fight') {
-        return skillLower.includes('pattern') || skillLower.includes('dodge') || 
-               skillLower.includes('timing') || skillLower.includes('boss') ||
-               skillLower.includes('tell') || skillLower.includes('phase');
+        return skillLower.includes('pattern') || skillLower.includes('dodge') ||
+          skillLower.includes('timing') || skillLower.includes('boss') ||
+          skillLower.includes('tell') || skillLower.includes('phase');
       }
       // For strategy, prefer skills about builds, optimization, adaptation
       if (questionCategory === 'strategy') {
-        return skillLower.includes('build') || skillLower.includes('strategy') || 
-               skillLower.includes('optimize') || skillLower.includes('adapt');
+        return skillLower.includes('build') || skillLower.includes('strategy') ||
+          skillLower.includes('optimize') || skillLower.includes('adapt');
       }
       // For exploration, prefer skills about observation, secrets
       if (questionCategory === 'level_walkthrough' || questionCategory === 'item_lookup') {
-        return skillLower.includes('explore') || skillLower.includes('observation') || 
-               skillLower.includes('secret') || skillLower.includes('clue');
+        return skillLower.includes('explore') || skillLower.includes('observation') ||
+          skillLower.includes('secret') || skillLower.includes('clue');
       }
       return false;
     });
-    
+
     // Only add 1-2 highly relevant skills
     if (relevantSkills.length > 0) {
       suggestions.push(...relevantSkills.slice(0, 2));
@@ -2868,8 +2869,8 @@ function generateLearningPath(
       nextSteps.push(`Test this strategy against different challenges in ${detectedGame} - see how versatile it is`);
     } else if (questionCategory === 'level_walkthrough') {
       // Check if question mentions temple, dungeon, or specific area
-      if (lowerQuestion.includes('temple') || lowerQuestion.includes('dungeon') || 
-          lowerQuestion.includes('clear') || lowerQuestion.includes('complete')) {
+      if (lowerQuestion.includes('temple') || lowerQuestion.includes('dungeon') ||
+        lowerQuestion.includes('clear') || lowerQuestion.includes('complete')) {
         nextSteps.push(`Once you've cleared this area in ${detectedGame}, try applying the same navigation and puzzle-solving skills to other dungeons`);
         nextSteps.push(`Use what you learned here to tackle more challenging areas in ${detectedGame} - the skills transfer`);
         nextSteps.push(`Try finding all the secrets and collectibles in this area of ${detectedGame} - there might be more than you think`);
@@ -2880,9 +2881,9 @@ function generateLearningPath(
       }
     } else if (questionCategory === 'general_gameplay' && detectedGame) {
       // For general gameplay questions about temples/dungeons
-      if (lowerQuestion.includes('temple') || lowerQuestion.includes('dungeon') || 
-          lowerQuestion.includes('clear') || lowerQuestion.includes('complete') ||
-          lowerQuestion.includes('area') || lowerQuestion.includes('level')) {
+      if (lowerQuestion.includes('temple') || lowerQuestion.includes('dungeon') ||
+        lowerQuestion.includes('clear') || lowerQuestion.includes('complete') ||
+        lowerQuestion.includes('area') || lowerQuestion.includes('level')) {
         nextSteps.push(`Once you've cleared this area in ${detectedGame}, try applying the same navigation and puzzle-solving skills to other dungeons`);
         nextSteps.push(`Use what you learned here to tackle more challenging areas in ${detectedGame} - the skills transfer`);
         nextSteps.push(`Try finding all the secrets and collectibles in this area of ${detectedGame} - there might be more than you think`);
@@ -2915,7 +2916,7 @@ function generateLearningPath(
   // Fallback: Natural-sounding suggestions if we still don't have enough
   // Make these sound conversational and relevant
   const currentLevel = patterns.difficulty?.currentLevel || 'intermediate';
-  
+
   if (suggestions.length < 3) {
     const needed = 3 - suggestions.length;
     if (currentLevel === 'beginner') {
@@ -3033,7 +3034,7 @@ function hoursSinceLastRecommendation(user: any): number {
   const lastRecTime = new Date(user.progress.personalized.recommendationHistory.lastRecommendations);
   const now = new Date();
   const hoursDiff = (now.getTime() - lastRecTime.getTime()) / (1000 * 60 * 60);
-  
+
   return hoursDiff;
 }
 
@@ -3057,20 +3058,20 @@ export function shouldShowRecommendations(user: any): boolean {
 
   // Condition 1: User has asked at least 5 questions
   const hasEnoughQuestions = (user.conversationCount || 0) >= 5;
-  
+
   // Condition 2: User has been using the app regularly (not sporadic)
   // If sessionFrequency is "sporadic" but user has 10+ questions, they're still considered regular
   // (they may have asked questions over a longer period, but still engaged)
   const sessionFrequency = user.progress?.personalized?.gameplayPatterns?.sessionFrequency;
   const hasEnoughForPattern = (user.conversationCount || 0) >= 10;
-  const isRegularUser = sessionFrequency 
+  const isRegularUser = sessionFrequency
     ? (sessionFrequency !== 'sporadic' || hasEnoughForPattern) // If sporadic but 10+ questions, still regular
     : hasEnoughForPattern; // If no pattern yet, require 10+ questions as proxy for regular use
-  
+
   // Condition 3: User hasn't dismissed recommendations recently
   const dismissedRecently = user.progress?.personalized?.recommendationHistory?.dismissedRecently || false;
   const notDismissed = !dismissedRecently;
-  
+
   // Condition 4: Time since last recommendation > 2 hours
   const hoursSinceLast = hoursSinceLastRecommendation(user);
   const enoughTimePassed = hoursSinceLast > 2;
@@ -3167,16 +3168,16 @@ export const generatePersonalizedRecommendations = async (
   //   question: currentQuestion ? currentQuestion.substring(0, 100) : 'none',
   //   forceShow,
   // });
-  
+
   try {
     // 1. Get user data first (needed for progressive disclosure check)
     const user = await User.findOne({ username }).lean() as any;
-    
+
     // 2. Extract context from current question FIRST (before progressive disclosure check)
     // This ensures we always have context available, even if we return early
     // console.log('[Recommendations] About to extract context. currentQuestion:', currentQuestion ? currentQuestion.substring(0, 100) : 'none');
     let context: Awaited<ReturnType<typeof extractQuestionContext>> = {};
-    
+
     if (currentQuestion) {
       try {
         // console.log('[Recommendations] Calling extractQuestionContext...');
@@ -3204,7 +3205,7 @@ export const generatePersonalizedRecommendations = async (
     // Also bypass check if we have a current question with context (user is actively asking)
     const hasContextualQuestion = !!(currentQuestion && (context?.detectedGame || context?.questionCategory));
     const shouldBypassCheck = forceShow || hasContextualQuestion;
-    
+
     if (!shouldBypassCheck && !shouldShowRecommendations(user)) {
       // Return empty recommendations with a reason
       return {
@@ -3269,7 +3270,7 @@ export const generatePersonalizedRecommendations = async (
     };
   } catch (error) {
     console.error('[Recommendations] Error generating personalized recommendations:', error);
-    
+
     // Return safe defaults on error
     return {
       strategyTips: {

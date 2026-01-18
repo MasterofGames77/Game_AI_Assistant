@@ -49,6 +49,8 @@ export function getSourceName(url: string): string {
       "progameguides.com": "Pro Game Guides",
       "pushsquare.com": "Push Square",
       "powerpyx.com": "PowerPyx",
+      "serebii.net": "Serebii",
+      "bulbapedia.bulbagarden.net": "Bulbapedia",
     };
 
     // Check for exact match first
@@ -119,25 +121,25 @@ export function shortenUrl(url: string, maxLength: number = 40): string {
 export function shortenMarkdownLinks(text: string): string {
   // Match markdown links: [text](url)
   const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-  
+
   let formattedText = text;
   let match;
   const matches: Array<{ fullMatch: string; url: string }> = [];
-  
+
   // First pass: find all markdown links
   while ((match = markdownLinkRegex.exec(text)) !== null) {
     const [fullMatch, linkText, url] = match;
     matches.push({ fullMatch, url });
   }
-  
+
   // Second pass: replace all markdown links with shortened URL (inline format)
   matches.forEach(({ fullMatch, url }) => {
     const shortened = shortenUrl(url);
-    
+
     // Create a placeholder with just the shortened URL in parentheses
     // Format: (shortened-url) - matches the screenshot style
     const placeholder = `(${shortened})`;
-    
+
     // Escape special regex characters in the full match
     const escapedMatch = fullMatch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     formattedText = formattedText.replace(
@@ -145,7 +147,7 @@ export function shortenMarkdownLinks(text: string): string {
       placeholder
     );
   });
-  
+
   return formattedText;
 }
 

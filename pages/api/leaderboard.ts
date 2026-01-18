@@ -40,6 +40,7 @@ const GENRE_TO_ACHIEVEMENT_MAP: Record<string, string> = {
   'Rhythm': 'rhythmMaster',
   'Sandbox': 'sandboxBuilder',
   'Shootem Up': 'shootemUpSniper',
+  'Roguelike': 'rogueRenegade',
 };
 
 /**
