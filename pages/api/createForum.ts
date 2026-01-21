@@ -4,6 +4,7 @@ import Forum from "../../models/Forum";
 import { validateUserAuthentication, validateForumData } from "@/utils/validation";
 import { containsOffensiveContent } from "@/utils/contentModeration";
 import { checkProAccess } from "../../utils/proAccessUtil";
+import { normalizeForumCategory } from "../../utils/forumCategory";
 
 // Middleware to validate authentication
 const validateAuth = (req: NextApiRequest) => {
@@ -36,6 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Extract username and forum data from request body
     const { title, gameTitle, category, isPrivate, username } = req.body;
+    const normalizedCategory = normalizeForumCategory(category);
 
     // Validate user authentication
     const userAuthErrors = validateUserAuthentication(username);
@@ -54,7 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const forumData = {
       title,
       gameTitle,
-      category,
+      category: normalizedCategory,
       isPrivate,
       allowedUsers: isPrivate ? [username] : [],
     };
@@ -71,20 +73,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Content contains offensive language' });
     }
 
-    // Check if a public forum with the same game and category already exists
-    // This prevents duplicate forums like "Story of Seasons - General Discussion" being created multiple times
+    // Check if a public forum with the same game, category, AND title already exists
+    // This prevents duplicate forums like "Story of Seasons - General Discussion" being created multiple times,
+    // while still allowing multiple forums per game/category as long as titles are unique.
     // Note: Private forums are allowed to have duplicates since they're user-specific
-    if (!isPrivate && gameTitle && category) {
+    if (!isPrivate && gameTitle && normalizedCategory && title) {
       const existingForum = await Forum.findOne({
         gameTitle: { $regex: new RegExp(`^${gameTitle}$`, 'i') }, // Case-insensitive match
-        category: category,
+        category: normalizedCategory,
+        title: { $regex: new RegExp(`^${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }, // Case-insensitive exact title
         isPrivate: false,
         'metadata.status': 'active'
       }).lean() as any;
 
       if (existingForum) {
         return res.status(409).json({ 
-          error: `A public forum for "${gameTitle}" with category "${category}" already exists. Please post in the existing forum or choose a different category.`,
+          error: `A public forum titled "${title}" for "${gameTitle}" (category "${normalizedCategory}") already exists. Please post in the existing forum or choose a different title.`,
           existingForum: {
             forumId: existingForum.forumId,
             title: existingForum.title,
@@ -102,7 +106,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       forumId,
       title,
       gameTitle,
-      category,
+      category: normalizedCategory,
       isPrivate: !!isPrivate,
       allowedUsers: isPrivate ? [username] : [],
       createdBy: username,
@@ -114,7 +118,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         viewedBy: [],
         status: "active",
         gameTitle,
-        category
+        category: normalizedCategory
       },
     });
 

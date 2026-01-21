@@ -41,13 +41,13 @@ async function selectModelForAutomatedUser(gameTitle: string): Promise<string> {
   const CUTOFF_YEAR = 2024; // Games released 2024+ use GPT-5.2
   const DEFAULT_MODEL = 'gpt-4o'; // Default for older games
   const SAFE_DEFAULT_MODEL = 'gpt-5.2'; // Safe default when release date unavailable (for newer games)
-  
+
   try {
     const releaseDate = await getGameReleaseDate(gameTitle);
-    
+
     if (releaseDate) {
       const releaseYear = releaseDate.getFullYear();
-      
+
       if (releaseYear >= CUTOFF_YEAR) {
         console.log(`[Automated User] ✅ Using GPT-5.2 for ${gameTitle} (released ${releaseYear}, after cutoff)`);
         return 'gpt-5.2';
@@ -59,7 +59,7 @@ async function selectModelForAutomatedUser(gameTitle: string): Promise<string> {
   } catch (error) {
     console.error(`[Automated User] ⚠️ Error determining release date for ${gameTitle}:`, error);
   }
-  
+
   // CRITICAL FIX: Default to GPT-5.2 if we can't determine release date
   // This is safer for newer games that may not be in databases yet
   // GPT-4o has knowledge cutoff of Oct 2023, so it won't know about newer games
@@ -93,6 +93,13 @@ export interface ContentGenerationOptions {
   gameTitle: string;
   genre: string;
   userPreferences: UserPreferences;
+  /** Optional multi-genre list for richer, more accurate context */
+  gameGenres?: string[];
+  /**
+   * Optional mode hint derived from presence in single-player.json and/or multiplayer.json.
+   * If omitted, generator falls back to heuristics.
+   */
+  gameModeProfile?: 'single' | 'multi' | 'hybrid' | 'unknown';
   forumTopic?: string;
   forumCategory?: string; // Category of the forum (gameplay, general, mods, etc.)
   previousPosts?: string[]; // Previous posts by this user for the same game to avoid repetition
@@ -105,6 +112,8 @@ export interface PostReplyOptions {
   genre: string;
   originalPost: string;
   originalPostAuthor: string;
+  gameGenres?: string[];
+  gameModeProfile?: 'single' | 'multi' | 'hybrid' | 'unknown';
   forumTopic?: string;
   forumCategory?: string; // Category of the forum (gameplay, general, mods, speedruns, help and supportetc.)
 }
@@ -117,19 +126,19 @@ export async function generateQuestion(
   options: ContentGenerationOptions
 ): Promise<string> {
   const { gameTitle, genre, userPreferences, previousQuestions = [], preferredQuestionTypes = [] } = options;
-  
+
   const isSinglePlayer = userPreferences.focus === 'single-player';
-  
+
   // Build previous questions context for uniqueness
   let previousQuestionsContext = '';
   if (previousQuestions.length > 0) {
-    const sameGameQuestions = previousQuestions.filter(q => 
+    const sameGameQuestions = previousQuestions.filter(q =>
       q.toLowerCase().includes(gameTitle.toLowerCase())
     );
-    const otherQuestions = previousQuestions.filter(q => 
+    const otherQuestions = previousQuestions.filter(q =>
       !q.toLowerCase().includes(gameTitle.toLowerCase())
     );
-    
+
     previousQuestionsContext = `\n\nCRITICAL - UNIQUENESS REQUIREMENTS:
 You have asked questions before (from you and other automated users). Here are previous questions to ensure your new question is UNIQUE and DIFFERENT:
 ${sameGameQuestions.length > 0 ? `\nPrevious questions about ${gameTitle}:\n${sameGameQuestions.map((q, idx) => `${idx + 1}. "${q}"`).join('\n')}` : ''}
@@ -144,7 +153,7 @@ IMPORTANT:
 - Find a COMPLETELY NEW angle or topic that hasn't been covered
 - Use a different question type (How, What, When, Which, Who, Where) to ensure variety`;
   }
-  
+
   // Add question type guidance if preferred types are provided
   let questionTypeGuidance = '';
   if (preferredQuestionTypes.length > 0) {
@@ -152,7 +161,7 @@ IMPORTANT:
 To ensure variety, try starting your question with one of these less-used question types: ${preferredQuestionTypes.join(', ')}.
 This helps ensure questions don't all start with the same word (e.g., "How...").`;
   }
-  
+
   const systemPrompt = isSinglePlayer
     ? `You are MysteriousMrEnter, a real gamer asking Video Game Wingman a direct question about ${gameTitle}.
 
@@ -265,13 +274,13 @@ Generate ONLY the direct question, nothing else:`;
     // Select model based on game release date (GPT-5.2 for 2024+ games, GPT-4o for older)
     let selectedModel = await selectModelForAutomatedUser(gameTitle);
     let lastError: Error | null = null;
-    
+
     // Retry logic: if GPT-4o fails (e.g., doesn't know about the game), try GPT-5.2
     const maxAttempts = 2;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         console.log(`[Question Generation] Attempt ${attempt}/${maxAttempts} using ${selectedModel} for ${gameTitle}`);
-        
+
         const completion = await getOpenAIClient().chat.completions.create({
           model: selectedModel,
           messages: [
@@ -289,7 +298,7 @@ Generate ONLY the direct question, nothing else:`;
         });
 
         const generatedQuestion = completion.choices[0]?.message?.content?.trim();
-        
+
         if (!generatedQuestion) {
           throw new Error('Empty response from model');
         }
@@ -309,7 +318,7 @@ Generate ONLY the direct question, nothing else:`;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         console.error(`[Question Generation] ❌ Attempt ${attempt} failed with ${selectedModel}:`, lastError.message);
-        
+
         // If we're using GPT-4o and it fails, retry with GPT-5.2 (might be a newer game)
         if (attempt < maxAttempts && selectedModel === 'gpt-4o') {
           console.log(`[Question Generation] ⚠️ GPT-4o failed, retrying with GPT-5.2 (game might be too new)`);
@@ -320,7 +329,7 @@ Generate ONLY the direct question, nothing else:`;
         }
       }
     }
-    
+
     // If we get here, all attempts failed
     throw new Error(`Failed to generate question after ${maxAttempts} attempts: ${lastError?.message || 'Unknown error'}`);
   } catch (error) {
@@ -351,13 +360,13 @@ function analyzeForumTopic(forumTopic: string | undefined, forumCategory: string
   const topicLower = (forumTopic || '').toLowerCase();
   const gameTitleLower = gameTitle.toLowerCase();
   const categoryLower = (forumCategory || '').toLowerCase();
-  
+
   // Check if this is truly a "General Discussion" (no specific topic)
-  const isGeneralDiscussion = !forumTopic || 
-    forumTopic === 'General Discussion' || 
+  const isGeneralDiscussion = !forumTopic ||
+    forumTopic === 'General Discussion' ||
     topicLower === 'general discussion' ||
     (topicLower.includes('general') && topicLower.includes('discussion'));
-  
+
   if (isGeneralDiscussion) {
     // For general discussion, use category to guide content
     if (categoryLower === 'gameplay') {
@@ -388,12 +397,12 @@ function analyzeForumTopic(forumTopic: string | undefined, forumCategory: string
     }
     return ''; // General discussion - no specific restrictions
   }
-  
+
   // Extract the specific topic from the forum title (remove game title)
   let specificTopic = topicLower.replace(gameTitleLower, '').trim();
   // Remove common forum title patterns
   specificTopic = specificTopic.replace(/^-\s*/, '').replace(/\s*-\s*general discussion$/i, '').trim();
-  
+
   // Check for character/favorite hero topics
   if (topicLower.includes('favorite') && (topicLower.includes('hero') || topicLower.includes('character'))) {
     return `CRITICAL TOPIC REQUIREMENT: This forum is specifically about FAVORITE HERO/CHARACTER. Your post MUST:
@@ -411,7 +420,7 @@ function analyzeForumTopic(forumTopic: string | undefined, forumCategory: string
 - If discussing multiple characters, make it clear which one is your favorite
 - Start your post by stating your favorite (e.g., "My favorite hero has to be...", "I'd say my favorite is...", etc.)`;
   }
-  
+
   // Check for mod-specific topics
   // Mods can include: recompiled versions, gameplay mods, graphics mods, bug fixes, content additions, ports, etc.
   // Look for mod-related keywords in the topic
@@ -421,16 +430,16 @@ function analyzeForumTopic(forumTopic: string | undefined, forumCategory: string
     'enhanced', 'improved', 'community', 'user-generated', 'sdk', 'development kit'
   ];
   const hasModKeyword = modKeywords.some(keyword => topicLower.includes(keyword));
-  
+
   // Also check category
   const isModCategory = categoryLower === 'mods';
-  
+
   if (hasModKeyword || isModCategory) {
     // Try to extract the mod name from the topic
     // Look for patterns like "GameName - ModName" or "ModName" after the game title
     let modName = '';
     const afterGameTitle = topicLower.replace(gameTitleLower, '').trim();
-    
+
     // Try to extract a specific mod name
     if (topicLower.includes('recompiled')) {
       modName = 'Recompiled';
@@ -441,9 +450,9 @@ function analyzeForumTopic(forumTopic: string | undefined, forumCategory: string
       modName = modName.replace(/\s*-\s*mods?$/i, '').replace(/\s*-\s*mod$/i, '').trim();
       if (modName.length > 30 || modName.length < 2) modName = ''; // Too long or too short, use generic
     }
-    
+
     const modNameText = modName ? ` (specifically "${modName}")` : '';
-    
+
     return `CRITICAL TOPIC REQUIREMENT: This forum is specifically about MODS or MODIFICATIONS${modNameText}. Your post MUST:
 - Discuss mods, modifications, or user-generated content for ${gameTitle}
 - If the forum title mentions a specific mod name, you MUST mention that mod by name in your post
@@ -457,7 +466,7 @@ function analyzeForumTopic(forumTopic: string | undefined, forumCategory: string
 - DO NOT just discuss the vanilla/unmodified game without mentioning mods or modifications
 - If discussing vanilla gameplay, make it clear you're comparing it to modded versions or discussing it in the context of mods`;
   }
-  
+
   // Check for gameplay category
   if (forumCategory === 'gameplay' || topicLower.includes('gameplay')) {
     return `CRITICAL TOPIC REQUIREMENT: This forum is specifically about GAMEPLAY. Your post MUST focus on:
@@ -468,7 +477,7 @@ function analyzeForumTopic(forumTopic: string | undefined, forumCategory: string
 - You can mention story/characters briefly if relevant to gameplay, but gameplay should be the PRIMARY focus
 - Focus on what you DO in the game, not what the story is about`;
   }
-  
+
   // Check for story/narrative topics
   if (topicLower.includes('story') || topicLower.includes('narrative') || topicLower.includes('plot')) {
     return `CRITICAL TOPIC REQUIREMENT: This forum is specifically about STORY/NARRATIVE. Your post MUST focus on:
@@ -476,7 +485,7 @@ function analyzeForumTopic(forumTopic: string | undefined, forumCategory: string
 - Story-related experiences, moments, or discussions
 - DO NOT focus primarily on gameplay mechanics, strategies, or tips unless they relate to story`;
   }
-  
+
   // Check for specific character mentions
   const characterMatch = topicLower.match(/(?:about|discuss|featuring|with)\s+([a-z\s]+?)(?:\s+in\s+|\s*$|$)/i);
   if (characterMatch && !topicLower.includes('favorite')) {
@@ -488,13 +497,13 @@ function analyzeForumTopic(forumTopic: string | undefined, forumCategory: string
 - DO NOT just discuss the game in general without addressing this character`;
     }
   }
-  
+
   // If there's a specific topic extracted, ensure it's addressed
   // This handles any custom forum topic dynamically
   if (specificTopic && specificTopic.length > 5 && !specificTopic.includes('general')) {
     // Check if it's a question format (e.g., "How to...", "Best way to...")
     const isQuestionFormat = /^(how|what|when|where|why|which|best|top|worst|should|can|do|does|did)/i.test(specificTopic.trim());
-    
+
     if (isQuestionFormat) {
       return `CRITICAL TOPIC REQUIREMENT: This forum is specifically about "${specificTopic}". Your post MUST:
 - Directly address or answer the question/topic: "${specificTopic}"
@@ -509,7 +518,7 @@ function analyzeForumTopic(forumTopic: string | undefined, forumCategory: string
 - If the topic asks about something specific (like a character, mechanic, or feature), make sure you discuss that specific thing`;
     }
   }
-  
+
   // If no specific topic requirements were found, return empty string
   // This allows general discussion without restrictions
   return ''; // No specific requirements
@@ -522,20 +531,26 @@ export async function generateForumPost(
   options: ContentGenerationOptions
 ): Promise<string> {
   const { gameTitle, genre, userPreferences, forumTopic, forumCategory, previousPosts = [] } = options;
-  
+
   const isSinglePlayer = userPreferences.focus === 'single-player';
   // Determine if this is for InterdimensionalHipster by checking if they have both types of genres
-  const isInterdimensionalHipster = userPreferences.genres.length > 5 && 
+  const isInterdimensionalHipster = userPreferences.genres.length > 5 &&
     userPreferences.genres.some(g => ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer'].includes(g)) &&
     userPreferences.genres.some(g => ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox'].includes(g));
-  
+
   // Check if this is a single-player or multiplayer game based on genre
   const singlePlayerGenres = ['rpg', 'adventure', 'simulation', 'puzzle', 'platformer'];
-  const isSinglePlayerGame = singlePlayerGenres.includes(genre.toLowerCase());
-  
+  const inferredFromGenre = singlePlayerGenres.includes(genre.toLowerCase());
+  const modeProfile = options.gameModeProfile || 'unknown';
+  const isHybridGame = modeProfile === 'hybrid';
+  const isSinglePlayerGame = modeProfile === 'single' ? true : modeProfile === 'multi' ? false : inferredFromGenre;
+  const modeGuidance = isHybridGame
+    ? `NOTE: ${gameTitle} may have BOTH single-player and multiplayer/online content. Focus on the forum category and your perspective. Do NOT claim the game has "no single-player" or "no multiplayer" unless you are absolutely certain.`
+    : '';
+
   // Analyze forum topic to get topic-specific requirements
   const topicRequirements = analyzeForumTopic(forumTopic, forumCategory, gameTitle);
-  
+
   // Build previous posts context if available
   let previousPostsContext = '';
   if (previousPosts.length > 0) {
@@ -558,7 +573,7 @@ export async function generateForumPost(
         uniqueTopics.push(topic);
       }
     });
-    
+
     // Build topic-specific uniqueness guidance
     let uniquenessGuidance = '';
     if (topicRequirements) {
@@ -591,11 +606,11 @@ ${uniqueTopics.length > 0 ? `- AVOID these specific topics that you've already d
 - Avoid repeating similar themes, topics, or experiences from previous posts
 - Think of a completely different aspect of the game: characters, story, items, secrets, different areas, different mechanics, different experiences`;
     }
-    
+
     // Determine if these are posts from the same user or other automated users
     const automatedUsers = ['MysteriousMrEnter', 'WaywardJammer', 'InterdimensionalHipster'];
     const isMultipleUsers = previousPosts.length > 0; // Simplified check
-    
+
     previousPostsContext = `\n\nCRITICAL: Here are previous posts about ${gameTitle} (from you and other automated users) to ensure your new post is UNIQUE and DIFFERENT:
 ${previousPosts.map((post, idx) => `${idx + 1}. "${post}"`).join('\n')}
 
@@ -619,7 +634,10 @@ You're posting in a forum about ${gameTitle}. Generate a natural forum post that
 ${topicRequirements ? `\n${topicRequirements}\n` : ''}
 
 CRITICAL ACCURACY REQUIREMENTS:
-- ${isSinglePlayerGame ? 'This is a SINGLE-PLAYER game - do NOT mention multiplayer, online matches, or competitive play features' : 'This is a MULTIPLAYER game - focus on online, competitive, or multiplayer features'}
+- ${isSinglePlayerGame
+      ? 'Focus mainly on single-player aspects, but do NOT claim the game has no multiplayer/online modes unless you are absolutely certain.'
+      : 'Focus mainly on multiplayer/online/competitive aspects, but do NOT claim the game has no single-player content unless you are absolutely certain.'}
+- ${modeGuidance ? modeGuidance : ''}
 - Spell character names, locations, and game terms CORRECTLY - double-check spelling before generating
 - Only mention features that actually exist in ${gameTitle} - do NOT make up features or mechanics
 - If you're unsure about a character name or feature, either omit it or use generic terms
@@ -633,13 +651,13 @@ IMPORTANT:
 - CRITICAL: Your post MUST be completely unique and different from ALL previous posts shown above (whether from you or other automated users). Avoid similar topics, characters, experiences, or phrasing.${previousPostsContext}
 
 Game: ${gameTitle}
-Genre: ${genre} (${isSinglePlayerGame ? 'Single-player' : 'Multiplayer'} focus)
+${options.gameGenres && options.gameGenres.length > 0 ? `Game Genres (multi-genre possible): ${options.gameGenres.join(', ')}\n` : ''}Genre: ${genre} (${isHybridGame ? 'Hybrid' : isSinglePlayerGame ? 'Single-player' : 'Multiplayer'} focus)
 Forum Topic: ${forumTopic || 'General Discussion'}
 Forum Category: ${forumCategory || 'general'}
 
 Generate ONLY the post content, nothing else:`
     : isSinglePlayer
-    ? `You are MysteriousMrEnter, a real gamer who loves single-player RPGs, adventure games, simulation games, puzzle games, and platformers.
+      ? `You are MysteriousMrEnter, a real gamer who loves single-player RPGs, adventure games, simulation games, puzzle games, and platformers.
 You're posting in a forum about ${gameTitle}. Generate a natural forum post that:
 - MUST mention the game title "${gameTitle}" in the post (this is required)
 - Sounds like a real person wrote it (NOT AI-generated - avoid phrases like "As an AI", "I would like to", "Hello", "In conclusion", etc.)
@@ -664,7 +682,7 @@ Forum Topic: ${forumTopic || 'General Discussion'}
 Forum Category: ${forumCategory || 'general'}
 
 Generate ONLY the post content, nothing else:`
-    : `You are WaywardJammer, a real gamer who loves multiplayer racing games, battle royale games, fighting games, first-person shooters, and sandbox games.
+      : `You are WaywardJammer, a real gamer who loves multiplayer racing games, battle royale games, fighting games, first-person shooters, and sandbox games.
 You're posting in a forum about ${gameTitle}. Generate a natural forum post that:
 - MUST mention the game title "${gameTitle}" in the post (this is required)
 - Sounds like a real person wrote it (NOT AI-generated - avoid phrases like "As an AI", "I would like to", "Hello", "In conclusion", etc.)
@@ -694,13 +712,13 @@ Generate ONLY the post content, nothing else:`;
     // Select model based on game release date (GPT-5.2 for 2024+ games, GPT-4o for older)
     let selectedModel = await selectModelForAutomatedUser(gameTitle);
     let lastError: Error | null = null;
-    
+
     // Retry logic: if GPT-4o fails (e.g., doesn't know about the game), try GPT-5.2
     const maxAttempts = 2;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         console.log(`[Forum Post Generation] Attempt ${attempt}/${maxAttempts} using ${selectedModel} for ${gameTitle}`);
-        
+
         const completion = await getOpenAIClient().chat.completions.create({
           model: selectedModel,
           messages: [
@@ -718,7 +736,7 @@ Generate ONLY the post content, nothing else:`;
         });
 
         const generatedPost = completion.choices[0]?.message?.content?.trim();
-        
+
         if (!generatedPost) {
           throw new Error('Empty response from model');
         }
@@ -738,7 +756,7 @@ Generate ONLY the post content, nothing else:`;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         console.error(`[Forum Post Generation] ❌ Attempt ${attempt} failed with ${selectedModel}:`, lastError.message);
-        
+
         // If we're using GPT-4o and it fails, retry with GPT-5.2 (might be a newer game)
         if (attempt < maxAttempts && selectedModel === 'gpt-4o') {
           console.log(`[Forum Post Generation] ⚠️ GPT-4o failed, retrying with GPT-5.2 (game might be too new)`);
@@ -749,7 +767,7 @@ Generate ONLY the post content, nothing else:`;
         }
       }
     }
-    
+
     // If we get here, all attempts failed
     throw new Error(`Failed to generate forum post after ${maxAttempts} attempts: ${lastError?.message || 'Unknown error'}`);
   } catch (error) {
@@ -766,14 +784,20 @@ export async function generatePostReply(
   options: PostReplyOptions
 ): Promise<string> {
   const { gameTitle, genre, originalPost, originalPostAuthor, forumTopic, forumCategory } = options;
-  
+
   // Determine if this is a single-player or multiplayer game based on genre
   const singlePlayerGenres = ['rpg', 'adventure', 'simulation', 'puzzle', 'platformer'];
-  const isSinglePlayerGame = singlePlayerGenres.includes(genre.toLowerCase());
-  
+  const inferredFromGenre = singlePlayerGenres.includes(genre.toLowerCase());
+  const modeProfile = options.gameModeProfile || 'unknown';
+  const isHybridGame = modeProfile === 'hybrid';
+  const isSinglePlayerGame = modeProfile === 'single' ? true : modeProfile === 'multi' ? false : inferredFromGenre;
+  const modeGuidance = isHybridGame
+    ? `NOTE: ${gameTitle} may have BOTH single-player and multiplayer/online content. Focus on the forum category and the original post. Do NOT claim the game has "no single-player" or "no multiplayer" unless you are absolutely certain.`
+    : '';
+
   // Analyze forum topic to get topic-specific requirements
   const topicRequirements = analyzeForumTopic(forumTopic, forumCategory, gameTitle);
-  
+
   const systemPrompt = `You are InterdimensionalHipster, a knowledgeable and helpful gamer who loves both single-player and multiplayer games.
 You're replying to a post in a forum about ${gameTitle}. The original post was written by ${originalPostAuthor}.
 
@@ -792,7 +816,10 @@ Generate a natural, helpful forum reply that:
 ${topicRequirements ? `\n${topicRequirements}\n` : ''}
 
 CRITICAL ACCURACY REQUIREMENTS:
-- ${isSinglePlayerGame ? 'This is a SINGLE-PLAYER game - do NOT mention multiplayer, online matches, or competitive play features' : 'This is a MULTIPLAYER game - focus on online, competitive, or multiplayer features'}
+- ${isSinglePlayerGame
+      ? 'Focus mainly on single-player aspects, but do NOT claim the game has no multiplayer/online modes unless you are absolutely certain.'
+      : 'Focus mainly on multiplayer/online/competitive aspects, but do NOT claim the game has no single-player content unless you are absolutely certain.'}
+- ${modeGuidance ? modeGuidance : ''}
 - Spell character names, locations, and game terms CORRECTLY - double-check spelling before generating (e.g., "Taion" not "Tion" in Xenoblade Chronicles 3)
 - Only mention features that actually exist in ${gameTitle} - do NOT make up features or mechanics
 - If you're unsure about a character name or feature, either omit it or use generic terms
@@ -806,7 +833,7 @@ IMPORTANT:
 - MOST IMPORTANTLY: Your reply MUST stay relevant to the forum topic "${forumTopic || 'General Discussion'}" - ensure your response addresses the forum's specific topic
 
 Game: ${gameTitle}
-Genre: ${genre} (${isSinglePlayerGame ? 'Single-player' : 'Multiplayer'} focus)
+${options.gameGenres && options.gameGenres.length > 0 ? `Game Genres (multi-genre possible): ${options.gameGenres.join(', ')}\n` : ''}Genre: ${genre} (${isHybridGame ? 'Hybrid' : isSinglePlayerGame ? 'Single-player' : 'Multiplayer'} focus)
 Forum Topic: ${forumTopic || 'General Discussion'}
 Forum Category: ${forumCategory || 'general'}
 Original Post Author: ${originalPostAuthor}
@@ -820,13 +847,13 @@ Generate ONLY the reply content, nothing else:`;
     // Select model based on game release date (GPT-5.2 for 2024+ games, GPT-4o for older)
     let selectedModel = await selectModelForAutomatedUser(gameTitle);
     let lastError: Error | null = null;
-    
+
     // Retry logic: if GPT-4o fails (e.g., doesn't know about the game), try GPT-5.2
     const maxAttempts = 2;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         console.log(`[Post Reply Generation] Attempt ${attempt}/${maxAttempts} using ${selectedModel} for ${gameTitle}`);
-        
+
         const completion = await getOpenAIClient().chat.completions.create({
           model: selectedModel,
           messages: [
@@ -844,7 +871,7 @@ Generate ONLY the reply content, nothing else:`;
         });
 
         const generatedReply = completion.choices[0]?.message?.content?.trim();
-        
+
         if (!generatedReply) {
           throw new Error('Empty response from model');
         }
@@ -864,7 +891,7 @@ Generate ONLY the reply content, nothing else:`;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         console.error(`[Post Reply Generation] ❌ Attempt ${attempt} failed with ${selectedModel}:`, lastError.message);
-        
+
         // If we're using GPT-4o and it fails, retry with GPT-5.2 (might be a newer game)
         if (attempt < maxAttempts && selectedModel === 'gpt-4o') {
           console.log(`[Post Reply Generation] ⚠️ GPT-4o failed, retrying with GPT-5.2 (game might be too new)`);
@@ -875,7 +902,7 @@ Generate ONLY the reply content, nothing else:`;
         }
       }
     }
-    
+
     // If we get here, all attempts failed
     throw new Error(`Failed to generate post reply after ${maxAttempts} attempts: ${lastError?.message || 'Unknown error'}`);
   } catch (error) {
@@ -894,18 +921,86 @@ export async function generateCommonGamerPost(
   }
 ): Promise<string> {
   const { gameTitle, genre, gamerProfile, username, forumTopic, forumCategory, previousPosts = [] } = options;
-  
+
   if (!gamerProfile || gamerProfile.type !== 'common') {
     throw new Error('Invalid gamer profile for COMMON gamer post');
   }
 
+  // Analyze forum topic to get topic/category-specific requirements (keeps COMMON gamers on-topic)
+  const topicRequirements = analyzeForumTopic(forumTopic, forumCategory, gameTitle);
+  const categoryLower = (forumCategory || 'general').toLowerCase();
+
   // Find a struggle from their favorite games that matches the current game
   const gameStruggles = gamerProfile.favoriteGames
     .find(g => g.gameTitle.toLowerCase() === gameTitle.toLowerCase())?.currentStruggles || [];
-  
-  const specificIssue = gameStruggles.length > 0 
+
+  // Category-aware issues: if the user's stored struggles don't match the forum category,
+  // fall back to a category-appropriate issue so posts stay aligned with the forum.
+  const categoryIssueFallbacks: Record<string, string[]> = {
+    mods: [
+      'having trouble installing a mod',
+      'running into mod compatibility issues',
+      'figuring out load order or mod conflicts',
+      'getting a mod to work after a game update',
+      'trying to find a safe, reputable mod setup'
+    ],
+    speedruns: [
+      'trying to learn a consistent route',
+      'losing time on a tricky section and not sure what the right strat is',
+      'struggling to execute a consistent skip or setup',
+      'not sure how to practice splits and pacing effectively',
+      'having trouble keeping runs consistent without resets'
+    ],
+    gameplay: [
+      'having trouble with a specific mechanic',
+      'struggling to execute a consistent combo or timing window',
+      'getting stuck on a boss or tough encounter',
+      'not sure what the best approach is for a tricky section',
+      'having trouble understanding a game system'
+    ],
+    help: [
+      'having trouble with a specific part',
+      'stuck and not sure what I’m missing',
+      'running into a frustrating issue and could use advice',
+      'trying a few things but nothing’s working',
+      'not sure how to progress from here'
+    ],
+    general: [
+      'a bit confused about how something works',
+      'trying to get better but keep messing up',
+      'not sure if I’m approaching something the right way',
+      'stuck on a specific part and could use pointers',
+      'having trouble with a specific part'
+    ]
+  };
+
+  const looksLikeCategory = (text: string, category: string): boolean => {
+    const t = (text || '').toLowerCase();
+    if (!t) return false;
+    switch (category) {
+      case 'mods':
+        return /mod|mods|modding|install|installer|load order|patch|plugin|compatib|crash|conflict|recompiled|overhaul/i.test(t);
+      case 'speedruns':
+        return /speedrun|pb|rta|il\b|route|split|strat|setup|reset|timing|skip|frame|cycle/i.test(t);
+      case 'gameplay':
+        return /combo|timing|inputs?|mechanic|strategy|strat|boss|matchup|movement|build|controls?/i.test(t);
+      case 'help':
+        return /help|stuck|any tips|any advice|can't|cannot|trouble|issue|problem|how do i|what should i/i.test(t);
+      default:
+        return true;
+    }
+  };
+
+  const pickedFromProfile = gameStruggles.length > 0
     ? gameStruggles[Math.floor(Math.random() * gameStruggles.length)]
-    : 'having trouble with a specific part';
+    : '';
+
+  const specificIssue =
+    pickedFromProfile && looksLikeCategory(pickedFromProfile, categoryLower)
+      ? pickedFromProfile
+      : (categoryIssueFallbacks[categoryLower] || categoryIssueFallbacks.general)[
+      Math.floor(Math.random() * (categoryIssueFallbacks[categoryLower] || categoryIssueFallbacks.general).length)
+      ];
 
   // Build context about their skill level and struggles
   const skillContext = `You have a skill level of ${gamerProfile.skillLevel}/10, which means you're still learning and often struggle with ${gamerProfile.skillLevel <= 2 ? 'basic mechanics and understanding game systems' : gamerProfile.skillLevel <= 4 ? 'intermediate challenges and optimization' : 'advanced techniques'}.`;
@@ -931,11 +1026,17 @@ Generate a forum post that:
 - Describes your specific problem or challenge in ${gameTitle}
 - Mentions what you've tried (even if it didn't work)
 - Asks for help in a genuine, relatable way that matches your skill level
+- Stays aligned with the forum category "${forumCategory || 'general'}" (do NOT drift into other categories)
+- If the forum category is "Mods", your help request must be specifically about modding/mod installation/compatibility
+- If the forum category is "Speedruns", your help request must be specifically about speedrunning routes/strats/consistency
+- If the forum category is "Gameplay", your help request must be specifically about gameplay mechanics/strategy/execution
 - References your struggles naturally (don't over-explain your skill level, just show it through your language)
 - Is 2-4 sentences long
 - Sounds like a real person struggling with the game
 - Uses casual gaming language that matches your communication style
 - Shows you're genuinely stuck and need help
+
+${topicRequirements ? `\n${topicRequirements}\n` : ''}
 
 CRITICAL ACCURACY REQUIREMENTS:
 - Spell character names, locations, and game terms CORRECTLY
@@ -946,6 +1047,7 @@ IMPORTANT:
 - Do NOT use formal language or AI-related phrases
 - You MUST include the game title "${gameTitle}" in your post
 - Your post should reflect your skill level naturally (skill ${gamerProfile.skillLevel}/10)
+- MOST IMPORTANTLY: Your post MUST directly address and stay relevant to the forum topic "${forumTopic || 'General Discussion'}"
 - Be genuine and relatable - you're asking for help because you're stuck${previousPostsContext}
 
 Game: ${gameTitle}
@@ -959,13 +1061,13 @@ Generate ONLY the post content, nothing else:`;
     // Select model based on game release date (GPT-5.2 for 2024+ games, GPT-4o for older)
     let selectedModel = await selectModelForAutomatedUser(gameTitle);
     let lastError: Error | null = null;
-    
+
     // Retry logic: if GPT-4o fails (e.g., doesn't know about the game), try GPT-5.2
     const maxAttempts = 2;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         console.log(`[Common Gamer Post] Attempt ${attempt}/${maxAttempts} using ${selectedModel} for ${gameTitle}`);
-        
+
         const completion = await getOpenAIClient().chat.completions.create({
           model: selectedModel,
           messages: [
@@ -983,7 +1085,7 @@ Generate ONLY the post content, nothing else:`;
         });
 
         const generatedPost = completion.choices[0]?.message?.content?.trim();
-        
+
         if (!generatedPost) {
           throw new Error('Empty response from model');
         }
@@ -1002,7 +1104,7 @@ Generate ONLY the post content, nothing else:`;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         console.error(`[Common Gamer Post] ❌ Attempt ${attempt} failed with ${selectedModel}:`, lastError.message);
-        
+
         // If we're using GPT-4o and it fails, retry with GPT-5.2 (might be a newer game)
         if (attempt < maxAttempts && selectedModel === 'gpt-4o') {
           console.log(`[Common Gamer Post] ⚠️ GPT-4o failed, retrying with GPT-5.2 (game might be too new)`);
@@ -1013,7 +1115,7 @@ Generate ONLY the post content, nothing else:`;
         }
       }
     }
-    
+
     // If we get here, all attempts failed
     throw new Error(`Failed to generate COMMON gamer post after ${maxAttempts} attempts: ${lastError?.message || 'Unknown error'}`);
   } catch (error) {
@@ -1033,7 +1135,7 @@ export async function generateExpertGamerReply(
   }
 ): Promise<string> {
   const { gameTitle, genre, originalPost, originalPostAuthor, gamerProfile, username, commonGamerUsername, forumTopic, forumCategory } = options;
-  
+
   if (!gamerProfile || gamerProfile.type !== 'expert') {
     throw new Error('Invalid gamer profile for EXPERT gamer reply');
   }
@@ -1041,7 +1143,7 @@ export async function generateExpertGamerReply(
   // Find expertise from their favorite games
   const gameExpertise = gamerProfile.favoriteGames
     .find(g => g.gameTitle.toLowerCase() === gameTitle.toLowerCase())?.expertise || [];
-  
+
   const expertiseContext = gameExpertise.length > 0
     ? `Your areas of expertise in ${gameTitle}: ${gameExpertise.join(', ')}.`
     : `You've mastered ${gameTitle} with extensive experience.`;
@@ -1050,7 +1152,16 @@ export async function generateExpertGamerReply(
 
   // Determine if this is a single-player or multiplayer game
   const singlePlayerGenres = ['rpg', 'adventure', 'simulation', 'puzzle', 'platformer', 'metroidvania'];
-  const isSinglePlayerGame = singlePlayerGenres.includes(genre.toLowerCase());
+  const inferredFromGenre = singlePlayerGenres.includes(genre.toLowerCase());
+  const modeProfile = options.gameModeProfile || 'unknown';
+  const isHybridGame = modeProfile === 'hybrid';
+  const isSinglePlayerGame = modeProfile === 'single' ? true : modeProfile === 'multi' ? false : inferredFromGenre;
+  const modeGuidance = isHybridGame
+    ? `NOTE: ${gameTitle} may have BOTH single-player and multiplayer/online content. Focus on the forum category and the original post. Do NOT claim the game has "no single-player" or "no multiplayer" unless you are absolutely certain.`
+    : '';
+
+  // Keep EXPERT replies aligned with forum topic/category (mods/speedruns/gameplay/help)
+  const topicRequirements = analyzeForumTopic(forumTopic, forumCategory, gameTitle);
 
   const systemPrompt = `You are ${username}, an EXPERT gamer with skill level ${gamerProfile.skillLevel}/10.
 ${expertiseContext}
@@ -1067,9 +1178,15 @@ Generate a helpful, detailed solution reply that:
 - Is 3-5 sentences long
 - Sounds like an experienced player helping a friend
 - Matches your communication style
+- Stays aligned with the forum category "${forumCategory || 'general'}" (do NOT drift into unrelated categories)
+
+${topicRequirements ? `\n${topicRequirements}\n` : ''}
 
 CRITICAL ACCURACY REQUIREMENTS:
-- ${isSinglePlayerGame ? 'This is a SINGLE-PLAYER game - do NOT mention multiplayer features' : 'This is a MULTIPLAYER game - focus on online/competitive features'}
+- ${isSinglePlayerGame
+      ? 'Focus mainly on single-player aspects, but do NOT claim the game has no multiplayer/online modes unless you are absolutely certain.'
+      : 'Focus mainly on multiplayer/online/competitive aspects, but do NOT claim the game has no single-player content unless you are absolutely certain.'}
+- ${modeGuidance ? modeGuidance : ''}
 - Spell character names, locations, and game terms CORRECTLY
 - Only mention features that actually exist in ${gameTitle}
 - Provide accurate, actionable advice
@@ -1082,7 +1199,7 @@ IMPORTANT:
 - Reference your expertise naturally (e.g., "I've found that...", "When I play...")
 
 Game: ${gameTitle}
-Genre: ${genre} (${isSinglePlayerGame ? 'Single-player' : 'Multiplayer'} focus)
+${options.gameGenres && options.gameGenres.length > 0 ? `Game Genres (multi-genre possible): ${options.gameGenres.join(', ')}\n` : ''}Genre: ${genre} (${isHybridGame ? 'Hybrid' : isSinglePlayerGame ? 'Single-player' : 'Multiplayer'} focus)
 Forum Topic: ${forumTopic || 'General Discussion'}
 Forum Category: ${forumCategory || 'general'}
 Original Post Author: ${originalPostAuthor} (COMMON gamer)
@@ -1096,13 +1213,13 @@ Generate ONLY the reply content, nothing else:`;
     // Select model based on game release date (GPT-5.2 for 2024+ games, GPT-4o for older)
     let selectedModel = await selectModelForAutomatedUser(gameTitle);
     let lastError: Error | null = null;
-    
+
     // Retry logic: if GPT-4o fails (e.g., doesn't know about the game), try GPT-5.2
     const maxAttempts = 2;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         console.log(`[Expert Gamer Reply] Attempt ${attempt}/${maxAttempts} using ${selectedModel} for ${gameTitle}`);
-        
+
         const completion = await getOpenAIClient().chat.completions.create({
           model: selectedModel,
           messages: [
@@ -1120,7 +1237,7 @@ Generate ONLY the reply content, nothing else:`;
         });
 
         const generatedReply = completion.choices[0]?.message?.content?.trim();
-        
+
         if (!generatedReply) {
           throw new Error('Empty response from model');
         }
@@ -1139,7 +1256,7 @@ Generate ONLY the reply content, nothing else:`;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         console.error(`[Expert Gamer Reply] ❌ Attempt ${attempt} failed with ${selectedModel}:`, lastError.message);
-        
+
         // If we're using GPT-4o and it fails, retry with GPT-5.2 (might be a newer game)
         if (attempt < maxAttempts && selectedModel === 'gpt-4o') {
           console.log(`[Expert Gamer Reply] ⚠️ GPT-4o failed, retrying with GPT-5.2 (game might be too new)`);
@@ -1150,7 +1267,7 @@ Generate ONLY the reply content, nothing else:`;
         }
       }
     }
-    
+
     // If we get here, all attempts failed
     throw new Error(`Failed to generate EXPERT gamer reply after ${maxAttempts} attempts: ${lastError?.message || 'Unknown error'}`);
   } catch (error) {
@@ -1167,11 +1284,11 @@ export function extractGameTitleFromContent(content: string, expectedGameTitle: 
   // Simple check: if the expected game title appears in the content, return it
   const lowerContent = content.toLowerCase();
   const lowerExpected = expectedGameTitle.toLowerCase();
-  
+
   if (lowerContent.includes(lowerExpected)) {
     return expectedGameTitle;
   }
-  
+
   // Try to find game title patterns (words in quotes, capitalized phrases, etc.)
   // For now, return the expected title as fallback
   return expectedGameTitle;

@@ -1,130 +1,586 @@
 {
-  "platformer": [
-    "Super Mario Odyssey",
-    "Sonic Mania",
-    "Celeste",
-    "Super Meat Boy",
-    "Shovel Knight",
-    "Rayman Legends",
-    "Donkey Kong Country",
-    "Banjo Kazooie",
-    "Crash Bandicoot N-Sane Trilogy",
-    "Spyro Reignited Trilogy",
-    "A Hat in Time",
-    "Jak and Daxter: The Precursor Legacy",
-    "Donkey Kong Bananza",
-    "Sonic 3 & Knuckles",
-    "Super Castlevania IV",
-    "Kirby and the Forgotten Land",
-    "Astro Bot"
-  ],
-  "simulation": [
-    "The Sims 4",
-    "Stardew Valley",
-    "Microsoft Flight Simulator",
-    "Cities: Skylines",
-    "Animal Crossing: New Horizons",
-    "Harvest Moon",
-    "Story of Seasons",
-    "Euro Truck Simulator 2",
-    "Planet Coaster",
-    "Two Point Museum",
-    "Football Manager 2024",
-    "PowerWash Simulator"
-  ],
-  "rpg": [
-    "The Elder Scrolls V: Skyrim",
-    "Elden Ring",
-    "Persona 5: Royal",
-    "Final Fantasy VII",
-    "The Witcher 3: Wild Hunt",
-    "Disco Elysium",
-    "Paper Mario: The Thousand Year Door",
-    "Xenoblade Chronicles 3",
-    "Xenoblade Chronicles 2",
-    "Cyberpunk 2077",
-    "Pokémon Legends: Arceus",
-    "Pokémon Platinum",
-    "Final Fantasy VI",
-    "Mario and Luigi: Bowser's Inside Story",
-    "Dragon Quest XI: Echoes of an Elusive Age",
-    "Chrono Trigger"
-  ],
-  "adventure": [
-    "The Legend of Zelda: Breath of the Wild",
-    "God of War (2018)",
-    "God of War Ragnarök",
-    "Assassin's Creed Valhalla",
-    "The Last of Us",
-    "Red Dead Redemption 2",
-    "Stray",
-    "Uncharted 2: Among Thieves",
-    "Star Wars Jedi: Survivor",
-    "Baldur's Gate 3",
-    "Marvel's Spider-Man",
-    "The Legend of Zelda: Ocarina of Time",
-    "Death Stranding",
-    "Death Stranding 2: On the Beach"
-  ],
-  "puzzle": [
-    "Tetris",
-    "Bejeweled",
-    "Candy Crush Saga",
-    "Baba is You",
-    "The Witness (Game)",
-    "Portal 2",
-    "Return of the Obra Dinn",
-    "The Room (Game)",
-    "Blue Prince",
-    "Animal Well"
-  ],
-  "action": [
-    "Sekiro: Shadows Die Twice",
-    "Devil May Cry 5",
-    "Bayonetta 2",
-    "Metal Gear Rising: Revengeance",
-    "NieR: Automata",
-    "Hogwarts Legacy",
-    "The Last of Us Part II",
-    "Clair Obscur: Expedition 33",
-    "Dispatch",
-    "Grand Theft Auto V",
-    "Ghost of Tsushima"
-  ],
-  "horror": [
-    "Resident Evil 4",
-    "Resident Evil 2 Remake",
-    "Dead Space",
-    "Left for Dead",
-    "Silent Hill 2",
+  "survival-horror": [
+    "7 Days to Die",
     "Alan Wake 2",
     "Alien Isolation",
-    "Phasmophobia",
     "Amnesia: The Bunker",
-    "Until Dawn"
+    "Dead Space",
+    "Five Night's at Freddy's",
+    "Left 4 Dead 2",
+    "Phasmophobia",
+    "Resident Evil 2 Remake",
+    "Resident Evil 4",
+    "Resident Evil 7: Biohazard",
+    "Silent Hill 2",
+    "Sons of the Forest"
+  ],
+  "platformer": [
+    "A Hat in Time",
+    "Astro Bot",
+    "Banjo Kazooie",
+    "Battletoads",
+    "Celeste",
+    "Cokur's Bad Fur Day",
+    "Crash Bandicoot 4: It's About Time",
+    "Crash Bandicoot N-Sane Trilogy",
+    "Donkey Kong Bananza",
+    "Donkey Kong Country",
+    "Donkey Kong Country: Tropical Freeze",
+    "Geometry Dash",
+    "Guacamelee!",
+    "Jak and Daxter: The Precursor Legacy",
+    "Jet Set Radio",
+    "Kirby and the Forgotten Land",
+    "Kirby Planet Robobot",
+    "Mark of the Ninja",
+    "Ori and the Will of the Wisps",
+    "Pac-Man World 2",
+    "Ratchet & Clank: Going Commando",
+    "Ratchet & Clank: Rift Apart",
+    "Ratchet & Clank: Up Your Arsenal",
+    "Rayman Legends",
+    "Rayman Origins",
+    "Shovel Knight",
+    "Sonic 3 & Knuckles",
+    "Sonic Adventure 2",
+    "Sonic Mania",
+    "Sonic Unleashed",
+    "Spyro Reignited Trilogy",
+    "Super Castlevania IV",
+    "Super Mario 3D World + Bowser's Fury",
+    "Super Mario 64",
+    "Super Mario Galaxy",
+    "Super Mario Maker 2",
+    "Super Mario Odyssey",
+    "Super Mario World",
+    "Super Meat Boy"
+  ],
+  "visual novel": [
+    "Ace Attorney Investigations: Miles Edgeworth",
+    "Apollo Justice: Ace Attorney",
+    "Coffee Talk",
+    "Danganronpa 2: Goodbye Despair",
+    "Danganronpa V3: Killing Harmony",
+    "Danganronpa: Trigger Happy Havoc",
+    "Doki Doki Literature Club",
+    "Hatoful Boyfriend",
+    "Hatsune Miku: Colorful Stage",
+    "Phoenix Wright: Ace Attorney",
+    "Phoenix Wright: Ace Attorney - Dual Destinies",
+    "Phoenix Wright: Ace Attorney - Spirit of Justice",
+    "Phoenix Wright: Ace Attorney - Trials and Tribulations",
+    "Sakura Wars (2019)",
+    "Steins Gate"
+  ],
+  "rail shooter": [
+    "After Burner",
+    "Kid Icarus: Uprising",
+    "Rez",
+    "Sin & Punishment",
+    "Star Fox (1993)",
+    "Star Fox 64"
+  ],
+  "action-adventure": [
+    "Alien Isolation",
+    "ARK: Survival Evolved",
+    "Banjo Kazooie",
+    "Batman Arkham City",
+    "Batman: Arkham Asylum",
+    "Bayonetta 2",
+    "Cokur's Bad Fur Day",
+    "Death Stranding",
+    "Death Stranding 2: On the Beach",
+    "Devil May Cry 5",
+    "Dishonored 2",
+    "Donkey Kong Bananza",
+    "Ghost of Tsushima",
+    "God of War (2018)",
+    "God of War Ragnarök",
+    "Grand Theft Auto V",
+    "Like a Dragon: Ishin!",
+    "Marvel's Spider-Man",
+    "Marvel's Spider-Man: Miles Morales",
+    "Metal Gear Rising: Revengeance",
+    "Metal Gear Solid",
+    "Metal Gear Solid 2: Sons of Liberty",
+    "Metal Gear Solid Delta: Snake Eater",
+    "No Man's Sky",
+    "Palworld",
+    "Prince of Persia: The Lost Crown",
+    "Red Dead Redemption 2",
+    "Sekiro: Shadows Die Twice",
+    "Sonic Adventure 2",
+    "Sonic Unleashed",
+    "Spyro Reignited Trilogy",
+    "Star Wars Jedi: Survivor",
+    "Subnautica",
+    "Super Mario 3D World + Bowser's Fury",
+    "Super Mario 64",
+    "Super Mario Galaxy",
+    "Super Mario Odyssey",
+    "Terraria",
+    "The Binding of Issac: Afterbirth+",
+    "The Chronicles of Riddick: Escape from Butcher Bay",
+    "The Last of Us (2013)",
+    "The Legend of Zelda: Breath of the Wild",
+    "The Legend of Zelda: Ocarina of Time",
+    "The Legend of Zelda: Tears of the Kingdom",
+    "Tom Clancy’s Splinter Cell: Chaos Theory",
+    "Uncharted 2: Among Thieves",
+    "Uncharted 3: Drake's Deception",
+    "Yakuza (2005)"
   ],
   "stealth": [
-    "Metal Gear Solid",
-    "The Chronicles of Riddick: Escape from Butcher Bay",
-    "Tom Clancy’s Splinter Cell: Chaos Theory",
-    "Thief 2: The Metal Age",
-    "Metal Gear Solid Delta: Snake Eater",
+    "Alien Isolation",
     "Dishonored 2",
-    "Hitman: World of Assassination",
-    "Tenchu: Stealth Assassins",
+    "Hitman: 3",
+    "Hitman: Blood Money",
     "Mark of the Ninja",
-    "Shadow Tactics: Blades of the Shogun"
+    "Metal Gear Solid",
+    "Metal Gear Solid 2: Sons of Liberty",
+    "Metal Gear Solid Delta: Snake Eater",
+    "Shadow Tactics: Blades of the Shogun",
+    "Tenchu: Stealth Assassins",
+    "The Chronicles of Riddick: Escape from Butcher Bay",
+    "Thief II: The Metal Age",
+    "Tom Clancy’s Splinter Cell: Chaos Theory"
+  ],
+  "simulation": [
+    "Animal Crossing: New Horizons",
+    "Football Manager 2024",
+    "PowerWash Simulator",
+    "Universe Sandbox"
   ],
   "metroidvania": [
-    "Castlevania: Symphony of the Night",
-    "Bloodstained: Ritual of the Night",
-    "Hollow Knight",
-    "Dust: An Elysian Tail",
-    "Prince of Persia: The Lost Crown",
-    "Cave Story+",
-    "Ori and the Will of the Wisps",
-    "Ender Magnolia: Bloom in the Mist",
+    "Animal Well",
     "Axiom Verge",
-    "Guacamelee!"
+    "Bloodstained: Ritual of the Night",
+    "Castlevania: Order of Ecclesia",
+    "Castlevania: Portrait of Ruin",
+    "Castlevania: Symphony of the Night",
+    "Cave Story+",
+    "Dead Cells",
+    "Dust: An Elysian Tail",
+    "Ender Magnolia: Bloom in the Mist",
+    "Guacamelee!",
+    "Hollow Knight",
+    "Ori and the Will of the Wisps"
+  ],
+  "puzzle": [
+    "Animal Well",
+    "Baba is You",
+    "Candy Crush Saga",
+    "Phasmophobia",
+    "Puyo Puyo Tetris",
+    "Return of the Obra Dinn",
+    "Tetris (Game Boy, 1989)",
+    "Tetris 99",
+    "The Room (Game)",
+    "The Witness (Game)"
+  ],
+  "adventure": [
+    "Apollo Justice: Ace Attorney",
+    "Astroneer",
+    "Danganronpa 2: Goodbye Despair",
+    "Danganronpa V3: Killing Harmony",
+    "Danganronpa: Trigger Happy Havoc",
+    "Dispatch",
+    "Ori and the Will of the Wisps",
+    "Phoenix Wright: Ace Attorney",
+    "Phoenix Wright: Ace Attorney - Dual Destinies",
+    "Phoenix Wright: Ace Attorney - Spirit of Justice",
+    "Phoenix Wright: Ace Attorney - Trials and Tribulations",
+    "Return of the Obra Dinn",
+    "Stray",
+    "The Last of Us Part II"
+  ],
+  "massively multiplayer online role-playing game": [
+    "ARK: Survival Evolved"
+  ],
+  "survival": [
+    "ARK: Survival Evolved",
+    "DayZ",
+    "Grounded",
+    "Minecraft",
+    "No Man's Sky",
+    "Palworld",
+    "Raft",
+    "State of Decay 2",
+    "Subnautica",
+    "The Long Dark",
+    "Valheim"
+  ],
+  "action role-playing": [
+    "Assassin's Creed Valhalla",
+    "Bloodstained: Ritual of the Night",
+    "Borderlands 2",
+    "Borderlands 3",
+    "Castlevania: Order of Ecclesia",
+    "Castlevania: Portrait of Ruin",
+    "Castlevania: Symphony of the Night",
+    "Cyberpunk 2077",
+    "Dust: An Elysian Tail",
+    "Elden Ring",
+    "Fallout 4",
+    "Genshin Impact",
+    "Hades",
+    "Hades II",
+    "Hogwarts Legacy",
+    "Horizon Forbidden West",
+    "Kingdom Come: Deliverance",
+    "Kingdom Come: Deliverance II",
+    "Kingdom Hearts HD 2.5 ReMix",
+    "Mass Effect 2",
+    "Mass Effect 3",
+    "NieR: Automata",
+    "Path of Exile",
+    "Pokémon Legends: Arceus",
+    "Scott Pilgrim vs the World: The Game",
+    "The Elder Scrolls V: Skyrim",
+    "The Witcher 3: Wild Hunt",
+    "Xenoblade Chronicles 2",
+    "Xenoblade Chronicles 3",
+    "Xenoblade Chronicles: Definitive Edition"
+  ],
+  "sandbox": [
+    "Astroneer",
+    "Garry's Mod",
+    "Minecraft",
+    "Raft",
+    "Roblox",
+    "Terraria",
+    "Valheim"
+  ],
+  "roguelike": [
+    "Balatro",
+    "Blue Prince",
+    "Cadence of Hyrule: Crypt of the NecroDancer Featuring The Legend of Zelda",
+    "Crypt of the NecroDancer",
+    "Cult of the Lamb",
+    "Dead Cells",
+    "FTL: Faster than Light",
+    "Hades",
+    "Hades II",
+    "Pokémon Mystery Dungeon: Explorers of Sky",
+    "Returnal",
+    "Risk of Rain 2",
+    "The Binding of Issac: Afterbirth+",
+    "Vampire Survivors"
+  ],
+  "deck-building": [
+    "Balatro"
+  ],
+  "rpg": [
+    "Baldur's Gate 3",
+    "Chrono Trigger",
+    "Clair Obscur: Expedition 33",
+    "Disco Elysium",
+    "Dragon Quest V: Hand of the Heavenly Bride",
+    "Dragon Quest XI S: Echoes of an Elusive Age - Definitive Edition",
+    "Final Fantasy IX",
+    "Final Fantasy VI",
+    "Final Fantasy VII",
+    "Granblue Fantasy Versus: Rising",
+    "Honkai: Star Rail",
+    "Like a Dragon: Infinite Wealth",
+    "Mario and Luigi: Bowser's Inside Story",
+    "Mario Golf",
+    "Panzer Dragoon Saga",
+    "Paper Mario: The Thousand Year Door",
+    "Persona 4: Golden",
+    "Persona 5: Royal",
+    "Pokémon Mystery Dungeon: Explorers of Sky",
+    "Pokémon Platinum",
+    "Star Wars Knights of the Old Republic II: The Sith Lords"
+  ],
+  "beat 'em up": [
+    "Battletoads",
+    "Caste Crashers",
+    "Double Dragon",
+    "Fight'N Rage",
+    "Final Fight",
+    "Golden Axe",
+    "Guacamelee!",
+    "River City Girls",
+    "Scott Pilgrim vs the World: The Game",
+    "Sifu",
+    "Sonic Unleashed",
+    "Streets of Rage 4",
+    "TMNT: Shredder's Revenge",
+    "Yakuza (2005)"
+  ],
+  "hack and slash": [
+    "Bayonetta 2",
+    "Devil May Cry 5",
+    "Dust: An Elysian Tail",
+    "God of War (2018)",
+    "God of War Ragnarök",
+    "Like a Dragon: Ishin!",
+    "Metal Gear Rising: Revengeance",
+    "NieR: Automata",
+    "Zone of the Enders: The 2nd Runner"
+  ],
+  "rhythm": [
+    "Beat Saber",
+    "Cadence of Hyrule: Crypt of the NecroDancer Featuring The Legend of Zelda",
+    "Crypt of the NecroDancer",
+    "Friday Night Funkin'",
+    "Geometry Dash",
+    "Guitar Hero 3: Legends of Rock",
+    "Hatsune Miku: Colorful Stage",
+    "Parappa the Rapper",
+    "Rhythm Doctor",
+    "Rhythm Heaven",
+    "Rock Band 2",
+    "Samba de Amigo"
+  ],
+  "tile-matching": [
+    "Bejeweled"
+  ],
+  "puzzle-adventure": [
+    "Blue Prince"
+  ],
+  "first-person shooter": [
+    "Borderlands 2",
+    "Borderlands 3",
+    "Doom Eternal",
+    "Far Cry 5",
+    "Half-Life 2",
+    "Halo Infinite",
+    "Left 4 Dead 2",
+    "Left for Dead",
+    "Team Fortress 2",
+    "Titanfall 2"
+  ],
+  "construction and management simulation": [
+    "Cities: Skylines",
+    "Cult of the Lamb",
+    "Planet Coaster",
+    "Rimworld",
+    "Roller Coaster Tycoon 3: Complete Edition"
+  ],
+  "city building": [
+    "Cities: Skylines"
+  ],
+  "run and gun": [
+    "Cuphead"
+  ],
+  "exercise": [
+    "Dance Dance Revolution 4thMix"
+  ],
+  "music": [
+    "Dance Dance Revolution 4thMix",
+    "Dance Dance Revolution: Mario Mix",
+    "Rez",
+    "Space Channel 5"
+  ],
+  "exergaming": [
+    "Dance Dance Revolution: Mario Mix"
+  ],
+  "interactive film": [
+    "Dispatch"
+  ],
+  "fighting": [
+    "Dragon Ball FighterZ",
+    "Granblue Fantasy Versus: Rising",
+    "Guilty Gear Strive",
+    "Injustice 2",
+    "Mortal Kombat 1",
+    "Skullgirls 2nd Encore",
+    "Soulcalibur II",
+    "Street Fighter 6",
+    "Super Smash Bros. Melee",
+    "Super Smash Bros. Ultimate",
+    "Tekken 8",
+    "The King of Fighters XV",
+    "Ultimate Marvel VS. Capcom 3",
+    "Virtua Fighter 5"
+  ],
+  "sports": [
+    "EA Sports College Football 25",
+    "FIFA 18",
+    "Hot Shots Golf 3",
+    "Jet Set Radio",
+    "Madden 24",
+    "Madden NFL 2005",
+    "Mario Golf",
+    "Mario Power Tennis",
+    "Mario Superstar Baseball",
+    "MLB Slugfest 2003",
+    "MLB The Show 15",
+    "MLB The Show 20",
+    "NBA 2K11",
+    "NBA 2K20",
+    "NBA Jam (1993)",
+    "NHL 14",
+    "NHL 94",
+    "PGA Tour 2K21",
+    "Pro Evolution Soccer 2008",
+    "Super Mario Strikers",
+    "Super Mega Baseball 4",
+    "Tiger Woods PGA Tour 2004",
+    "Tony Hawk's Pro Skater 2",
+    "Wii Sports",
+    "WWE 2K19",
+    "WWE 2K22"
+  ],
+  "vehicle simulation": [
+    "Euro Truck Simulator 2"
+  ],
+  "racing": [
+    "F-Zero GX",
+    "F1 2019",
+    "F1 2020",
+    "Forza Horizon 5",
+    "Mario Kart 8 Deluxe",
+    "Need for Speed: Most Wanted (2005)",
+    "Sonic & All-Stars Racing Transformed",
+    "Sonic Racing Crossworlds",
+    "The Crew Motorfest",
+    "Wipeout Omega Collection"
+  ],
+  "tactical role-playing": [
+    "Fire Emblem Awakening",
+    "Fire Emblem: Three Houses"
+  ],
+  "point-and-click": [
+    "Five Night's at Freddy's"
+  ],
+  "sports management": [
+    "Football Manager 2024"
+  ],
+  "strategy": [
+    "FTL: Faster than Light"
+  ],
+  "third-person shooter": [
+    "Gears of War",
+    "Gears of War 2",
+    "Gears of War 3",
+    "Kid Icarus: Uprising",
+    "Mass Effect 2",
+    "Mass Effect 3",
+    "Ratchet & Clank: Going Commando",
+    "Ratchet & Clank: Rift Apart",
+    "Ratchet & Clank: Up Your Arsenal",
+    "Resident Evil 4",
+    "Returnal",
+    "Risk of Rain 2",
+    "Splatoon 2",
+    "Splatoon 3",
+    "Uncharted 2: Among Thieves",
+    "Uncharted 3: Drake's Deception",
+    "Zone of the Enders: The 2nd Runner"
+  ],
+  "sim racing": [
+    "Gran Turismo 7"
+  ],
+  "farming simulation": [
+    "Harvest Moon"
+  ],
+  "otome": [
+    "Hatoful Boyfriend"
+  ],
+  "top-down shooter": [
+    "Hotline Miami"
+  ],
+  "turn-based strategy": [
+    "Into the Breach",
+    "Sid Meier's Civilization VI"
+  ],
+  "action": [
+    "Jet Set Radio",
+    "Sakura Wars (2019)",
+    "The Last of Us Part II",
+    "War Thunder"
+  ],
+  "flight simulation": [
+    "Microsoft Flight Simulator"
+  ],
+  "photography": [
+    "New Pokémon Snap"
+  ],
+  "maze": [
+    "Pac-Man"
+  ],
+  "monster-taming": [
+    "Palworld"
+  ],
+  "social simulation": [
+    "Persona 4: Golden",
+    "Persona 5: Royal",
+    "The Sims 4"
+  ],
+  "puzzle-platformer": [
+    "Portal 2"
+  ],
+  "bullet hell": [
+    "Returnal"
+  ],
+  "game creation system": [
+    "Roblox"
+  ],
+  "massively multiplayer online": [
+    "Roblox"
+  ],
+  "dating sim": [
+    "Sakura Wars (2019)"
+  ],
+  "real-time tactics": [
+    "Shadow Tactics: Blades of the Shogun"
+  ],
+  "4X": [
+    "Sid Meier's Civilization VI"
+  ],
+  "shooting gallery": [
+    "Sin & Punishment"
+  ],
+  "roguelike deck-building": [
+    "Slay the Spire"
+  ],
+  "shoot' em up": [
+    "Star Fox 64",
+    "Vampire Survivors"
+  ],
+  "farm life simulation": [
+    "Stardew Valley",
+    "Story of Seasons (2014)"
+  ],
+  "battle-royale": [
+    "Super Animal Royale",
+    "Tetris 99"
+  ],
+  "level editor": [
+    "Super Mario Maker 2"
+  ],
+  "survival horror": [
+    "The Evil Within",
+    "Until Dawn"
+  ],
+  "light gun shooter": [
+    "The House of the Dead (1997)"
+  ],
+  "tactical shooter": [
+    "Tom Clancy's Rainbow Six Siege"
+  ],
+  "businesssimulation": [
+    "Two Point Museum"
+  ],
+  "interactive drama": [
+    "Until Dawn"
+  ],
+  "vehicular combat": [
+    "War Thunder"
+  ],
+  "combat flight simulator": [
+    "War Thunder"
+  ],
+  "turn-based tactics": [
+    "XCOM 2"
+  ],
+  "digital collectible card game": [
+    "Yu-Gi-Oh! Master Duel"
+  ],
+  "strategy game": [
+    "Yu-Gi-Oh! Master Duel"
   ]
 }

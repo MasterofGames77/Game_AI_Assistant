@@ -13,6 +13,8 @@ import { connectToWingmanDB } from './databaseConnections';
 import Forum from '../models/Forum';
 import User from '../models/User';
 import mongoose from 'mongoose';
+import { normalizeForumCategory, forumCategoryDisplayName } from './forumCategory';
+import { getGameModeProfile, getPrimaryGenreForGame, getAllGenresForGame } from './gameCatalog';
 
 /**
  * Helper function to determine if an error is retryable
@@ -650,11 +652,103 @@ async function createForumForGame(
 
     // Available categories: speedruns, gameplay, mods, general, help
     const allCategories = ['speedruns', 'gameplay', 'mods', 'general', 'help'];
+    const MAX_FORUMS_PER_GAME_CATEGORY_AUTOMATED = 3;
+
+    const normalizeTitle = (t: string) => t.toLowerCase().trim().replace(/\s+/g, ' ');
+
+    const buildCandidateTopics = (category: string): string[] => {
+      // Keep these generic so we don't invent game-specific facts.
+      // Posts will become specific within the category when generated.
+      switch (category) {
+        case 'speedruns':
+          return [
+            'Any% Route & Strats',
+            'Movement Tech & Shortcuts',
+            'PB Progress & Consistency',
+            'Timing Windows & Cycles',
+            'World Record Discussion',
+          ];
+        case 'mods':
+          return [
+            'Mod Installation & Compatibility',
+            'Best Mods & Recommendations',
+            'Graphics / Texture Mods',
+            'Gameplay Overhauls',
+            'Modding Tools & Setup',
+          ];
+        case 'gameplay':
+          return [
+            'Gameplay Tips & Tech',
+            'Mechanics & Strategies',
+            'Beginner Questions',
+            'Advanced Techniques',
+            'Builds / Loadouts / Setups',
+          ];
+        case 'help':
+          return [
+            'Help & Troubleshooting',
+            'Stuck? Ask Here',
+            'Need Tips / Advice',
+            'Fixes & Workarounds',
+            'Beginner Help Thread',
+          ];
+        case 'general':
+        default:
+          return [
+            'General Discussion',
+            'Favorite Moments',
+            'Characters & Story Talk',
+            'Hot Takes & Opinions',
+            'Tips and Discoveries',
+          ];
+      }
+    };
+
+    const pickUniqueForumTitle = (params: {
+      gameTitle: string;
+      category: string;
+      existingForumsForGame: any[];
+    }): string => {
+      const categoryDisplay = forumCategoryDisplayName(normalizeForumCategory(params.category));
+      const defaultGenericTitles = new Set<string>([
+        normalizeTitle(`${params.gameTitle} - ${categoryDisplay}`),
+        normalizeTitle(`${params.gameTitle} - ${params.category}`),
+        normalizeTitle(`${params.gameTitle} - ${forumCategoryDisplayName('general')}`),
+      ]);
+
+      const existingTitlesInCategory = params.existingForumsForGame
+        .filter(f => normalizeForumCategory(f.category) === normalizeForumCategory(params.category))
+        .map(f => normalizeTitle(f.title || ''))
+        .filter(Boolean);
+
+      const taken = new Set(existingTitlesInCategory);
+
+      const topics = buildCandidateTopics(params.category);
+
+      // Prefer non-generic topics when possible
+      const shuffled = topics
+        .map(t => ({ t, r: Math.random() }))
+        .sort((a, b) => a.r - b.r)
+        .map(x => x.t);
+
+      for (const topic of shuffled) {
+        const candidate = `${params.gameTitle} - ${topic}`;
+        const candidateNorm = normalizeTitle(candidate);
+        if (defaultGenericTitles.has(candidateNorm)) continue; // avoid generic collisions
+        if (!taken.has(candidateNorm)) return candidate;
+      }
+
+      // If all topics taken, fall back to generic with a numeric suffix
+      const base = `${params.gameTitle} - ${categoryDisplay}`;
+      let suffix = 2;
+      while (taken.has(normalizeTitle(`${base} (${suffix})`))) suffix++;
+      return `${base} (${suffix})`;
+    };
 
     // Determine category: use preferredCategory if provided, otherwise select randomly
     let selectedCategory: string;
     if (preferredCategory && allCategories.includes(preferredCategory.toLowerCase())) {
-      selectedCategory = preferredCategory.toLowerCase();
+      selectedCategory = normalizeForumCategory(preferredCategory).toLowerCase();
     } else {
       // Weight categories based on what makes sense
       // Most posts will be gameplay or general discussion
@@ -681,10 +775,8 @@ async function createForumForGame(
       }
     }
 
-    // CRITICAL: Check if a forum with the same game AND category already exists
-    // This prevents duplicate forums like "Story of Seasons - General Discussion" being created multiple times
-    // BUT allows multiple forums per game as long as they have different categories
     const gameTitleNormalized = normalizeGameTitle(gameTitle);
+    const normalizedCategory = normalizeForumCategory(selectedCategory).toLowerCase();
 
     // Find all active forums for this game (case-insensitive)
     const existingForums = await Forum.find({
@@ -692,35 +784,47 @@ async function createForumForGame(
       'metadata.status': 'active'
     }).lean() as any[];
 
-    // Check if any existing forum has the same category
-    const existingForumWithCategory = existingForums.find((f: any) => {
-      const forumCategory = (f.category || 'general').toLowerCase();
-      return forumCategory === selectedCategory.toLowerCase();
+    const forumsInCategory = existingForums.filter((f: any) => {
+      const c = normalizeForumCategory(f.category).toLowerCase();
+      return c === normalizedCategory;
     });
 
-    if (existingForumWithCategory) {
-      console.log(`[FORUM CREATION] Forum already exists for ${gameTitle} with category ${selectedCategory}. Forum ID: ${existingForumWithCategory.forumId}`);
-      // Return the existing forum info instead of creating a duplicate
+    // If we already have enough forums for this game/category, reuse one (avoid runaway growth)
+    if (forumsInCategory.length >= MAX_FORUMS_PER_GAME_CATEGORY_AUTOMATED) {
+      const pick = forumsInCategory[Math.floor(Math.random() * forumsInCategory.length)];
+      console.log(
+        `[FORUM CREATION] Reusing existing forum for ${gameTitle} category ${normalizedCategory} (cap reached: ${forumsInCategory.length}/${MAX_FORUMS_PER_GAME_CATEGORY_AUTOMATED}). Forum ID: ${pick.forumId}`
+      );
       return {
-        forumId: existingForumWithCategory.forumId || (existingForumWithCategory._id as any).toString(),
-        forumTitle: existingForumWithCategory.title || `${gameTitle} - General Discussion`,
-        category: selectedCategory
+        forumId: pick.forumId || (pick._id as any).toString(),
+        forumTitle: pick.title || `${gameTitle} - ${forumCategoryDisplayName(normalizeForumCategory(normalizedCategory))}`,
+        category: normalizedCategory
       };
     }
 
-    // No forum exists for this game+category combination - we can create a new one
-    console.log(`[FORUM CREATION] No forum exists for ${gameTitle} with category ${selectedCategory}. Found ${existingForums.length} forum(s) with other categories.`);
+    // Prefer creating a more specific forum title (topic-based) to avoid many identical "Game - Category" forums.
+    const forumTitle = pickUniqueForumTitle({
+      gameTitle,
+      category: normalizedCategory,
+      existingForumsForGame: existingForums
+    });
 
-    // Generate forum title based on category
-    const categoryTitles: { [key: string]: string } = {
-      'speedruns': `${gameTitle} - Speedruns`,
-      'gameplay': `${gameTitle} - Gameplay`,
-      'mods': `${gameTitle} - Mods`,
-      'general': `${gameTitle} - General Discussion`,
-      'help': `${gameTitle} - Help & Support`
-    };
+    // If an identical title already exists for this game/category (race conditions), reuse it
+    const existingSameTitle = forumsInCategory.find((f: any) => {
+      const t = normalizeTitle(f.title || '');
+      return t === normalizeTitle(forumTitle);
+    });
 
-    const forumTitle = categoryTitles[selectedCategory] || `${gameTitle} - General Discussion`;
+    if (existingSameTitle) {
+      console.log(
+        `[FORUM CREATION] Forum already exists for ${gameTitle} category ${normalizedCategory} with same title "${forumTitle}". Reusing Forum ID: ${existingSameTitle.forumId}`
+      );
+      return {
+        forumId: existingSameTitle.forumId || (existingSameTitle._id as any).toString(),
+        forumTitle: existingSameTitle.title || forumTitle,
+        category: normalizedCategory
+      };
+    }
 
     console.log(`[FORUM CREATION] Creating forum for ${gameTitle} with category: ${selectedCategory}, title: ${forumTitle}`);
 
@@ -731,7 +835,7 @@ async function createForumForGame(
       forumId,
       gameTitle,
       title: forumTitle,
-      category: selectedCategory,
+      category: normalizedCategory,
       isPrivate: false,
       allowedUsers: [],
       createdBy: username,
@@ -749,10 +853,39 @@ async function createForumForGame(
 
     console.log(`[FORUM CREATION] Successfully created forum ${forumId} in database`);
 
+    // Race-condition safety: if another forum with same game+category+title exists, keep the earliest and discard the empty duplicate.
+    const dupes = await Forum.find({
+      gameTitle: { $regex: new RegExp(`^${gameTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      category: normalizedCategory,
+      title: { $regex: new RegExp(`^${forumTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      isPrivate: false,
+      'metadata.status': 'active'
+    }).sort({ createdAt: 1 }).lean() as any[];
+
+    if (dupes.length > 1) {
+      const canonical = dupes[0];
+      if (canonical.forumId !== forumId) {
+        // Only delete if our newly created forum is empty (it should be)
+        const createdDoc = await Forum.findOne({ forumId }).select('posts').lean() as any;
+        const hasPosts = createdDoc?.posts && Array.isArray(createdDoc.posts) && createdDoc.posts.length > 0;
+        if (!hasPosts) {
+          await Forum.deleteOne({ forumId });
+          console.warn(
+            `[FORUM CREATION] Detected duplicate forum title race. Deleted empty duplicate ${forumId}; using canonical ${canonical.forumId}.`
+          );
+        }
+        return {
+          forumId: canonical.forumId,
+          forumTitle: canonical.title || forumTitle,
+          category: normalizedCategory
+        };
+      }
+    }
+
     return {
       forumId,
       forumTitle,
-      category: selectedCategory
+      category: normalizedCategory
     };
   } catch (error) {
     console.error('[FORUM CREATION] Error creating forum:', error);
@@ -1189,6 +1322,8 @@ export async function createForumPost(
     // Generate natural forum post using the actual game title from the forum
     // Note: forumCategory is already set above in the if/else block
     // CRITICAL: We MUST generate a post - forums should never be created empty
+    const gameModeProfile = getGameModeProfile(actualGameTitle);
+    const gameGenres = getAllGenresForGame(actualGameTitle);
     let postContent = '';
     let attempts = 0;
     const maxAttempts = 5; // Increased attempts to ensure we get a post
@@ -1207,6 +1342,8 @@ export async function createForumPost(
             gameTitle: actualGameTitle,
             genre: actualGenre,
             userPreferences,
+            gameGenres,
+            gameModeProfile,
             forumTopic: forumTitle,
             forumCategory: forumCategory,
             previousPosts: previousPosts,
@@ -1219,6 +1356,8 @@ export async function createForumPost(
             gameTitle: actualGameTitle,
             genre: actualGenre,
             userPreferences,
+            gameGenres,
+            gameModeProfile,
             forumTopic: forumTitle,
             forumCategory: forumCategory,
             previousPosts: previousPosts
@@ -1228,6 +1367,14 @@ export async function createForumPost(
         // Validate the generated post
         if (!postContent || postContent.trim().length < 20) {
           console.warn(`[FORUM POST] Generated post is too short or empty (attempt ${attempts}/${maxAttempts}), retrying...`);
+          continue;
+        }
+
+        // Guardrail: ensure the post matches the forum category (prevents drift across categories)
+        if (!isPostAlignedWithForumCategory(postContent, forumCategory)) {
+          console.warn(
+            `[FORUM POST] Generated post does not align with forum category "${forumCategory}" (attempt ${attempts}/${maxAttempts}), retrying...`
+          );
           continue;
         }
       } catch (error) {
@@ -1312,6 +1459,8 @@ export async function createForumPost(
           gameTitle: actualGameTitle,
           genre: actualGenre,
           userPreferences,
+          gameGenres,
+          gameModeProfile,
           forumTopic: forumTitle,
           forumCategory: forumCategory,
           previousPosts: previousPosts
@@ -2027,6 +2176,40 @@ function calculateSimilarity(str1: string, str2: string): number {
 }
 
 /**
+ * Heuristic check to keep automated posts aligned with the forum category.
+ * This is a lightweight guardrail to prevent COMMON gamer "help" posts
+ * from drifting into unrelated categories (e.g., gameplay help in Mods forums).
+ */
+function isPostAlignedWithForumCategory(post: string, forumCategory: string | undefined): boolean {
+  const category = (forumCategory || 'general').toLowerCase();
+  const text = (post || '').toLowerCase();
+  if (!text) return false;
+
+  // Always allow general discussion (broad)
+  if (category === 'general') return true;
+
+  const hasHelpTone = /\b(help|stuck|any tips|any advice|trouble|issue|problem|can't|cannot|how do i|what should i)\b/i.test(text);
+  const hasMods = /\b(mod|mods|modding|install|installer|load order|patch|plugin|compatib|conflict|crash|recompiled|overhaul)\b/i.test(text);
+  const hasSpeedrun = /\b(speedrun|pb|rta|route|split|strat|setup|reset|timing|skip|frame|cycle)\b/i.test(text);
+  const hasGameplay = /\b(combo|matchup|inputs?|mechanic|strategy|boss|movement|build|controls?)\b/i.test(text);
+
+  switch (category) {
+    case 'mods':
+      // Must be mod-focused (help tone is fine, but not sufficient)
+      return hasMods;
+    case 'speedruns':
+      return hasSpeedrun;
+    case 'gameplay':
+      return hasGameplay || (hasHelpTone && !hasMods && !hasSpeedrun); // gameplay-help is fine
+    case 'help':
+      // Help forums can be broad; accept help tone or any category keywords
+      return hasHelpTone || hasMods || hasSpeedrun || hasGameplay;
+    default:
+      return true;
+  }
+}
+
+/**
  * Determine genre from game title by checking game lists
  * Prioritizes single-player games first, then multiplayer games
  */
@@ -2036,49 +2219,11 @@ function determineGenreFromGame(gameTitle: string): string {
   }
 
   try {
-    // Normalize game title for comparison (case-insensitive, trim whitespace)
-    const normalizedTitle = gameTitle.trim().toLowerCase();
-
-    // Check single-player games FIRST (most games are single-player)
-    const singlePlayerPath = path.join(process.cwd(), 'data', 'automated-users', 'single-player.json');
-    const singlePlayerContent = fs.readFileSync(singlePlayerPath, 'utf-8');
-    const singlePlayerGames: GameList = JSON.parse(singlePlayerContent);
-
-    for (const [genre, games] of Object.entries(singlePlayerGames)) {
-      // Check for exact match first
-      if (games.some(g => g.trim().toLowerCase() === normalizedTitle)) {
-        console.log(`Genre determined: ${genre} for game: ${gameTitle}`);
-        return genre;
-      }
-      // Also check if game title contains the game name or vice versa (for partial matches)
-      if (games.some(g => {
-        const normalizedGame = g.trim().toLowerCase();
-        return normalizedTitle.includes(normalizedGame) || normalizedGame.includes(normalizedTitle);
-      })) {
-        console.log(`Genre determined (partial match): ${genre} for game: ${gameTitle}`);
-        return genre;
-      }
-    }
-
-    // Check multiplayer games SECOND (only if not found in single-player)
-    const multiplayerPath = path.join(process.cwd(), 'data', 'automated-users', 'multiplayer.json');
-    const multiplayerContent = fs.readFileSync(multiplayerPath, 'utf-8');
-    const multiplayerGames: GameList = JSON.parse(multiplayerContent);
-
-    for (const [genre, games] of Object.entries(multiplayerGames)) {
-      // Check for exact match first
-      if (games.some(g => g.trim().toLowerCase() === normalizedTitle)) {
-        console.log(`Genre determined: ${genre} for game: ${gameTitle}`);
-        return genre;
-      }
-      // Also check if game title contains the game name or vice versa (for partial matches)
-      if (games.some(g => {
-        const normalizedGame = g.trim().toLowerCase();
-        return normalizedTitle.includes(normalizedGame) || normalizedGame.includes(normalizedTitle);
-      })) {
-        console.log(`Genre determined (partial match): ${genre} for game: ${gameTitle}`);
-        return genre;
-      }
+    const genre = getPrimaryGenreForGame(gameTitle, 'rpg');
+    if (genre) {
+      // Keep the existing logging style
+      console.log(`Genre determined: ${genre} for game: ${gameTitle}`);
+      return genre;
     }
   } catch (error) {
     console.error('Error determining genre from game:', error);
@@ -2229,6 +2374,8 @@ export async function respondToForumPost(
 
     // Generate relevant reply
     let replyContent: string;
+    const gameModeProfile = getGameModeProfile(gameTitle);
+    const gameGenres = getAllGenresForGame(gameTitle);
 
     // If this is an EXPERT gamer replying to a COMMON gamer, use specialized function
     if (userPreferences.gamerProfile?.type === 'expert' && isReplyingToCommonGamer) {
@@ -2237,6 +2384,8 @@ export async function respondToForumPost(
         genre,
         originalPost: originalPostContent,
         originalPostAuthor,
+        gameGenres,
+        gameModeProfile,
         forumTopic: forumTitle,
         forumCategory: forumCategory,
         gamerProfile: userPreferences.gamerProfile,
@@ -2250,9 +2399,46 @@ export async function respondToForumPost(
         genre,
         originalPost: originalPostContent,
         originalPostAuthor,
+        gameGenres,
+        gameModeProfile,
         forumTopic: forumTitle,
         forumCategory: forumCategory
       });
+    }
+
+    // Guardrail: ensure replies match the forum category (prevents drift across categories)
+    // Note: replies often start with an @mention which can hide category keywords, so we check the body as-generated.
+    if (!isPostAlignedWithForumCategory(replyContent, forumCategory)) {
+      console.warn(
+        `[POST REPLY] Generated reply does not align with forum category "${forumCategory}". Regenerating once...`
+      );
+      // One retry with the same generation path
+      if (userPreferences.gamerProfile?.type === 'expert' && isReplyingToCommonGamer) {
+        replyContent = await generateExpertGamerReply({
+          gameTitle,
+          genre,
+          originalPost: originalPostContent,
+          originalPostAuthor,
+          gameGenres,
+          gameModeProfile,
+          forumTopic: forumTitle,
+          forumCategory: forumCategory,
+          gamerProfile: userPreferences.gamerProfile,
+          username: username,
+          commonGamerUsername: commonGamerUsername
+        });
+      } else {
+        replyContent = await generatePostReply({
+          gameTitle,
+          genre,
+          originalPost: originalPostContent,
+          originalPostAuthor,
+          gameGenres,
+          gameModeProfile,
+          forumTopic: forumTitle,
+          forumCategory: forumCategory
+        });
+      }
     }
 
     // Prepend @mention if not already present (same logic as manual replies)

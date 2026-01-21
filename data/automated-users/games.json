@@ -1,0 +1,3475 @@
+{
+  "games": [
+    {
+      "title": "7 Days to Die",
+      "genres": [
+        "survival-horror"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Among Us",
+      "genres": [
+        "party",
+        "social deduction"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "A Hat in Time",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Ace Attorney Investigations: Miles Edgeworth",
+      "genres": [
+        "visual novel"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "After Burner",
+      "genres": [
+        "rail shooter"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Alan Wake 2",
+      "genres": [
+        "survival-horror"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Alien Isolation",
+      "genres": [
+        "survival-horror",
+        "action-adventure",
+        "stealth"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Amnesia: The Bunker",
+      "genres": [
+        "survival-horror"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Animal Crossing: New Horizons",
+      "genres": [
+        "simulation"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Animal Well",
+      "genres": [
+        "metroidvania",
+        "puzzle"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Apex Legends",
+      "genres": [
+        "battle-royale",
+        "first-person hero shooter"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Apollo Justice: Ace Attorney",
+      "genres": [
+        "visual novel",
+        "adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Arena of Valor",
+      "genres": [
+        "multiplayer online battle arena"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "ARK: Survival Evolved",
+      "genres": [
+        "massively multiplayer online role-playing game",
+        "action-adventure",
+        "survival"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Assassin's Creed Valhalla",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Astro Bot",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Astroneer",
+      "genres": [
+        "sandbox",
+        "adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Axiom Verge",
+      "genres": [
+        "metroidvania"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Baba is You",
+      "genres": [
+        "puzzle"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Balatro",
+      "genres": [
+        "roguelike",
+        "deck-building"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Baldur's Gate 3",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Banjo Kazooie",
+      "genres": [
+        "platformer",
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Batman Arkham City",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Batman: Arkham Asylum",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Battletoads",
+      "genres": [
+        "beat 'em up",
+        "platformer"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Bayonetta 2",
+      "genres": [
+        "action-adventure",
+        "hack and slash"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Beat Saber",
+      "genres": [
+        "rhythm"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Bejeweled",
+      "genres": [
+        "tile-matching"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Bioshock Infinite",
+      "genres": [
+        "first-person shooter"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Bloodstained: Ritual of the Night",
+      "genres": [
+        "metroidvania",
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Blue Prince",
+      "genres": [
+        "puzzle-adventure",
+        "roguelike"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title":  "Borderlands 2",
+      "genres": [
+        "action role-playing",
+        "first-person shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Borderlands 3",
+      "genres": [
+        "action role-playing",
+        "first-person shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Burnout Paradise",
+      "genres": [
+        "racing"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Cadence of Hyrule: Crypt of the NecroDancer Featuring The Legend of Zelda",
+      "genres": [
+        "rhythm",
+        "roguelike"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Candy Crush Saga",
+      "genres": [
+        "puzzle"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Caste Crashers",
+      "genres": [
+        "beat 'em up"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Castlevania: Order of Ecclesia",
+      "genres": [
+        "metroidvania",
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Castlevania: Portrait of Ruin",
+      "genres": [
+        "metroidvania",
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Castlevania: Symphony of the Night",
+      "genres": [
+        "metroidvania",
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Cave Story+",
+      "genres": [
+        "metroidvania"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Celeste",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Chrono Trigger",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Cities: Skylines",
+      "genres": [
+        "construction and management simulation",
+        "city building"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Clair Obscur: Expedition 33",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Coffee Talk",
+      "genres": [
+        "visual novel"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Cokur's Bad Fur Day",
+      "genres": [
+        "platformer",
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Crash Bandicoot 4: It's About Time",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Crash Bandicoot N-Sane Trilogy",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Crash Team Racing Nitro-Fueled",
+      "genres": [
+        "racing"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Crypt of the NecroDancer",
+      "genres": [
+        "rhythm",
+        "roguelike"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Cult of the Lamb",
+      "genres": [
+        "roguelike",
+        "construction and management simulation"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Cuphead",
+      "genres": [
+        "run and gun"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Cyberpunk 2077",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Dance Dance Revolution 4thMix",
+      "genres": [
+        "exercise",
+        "music"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Dance Dance Revolution: Mario Mix",
+      "genres": [
+        "music",
+        "exergaming"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Danganronpa 2: Goodbye Despair",
+      "genres": [
+        "visual novel",
+        "adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Danganronpa V3: Killing Harmony",
+      "genres": [
+        "visual novel",
+        "adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Danganronpa: Trigger Happy Havoc",
+      "genres": [
+        "visual novel",
+        "adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "DayZ",
+      "genres": [
+        "survival"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Dead Cells",
+      "genres": [
+        "roguelike",
+        "metroidvania"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Dead or Alive 3",
+      "genres": [
+        "fighting"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Dead Space",
+      "genres": [
+        "survival-horror"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Death Stranding",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Death Stranding 2: On the Beach",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Deisim",
+      "genres": [
+        "sandbox"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Destiny 2",
+      "genres": [
+        "first-person shooter",
+        "massively multiplayer online"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Devil May Cry 5",
+      "genres": [
+        "action-adventure",
+        "hack and slash"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Diddy Kong Racing",
+      "genres": [
+        "racing"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Disco Elysium",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Dishonored 2",
+      "genres": [
+        "stealth",
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Dispatch",
+      "genres": [
+        "adventure",
+        "interactive film"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Doki Doki Literature Club",
+      "genres": [
+        "visual novel"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Donkey Kong Bananza",
+      "genres": [
+        "platformer",
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Donkey Kong Country",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Donkey Kong Country: Tropical Freeze",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Doom Eternal",
+      "genres": [
+        "first-person shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Dota 2",
+      "genres": [
+        "multiplayer online battle arena"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Double Dragon",
+      "genres": [
+        "beat 'em up"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Dragon Ball FighterZ",
+      "genres": [
+        "fighting"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Dragon Quest V: Hand of the Heavenly Bride",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Dragon Quest XI S: Echoes of an Elusive Age - Definitive Edition",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Dune: Awakening",
+      "genres": [
+        "survival"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Dust: An Elysian Tail",
+      "genres": [
+        "metroidvania",
+        "action role-playing",
+        "hack and slash"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "EA Sports College Football 25",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Elden Ring",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Ender Magnolia: Bloom in the Mist",
+      "genres": [
+        "metroidvania"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Euro Truck Simulator 2",
+      "genres": [
+        "vehicle simulation"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "F-Zero GX",
+      "genres": [
+        "racing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "F1 2019",
+      "genres": [
+        "racing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "F1 2020",
+      "genres": [
+        "racing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Fall Guys",
+      "genres": [
+        "battle-royale",
+        "platformer"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Fallout 4",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Far Cry 5",
+      "genres": [
+        "first-person shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "FIFA 13",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "FIFA 18",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Fight'N Rage",
+      "genres": [
+        "beat 'em up"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Final Fantasy IX",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Final Fantasy VI",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Final Fantasy VII",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Final Fantasy XIV",
+      "genres": [
+        "massively multiplayer online role-playing game"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Final Fight",
+      "genres": [
+        "beat 'em up"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Fire Emblem Awakening",
+      "genres": [
+        "tactical role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Fire Emblem: Three Houses",
+      "genres": [
+        "tactical role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Five Night's at Freddy's",
+      "genres": [
+        "survival-horror",
+        "point-and-click"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Football Manager 2024",
+      "genres": [
+        "simulation",
+        "sports management"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Fortnite: Battle Royale",
+      "genres": [
+        "battle-royale",
+        "third-person shooter"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Forza Horizon 5",
+      "genres": [
+        "racing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Free Fire",
+      "genres": [
+        "battle-royale"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Friday Night Funkin'",
+      "genres": [
+        "rhythm"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "FTL: Faster than Light",
+      "genres": [
+        "roguelike",
+        "strategy"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Garry's Mod",
+      "genres": [
+        "sandbox"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Gears of War",
+      "genres": [
+        "third-person shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Gears of War 2",
+      "genres": [
+        "third-person shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Gears of War 3",
+      "genres": [
+        "third-person shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Genshin Impact",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Geometry Dash",
+      "genres": [
+        "rhythm",
+        "platformer"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Ghost of Tsushima",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "God of War (2018)",
+      "genres": [
+        "action-adventure",
+        "hack and slash"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "God of War Ragnarök",
+      "genres": [
+        "action-adventure",
+        "hack and slash"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Golden Axe",
+      "genres": [
+        "beat 'em up"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Gran Turismo 7",
+      "genres": [
+        "sim racing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Granblue Fantasy Versus: Rising",
+      "genres": [
+        "fighting",
+        "rpg"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Grand Theft Auto V",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Grounded",
+      "genres": [
+        "survival"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Guacamelee!",
+      "genres": [
+        "metroidvania",
+        "platformer",
+        "beat 'em up"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Guild Wars 2",
+      "genres": [
+        "massively multiplayer online role-playing game"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Guilty Gear Strive",
+      "genres": [
+        "fighting"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Guitar Hero 3: Legends of Rock",
+      "genres": [
+        "rhythm"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Hades",
+      "genres": [
+        "roguelike",
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Hades II",
+      "genres": [
+        "roguelike",
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Half-Life 2",
+      "genres": [
+        "first-person shooter"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Halo Infinite",
+      "genres": [
+        "first-person shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Harvest Moon",
+      "genres": [
+        "farming simulation"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Hatoful Boyfriend",
+      "genres": [
+        "visual novel",
+        "otome"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Hatsune Miku: Colorful Stage",
+      "genres": [
+        "rhythm",
+        "visual novel"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Helldivers 2",
+      "genres": [
+        "third-person shooter"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Heroes of the Storm",
+      "genres": [
+        "multiplayer online battle arena"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Hitman: Blood Money",
+      "genres": [
+        "stealth"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Hitman: 3",
+      "genres": [
+        "stealth"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Hogwarts Legacy",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Hollow Knight",
+      "genres": [
+        "metroidvania"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Honkai: Star Rail",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Honor of Kings",
+      "genres": [
+        "multiplayer online battle arena"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Horizon Forbidden West",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Hotline Miami",
+      "genres": [
+        "top-down shooter"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Hot Shots Golf 3",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Injustice 2",
+      "genres": [
+        "fighting"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Into the Breach",
+      "genres": [
+        "turn-based strategy"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Jak and Daxter: The Precursor Legacy",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Jet Set Radio",
+      "genres": [
+        "platformer",
+        "action",
+        "sports"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Kid Icarus: Uprising",
+      "genres": [
+        "third-person shooter",
+        "rail shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Kingdom Come: Deliverance",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Kingdom Come: Deliverance II",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Kingdom Hearts HD 2.5 ReMix",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Kirby and the Forgotten Land",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Kirby Planet Robobot",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "League of Legends",
+      "genres": [
+        "multiplayer online battle arena"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Left for Dead",
+      "genres": [
+        "first-person shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Left 4 Dead 2",
+      "genres": [
+        "first-person shooter",
+        "survival-horror"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Like a Dragon: Infinite Wealth",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Like a Dragon: Ishin!",
+      "genres": [
+        "action-adventure",
+        "hack and slash"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Madden 24",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Madden NFL 2005",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Mario and Luigi: Bowser's Inside Story",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Mario Golf",
+      "genres": [
+        "sports",
+        "rpg"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Mario Kart 8 Deluxe",
+      "genres": [
+        "racing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Mario Power Tennis",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Mario Superstar Baseball",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Mark of the Ninja",
+      "genres": [
+        "stealth",
+        "platformer"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Marvel Rivals",
+      "genres": [
+        "third-person shooter",
+        "hero shooter"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Marvel's Spider-Man",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Marvel's Spider-Man: Miles Morales",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Mass Effect 2",
+      "genres": [
+        "action role-playing",
+        "third-person shooter"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Mass Effect 3",
+      "genres": [
+        "action role-playing",
+        "third-person shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Metal Gear Rising: Revengeance",
+      "genres": [
+        "action-adventure",
+        "hack and slash"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Metal Gear Solid",
+      "genres": [
+        "stealth",
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Metal Gear Solid 2: Sons of Liberty",
+      "genres": [
+        "stealth",
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Metal Gear Solid Delta: Snake Eater",
+      "genres": [
+        "stealth",
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Microsoft Flight Simulator",
+      "genres": [
+        "flight simulation"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Minecraft",
+      "genres": [
+        "survival",
+        "sandbox"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "MLB Slugfest 2003",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "MLB The Show 15",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "MLB The Show 20",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Mortal Kombat 1",
+      "genres": [
+        "fighting"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Naraka: Bladepoint",
+      "genres": [
+        "battle-royale",
+        "action-adventure"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "NBA 2K11",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "NBA 2K20",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "NBA Jam (1993)",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Need for Speed: Most Wanted (2005)",
+      "genres": [
+        "racing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "New Pokémon Snap",
+      "genres": [
+        "photography"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "NHL 14",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "NHL 94",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "NieR: Automata",
+      "genres": [
+        "action role-playing",
+        "hack and slash"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "No Man's Sky",
+      "genres": [
+        "action-adventure",
+        "survival"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Ori and the Will of the Wisps",
+      "genres": [
+        "metroidvania",
+        "platformer",
+        "adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Overwatch (2016)",
+      "genres": [
+        "first-person shooter",
+        "hero shooter"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Pac-Man",
+      "genres": [
+        "maze"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Pac-Man World 2",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Palworld",
+      "genres": [
+        "survival",
+        "action-adventure",
+        "monster-taming"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Panzer Dragoon Saga",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Paper Mario: The Thousand Year Door",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Parappa the Rapper",
+      "genres": [
+        "rhythm"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Path of Exile",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Persona 4: Golden",
+      "genres": [
+        "rpg",
+        "social simulation"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Persona 5: Royal",
+      "genres": [
+        "rpg",
+        "social simulation"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "PGA Tour 2K21",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Phasmophobia",
+      "genres": [
+        "survival-horror",
+        "puzzle"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Phoenix Wright: Ace Attorney",
+      "genres": [
+        "visual novel",
+        "adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Phoenix Wright: Ace Attorney - Dual Destinies",
+      "genres": [
+        "visual novel",
+        "adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Phoenix Wright: Ace Attorney - Spirit of Justice",
+      "genres": [
+        "visual novel",
+        "adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Phoenix Wright: Ace Attorney - Trials and Tribulations",
+      "genres": [
+        "visual novel",
+        "adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Planet Coaster",
+      "genres": [
+        "construction and management simulation"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Pokémon Legends: Arceus",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Pokémon Mystery Dungeon: Explorers of Sky",
+      "genres": [
+        "roguelike",
+        "rpg"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Pokémon Platinum",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Pokémon Unite",
+      "genres": [
+        "multiplayer online battle arena",
+        "real-time strategy"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Population: ONE",
+      "genres": [
+        "battle-royale"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Portal 2",
+      "genres": [
+        "puzzle-platformer"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "PowerWash Simulator",
+      "genres": [
+        "simulation"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Prince of Persia: The Lost Crown",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Pro Evolution Soccer 2008",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "PUBG: Battlegrounds",
+      "genres": [
+        "battle-royale"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Puyo Puyo Tetris",
+      "genres": [
+        "puzzle"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Raft",
+      "genres": [
+        "survival",
+        "sandbox"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Ratchet & Clank: Going Commando",
+      "genres": [
+        "platformer",
+        "third-person shooter"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Ratchet & Clank: Up Your Arsenal",
+      "genres": [
+        "platformer",
+        "third-person shooter"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Ratchet & Clank: Rift Apart",
+      "genres": [
+        "platformer",
+        "third-person shooter"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Rayman Legends",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Rayman Origins",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Red Dead Redemption 2",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Resident Evil 2 Remake",
+      "genres": [
+        "survival-horror"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Resident Evil 4",
+      "genres": [
+        "survival-horror",
+        "third-person shooter"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Resident Evil 7: Biohazard",
+      "genres": [
+        "survival-horror"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Return of the Obra Dinn",
+      "genres": [
+        "puzzle",
+        "adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Returnal",
+      "genres": [
+        "third-person shooter",
+        "bullet hell",
+        "roguelike"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Rez",
+      "genres": [
+        "rail shooter",
+        "music"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Rhythm Doctor",
+      "genres": [
+        "rhythm"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Rhythm Heaven",
+      "genres": [
+        "rhythm"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Rimworld",
+      "genres": [
+        "construction and management simulation"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Risk of Rain 2",
+      "genres": [
+        "roguelike",
+        "third-person shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "River City Girls",
+      "genres": [
+        "beat 'em up"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Roblox",
+      "genres": [
+        "sandbox",
+        "game creation system",
+        "massively multiplayer online"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Rock Band 2",
+      "genres": [
+        "rhythm"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Roller Coaster Tycoon 3: Complete Edition",
+      "genres": [
+        "construction and management simulation"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Runescape",
+      "genres": [
+        "massively multiplayer online role-playing game"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Rust (video game)",
+      "genres": [
+        "survival"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Sakura Wars (2019)",
+      "genres": [
+        "visual novel",
+        "dating sim",
+        "action"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Samba de Amigo",
+      "genres": [
+        "rhythm"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Scott Pilgrim vs the World: The Game",
+      "genres": [
+        "beat 'em up",
+        "action role-playing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Sea of Thieves",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Sekiro: Shadows Die Twice",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Shadow Tactics: Blades of the Shogun",
+      "genres": [
+        "stealth",
+        "real-time tactics"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Shovel Knight",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Sid Meier's Civilization VI",
+      "genres": [
+        "4X",
+        "turn-based strategy"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Sifu",
+      "genres": [
+        "beat 'em up"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Silent Hill 2",
+      "genres": [
+        "survival-horror"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Sin & Punishment",
+      "genres": [
+        "rail shooter",
+        "shooting gallery"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Skullgirls 2nd Encore",
+      "genres": [
+        "fighting"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Slay the Spire",
+      "genres": [
+        "roguelike deck-building"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Smite",
+      "genres": [
+        "multiplayer online battle arena"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Sonic & All-Stars Racing Transformed",
+      "genres": [
+        "racing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Sonic 3 & Knuckles",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Sonic Adventure 2",
+      "genres": [
+        "platformer",
+        "action-adventure"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Sonic Mania",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Sonic Racing Crossworlds",
+      "genres": [
+        "racing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Sonic Unleashed",
+      "genres": [
+        "platformer",
+        "action-adventure",
+        "beat 'em up"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Sons of the Forest",
+      "genres": [
+        "survival-horror"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Soulcalibur II",
+      "genres": [
+        "fighting"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Space Channel 5",
+      "genres": [
+        "music"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Splatoon 2",
+      "genres": [
+        "third-person shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Splatoon 3",
+      "genres": [
+        "third-person shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Spyro Reignited Trilogy",
+      "genres": [
+        "platformer",
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Star Fox (1993)",
+      "genres": [
+        "rail shooter"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Star Fox 64",
+      "genres": [
+        "rail shooter",
+        "shoot' em up"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Star Wars Jedi: Survivor",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Star Wars Knights of the Old Republic II: The Sith Lords",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Stardew Valley",
+      "genres": [
+        "farm life simulation"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "State of Decay 2",
+      "genres": [
+        "survival"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Steins Gate",
+      "genres": [
+        "visual novel"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Story of Seasons (2014)",
+      "genres": [
+        "farm life simulation"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Stray",
+      "genres": [
+        "adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Street Fighter 6",
+      "genres": [
+        "fighting"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Streets of Rage 4",
+      "genres": [
+        "beat 'em up"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Subnautica",
+      "genres": [
+        "survival",
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Super Animal Royale",
+      "genres": [
+        "battle-royale"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Super Castlevania IV",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Super Mario 3D World + Bowser's Fury",
+      "genres": [
+        "platformer",
+        "action-adventure"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Super Mario 64",
+      "genres": [
+        "platformer",
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Super Mario Maker 2",
+      "genres": [
+        "platformer",
+        "level editor"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Super Mario Galaxy",
+      "genres": [
+        "platformer",
+        "action-adventure"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Super Mario Odyssey",
+      "genres": [
+        "platformer",
+        "action-adventure"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Super Mario Strikers",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Super Mario World",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Super Meat Boy",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Super Mega Baseball 4",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Super Smash Bros. Melee",
+      "genres": [
+        "fighting"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Super Smash Bros. Ultimate",
+      "genres": [
+        "fighting"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "SUPERVIVE",
+      "genres": [
+        "battle-royale",
+        "hero brawler"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Team Fortress 2",
+      "genres": [
+        "first-person shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Tekken 8",
+      "genres": [
+        "fighting"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Tenchu: Stealth Assassins",
+      "genres": [
+        "stealth"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Terraria",
+      "genres": [
+        "action-adventure",
+        "sandbox"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Tetris (Game Boy, 1989)",
+      "genres": [
+        "puzzle"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Tetris 99",
+      "genres": [
+        "puzzle",
+        "battle-royale"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "The Binding of Issac: Afterbirth+",
+      "genres": [
+        "roguelike",
+        "action-adventure"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "The Chronicles of Riddick: Escape from Butcher Bay",
+      "genres": [
+        "stealth",
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "The Crew Motorfest",
+      "genres": [
+        "racing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "The Elder Scrolls Online",
+      "genres": [
+        "massively multiplayer online role-playing game"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "The Elder Scrolls V: Skyrim",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "The Evil Within",
+      "genres": [
+        "survival horror"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "The House of the Dead (1997)",
+      "genres": [
+        "light gun shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "The King of Fighters XV",
+      "genres": [
+        "fighting"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "The Last of Us (2013)",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "The Last of Us Part II",
+      "genres": [
+        "adventure",
+        "action"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "The Legend of Zelda: Breath of the Wild",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "The Legend of Zelda: Ocarina of Time",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "The Legend of Zelda: Tears of the Kingdom",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "The Long Dark",
+      "genres": [
+        "survival"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "The Room (Game)",
+      "genres": [
+        "puzzle"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "The Sims 4",
+      "genres": [
+        "social simulation"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "The Witcher 3: Wild Hunt",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "The Witness (Game)",
+      "genres": [
+        "puzzle"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Thief II: The Metal Age",
+      "genres": [
+        "stealth"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Tiger Woods PGA Tour 2004",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Titanfall 2",
+      "genres": [
+        "first-person shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "TMNT: Shredder's Revenge",
+      "genres": [
+        "beat 'em up"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Tom Clancy's Rainbow Six Siege",
+      "genres": [
+        "tactical shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Tom Clancy’s Splinter Cell: Chaos Theory",
+      "genres": [
+        "stealth",
+        "action-adventure"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Tony Hawk's Pro Skater 2",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Two Point Museum",
+      "genres": [
+        "businesssimulation"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Ultimate Marvel VS. Capcom 3",
+      "genres": [
+        "fighting"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Uncharted 2: Among Thieves",
+      "genres": [
+        "action-adventure",
+        "third-person shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Uncharted 3: Drake's Deception",
+      "genres": [
+        "action-adventure",
+        "third-person shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Universe Sandbox",
+      "genres": [
+        "simulation"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Until Dawn",
+      "genres": [
+        "survival horror",
+        "interactive drama"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Valheim",
+      "genres": [
+        "survival",
+        "sandbox"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Valorant",
+      "genres": [
+        "hero shooter",
+        "tactical shooter"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Vampire Survivors",
+      "genres": [
+        "roguelike",
+        "shoot' em up"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Vampire: The Masquerade – Bloodhunt",
+      "genres": [
+        "battle-royale"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Virtua Fighter 5",
+      "genres": [
+        "fighting"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "War Thunder",
+      "genres": [
+        "action",
+        "vehicular combat",
+        "combat flight simulator"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Wii Sports",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Wipeout Omega Collection",
+      "genres": [
+        "racing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "World of Warcraft",
+      "genres": [
+        "massively multiplayer online role-playing game"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "WWE 2K19",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "WWE 2K22",
+      "genres": [
+        "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "XCOM 2",
+      "genres": [
+        "turn-based tactics"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Xenoblade Chronicles 2",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Xenoblade Chronicles 3",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Xenoblade Chronicles: Definitive Edition",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Xenoblade Chronicles X: Definitive Edition",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes ":[
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Yakuza (2005)",
+      "genres": [
+        "beat 'em up",
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Yu-Gi-Oh! Master Duel",
+      "genres": [
+        "digital collectible card game",
+        "strategy game"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Zone of the Enders: The 2nd Runner",
+      "genres": [
+        "third-person shooter",
+        "hack and slash"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    }
+  ]
+}

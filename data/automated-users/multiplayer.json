@@ -1,119 +1,359 @@
 {
-  "racing": [
-    "Forza Horizon 5",
-    "Gran Turismo 7",
-    "Mario Kart 8 Deluxe",
-    "Burnout Paradise",
-    "F-Zero GX",
-    "Sonic & All-Stars Racing Transformed",
-    "Need for Speed",
-    "Crash Team Racing Nitro-Fueled",
-    "Wipeout Omega Collection",
-    "The Crew Motorfest",
-    "Sonic Racing Crossworlds",
-    "F1 2019",
-    "F1 2020",
-    "Diddy Kong Racing"
+  "party": [
+    "Among Us"
+  ],
+  "social deduction": [
+    "Among Us"
   ],
   "battle-royale": [
-    "Fall Guys",
-    "Fortnite",
     "Apex Legends",
-    "PUBG: Battlegrounds",
-    "Naraka: Bladepoint",
+    "Fall Guys",
+    "Fortnite: Battle Royale",
     "Free Fire",
-    "Vampire: The Masquerade – Bloodhunt",
+    "Naraka: Bladepoint",
     "Population: ONE",
+    "PUBG: Battlegrounds",
+    "Super Animal Royale",
+    "SUPERVIVE",
     "Tetris 99",
-    "Super Animal Royal"
+    "Vampire: The Masquerade – Bloodhunt"
+  ],
+  "first-person hero shooter": [
+    "Apex Legends"
+  ],
+  "multiplayer online battle arena": [
+    "Arena of Valor",
+    "Dota 2",
+    "Heroes of the Storm",
+    "Honor of Kings",
+    "League of Legends",
+    "Pokémon Unite",
+    "Smite"
+  ],
+  "first-person shooter": [
+    "Bioshock Infinite",
+    "Borderlands 2",
+    "Borderlands 3",
+    "Destiny 2",
+    "Doom Eternal",
+    "Far Cry 5",
+    "Halo Infinite",
+    "Left 4 Dead 2",
+    "Left for Dead",
+    "Overwatch (2016)",
+    "Team Fortress 2",
+    "Titanfall 2"
+  ],
+  "action role-playing": [
+    "Borderlands 2",
+    "Borderlands 3",
+    "Elden Ring",
+    "Genshin Impact",
+    "Mass Effect 3",
+    "Path of Exile",
+    "Scott Pilgrim vs the World: The Game"
+  ],
+  "racing": [
+    "Burnout Paradise",
+    "Crash Team Racing Nitro-Fueled",
+    "Diddy Kong Racing",
+    "F-Zero GX",
+    "F1 2019",
+    "F1 2020",
+    "Forza Horizon 5",
+    "Mario Kart 8 Deluxe",
+    "Need for Speed: Most Wanted (2005)",
+    "Sonic & All-Stars Racing Transformed",
+    "Sonic Racing Crossworlds",
+    "The Crew Motorfest",
+    "Wipeout Omega Collection"
+  ],
+  "platformer": [
+    "Crash Bandicoot 4: It's About Time",
+    "Fall Guys",
+    "Guacamelee!",
+    "Kirby and the Forgotten Land",
+    "Kirby Planet Robobot",
+    "Rayman Legends",
+    "Rayman Origins",
+    "Shovel Knight",
+    "Sonic 3 & Knuckles",
+    "Sonic Adventure 2",
+    "Sonic Mania",
+    "Super Mario 3D World + Bowser's Fury",
+    "Super Mario Galaxy",
+    "Super Mario Maker 2",
+    "Super Mario Odyssey",
+    "Super Mario World"
+  ],
+  "run and gun": [
+    "Cuphead"
+  ],
+  "exercise": [
+    "Dance Dance Revolution 4thMix"
+  ],
+  "music": [
+    "Dance Dance Revolution 4thMix",
+    "Dance Dance Revolution: Mario Mix"
+  ],
+  "exergaming": [
+    "Dance Dance Revolution: Mario Mix"
   ],
   "fighting": [
+    "Dead or Alive 3",
+    "Dragon Ball FighterZ",
+    "Granblue Fantasy Versus: Rising",
+    "Guilty Gear Strive",
+    "Injustice 2",
+    "Mortal Kombat 1",
+    "Skullgirls 2nd Encore",
+    "Soulcalibur II",
+    "Street Fighter 6",
+    "Super Smash Bros. Melee",
     "Super Smash Bros. Ultimate",
     "Tekken 8",
-    "Dragon Ball FighterZ",
-    "Guilty Gear Strive",
-    "Ultimate Marvel VS. Capcom 3",
-    "Street Fighter VI",
-    "Soulcalibur II",
-    "Skullgirls 2nd Encore",
-    "Mortal Kombat 1",
     "The King of Fighters XV",
-    "Super Smash Bros. Melee",
-    "Granblue Fantasy Versus: Rising",
-    "Dead or Alive 3",
-    "Virtua Fighter 5",
-    "Injustice 2: Gods Among Us"
+    "Ultimate Marvel VS. Capcom 3",
+    "Virtua Fighter 5"
   ],
   "sandbox": [
-    "Minecraft",
-    "Terraria",
-    "Roblox",
-    "No Man's Sky",
-    "Raft",
-    "Valheim",
-    "Universe Sandbox",
     "Deisim",
-    "Rimworld",
-    "Garry's Mod"
+    "Garry's Mod",
+    "Minecraft",
+    "Raft",
+    "Roblox",
+    "Terraria",
+    "Valheim"
   ],
-  "fps": [
-    "Overwatch",
-    "Team Fortress 2",
-    "Half-Life 2",
-    "Bioshock Infinite",
-    "Doom Eternal",
-    "Halo Infinite",
-    "Tom Clancy's Rainbow Six Siege",
+  "massively multiplayer online": [
     "Destiny 2",
-    "Titanfall 2",
-    "Valorant"
+    "Roblox"
   ],
-  "moba": [
-    "Dota 2",
-    "League of Legends",
-    "Smite",
-    "Heroes of the Storm",
-    "Arena of Valor",
-    "Pokémon Unite",
-    "Honor of Kings",
-    "SUPERVIVE"
-  ],
-  "mmorpg": [
-    "World of Warcraft",
-    "Final Fantasy XIV",
-    "The Elder Scrolls Online",
-    "Path of Exile 2",
-    "Sea of Thieves",
-    "War Thunder",
-    "Runescape",
-    "Guild Wars 2"
+  "survival": [
+    "Dune: Awakening",
+    "Grounded",
+    "Minecraft",
+    "No Man's Sky",
+    "Palworld",
+    "Raft",
+    "Rust (video game)",
+    "State of Decay 2",
+    "Valheim"
   ],
   "sports": [
-    "Wii Sports",
-    "Tony Hawk's Pro Skater 2",
-    "Tiger Woods PGA Tour 2004",
     "EA Sports College Football 25",
     "FIFA 13",
     "FIFA 18",
-    "NBA 2K11",
-    "NBA 2K20",
-    "Madden NFL 2005",
+    "Hot Shots Golf 3",
     "Madden 24",
-    "NHL 94",
-    "NHL 14",
-    "WWE 2K19",
-    "WWE 2K22",
-    "NBA Jam (1993)",
-    "PGA Tour 2K21",
+    "Madden NFL 2005",
     "Mario Golf",
     "Mario Power Tennis",
-    "Super Mario Strikers",
-    "Hot Shots Golf 3",
-    "Pro Evolution Soccer 2008",
+    "Mario Superstar Baseball",
     "MLB Slugfest 2003",
-    "MLB The Show 20",
     "MLB The Show 15",
+    "MLB The Show 20",
+    "NBA 2K11",
+    "NBA 2K20",
+    "NBA Jam (1993)",
+    "NHL 14",
+    "NHL 94",
+    "PGA Tour 2K21",
+    "Pro Evolution Soccer 2008",
+    "Super Mario Strikers",
     "Super Mega Baseball 4",
-    "Mario Superstar Baseball"
+    "Tiger Woods PGA Tour 2004",
+    "Tony Hawk's Pro Skater 2",
+    "Wii Sports",
+    "WWE 2K19",
+    "WWE 2K22"
+  ],
+  "vehicle simulation": [
+    "Euro Truck Simulator 2"
+  ],
+  "beat 'em up": [
+    "Fight'N Rage",
+    "Final Fight",
+    "Golden Axe",
+    "Guacamelee!",
+    "River City Girls",
+    "Scott Pilgrim vs the World: The Game",
+    "Streets of Rage 4",
+    "TMNT: Shredder's Revenge"
+  ],
+  "massively multiplayer online role-playing game": [
+    "Final Fantasy XIV",
+    "Guild Wars 2",
+    "Runescape",
+    "The Elder Scrolls Online",
+    "World of Warcraft"
+  ],
+  "simulation": [
+    "Football Manager 2024",
+    "PowerWash Simulator"
+  ],
+  "sports management": [
+    "Football Manager 2024"
+  ],
+  "third-person shooter": [
+    "Fortnite: Battle Royale",
+    "Gears of War",
+    "Gears of War 2",
+    "Gears of War 3",
+    "Helldivers 2",
+    "Kid Icarus: Uprising",
+    "Marvel Rivals",
+    "Mass Effect 3",
+    "Returnal",
+    "Risk of Rain 2",
+    "Splatoon 2",
+    "Splatoon 3",
+    "Uncharted 2: Among Thieves",
+    "Uncharted 3: Drake's Deception",
+    "Zone of the Enders: The 2nd Runner"
+  ],
+  "action-adventure": [
+    "Ghost of Tsushima",
+    "Grand Theft Auto V",
+    "Naraka: Bladepoint",
+    "No Man's Sky",
+    "Palworld",
+    "Red Dead Redemption 2",
+    "Sea of Thieves",
+    "Sonic Adventure 2",
+    "Super Mario 3D World + Bowser's Fury",
+    "Super Mario Galaxy",
+    "Super Mario Odyssey",
+    "Terraria",
+    "The Binding of Issac: Afterbirth+",
+    "The Last of Us (2013)",
+    "Tom Clancy’s Splinter Cell: Chaos Theory",
+    "Uncharted 2: Among Thieves",
+    "Uncharted 3: Drake's Deception"
+  ],
+  "sim racing": [
+    "Gran Turismo 7"
+  ],
+  "rpg": [
+    "Granblue Fantasy Versus: Rising",
+    "Mario Golf"
+  ],
+  "metroidvania": [
+    "Guacamelee!"
+  ],
+  "rhythm": [
+    "Guitar Hero 3: Legends of Rock",
+    "Hatsune Miku: Colorful Stage",
+    "Rock Band 2",
+    "Samba de Amigo"
+  ],
+  "visual novel": [
+    "Hatsune Miku: Colorful Stage"
+  ],
+  "stealth": [
+    "Hitman: 3",
+    "Tom Clancy’s Splinter Cell: Chaos Theory"
+  ],
+  "rail shooter": [
+    "Kid Icarus: Uprising",
+    "Sin & Punishment",
+    "Star Fox 64"
+  ],
+  "survival-horror": [
+    "Left 4 Dead 2",
+    "Phasmophobia",
+    "Sons of the Forest"
+  ],
+  "hero shooter": [
+    "Marvel Rivals",
+    "Overwatch (2016)",
+    "Valorant"
+  ],
+  "flight simulation": [
+    "Microsoft Flight Simulator"
+  ],
+  "maze": [
+    "Pac-Man"
+  ],
+  "monster-taming": [
+    "Palworld"
+  ],
+  "puzzle": [
+    "Phasmophobia",
+    "Puyo Puyo Tetris",
+    "Tetris (Game Boy, 1989)",
+    "Tetris 99"
+  ],
+  "real-time strategy": [
+    "Pokémon Unite"
+  ],
+  "puzzle-platformer": [
+    "Portal 2"
+  ],
+  "bullet hell": [
+    "Returnal"
+  ],
+  "roguelike": [
+    "Returnal",
+    "Risk of Rain 2",
+    "The Binding of Issac: Afterbirth+",
+    "Vampire Survivors"
+  ],
+  "game creation system": [
+    "Roblox"
+  ],
+  "4X": [
+    "Sid Meier's Civilization VI"
+  ],
+  "turn-based strategy": [
+    "Sid Meier's Civilization VI"
+  ],
+  "shooting gallery": [
+    "Sin & Punishment"
+  ],
+  "shoot' em up": [
+    "Star Fox 64",
+    "Vampire Survivors"
+  ],
+  "farm life simulation": [
+    "Stardew Valley"
+  ],
+  "level editor": [
+    "Super Mario Maker 2"
+  ],
+  "hero brawler": [
+    "SUPERVIVE"
+  ],
+  "light gun shooter": [
+    "The House of the Dead (1997)"
+  ],
+  "adventure": [
+    "The Last of Us Part II"
+  ],
+  "action": [
+    "The Last of Us Part II",
+    "War Thunder"
+  ],
+  "tactical shooter": [
+    "Tom Clancy's Rainbow Six Siege",
+    "Valorant"
+  ],
+  "vehicular combat": [
+    "War Thunder"
+  ],
+  "combat flight simulator": [
+    "War Thunder"
+  ],
+  "turn-based tactics": [
+    "XCOM 2"
+  ],
+  "digital collectible card game": [
+    "Yu-Gi-Oh! Master Duel"
+  ],
+  "strategy game": [
+    "Yu-Gi-Oh! Master Duel"
+  ],
+  "hack and slash": [
+    "Zone of the Enders: The 2nd Runner"
   ]
 }

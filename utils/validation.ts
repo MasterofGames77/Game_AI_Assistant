@@ -52,8 +52,10 @@ export const validateForumData = (data: Partial<Forum>) => {
   if (!data.category?.trim()) {
     errors.push('Category is required');
   } else {
+    // Normalize category to avoid accidental invalid values like "Help & Support"
+    const category = data.category.toLowerCase().trim();
     const allowedCategories = ["speedruns", "gameplay", "mods", "general", "help"];
-    if (!allowedCategories.includes(data.category)) {
+    if (!allowedCategories.includes(category)) {
       errors.push('Invalid category. Allowed categories are: speedruns, gameplay, mods, general, help');
     }
   }

@@ -83,6 +83,25 @@ npm run dev:full
   - Automated scheduler
   - Full integration testing
 
+## Game catalog data (automated users)
+
+The automated-user system uses a unified catalog file:
+- `data/automated-users/games.json` (**source of truth**)
+
+Legacy compatibility files:
+- `data/automated-users/single-player.json`
+- `data/automated-users/multiplayer.json`
+
+During migration, the app will prefer `games.json` and fall back to the legacy files if `games.json` is missing.
+
+### Regenerating legacy lists (optional)
+
+If you need to regenerate the legacy lists from `games.json`:
+
+```bash
+npx tsx scripts/generate-legacy-game-lists.ts
+```
+
 5. Open [http://localhost:3000](http://localhost:3000) in your browser
 
 ### Discord Bot Setup

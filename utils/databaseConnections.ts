@@ -7,8 +7,10 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables from .env.local file
-dotenv.config({ path: path.resolve(__dirname, '.env.local') });
+// Load environment variables from repo root (.env / .env.local)
+// NOTE: scripts run via `tsx` do NOT automatically load Next.js env files.
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 // Database connection instances
 // let wingmanDB: mongoose.Connection;
