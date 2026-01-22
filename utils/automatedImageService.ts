@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import axios from 'axios';
 import { ImageMapping, ImageUsage } from '../types';
 import { getImageStorage } from './imageStorage';
 
@@ -520,9 +521,6 @@ export async function downloadAndStoreImage(
   keywords: string[],
   uploadToCloud: boolean = true
 ): Promise<string | null> {
-  const axios = require('axios');
-  const { getImageStorage } = require('./imageStorage');
-  
   try {
     // Download image
     console.log(`[IMAGE SEARCH] Downloading image from: ${imageUrl}`);

@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { generateQuestion, generateForumPost, generatePostReply, generateCommonGamerPost, generateExpertGamerReply, UserPreferences } from './automatedContentGenerator';
 import { getRandomGameImage, recordImageUsage, downloadAndStoreImage } from './automatedImageService';
-import { searchGameImage, searchGameImageUnsplash, getCachedImageSearch, cacheImageSearch } from './automatedImageSearch';
+import { searchGameImage, getCachedImageSearch, cacheImageSearch } from './automatedImageSearch';
 import { extractKeywordsSimple, extractKeywordsFromPost } from './imageKeywordExtractor';
 import { verifyImageRelevance, buildSearchQuery } from './imageRelevanceVerifier';
 import { containsOffensiveContent } from './contentModeration';
@@ -1609,33 +1609,7 @@ export async function createForumPost(
               console.log(`[IMAGE SEARCH] Image relevance verification failed (confidence: ${verification.confidence}, reason: ${verification.reason}), trying fallback...`);
             }
           } else {
-            console.log(`[IMAGE SEARCH] No search results found, trying fallback...`);
-          }
-
-          // Fallback to Unsplash if Google search failed or had low relevance
-          if (!imageUrl) {
-            const unsplashResult = await searchGameImageUnsplash({
-              gameTitle: actualGameTitle,
-              keywords: extractedKeywords, // Use structured keywords
-              postContent: postContent,
-              forumCategory: forumCategory,
-              maxResults: 10
-            });
-
-            if (unsplashResult) {
-              const downloadedPath = await downloadAndStoreImage(
-                unsplashResult.url,
-                actualGameTitle,
-                allKeywords,
-                true
-              );
-
-              if (downloadedPath) {
-                imageUrl = downloadedPath;
-                cacheImageSearch(actualGameTitle, allKeywords, downloadedPath);
-                console.log(`[IMAGE SEARCH] Successfully downloaded image from Unsplash for ${actualGameTitle}`);
-              }
-            }
+            console.log(`[IMAGE SEARCH] No search results found, skipping Unsplash (unreliable for game content), using static image fallback...`);
           }
         }
       } catch (error) {

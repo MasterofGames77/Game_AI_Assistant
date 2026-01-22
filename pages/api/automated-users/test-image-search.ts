@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { extractKeywordsFromPost, extractKeywordsSimple } from '../../../utils/imageKeywordExtractor';
-import { searchGameImage, searchGameImageUnsplash, getCachedImageSearch, cacheImageSearch } from '../../../utils/automatedImageSearch';
+import { searchGameImage, getCachedImageSearch, cacheImageSearch } from '../../../utils/automatedImageSearch';
 import { verifyImageRelevance, buildSearchQuery } from '../../../utils/imageRelevanceVerifier';
 import { downloadAndStoreImage } from '../../../utils/automatedImageService';
 
@@ -24,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { postContent, gameTitle, forumCategory, testPhase = 'both' } = req.body;
 
   if (!postContent || !gameTitle) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: 'Missing required fields: postContent, gameTitle',
       example: {
         postContent: "I just finished the Ashera boss fight in Xenoblade Chronicles 3. The character design was amazing!",
@@ -50,7 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (testPhase === '1' || testPhase === 'both') {
       console.log('[TEST] Phase 1: Simple keyword extraction');
       const simpleKeywords = extractKeywordsSimple(postContent, gameTitle, forumCategory);
-      
+
       results.phase1 = {
         keywords: simpleKeywords,
         searchQuery: `${gameTitle} ${simpleKeywords.join(' ')} screenshot`,
@@ -89,7 +89,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log('[TEST] Phase 2: AI-powered keyword extraction');
       try {
         const extractedKeywords = await extractKeywordsFromPost(postContent, gameTitle, forumCategory);
-        
+
         const allKeywords = [
           ...extractedKeywords.characters,
           ...extractedKeywords.locations,
@@ -164,7 +164,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 if (downloadedPath) {
                   results.phase2.downloaded = true;
                   results.phase2.downloadedPath = downloadedPath;
-                  
+
                   // Cache it
                   cacheImageSearch(gameTitle, allKeywords, downloadedPath);
                   results.phase2.cached = true;
@@ -176,31 +176,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           } else {
             results.phase2.searchResult = {
               found: false,
-              message: 'No results found from Google Custom Search'
+              message: 'No results found from Google Custom Search. Unsplash fallback disabled (unreliable for game content).'
             };
-
-            // Try Unsplash fallback
-            try {
-              const unsplashResult = await searchGameImageUnsplash({
-                gameTitle,
-                keywords: extractedKeywords,
-                postContent,
-                forumCategory,
-                maxResults: 5
-              });
-
-              if (unsplashResult) {
-                results.phase2.fallbackResult = {
-                  source: 'Unsplash',
-                  url: unsplashResult.url,
-                  title: unsplashResult.title,
-                  relevanceScore: unsplashResult.relevanceScore,
-                  found: true
-                };
-              }
-            } catch (fallbackError: any) {
-              results.phase2.fallbackError = fallbackError.message;
-            }
           }
         } catch (searchError: any) {
           results.phase2.searchResult = {

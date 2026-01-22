@@ -610,6 +610,16 @@ export async function searchGameImage(
     // Sort by score (highest first)
     filteredResults.sort((a: { item: any; score: number }, b: { item: any; score: number }) => b.score - a.score);
     
+    // Log top scores for debugging
+    if (filteredResults.length > 0) {
+      const topScores = filteredResults.slice(0, Math.min(5, filteredResults.length)).map((r: { item: any; score: number }) => ({
+        score: r.score,
+        title: r.item.title?.substring(0, 60) || 'No title',
+        url: r.item.link?.substring(0, 80) || 'No URL'
+      }));
+      console.log(`[IMAGE SEARCH] Top ${topScores.length} result scores:`, JSON.stringify(topScores, null, 2));
+    }
+    
     // For Phase 2 (structured keywords), filter out results below threshold
     // For Phase 1 (array keywords), we'll still return low scores as fallback
     const isPhase2 = !Array.isArray(keywords);
@@ -618,7 +628,8 @@ export async function searchGameImage(
       const thresholdResults = filteredResults.filter((result: { item: any; score: number }) => result.score >= 40);
       
       if (thresholdResults.length === 0) {
-        console.log(`[IMAGE SEARCH] No results meet minimum relevance threshold (40) for "${searchQuery}"`);
+        const maxScore = filteredResults.length > 0 ? filteredResults[0].score : 0;
+        console.log(`[IMAGE SEARCH] No results meet minimum relevance threshold (40) for "${searchQuery}". Highest score was: ${maxScore}`);
         return null;
       }
       
