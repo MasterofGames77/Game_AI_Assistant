@@ -8,13 +8,15 @@ import axios from 'axios';
 import { LRUCache } from '../../utils/cacheManager';
 import { cacheManager } from '../../utils/cacheManager';
 
-// Cache for user context responses (5 minute TTL - user data changes frequently)
-const USER_CONTEXT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+// Cache for user context responses (10 minute TTL - balances freshness with cache efficiency)
+// User context is aggregated from last 50 questions, so it's relatively stable
+// 10 minutes provides good cache hit rate while maintaining acceptable data freshness
+const USER_CONTEXT_CACHE_TTL = 10 * 60 * 1000; // 10 minutes (increased from 5 minutes)
 const USER_CONTEXT_CACHE_MAX_SIZE = 500; // Max 500 users
 const userContextCache = new LRUCache<UserContextResponse>(
   USER_CONTEXT_CACHE_MAX_SIZE,
   USER_CONTEXT_CACHE_TTL,
-  5 * 60 * 1000 // Cleanup every 5 minutes
+  10 * 60 * 1000 // Cleanup every 10 minutes (matches TTL)
 );
 
 // Cache for game verification results (24 hour TTL - games don't change)

@@ -256,10 +256,48 @@ export async function getGameReleaseDate(gameTitle: string): Promise<Date | null
   // Use normalized cache key to handle title variations
   const cacheKey = normalizeCacheKey(gameTitle);
   
-  // Check cache first
+  // Check cache first with normalized key
   const cached = releaseDateCache.get(cacheKey);
   if (cached) {
     return cached;
+  }
+  
+  // Also check with original title format (lowercase, trimmed) in case it was cached differently
+  const originalKey = gameTitle.toLowerCase().trim();
+  if (originalKey !== cacheKey) {
+    const cachedOriginal = releaseDateCache.get(originalKey);
+    if (cachedOriginal) {
+      // Cache hit with original format - also cache with normalized key for future lookups
+      releaseDateCache.set(cacheKey, cachedOriginal, RELEASE_DATE_CACHE_TTL);
+      return cachedOriginal;
+    }
+  }
+  
+  // Also check with "The" prefix variations (add/remove "The")
+  // This handles cases where "The Legend of Zelda" vs "Legend of Zelda" are used
+  const withTheKey = cacheKey.startsWith('the ') ? cacheKey : `the ${cacheKey}`;
+  const withoutTheKey = cacheKey.replace(/^the\s+/i, '');
+  
+  if (withTheKey !== cacheKey && withTheKey !== originalKey) {
+    const cachedWithThe = releaseDateCache.get(withTheKey);
+    if (cachedWithThe) {
+      releaseDateCache.set(cacheKey, cachedWithThe, RELEASE_DATE_CACHE_TTL);
+      if (originalKey !== cacheKey) {
+        releaseDateCache.set(originalKey, cachedWithThe, RELEASE_DATE_CACHE_TTL);
+      }
+      return cachedWithThe;
+    }
+  }
+  
+  if (withoutTheKey !== cacheKey && withoutTheKey !== originalKey) {
+    const cachedWithoutThe = releaseDateCache.get(withoutTheKey);
+    if (cachedWithoutThe) {
+      releaseDateCache.set(cacheKey, cachedWithoutThe, RELEASE_DATE_CACHE_TTL);
+      if (originalKey !== cacheKey) {
+        releaseDateCache.set(originalKey, cachedWithoutThe, RELEASE_DATE_CACHE_TTL);
+      }
+      return cachedWithoutThe;
+    }
   }
   
   // Try IGDB first (more reliable)
@@ -271,15 +309,22 @@ export async function getGameReleaseDate(gameTitle: string): Promise<Date | null
   }
   
   // Cache the result if we got one
-  // Also try to cache with alternative keys if the API returned a different title format
+  // Cache with multiple key variations to maximize hit rate
   if (releaseDate) {
+    // Primary cache key (normalized input title)
     releaseDateCache.set(cacheKey, releaseDate, RELEASE_DATE_CACHE_TTL);
     
     // Also cache with the original title format (in case it's different)
-    // This helps catch cases where the input title format differs from what we normalized
-    const originalKey = gameTitle.toLowerCase().trim();
     if (originalKey !== cacheKey) {
       releaseDateCache.set(originalKey, releaseDate, RELEASE_DATE_CACHE_TTL);
+    }
+    
+    // Cache with "The" prefix variations to handle title format differences
+    if (withTheKey !== cacheKey && withTheKey !== originalKey) {
+      releaseDateCache.set(withTheKey, releaseDate, RELEASE_DATE_CACHE_TTL);
+    }
+    if (withoutTheKey !== cacheKey && withoutTheKey !== originalKey) {
+      releaseDateCache.set(withoutTheKey, releaseDate, RELEASE_DATE_CACHE_TTL);
     }
   }
   
@@ -1219,8 +1264,13 @@ export const getChatCompletionWithVision = async (
 // Get chat completion for user questions
 export const getChatCompletion = async (question: string, systemMessage?: string): Promise<string | null> => {
   try {
-    // Generate a cache key based on the question and system message
-    const cacheKey = `chat:${question}:${systemMessage || 'default'}`;
+    // Normalize question for cache key (lowercase, trim) to match usage in assistant.ts
+    // This ensures consistent cache keys across the codebase
+    const normalizedQuestion = question.toLowerCase().trim();
+    const normalizedSystemMessage = (systemMessage || 'default').toLowerCase().trim();
+    
+    // Generate a cache key based on the normalized question and system message
+    const cacheKey = `chat:${normalizedQuestion}:${normalizedSystemMessage}`;
     
     // Check if we have a cached response
     const cachedResponse = aiCache.get(cacheKey);
