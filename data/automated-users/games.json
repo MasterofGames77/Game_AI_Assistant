@@ -47,6 +47,16 @@
       ]
     },
     {
+      "title": "Age of Empires II: Definitive Edition",
+      "genres": [
+        "real time strategy"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
       "title": "Alan Wake 2",
       "genres": [
         "survival-horror"
@@ -78,10 +88,11 @@
     {
       "title": "Animal Crossing: New Horizons",
       "genres": [
-        "simulation"
+        "social simulation"
       ],
       "modes": [
-        "single"
+        "single",
+        "multi"
       ]
     },
     {
@@ -129,6 +140,15 @@
         "massively multiplayer online role-playing game",
         "action-adventure",
         "survival"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Assassin's Creed: Odyssey",
+      "genres": [
+        "action role-playing"
       ],
       "modes": [
         "single"
@@ -275,6 +295,16 @@
       ]
     },
     {
+      "title": "Bloodborne",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
       "title": "Bloodstained: Ritual of the Night",
       "genres": [
         "metroidvania",
@@ -282,6 +312,16 @@
       ],
       "modes": [
         "single"
+      ]
+    },
+    {
+      "title": "Bloons TD 6",
+      "genres": [
+        "tower defense"
+      ],
+      "modes": [
+        "single",
+        "multi"
       ]
     },
     {
@@ -323,6 +363,15 @@
       ],
       "modes": [
         "multi"
+      ]
+    },
+    {
+      "title": "Bravely Default",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
       ]
     },
     {
@@ -439,7 +488,7 @@
       ]
     },
     {
-      "title": "Cokur's Bad Fur Day",
+      "title": "Conkur's Bad Fur Day",
       "genres": [
         "platformer",
         "action-adventure"
@@ -568,6 +617,16 @@
       ]
     },
     {
+      "title": "Dark Souls",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
       "title": "DayZ",
       "genres": [
         "survival"
@@ -599,6 +658,16 @@
       "title": "Dead Space",
       "genres": [
         "survival-horror"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Deathloop",
+      "genres": [
+        "first-person shooter",
+        "immersive sim"
       ],
       "modes": [
         "single"
@@ -638,6 +707,17 @@
         "massively multiplayer online"
       ],
       "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Devil May Cry 3: Special Edition",
+      "genres": [
+        "action-adventure",
+        "hack and slash"
+      ],
+      "modes": [
+        "single",
         "multi"
       ]
     },
@@ -734,6 +814,15 @@
       "modes": [
         "single",
         "multi"
+      ]
+    },
+    {
+      "title": "Doom (2016)",
+      "genres": [
+        "first-person shooter"
+      ],
+      "modes": [
+        "single"
       ]
     },
     {
@@ -901,6 +990,16 @@
       ]
     },
     {
+      "title":"Fatal Fury: City of the Wolves",
+      "genres": [
+        "fighting"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
       "title": "FIFA 13",
       "genres": [
         "sports"
@@ -957,7 +1056,7 @@
       ]
     },
     {
-      "title": "Final Fantasy XIV",
+      "title": "Final Fantasy XIV: A Realm Reborn",
       "genres": [
         "massively multiplayer online role-playing game"
       ],
@@ -1032,6 +1131,15 @@
       "modes": [
         "single",
         "multi"
+      ]
+    },
+    {
+      "title": "Freedom Planet",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single"
       ]
     },
     {
@@ -1443,6 +1551,16 @@
       ]
     },
     {
+      "title": "Jak II",
+      "genres": [
+        "platformer",
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
       "title": "Jet Set Radio",
       "genres": [
         "platformer",
@@ -1611,6 +1729,16 @@
       ]
     },
     {
+      "title": "Mario Party Superstars",
+      "genres": [
+        "party"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
       "title": "Mario Power Tennis",
       "genres": [
         "sports"
@@ -1687,6 +1815,24 @@
       "modes": [
         "single",
         "multi"
+      ]
+    },
+    {
+      "title": "Mega Man 9",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Mega Man X (1993)",
+      "genres": [
+        "platformer"
+      ],
+      "modes": [
+        "single"
       ]
     },
     {
@@ -1891,6 +2037,17 @@
       ]
     },
     {
+      "title": "Ori and the Blind Forest",
+      "genres": [
+        "metroidvania",
+        "platformer",
+        "adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
       "title": "Ori and the Will of the Wisps",
       "genres": [
         "metroidvania",
@@ -2010,6 +2167,17 @@
       ]
     },
     {
+      "title": "Phantasy Star Online 2: New Genesis",
+      "genres": [
+        "action role-playing",
+        "massively multiplayer online"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
       "title": "Phasmophobia",
       "genres": [
         "survival-horror",
@@ -2070,12 +2238,32 @@
       ]
     },
     {
+      "title": "Pokémon Black and White",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
       "title": "Pokémon Legends: Arceus",
       "genres": [
         "action role-playing"
       ],
       "modes": [
         "single"
+      ]
+    },
+    {
+      "title": "Pokémon HeartGold and SoulSilver",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single",
+        "multi"
       ]
     },
     {
@@ -2463,6 +2651,27 @@
       ]
     },
     {
+      "title": "Shantae and the Pirate's Curse",
+      "genres": [
+        "platformer",
+        "metroidvania"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Shellshock Live",
+      "genres": [
+        "artillery",
+        "strategy"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
       "title": "Shovel Knight",
       "genres": [
         "platformer"
@@ -2510,6 +2719,15 @@
       "modes": [
         "single",
         "multi"
+      ]
+    },
+    {
+      "title": "Skies of Arcadia Legends",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
       ]
     },
     {
@@ -2777,6 +2995,15 @@
       ]
     },
     {
+      "title": "Subway Surfers",
+      "genres": [
+        "endless runner"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
       "title": "Super Animal Royale",
       "genres": [
         "battle-royale"
@@ -2900,6 +3127,16 @@
     },
     {
       "title": "Super Smash Bros. Ultimate",
+      "genres": [
+        "fighting"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title":"Super Street Fighter II Turbo ",
       "genres": [
         "fighting"
       ],
@@ -3079,6 +3316,15 @@
       ]
     },
     {
+      "title": "The Legend of Zelda: A Link to the Past",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
       "title": "The Legend of Zelda: Breath of the Wild",
       "genres": [
         "action-adventure"
@@ -3127,6 +3373,16 @@
       "title": "The Sims 4",
       "genres": [
         "social simulation"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "The Stanley Parable",
+      "genres": [
+        "interactive story",
+        "adventure"
       ],
       "modes": [
         "single"
@@ -3218,6 +3474,15 @@
       "modes": [
         "single",
         "multi"
+      ]
+    },
+    {
+      "title": "Turnip Boy Commits Tax Evasion",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
       ]
     },
     {
@@ -3325,6 +3590,16 @@
       "title": "Virtua Fighter 5",
       "genres": [
         "fighting"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Warioware Gold",
+      "genres": [
+        "minigame compilation"
       ],
       "modes": [
         "single",

@@ -1,9 +1,16 @@
 {
   "party": [
-    "Among Us"
+    "Among Us",
+    "Mario Party Superstars"
   ],
   "social deduction": [
     "Among Us"
+  ],
+  "real time strategy": [
+    "Age of Empires II: Definitive Edition"
+  ],
+  "social simulation": [
+    "Animal Crossing: New Horizons"
   ],
   "battle-royale": [
     "Apex Legends",
@@ -45,13 +52,19 @@
     "Titanfall 2"
   ],
   "action role-playing": [
+    "Bloodborne",
     "Borderlands 2",
     "Borderlands 3",
+    "Dark Souls",
     "Elden Ring",
     "Genshin Impact",
     "Mass Effect 3",
     "Path of Exile",
+    "Phantasy Star Online 2: New Genesis",
     "Scott Pilgrim vs the World: The Game"
+  ],
+  "tower defense": [
+    "Bloons TD 6"
   ],
   "racing": [
     "Burnout Paradise",
@@ -102,6 +115,7 @@
   "fighting": [
     "Dead or Alive 3",
     "Dragon Ball FighterZ",
+    "Fatal Fury: City of the Wolves",
     "Granblue Fantasy Versus: Rising",
     "Guilty Gear Strive",
     "Injustice 2",
@@ -111,6 +125,7 @@
     "Street Fighter 6",
     "Super Smash Bros. Melee",
     "Super Smash Bros. Ultimate",
+    "Super Street Fighter II Turbo ",
     "Tekken 8",
     "The King of Fighters XV",
     "Ultimate Marvel VS. Capcom 3",
@@ -127,7 +142,32 @@
   ],
   "massively multiplayer online": [
     "Destiny 2",
+    "Phantasy Star Online 2: New Genesis",
     "Roblox"
+  ],
+  "action-adventure": [
+    "Devil May Cry 3: Special Edition",
+    "Ghost of Tsushima",
+    "Grand Theft Auto V",
+    "Naraka: Bladepoint",
+    "No Man's Sky",
+    "Palworld",
+    "Red Dead Redemption 2",
+    "Sea of Thieves",
+    "Sonic Adventure 2",
+    "Super Mario 3D World + Bowser's Fury",
+    "Super Mario Galaxy",
+    "Super Mario Odyssey",
+    "Terraria",
+    "The Binding of Issac: Afterbirth+",
+    "The Last of Us (2013)",
+    "Tom Clancy’s Splinter Cell: Chaos Theory",
+    "Uncharted 2: Among Thieves",
+    "Uncharted 3: Drake's Deception"
+  ],
+  "hack and slash": [
+    "Devil May Cry 3: Special Edition",
+    "Zone of the Enders: The 2nd Runner"
   ],
   "survival": [
     "Dune: Awakening",
@@ -182,7 +222,7 @@
     "TMNT: Shredder's Revenge"
   ],
   "massively multiplayer online role-playing game": [
-    "Final Fantasy XIV",
+    "Final Fantasy XIV: A Realm Reborn",
     "Guild Wars 2",
     "Runescape",
     "The Elder Scrolls Online",
@@ -212,31 +252,14 @@
     "Uncharted 3: Drake's Deception",
     "Zone of the Enders: The 2nd Runner"
   ],
-  "action-adventure": [
-    "Ghost of Tsushima",
-    "Grand Theft Auto V",
-    "Naraka: Bladepoint",
-    "No Man's Sky",
-    "Palworld",
-    "Red Dead Redemption 2",
-    "Sea of Thieves",
-    "Sonic Adventure 2",
-    "Super Mario 3D World + Bowser's Fury",
-    "Super Mario Galaxy",
-    "Super Mario Odyssey",
-    "Terraria",
-    "The Binding of Issac: Afterbirth+",
-    "The Last of Us (2013)",
-    "Tom Clancy’s Splinter Cell: Chaos Theory",
-    "Uncharted 2: Among Thieves",
-    "Uncharted 3: Drake's Deception"
-  ],
   "sim racing": [
     "Gran Turismo 7"
   ],
   "rpg": [
     "Granblue Fantasy Versus: Rising",
-    "Mario Golf"
+    "Mario Golf",
+    "Pokémon Black and White",
+    "Pokémon HeartGold and SoulSilver"
   ],
   "metroidvania": [
     "Guacamelee!"
@@ -302,6 +325,12 @@
   "game creation system": [
     "Roblox"
   ],
+  "artillery": [
+    "Shellshock Live"
+  ],
+  "strategy": [
+    "Shellshock Live"
+  ],
   "4X": [
     "Sid Meier's Civilization VI"
   ],
@@ -338,6 +367,9 @@
     "Tom Clancy's Rainbow Six Siege",
     "Valorant"
   ],
+  "minigame compilation": [
+    "Warioware Gold"
+  ],
   "vehicular combat": [
     "War Thunder"
   ],
@@ -352,8 +384,5 @@
   ],
   "strategy game": [
     "Yu-Gi-Oh! Master Duel"
-  ],
-  "hack and slash": [
-    "Zone of the Enders: The 2nd Runner"
   ]
 }

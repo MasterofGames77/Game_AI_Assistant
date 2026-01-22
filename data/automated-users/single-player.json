@@ -20,19 +20,24 @@
     "Banjo Kazooie",
     "Battletoads",
     "Celeste",
-    "Cokur's Bad Fur Day",
+    "Conkur's Bad Fur Day",
     "Crash Bandicoot 4: It's About Time",
     "Crash Bandicoot N-Sane Trilogy",
     "Donkey Kong Bananza",
     "Donkey Kong Country",
     "Donkey Kong Country: Tropical Freeze",
+    "Freedom Planet",
     "Geometry Dash",
     "Guacamelee!",
     "Jak and Daxter: The Precursor Legacy",
+    "Jak II",
     "Jet Set Radio",
     "Kirby and the Forgotten Land",
     "Kirby Planet Robobot",
     "Mark of the Ninja",
+    "Mega Man 9",
+    "Mega Man X (1993)",
+    "Ori and the Blind Forest",
     "Ori and the Will of the Wisps",
     "Pac-Man World 2",
     "Ratchet & Clank: Going Commando",
@@ -40,6 +45,7 @@
     "Ratchet & Clank: Up Your Arsenal",
     "Rayman Legends",
     "Rayman Origins",
+    "Shantae and the Pirate's Curse",
     "Shovel Knight",
     "Sonic 3 & Knuckles",
     "Sonic Adventure 2",
@@ -80,6 +86,9 @@
     "Star Fox (1993)",
     "Star Fox 64"
   ],
+  "real time strategy": [
+    "Age of Empires II: Definitive Edition"
+  ],
   "action-adventure": [
     "Alien Isolation",
     "ARK: Survival Evolved",
@@ -87,9 +96,10 @@
     "Batman Arkham City",
     "Batman: Arkham Asylum",
     "Bayonetta 2",
-    "Cokur's Bad Fur Day",
+    "Conkur's Bad Fur Day",
     "Death Stranding",
     "Death Stranding 2: On the Beach",
+    "Devil May Cry 3: Special Edition",
     "Devil May Cry 5",
     "Dishonored 2",
     "Donkey Kong Bananza",
@@ -97,6 +107,7 @@
     "God of War (2018)",
     "God of War Ragnarök",
     "Grand Theft Auto V",
+    "Jak II",
     "Like a Dragon: Ishin!",
     "Marvel's Spider-Man",
     "Marvel's Spider-Man: Miles Morales",
@@ -122,10 +133,12 @@
     "The Binding of Issac: Afterbirth+",
     "The Chronicles of Riddick: Escape from Butcher Bay",
     "The Last of Us (2013)",
+    "The Legend of Zelda: A Link to the Past",
     "The Legend of Zelda: Breath of the Wild",
     "The Legend of Zelda: Ocarina of Time",
     "The Legend of Zelda: Tears of the Kingdom",
     "Tom Clancy’s Splinter Cell: Chaos Theory",
+    "Turnip Boy Commits Tax Evasion",
     "Uncharted 2: Among Thieves",
     "Uncharted 3: Drake's Deception",
     "Yakuza (2005)"
@@ -145,11 +158,11 @@
     "Thief II: The Metal Age",
     "Tom Clancy’s Splinter Cell: Chaos Theory"
   ],
-  "simulation": [
+  "social simulation": [
     "Animal Crossing: New Horizons",
-    "Football Manager 2024",
-    "PowerWash Simulator",
-    "Universe Sandbox"
+    "Persona 4: Golden",
+    "Persona 5: Royal",
+    "The Sims 4"
   ],
   "metroidvania": [
     "Animal Well",
@@ -164,7 +177,9 @@
     "Ender Magnolia: Bloom in the Mist",
     "Guacamelee!",
     "Hollow Knight",
-    "Ori and the Will of the Wisps"
+    "Ori and the Blind Forest",
+    "Ori and the Will of the Wisps",
+    "Shantae and the Pirate's Curse"
   ],
   "puzzle": [
     "Animal Well",
@@ -185,6 +200,7 @@
     "Danganronpa V3: Killing Harmony",
     "Danganronpa: Trigger Happy Havoc",
     "Dispatch",
+    "Ori and the Blind Forest",
     "Ori and the Will of the Wisps",
     "Phoenix Wright: Ace Attorney",
     "Phoenix Wright: Ace Attorney - Dual Destinies",
@@ -192,7 +208,8 @@
     "Phoenix Wright: Ace Attorney - Trials and Tribulations",
     "Return of the Obra Dinn",
     "Stray",
-    "The Last of Us Part II"
+    "The Last of Us Part II",
+    "The Stanley Parable"
   ],
   "massively multiplayer online role-playing game": [
     "ARK: Survival Evolved"
@@ -212,6 +229,8 @@
   ],
   "action role-playing": [
     "Assassin's Creed Valhalla",
+    "Assassin's Creed: Odyssey",
+    "Bloodborne",
     "Bloodstained: Ritual of the Night",
     "Borderlands 2",
     "Borderlands 3",
@@ -219,6 +238,7 @@
     "Castlevania: Portrait of Ruin",
     "Castlevania: Symphony of the Night",
     "Cyberpunk 2077",
+    "Dark Souls",
     "Dust: An Elysian Tail",
     "Elden Ring",
     "Fallout 4",
@@ -234,6 +254,7 @@
     "Mass Effect 3",
     "NieR: Automata",
     "Path of Exile",
+    "Phantasy Star Online 2: New Genesis",
     "Pokémon Legends: Arceus",
     "Scott Pilgrim vs the World: The Game",
     "The Elder Scrolls V: Skyrim",
@@ -272,6 +293,7 @@
   ],
   "rpg": [
     "Baldur's Gate 3",
+    "Bravely Default",
     "Chrono Trigger",
     "Clair Obscur: Expedition 33",
     "Disco Elysium",
@@ -289,8 +311,11 @@
     "Paper Mario: The Thousand Year Door",
     "Persona 4: Golden",
     "Persona 5: Royal",
+    "Pokémon Black and White",
+    "Pokémon HeartGold and SoulSilver",
     "Pokémon Mystery Dungeon: Explorers of Sky",
     "Pokémon Platinum",
+    "Skies of Arcadia Legends",
     "Star Wars Knights of the Old Republic II: The Sith Lords"
   ],
   "beat 'em up": [
@@ -311,6 +336,7 @@
   ],
   "hack and slash": [
     "Bayonetta 2",
+    "Devil May Cry 3: Special Edition",
     "Devil May Cry 5",
     "Dust: An Elysian Tail",
     "God of War (2018)",
@@ -337,12 +363,17 @@
   "tile-matching": [
     "Bejeweled"
   ],
+  "tower defense": [
+    "Bloons TD 6"
+  ],
   "puzzle-adventure": [
     "Blue Prince"
   ],
   "first-person shooter": [
     "Borderlands 2",
     "Borderlands 3",
+    "Deathloop",
+    "Doom (2016)",
     "Doom Eternal",
     "Far Cry 5",
     "Half-Life 2",
@@ -377,11 +408,15 @@
   "exergaming": [
     "Dance Dance Revolution: Mario Mix"
   ],
+  "immersive sim": [
+    "Deathloop"
+  ],
   "interactive film": [
     "Dispatch"
   ],
   "fighting": [
     "Dragon Ball FighterZ",
+    "Fatal Fury: City of the Wolves",
     "Granblue Fantasy Versus: Rising",
     "Guilty Gear Strive",
     "Injustice 2",
@@ -391,6 +426,7 @@
     "Street Fighter 6",
     "Super Smash Bros. Melee",
     "Super Smash Bros. Ultimate",
+    "Super Street Fighter II Turbo ",
     "Tekken 8",
     "The King of Fighters XV",
     "Ultimate Marvel VS. Capcom 3",
@@ -446,11 +482,17 @@
   "point-and-click": [
     "Five Night's at Freddy's"
   ],
+  "simulation": [
+    "Football Manager 2024",
+    "PowerWash Simulator",
+    "Universe Sandbox"
+  ],
   "sports management": [
     "Football Manager 2024"
   ],
   "strategy": [
-    "FTL: Faster than Light"
+    "FTL: Faster than Light",
+    "Shellshock Live"
   ],
   "third-person shooter": [
     "Gears of War",
@@ -493,6 +535,9 @@
     "The Last of Us Part II",
     "War Thunder"
   ],
+  "party": [
+    "Mario Party Superstars"
+  ],
   "flight simulation": [
     "Microsoft Flight Simulator"
   ],
@@ -505,10 +550,9 @@
   "monster-taming": [
     "Palworld"
   ],
-  "social simulation": [
-    "Persona 4: Golden",
-    "Persona 5: Royal",
-    "The Sims 4"
+  "massively multiplayer online": [
+    "Phantasy Star Online 2: New Genesis",
+    "Roblox"
   ],
   "puzzle-platformer": [
     "Portal 2"
@@ -519,14 +563,14 @@
   "game creation system": [
     "Roblox"
   ],
-  "massively multiplayer online": [
-    "Roblox"
-  ],
   "dating sim": [
     "Sakura Wars (2019)"
   ],
   "real-time tactics": [
     "Shadow Tactics: Blades of the Shogun"
+  ],
+  "artillery": [
+    "Shellshock Live"
   ],
   "4X": [
     "Sid Meier's Civilization VI"
@@ -545,6 +589,9 @@
     "Stardew Valley",
     "Story of Seasons (2014)"
   ],
+  "endless runner": [
+    "Subway Surfers"
+  ],
   "battle-royale": [
     "Super Animal Royale",
     "Tetris 99"
@@ -559,6 +606,9 @@
   "light gun shooter": [
     "The House of the Dead (1997)"
   ],
+  "interactive story": [
+    "The Stanley Parable"
+  ],
   "tactical shooter": [
     "Tom Clancy's Rainbow Six Siege"
   ],
@@ -567,6 +617,9 @@
   ],
   "interactive drama": [
     "Until Dawn"
+  ],
+  "minigame compilation": [
+    "Warioware Gold"
   ],
   "vehicular combat": [
     "War Thunder"
