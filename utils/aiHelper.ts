@@ -126,6 +126,14 @@ const releaseDateCache = new LRUCache<Date>(
 cacheManager.registerCache('ReleaseDateCache', releaseDateCache);
 
 /**
+ * Request deduplication for release date fetches
+ * Prevents cache stampedes when multiple parallel requests ask for the same game
+ * Key: normalized game title, Value: Promise<Date | null>
+ */
+const pendingReleaseDateRequests = new Map<string, Promise<Date | null>>();
+const RELEASE_DATE_DEDUP_TTL = 30 * 1000; // 30 seconds - cleanup completed requests
+
+/**
  * Fetch release date for a game from IGDB (lightweight version)
  * Returns just the release date, not full game info
  */
@@ -249,8 +257,9 @@ function normalizeCacheKey(gameTitle: string): string {
 }
 
 /**
- * Get release date for a game with caching
+ * Get release date for a game with caching and request deduplication
  * Checks cache first, then tries IGDB, then RAWG
+ * Uses request deduplication to prevent cache stampedes from parallel requests
  */
 export async function getGameReleaseDate(gameTitle: string): Promise<Date | null> {
   // Use normalized cache key to handle title variations
@@ -300,35 +309,58 @@ export async function getGameReleaseDate(gameTitle: string): Promise<Date | null
     }
   }
   
-  // Try IGDB first (more reliable)
-  let releaseDate = await fetchReleaseDateFromIGDB(gameTitle);
-  
-  // Fallback to RAWG if IGDB fails
-  if (!releaseDate) {
-    releaseDate = await fetchReleaseDateFromRAWG(gameTitle);
+  // REQUEST DEDUPLICATION: Check if a request for this game is already in progress
+  // This prevents cache stampedes when multiple parallel calls happen for the same game
+  if (pendingReleaseDateRequests.has(cacheKey)) {
+    // Reuse the existing in-flight request
+    return pendingReleaseDateRequests.get(cacheKey)!;
   }
   
-  // Cache the result if we got one
-  // Cache with multiple key variations to maximize hit rate
-  if (releaseDate) {
-    // Primary cache key (normalized input title)
-    releaseDateCache.set(cacheKey, releaseDate, RELEASE_DATE_CACHE_TTL);
-    
-    // Also cache with the original title format (in case it's different)
-    if (originalKey !== cacheKey) {
-      releaseDateCache.set(originalKey, releaseDate, RELEASE_DATE_CACHE_TTL);
+  // Create new request promise
+  const requestPromise = (async (): Promise<Date | null> => {
+    try {
+      // Try IGDB first (more reliable)
+      let releaseDate = await fetchReleaseDateFromIGDB(gameTitle);
+      
+      // Fallback to RAWG if IGDB fails
+      if (!releaseDate) {
+        releaseDate = await fetchReleaseDateFromRAWG(gameTitle);
+      }
+      
+      // Cache the result if we got one
+      // Cache with multiple key variations to maximize hit rate
+      if (releaseDate) {
+        // Primary cache key (normalized input title)
+        releaseDateCache.set(cacheKey, releaseDate, RELEASE_DATE_CACHE_TTL);
+        
+        // Also cache with the original title format (in case it's different)
+        if (originalKey !== cacheKey) {
+          releaseDateCache.set(originalKey, releaseDate, RELEASE_DATE_CACHE_TTL);
+        }
+        
+        // Cache with "The" prefix variations to handle title format differences
+        if (withTheKey !== cacheKey && withTheKey !== originalKey) {
+          releaseDateCache.set(withTheKey, releaseDate, RELEASE_DATE_CACHE_TTL);
+        }
+        if (withoutTheKey !== cacheKey && withoutTheKey !== originalKey) {
+          releaseDateCache.set(withoutTheKey, releaseDate, RELEASE_DATE_CACHE_TTL);
+        }
+      }
+      
+      return releaseDate;
+    } finally {
+      // Clean up the pending request after a short delay
+      // This allows other parallel requests to reuse the result if they arrive just after completion
+      setTimeout(() => {
+        pendingReleaseDateRequests.delete(cacheKey);
+      }, RELEASE_DATE_DEDUP_TTL);
     }
-    
-    // Cache with "The" prefix variations to handle title format differences
-    if (withTheKey !== cacheKey && withTheKey !== originalKey) {
-      releaseDateCache.set(withTheKey, releaseDate, RELEASE_DATE_CACHE_TTL);
-    }
-    if (withoutTheKey !== cacheKey && withoutTheKey !== originalKey) {
-      releaseDateCache.set(withoutTheKey, releaseDate, RELEASE_DATE_CACHE_TTL);
-    }
-  }
+  })();
   
-  return releaseDate;
+  // Store the promise so other parallel requests can reuse it
+  pendingReleaseDateRequests.set(cacheKey, requestPromise);
+  
+  return requestPromise;
 }
 
 /**

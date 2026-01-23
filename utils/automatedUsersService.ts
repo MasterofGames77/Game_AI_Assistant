@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios';
 import fs from 'fs';
 import path from 'path';
-import { generateQuestion, generateForumPost, generatePostReply, generateCommonGamerPost, generateExpertGamerReply, UserPreferences } from './automatedContentGenerator';
+import { generateQuestion, generateForumPost, generatePostReply, generateCommonGamerPost, generateExpertGamerReply, UserPreferences, validateGameFeature } from './automatedContentGenerator';
 import { getRandomGameImage, recordImageUsage, downloadAndStoreImage } from './automatedImageService';
 import { searchGameImage, getCachedImageSearch, cacheImageSearch } from './automatedImageSearch';
 import { extractKeywordsSimple, extractKeywordsFromPost } from './imageKeywordExtractor';
@@ -656,59 +656,81 @@ async function createForumForGame(
 
     const normalizeTitle = (t: string) => t.toLowerCase().trim().replace(/\s+/g, ' ');
 
-    const buildCandidateTopics = (category: string): string[] => {
+    const buildCandidateTopics = async (category: string, gameTitle: string): Promise<string[]> => {
       // Keep these generic so we don't invent game-specific facts.
       // Posts will become specific within the category when generated.
+      // Filter out topics that don't apply to the game.
+      let baseTopics: string[] = [];
+
       switch (category) {
         case 'speedruns':
-          return [
+          baseTopics = [
             'Any% Route & Strats',
             'Movement Tech & Shortcuts',
             'PB Progress & Consistency',
             'Timing Windows & Cycles',
             'World Record Discussion',
           ];
+          break;
         case 'mods':
-          return [
+          baseTopics = [
             'Mod Installation & Compatibility',
             'Best Mods & Recommendations',
             'Graphics / Texture Mods',
             'Gameplay Overhauls',
             'Modding Tools & Setup',
           ];
+          // Validate mod support - filter out mod topics if game doesn't support mods
+          const hasModSupport = await validateGameFeature(gameTitle, 'mods');
+          if (hasModSupport === false) {
+            console.log(`[FORUM CREATION] ${gameTitle} does not support mods - filtering out mod topics`);
+            return []; // Return empty array - caller should handle fallback
+          }
+          break;
         case 'gameplay':
-          return [
+          baseTopics = [
             'Gameplay Tips & Tech',
             'Mechanics & Strategies',
             'Beginner Questions',
             'Advanced Techniques',
             'Builds / Loadouts / Setups',
           ];
+          break;
         case 'help':
-          return [
+          baseTopics = [
             'Help & Troubleshooting',
             'Stuck? Ask Here',
             'Need Tips / Advice',
             'Fixes & Workarounds',
             'Beginner Help Thread',
           ];
+          break;
         case 'general':
         default:
-          return [
+          baseTopics = [
             'General Discussion',
             'Favorite Moments',
             'Characters & Story Talk',
             'Hot Takes & Opinions',
             'Tips and Discoveries',
           ];
+          // Validate story content - filter out "Characters & Story Talk" if game doesn't have story
+          const hasStoryContent = await validateGameFeature(gameTitle, 'story content');
+          if (hasStoryContent === false) {
+            console.log(`[FORUM CREATION] ${gameTitle} does not have story content - filtering out "Characters & Story Talk"`);
+            baseTopics = baseTopics.filter(topic => topic !== 'Characters & Story Talk');
+          }
+          break;
       }
+
+      return baseTopics;
     };
 
-    const pickUniqueForumTitle = (params: {
+    const pickUniqueForumTitle = async (params: {
       gameTitle: string;
       category: string;
       existingForumsForGame: any[];
-    }): string => {
+    }): Promise<string> => {
       const categoryDisplay = forumCategoryDisplayName(normalizeForumCategory(params.category));
       const defaultGenericTitles = new Set<string>([
         normalizeTitle(`${params.gameTitle} - ${categoryDisplay}`),
@@ -723,7 +745,16 @@ async function createForumForGame(
 
       const taken = new Set(existingTitlesInCategory);
 
-      const topics = buildCandidateTopics(params.category);
+      const topics = await buildCandidateTopics(params.category, params.gameTitle);
+
+      // If no topics available (e.g., mods category but game doesn't support mods), fall back to generic
+      if (topics.length === 0) {
+        console.log(`[FORUM CREATION] No valid topics for ${params.gameTitle} category ${params.category} - using generic title`);
+        const base = `${params.gameTitle} - ${categoryDisplay}`;
+        let suffix = 2;
+        while (taken.has(normalizeTitle(`${base} (${suffix})`))) suffix++;
+        return `${base} (${suffix})`;
+      }
 
       // Prefer non-generic topics when possible
       const shuffled = topics
@@ -754,11 +785,11 @@ async function createForumForGame(
       // Most posts will be gameplay or general discussion
       // Occasionally use speedruns, mods, or help
       const categoryWeights: { [key: string]: number } = {
-        'gameplay': 0.35,      // 35% - most common
+        'gameplay': 0.30,      // 30% - most common
         'general': 0.30,       // 30% - also common
         'speedruns': 0.15,     // 15% - for competitive/speedrun-friendly games
-        'help': 0.12,          // 12% - for questions/help
-        'mods': 0.08           // 8% - less common, mainly for PC games
+        'help': 0.15,          // 15% - for questions/help
+        'mods': 0.10           // 10% - less common, mainly for PC games
       };
 
       // Select category based on weighted random
@@ -803,7 +834,7 @@ async function createForumForGame(
     }
 
     // Prefer creating a more specific forum title (topic-based) to avoid many identical "Game - Category" forums.
-    const forumTitle = pickUniqueForumTitle({
+    const forumTitle = await pickUniqueForumTitle({
       gameTitle,
       category: normalizedCategory,
       existingForumsForGame: existingForums

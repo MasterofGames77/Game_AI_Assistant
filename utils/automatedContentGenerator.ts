@@ -67,6 +67,69 @@ async function selectModelForAutomatedUser(gameTitle: string): Promise<string> {
   return SAFE_DEFAULT_MODEL;
 }
 
+/**
+ * Validate if a game has specific features/content
+ * This prevents creating forums or posts about content that doesn't exist in the game
+ * 
+ * @param gameTitle - The game title to check
+ * @param featureType - The type of feature to check for (e.g., 'story mode', 'mods', 'character development')
+ * @returns true if the game has the feature, false if it doesn't, null if uncertain
+ */
+export async function validateGameFeature(
+  gameTitle: string,
+  featureType: 'story mode' | 'story content' | 'narrative' | 'character development' | 'mods' | 'modding support'
+): Promise<boolean | null> {
+  try {
+    // Select appropriate model
+    const selectedModel = await selectModelForAutomatedUser(gameTitle);
+
+    // Map feature types to specific questions
+    const featureQuestions: Record<string, string> = {
+      'story mode': `Does ${gameTitle} have a traditional story mode, campaign mode, or single-player story/campaign? Answer with only "YES" if it has a story mode, "NO" if it does not have a story mode (only has gameplay modes like arcade, versus, or unlock modes), or "UNCERTAIN" if you're not sure.`,
+      'story content': `Does ${gameTitle} have story content, narrative elements, plot, or character development? Answer with only "YES" if it has story/narrative content, "NO" if it focuses purely on gameplay without story elements, or "UNCERTAIN" if you're not sure.`,
+      'narrative': `Does ${gameTitle} have narrative elements, story, plot, or character arcs? Answer with only "YES" if it has narrative/story elements, "NO" if it's purely gameplay-focused without narrative, or "UNCERTAIN" if you're not sure.`,
+      'character development': `Does ${gameTitle} have character development, character arcs, or character growth throughout the game? Answer with only "YES" if it has character development, "NO" if characters are static or the game doesn't focus on character growth, or "UNCERTAIN" if you're not sure.`,
+      'mods': `Does ${gameTitle} support mods, modifications, or user-generated content? Answer with only "YES" if it has mod support or active modding community, "NO" if it doesn't support mods, or "UNCERTAIN" if you're not sure.`,
+      'modding support': `Does ${gameTitle} have modding support, mod tools, or an active modding community? Answer with only "YES" if it has modding support, "NO" if it doesn't, or "UNCERTAIN" if you're not sure.`
+    };
+
+    const question = featureQuestions[featureType] || featureQuestions['story content'];
+
+    const completion = await getOpenAIClient().chat.completions.create({
+      model: selectedModel,
+      messages: [
+        {
+          role: 'system',
+          content: `You are a game knowledge expert. Answer questions about game features accurately and concisely. Only respond with "YES", "NO", or "UNCERTAIN".`
+        },
+        {
+          role: 'user',
+          content: question
+        }
+      ],
+      temperature: 0.1, // Low temperature for factual accuracy
+      max_tokens: 10
+    });
+
+    const response = completion.choices[0]?.message?.content?.trim().toUpperCase();
+
+    if (response === 'YES') {
+      console.log(`[Game Feature Validation] ✅ ${gameTitle} has ${featureType}`);
+      return true;
+    } else if (response === 'NO') {
+      console.log(`[Game Feature Validation] ❌ ${gameTitle} does NOT have ${featureType}`);
+      return false;
+    } else {
+      console.log(`[Game Feature Validation] ⚠️ Uncertain if ${gameTitle} has ${featureType} - defaulting to allowing it`);
+      return null; // Uncertain - default to allowing (conservative approach)
+    }
+  } catch (error) {
+    console.error(`[Game Feature Validation] Error validating ${featureType} for ${gameTitle}:`, error);
+    // On error, default to null (uncertain) - conservative approach
+    return null;
+  }
+}
+
 export interface UserPreferences {
   genres: string[];
   focus: 'single-player' | 'multiplayer';
@@ -464,7 +527,9 @@ function analyzeForumTopic(forumTopic: string | undefined, forumCategory: string
   * Comparisons between modded and vanilla (unmodified) versions
 - You can mention the base game for context, but mods/modifications MUST be the primary focus
 - DO NOT just discuss the vanilla/unmodified game without mentioning mods or modifications
-- If discussing vanilla gameplay, make it clear you're comparing it to modded versions or discussing it in the context of mods`;
+- If discussing vanilla gameplay, make it clear you're comparing it to modded versions or discussing it in the context of mods
+
+CRITICAL VALIDATION: Before posting, verify that ${gameTitle} actually supports mods. If ${gameTitle} does NOT support mods or have an active modding community, you MUST NOT discuss modding. Instead, acknowledge that the game doesn't support mods or focus on what the game actually has.`;
   }
 
   // Check for gameplay category
@@ -483,7 +548,9 @@ function analyzeForumTopic(forumTopic: string | undefined, forumCategory: string
     return `CRITICAL TOPIC REQUIREMENT: This forum is specifically about STORY/NARRATIVE. Your post MUST focus on:
 - Story elements, plot, narrative, character development, or themes
 - Story-related experiences, moments, or discussions
-- DO NOT focus primarily on gameplay mechanics, strategies, or tips unless they relate to story`;
+- DO NOT focus primarily on gameplay mechanics, strategies, or tips unless they relate to story
+
+CRITICAL VALIDATION: Before posting, verify that ${gameTitle} actually has story/narrative content. If ${gameTitle} does NOT have a story mode, narrative, or story content (e.g., it's a pure gameplay-focused game like arcade games, sports games without story modes, or competitive games), you MUST NOT discuss story elements. Instead, focus on what the game actually has (gameplay, characters as gameplay elements, etc.).`;
   }
 
   // Check for specific character mentions
@@ -641,6 +708,9 @@ CRITICAL ACCURACY REQUIREMENTS:
 - Spell character names, locations, and game terms CORRECTLY - double-check spelling before generating
 - Only mention features that actually exist in ${gameTitle} - do NOT make up features or mechanics
 - If you're unsure about a character name or feature, either omit it or use generic terms
+- CRITICAL: Before discussing story/narrative content, verify that ${gameTitle} actually has story content. If the game does NOT have a story mode or narrative (e.g., pure gameplay/arcade games), do NOT discuss story elements - focus on what the game actually has
+- CRITICAL: Before discussing mods, verify that ${gameTitle} actually supports mods. If the game does NOT support mods, do NOT discuss modding
+- CRITICAL: Before discussing character development or character arcs, verify that ${gameTitle} actually has character development. If characters are static or the game doesn't focus on character growth, do NOT discuss character development
 
 IMPORTANT: 
 - Do NOT use formal language, greetings, conclusion phrases, or AI-related phrases. Write naturally and casually like a real gamer.
@@ -675,6 +745,7 @@ IMPORTANT:
 - You MUST include the game title "${gameTitle}" in your post.
 - MOST IMPORTANTLY: Your post MUST directly address and stay relevant to the forum topic "${forumTopic || 'General Discussion'}"
 - CRITICAL: Your post MUST be completely unique and different from ALL previous posts shown above (whether from you or other automated users). Avoid similar topics, characters, experiences, or phrasing.${previousPostsContext}
+- CRITICAL VALIDATION: Only discuss content that actually exists in ${gameTitle}. If the forum topic mentions story/narrative but the game doesn't have story content, focus on what the game actually has (gameplay, characters as gameplay elements, etc.) rather than making up story content
 
 Game: ${gameTitle}
 Genre: ${genre} (RPG/Adventure/Simulation/Puzzle/Platformer focus)
@@ -700,6 +771,7 @@ IMPORTANT:
 - You MUST include the game title "${gameTitle}" in your post.
 - MOST IMPORTANTLY: Your post MUST directly address and stay relevant to the forum topic "${forumTopic || 'General Discussion'}"
 - CRITICAL: Your post MUST be completely unique and different from ALL previous posts shown above (whether from you or other automated users). Avoid similar topics, characters, experiences, or phrasing.${previousPostsContext}
+- CRITICAL VALIDATION: Only discuss content that actually exists in ${gameTitle}. If the forum topic mentions story/narrative but the game doesn't have story content, focus on what the game actually has (gameplay, characters as gameplay elements, etc.) rather than making up story content
 
 Game: ${gameTitle}
 Genre: ${genre} (Racing/Battle Royale/Fighting/FPS/Sandbox focus)
@@ -824,6 +896,9 @@ CRITICAL ACCURACY REQUIREMENTS:
 - Only mention features that actually exist in ${gameTitle} - do NOT make up features or mechanics
 - If you're unsure about a character name or feature, either omit it or use generic terms
 - FACTUAL ACCURACY is more important than sounding natural - if you're not certain about a fact, don't include it
+- CRITICAL: Before discussing story/narrative content, verify that ${gameTitle} actually has story content. If the game does NOT have a story mode or narrative, do NOT discuss story elements
+- CRITICAL: Before discussing mods, verify that ${gameTitle} actually supports mods. If the game does NOT support mods, do NOT discuss modding
+- CRITICAL: Before discussing character development, verify that ${gameTitle} actually has character development. If characters are static, do NOT discuss character development
 
 IMPORTANT: 
 - Do NOT use formal language, greetings, conclusion phrases, or AI-related phrases. Write naturally and casually like a real gamer.
@@ -1042,6 +1117,9 @@ CRITICAL ACCURACY REQUIREMENTS:
 - Spell character names, locations, and game terms CORRECTLY
 - Only mention features that actually exist in ${gameTitle}
 - If you're unsure about a fact, don't include it
+- CRITICAL: Before discussing story/narrative content, verify that ${gameTitle} actually has story content. If the game does NOT have a story mode or narrative, do NOT discuss story elements
+- CRITICAL: Before discussing mods, verify that ${gameTitle} actually supports mods. If the game does NOT support mods, do NOT discuss modding
+- CRITICAL: Before discussing character development, verify that ${gameTitle} actually has character development. If characters are static, do NOT discuss character development
 
 IMPORTANT:
 - Do NOT use formal language or AI-related phrases
@@ -1190,6 +1268,9 @@ CRITICAL ACCURACY REQUIREMENTS:
 - Spell character names, locations, and game terms CORRECTLY
 - Only mention features that actually exist in ${gameTitle}
 - Provide accurate, actionable advice
+- CRITICAL: Before discussing story/narrative content, verify that ${gameTitle} actually has story content. If the game does NOT have a story mode or narrative, do NOT discuss story elements
+- CRITICAL: Before discussing mods, verify that ${gameTitle} actually supports mods. If the game does NOT support mods, do NOT discuss modding
+- CRITICAL: Before discussing character development, verify that ${gameTitle} actually has character development. If characters are static, do NOT discuss character development
 
 IMPORTANT:
 - Do NOT use formal language or AI-related phrases
