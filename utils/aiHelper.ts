@@ -250,6 +250,12 @@ function normalizeCacheKey(gameTitle: string): string {
   normalized = normalized.replace(/\s+\./g, '.');
   normalized = normalized.replace(/\.\s+/g, '. ');
   
+  // Normalize hyphens and dashes (standardize to single hyphen with no spaces)
+  // "Super Mario Bros - Wonder" and "Super Mario Bros-Wonder" both become "super mario bros - wonder"
+  normalized = normalized.replace(/\s*-\s*/g, ' - ');
+  normalized = normalized.replace(/\s*—\s*/g, ' - '); // Em dash
+  normalized = normalized.replace(/\s*–\s*/g, ' - '); // En dash
+  
   // Remove trailing spaces and punctuation artifacts
   normalized = normalized.trim();
   
@@ -310,10 +316,17 @@ export async function getGameReleaseDate(gameTitle: string): Promise<Date | null
   }
   
   // REQUEST DEDUPLICATION: Check if a request for this game is already in progress
+  // Check with ALL key variations to catch parallel requests with different title formats
   // This prevents cache stampedes when multiple parallel calls happen for the same game
-  if (pendingReleaseDateRequests.has(cacheKey)) {
-    // Reuse the existing in-flight request
-    return pendingReleaseDateRequests.get(cacheKey)!;
+  const allKeysToCheck = [cacheKey, originalKey, withTheKey, withoutTheKey].filter(
+    (key, index, self) => key && self.indexOf(key) === index // Remove duplicates
+  );
+  
+  for (const key of allKeysToCheck) {
+    if (pendingReleaseDateRequests.has(key)) {
+      // Reuse the existing in-flight request
+      return pendingReleaseDateRequests.get(key)!;
+    }
   }
   
   // Create new request promise
@@ -350,15 +363,21 @@ export async function getGameReleaseDate(gameTitle: string): Promise<Date | null
       return releaseDate;
     } finally {
       // Clean up the pending request after a short delay
+      // Clean up ALL key variations so any variation can be reused
       // This allows other parallel requests to reuse the result if they arrive just after completion
       setTimeout(() => {
-        pendingReleaseDateRequests.delete(cacheKey);
+        for (const key of allKeysToCheck) {
+          pendingReleaseDateRequests.delete(key);
+        }
       }, RELEASE_DATE_DEDUP_TTL);
     }
   })();
   
-  // Store the promise so other parallel requests can reuse it
-  pendingReleaseDateRequests.set(cacheKey, requestPromise);
+  // Store the promise with ALL key variations so any variation can find it
+  // This ensures that "The War Thunder" and "War Thunder" share the same request
+  for (const key of allKeysToCheck) {
+    pendingReleaseDateRequests.set(key, requestPromise);
+  }
   
   return requestPromise;
 }

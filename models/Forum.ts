@@ -139,6 +139,25 @@ ForumSchema.index({ 'posts.timestamp': 1, 'posts.username': 1, 'metadata.status'
 // Index for posts metadata status (for filtering active posts)
 ForumSchema.index({ 'posts.metadata.status': 1 });
 
+// OPTIMIZED: Additional indexes for common automated user queries
+// Index on gameTitle for case-insensitive lookups (used in createForumForGame)
+ForumSchema.index({ gameTitle: 1 });
+
+// Index on category for filtering by category
+ForumSchema.index({ category: 1 });
+
+// Compound index for common query pattern: status + isPrivate + lastActivityAt (used in createForumPost, respondToForumPost)
+ForumSchema.index({ 'metadata.status': 1, isPrivate: 1, 'metadata.lastActivityAt': -1 });
+
+// Index on createdBy for user-specific forum queries
+ForumSchema.index({ createdBy: 1 });
+
+// Compound index for gameTitle + category lookups (used in createForumForGame)
+ForumSchema.index({ gameTitle: 1, category: 1 });
+
+// Compound index for gameTitle + status (used in createForumForGame)
+ForumSchema.index({ gameTitle: 1, 'metadata.status': 1 });
+
 ForumSchema.methods.updateActivity = async function(userId: string) {
   this.metadata.lastActivityAt = new Date();
   this.metadata.lastActiveUser = userId;

@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import path from 'path';
 import { getGameReleaseDate } from './aiHelper';
+import { LRUCache } from './cacheManager';
 
 // Load environment variables from both .env and .env.local
 dotenv.config(); // Loads .env by default
@@ -68,8 +69,22 @@ async function selectModelForAutomatedUser(gameTitle: string): Promise<string> {
 }
 
 /**
+ * Cache for game feature validations to avoid repeated API calls
+ * TTL: 24 hours (game features don't change)
+ * Max size: 1000 entries (game + feature combinations)
+ */
+const GAME_FEATURE_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const GAME_FEATURE_CACHE_MAX_SIZE = 1000;
+const gameFeatureCache = new LRUCache<boolean | null>(
+  GAME_FEATURE_CACHE_MAX_SIZE,
+  GAME_FEATURE_CACHE_TTL,
+  10 * 60 * 1000 // Cleanup every 10 minutes
+);
+
+/**
  * Validate if a game has specific features/content
  * This prevents creating forums or posts about content that doesn't exist in the game
+ * OPTIMIZED: Uses caching to avoid repeated API calls for the same game+feature combination
  * 
  * @param gameTitle - The game title to check
  * @param featureType - The type of feature to check for (e.g., 'story mode', 'mods', 'character development')
@@ -79,6 +94,13 @@ export async function validateGameFeature(
   gameTitle: string,
   featureType: 'story mode' | 'story content' | 'narrative' | 'character development' | 'mods' | 'modding support'
 ): Promise<boolean | null> {
+  // Check cache first
+  const cacheKey = `${gameTitle.toLowerCase().trim()}:${featureType}`;
+  const cached = gameFeatureCache.get(cacheKey);
+  if (cached !== null) {
+    return cached;
+  }
+  
   try {
     // Select appropriate model
     const selectedModel = await selectModelForAutomatedUser(gameTitle);
@@ -90,7 +112,9 @@ export async function validateGameFeature(
       'narrative': `Does ${gameTitle} have narrative elements, story, plot, or character arcs? Answer with only "YES" if it has narrative/story elements, "NO" if it's purely gameplay-focused without narrative, or "UNCERTAIN" if you're not sure.`,
       'character development': `Does ${gameTitle} have character development, character arcs, or character growth throughout the game? Answer with only "YES" if it has character development, "NO" if characters are static or the game doesn't focus on character growth, or "UNCERTAIN" if you're not sure.`,
       'mods': `Does ${gameTitle} support mods, modifications, or user-generated content? Answer with only "YES" if it has mod support or active modding community, "NO" if it doesn't support mods, or "UNCERTAIN" if you're not sure.`,
-      'modding support': `Does ${gameTitle} have modding support, mod tools, or an active modding community? Answer with only "YES" if it has modding support, "NO" if it doesn't, or "UNCERTAIN" if you're not sure.`
+      'modding support': `Does ${gameTitle} have modding support, mod tools, or an active modding community? Answer with only "YES" if it has modding support, "NO" if it doesn't, or "UNCERTAIN" if you're not sure.`,
+      'romhacks': `Does ${gameTitle} have romhacks, custom content, or user-generated content? Answer with only "YES" if it has romhacks or custom content, "NO" if it doesn't, or "UNCERTAIN" if you're not sure.`,
+      'world record speedruns': `Does ${gameTitle} have world record speedruns, world records, or optimal playthroughs? Answer with only "YES" if it has speedruns or world records, "NO" if it doesn't, or "UNCERTAIN" if you're not sure.`,
     };
 
     const question = featureQuestions[featureType] || featureQuestions['story content'];
@@ -113,21 +137,83 @@ export async function validateGameFeature(
 
     const response = completion.choices[0]?.message?.content?.trim().toUpperCase();
 
+    let result: boolean | null;
     if (response === 'YES') {
       console.log(`[Game Feature Validation] ✅ ${gameTitle} has ${featureType}`);
-      return true;
+      result = true;
     } else if (response === 'NO') {
       console.log(`[Game Feature Validation] ❌ ${gameTitle} does NOT have ${featureType}`);
-      return false;
+      result = false;
     } else {
       console.log(`[Game Feature Validation] ⚠️ Uncertain if ${gameTitle} has ${featureType} - defaulting to allowing it`);
-      return null; // Uncertain - default to allowing (conservative approach)
+      result = null; // Uncertain - default to allowing (conservative approach)
     }
+    
+    // Cache the result (including null for uncertain cases)
+    gameFeatureCache.set(cacheKey, result, GAME_FEATURE_CACHE_TTL);
+    return result;
   } catch (error) {
     console.error(`[Game Feature Validation] Error validating ${featureType} for ${gameTitle}:`, error);
     // On error, default to null (uncertain) - conservative approach
-    return null;
+    const result = null;
+    // Cache the error result as well to avoid repeated failed API calls
+    gameFeatureCache.set(cacheKey, result, GAME_FEATURE_CACHE_TTL);
+    return result;
   }
+}
+
+/**
+ * Batch validate multiple game features in parallel
+ * This is more efficient than calling validateGameFeature multiple times sequentially
+ * 
+ * @param validations - Array of { gameTitle, featureType } to validate
+ * @returns Map of cache keys to validation results
+ */
+export async function batchValidateGameFeatures(
+  validations: Array<{ gameTitle: string; featureType: 'story mode' | 'story content' | 'narrative' | 'character development' | 'mods' | 'modding support' }>
+): Promise<Map<string, boolean | null>> {
+  const results = new Map<string, boolean | null>();
+  
+  // Check cache for all validations first
+  const uncachedValidations: Array<{ gameTitle: string; featureType: string; cacheKey: string }> = [];
+  
+  for (const { gameTitle, featureType } of validations) {
+    const cacheKey = `${gameTitle.toLowerCase().trim()}:${featureType}`;
+    const cached = gameFeatureCache.get(cacheKey);
+    
+    if (cached !== null) {
+      // Found in cache
+      results.set(cacheKey, cached);
+    } else {
+      // Need to validate
+      uncachedValidations.push({ gameTitle, featureType, cacheKey });
+    }
+  }
+  
+  // If all were cached, return early
+  if (uncachedValidations.length === 0) {
+    return results;
+  }
+  
+  // Validate uncached items in parallel
+  const validationPromises = uncachedValidations.map(async ({ gameTitle, featureType, cacheKey }) => {
+    try {
+      const result = await validateGameFeature(gameTitle, featureType as any);
+      return { cacheKey, result };
+    } catch (error) {
+      console.error(`[Batch Validation] Error validating ${gameTitle} ${featureType}:`, error);
+      return { cacheKey, result: null as boolean | null };
+    }
+  });
+  
+  const validationResults = await Promise.all(validationPromises);
+  
+  // Add all results to the map
+  for (const { cacheKey, result } of validationResults) {
+    results.set(cacheKey, result);
+  }
+  
+  return results;
 }
 
 export interface UserPreferences {

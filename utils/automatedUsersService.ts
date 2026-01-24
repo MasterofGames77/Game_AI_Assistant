@@ -4,7 +4,7 @@ import path from 'path';
 import { generateQuestion, generateForumPost, generatePostReply, generateCommonGamerPost, generateExpertGamerReply, UserPreferences, validateGameFeature } from './automatedContentGenerator';
 import { getRandomGameImage, recordImageUsage, downloadAndStoreImage } from './automatedImageService';
 import { searchGameImage, getCachedImageSearch, cacheImageSearch } from './automatedImageSearch';
-import { extractKeywordsSimple, extractKeywordsFromPost } from './imageKeywordExtractor';
+import { extractKeywordsFromPost } from './imageKeywordExtractor';
 import { verifyImageRelevance, buildSearchQuery } from './imageRelevanceVerifier';
 import { containsOffensiveContent } from './contentModeration';
 import { GameList, ActivityResult } from '../types';
@@ -15,6 +15,46 @@ import User from '../models/User';
 import mongoose from 'mongoose';
 import { normalizeForumCategory, forumCategoryDisplayName } from './forumCategory';
 import { getGameModeProfile, getPrimaryGenreForGame, getAllGenresForGame } from './gameCatalog';
+import { LRUCache } from './cacheManager';
+
+/**
+ * Cache for user preferences to avoid repeated database queries
+ * TTL: 7 minutes (420 seconds) - balances freshness with performance
+ * Max size: 500 users (covers all automated users plus frequently accessed real users)
+ */
+const USER_PREFERENCES_CACHE_TTL = 7 * 60 * 1000; // 7 minutes
+const USER_PREFERENCES_CACHE_MAX_SIZE = 500;
+const userPreferencesCache = new LRUCache<UserPreferences>(
+  USER_PREFERENCES_CACHE_MAX_SIZE,
+  USER_PREFERENCES_CACHE_TTL,
+  2 * 60 * 1000 // Cleanup every 2 minutes
+);
+
+/**
+ * Cache for genre lookups to avoid repeated game catalog searches
+ * TTL: 24 hours (genres don't change frequently)
+ * Max size: 2000 games (covers most games in the catalog)
+ */
+const GENRE_LOOKUP_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const GENRE_LOOKUP_CACHE_MAX_SIZE = 2000;
+const genreLookupCache = new LRUCache<string>(
+  GENRE_LOOKUP_CACHE_MAX_SIZE,
+  GENRE_LOOKUP_CACHE_TTL,
+  10 * 60 * 1000 // Cleanup every 10 minutes
+);
+
+/**
+ * Cache for forum list queries to avoid repeated database queries
+ * TTL: 45 seconds - balances freshness with performance (forums change frequently)
+ * Max size: 10 entries (covers different query patterns: all forums, user-specific, etc.)
+ */
+const FORUM_LIST_CACHE_TTL = 45 * 1000; // 45 seconds
+const FORUM_LIST_CACHE_MAX_SIZE = 10;
+const forumListCache = new LRUCache<any[]>(
+  FORUM_LIST_CACHE_MAX_SIZE,
+  FORUM_LIST_CACHE_TTL,
+  30 * 1000 // Cleanup every 30 seconds
+);
 
 /**
  * Helper function to determine if an error is retryable
@@ -670,6 +710,7 @@ async function createForumForGame(
             'PB Progress & Consistency',
             'Timing Windows & Cycles',
             'World Record Discussion',
+            'Optimal Playthroughs & Routes',
           ];
           break;
         case 'mods':
@@ -679,6 +720,7 @@ async function createForumForGame(
             'Graphics / Texture Mods',
             'Gameplay Overhauls',
             'Modding Tools & Setup',
+            'Romhacks & Custom Content',
           ];
           // Validate mod support - filter out mod topics if game doesn't support mods
           const hasModSupport = await validateGameFeature(gameTitle, 'mods');
@@ -713,6 +755,7 @@ async function createForumForGame(
             'Characters & Story Talk',
             'Hot Takes & Opinions',
             'Tips and Discoveries',
+            'Spoilers and Discussion',
           ];
           // Validate story content - filter out "Characters & Story Talk" if game doesn't have story
           const hasStoryContent = await validateGameFeature(gameTitle, 'story content');
@@ -810,10 +853,13 @@ async function createForumForGame(
     const normalizedCategory = normalizeForumCategory(selectedCategory).toLowerCase();
 
     // Find all active forums for this game (case-insensitive)
+    // OPTIMIZED: Use .select() to limit fields fetched (only need forumId, title, category, gameTitle)
     const existingForums = await Forum.find({
       gameTitle: { $regex: new RegExp(`^${gameTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }, // Escape special regex chars, case-insensitive
       'metadata.status': 'active'
-    }).lean() as any[];
+    })
+      .select('forumId title category gameTitle _id')
+      .lean() as any[];
 
     const forumsInCategory = existingForums.filter((f: any) => {
       const c = normalizeForumCategory(f.category).toLowerCase();
@@ -882,16 +928,24 @@ async function createForumForGame(
 
     await newForum.save();
 
+    // Invalidate forum list cache since we created a new forum
+    // Clear all forum list cache entries to ensure fresh data
+    forumListCache.clear();
+
     console.log(`[FORUM CREATION] Successfully created forum ${forumId} in database`);
 
     // Race-condition safety: if another forum with same game+category+title exists, keep the earliest and discard the empty duplicate.
+    // OPTIMIZED: Use .select() to limit fields fetched (only need forumId and _id for duplicate check)
     const dupes = await Forum.find({
       gameTitle: { $regex: new RegExp(`^${gameTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
       category: normalizedCategory,
       title: { $regex: new RegExp(`^${forumTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
       isPrivate: false,
       'metadata.status': 'active'
-    }).sort({ createdAt: 1 }).lean() as any[];
+    })
+      .select('forumId _id')
+      .sort({ createdAt: 1 })
+      .lean() as any[];
 
     if (dupes.length > 1) {
       const canonical = dupes[0];
@@ -1004,15 +1058,33 @@ function findSuitableForum(
 
   // Priority 5: Any active forum (to encourage participation in existing discussions)
   // This includes forums created by others, promoting diversity
-  // Filter to only include forums that are active and have some activity
-  const activeForums = forums.filter((f: any) =>
-    f.metadata?.status === 'active' &&
-    (f.metadata?.totalPosts > 0 || f.posts?.length > 0)
-  );
+  // OPTIMIZED: Single-pass processing instead of multiple filter operations
+  const activeForums: any[] = [];
+  const othersForums: any[] = [];
+  const userCreatedForums: any[] = [];
+  
+  for (const forum of forums) {
+    // Check if active and has activity
+    const isActive = forum.metadata?.status === 'active' &&
+      (forum.metadata?.totalPosts > 0 || forum.posts?.length > 0);
+    
+    if (isActive) {
+      activeForums.push(forum);
+      // Separate into others' forums vs user's forums in the same pass
+      if (forum.createdBy !== username) {
+        othersForums.push(forum);
+      }
+    }
+    
+    // Also collect user-created forums for Priority 6 (if needed)
+    if (forum.createdBy === username) {
+      userCreatedForums.push(forum);
+    }
+  }
+  
   if (activeForums.length > 0) {
     // Prefer forums created by others (not this user) to encourage diverse participation
     // But include user's own forums as well for variety
-    const othersForums = activeForums.filter((f: any) => f.createdBy !== username);
     const forumsToChooseFrom = othersForums.length > 0 ? othersForums : activeForums;
     // Return a random active forum
     return forumsToChooseFrom[Math.floor(Math.random() * forumsToChooseFrom.length)];
@@ -1020,7 +1092,6 @@ function findSuitableForum(
 
   // Priority 6: Forums created by this user (any game in their preferred genres)
   // Only if no active forums exist
-  const userCreatedForums = forums.filter((f: any) => f.createdBy === username);
   if (userCreatedForums.length > 0) {
     // Return a random forum created by the user to add variety
     return userCreatedForums[Math.floor(Math.random() * userCreatedForums.length)];
@@ -1043,33 +1114,47 @@ export async function createForumPost(
     await connectToMongoDB();
 
     // Get list of active forums directly from database
+    // OPTIMIZED: Use caching to avoid repeated database queries
+    const cacheKey = `forums:active:${username}`;
     let forums: any[] = [];
-    try {
-      const forumDocs = await Forum.find({
-        $or: [
-          { isPrivate: false },
-          { allowedUsers: username }
-        ],
-        'metadata.status': 'active'
-      })
-        .sort({ 'metadata.lastActivityAt': -1 })
-        .limit(100)
-        .lean(); // Use lean() for better performance
+    
+    // Check cache first
+    const cachedForums = forumListCache.get(cacheKey);
+    if (cachedForums) {
+      forums = cachedForums;
+      console.log(`[FORUM POST] Using cached forums (${forums.length} forums)`);
+    } else {
+      try {
+        // OPTIMIZED: Use .select() to limit fields fetched (only need essential fields for forum selection)
+        const forumDocs = await Forum.find({
+          $or: [
+            { isPrivate: false },
+            { allowedUsers: username }
+          ],
+          'metadata.status': 'active'
+        })
+          .select('forumId gameTitle title category isPrivate allowedUsers createdBy posts metadata.totalPosts metadata.lastActivityAt metadata.viewCount metadata.status _id')
+          .sort({ 'metadata.lastActivityAt': -1 })
+          .limit(100)
+          .lean(); // Use lean() for better performance
 
-      forums = forumDocs.map(forum => ({
-        ...forum,
-        metadata: {
-          totalPosts: forum.metadata?.totalPosts || 0,
-          lastActivityAt: forum.metadata?.lastActivityAt || new Date(),
-          viewCount: forum.metadata?.viewCount || 0,
-          status: forum.metadata?.status || 'active'
-        }
-      }));
+        forums = forumDocs.map(forum => ({
+          ...forum,
+          metadata: {
+            totalPosts: forum.metadata?.totalPosts || 0,
+            lastActivityAt: forum.metadata?.lastActivityAt || new Date(),
+            viewCount: forum.metadata?.viewCount || 0,
+            status: forum.metadata?.status || 'active'
+          }
+        }));
 
-      console.log(`[FORUM POST] Fetched ${forums.length} forums from database`);
-    } catch (error) {
-      console.error('[FORUM POST] Error fetching forums from database:', error);
-      forums = [];
+        // Cache the result
+        forumListCache.set(cacheKey, forums, FORUM_LIST_CACHE_TTL);
+        console.log(`[FORUM POST] Fetched ${forums.length} forums from database and cached`);
+      } catch (error) {
+        console.error('[FORUM POST] Error fetching forums from database:', error);
+        forums = [];
+      }
     }
 
     // NEW LOGIC: Prioritize creating forums for games that DON'T have forums yet
@@ -1325,17 +1410,32 @@ export async function createForumPost(
       previousPostsWithTimestamps.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
       // Prioritize posts about the same game, but include all recent posts from all automated users
-      const sameGamePosts = previousPostsWithTimestamps
-        .filter(p => p.gameTitle.toLowerCase() === actualGameTitle.toLowerCase())
-        .map(p => p.post);
-      const otherGamePosts = previousPostsWithTimestamps
-        .filter(p => p.gameTitle.toLowerCase() !== actualGameTitle.toLowerCase())
-        .map(p => p.post);
+      // OPTIMIZED: Single-pass processing instead of two separate filter operations
+      const sameGamePosts: string[] = [];
+      const otherGamePosts: string[] = [];
+      const actualGameTitleLower = actualGameTitle.toLowerCase();
+      
+      for (const p of previousPostsWithTimestamps) {
+        const post = p.post;
+        if (p.gameTitle.toLowerCase() === actualGameTitleLower) {
+          if (sameGamePosts.length < 20) {
+            sameGamePosts.push(post);
+          }
+        } else {
+          if (otherGamePosts.length < 10) {
+            otherGamePosts.push(post);
+          }
+        }
+        // Early termination if we have enough posts
+        if (sameGamePosts.length >= 20 && otherGamePosts.length >= 10) {
+          break;
+        }
+      }
 
       // Include up to 20 posts about the same game (from all automated users), and 10 posts about other games
       // This ensures we check for similarity across ALL automated users, not just the current one
-      previousPosts.push(...sameGamePosts.slice(0, 20));
-      previousPosts.push(...otherGamePosts.slice(0, 10));
+      previousPosts.push(...sameGamePosts);
+      previousPosts.push(...otherGamePosts);
 
       const userPostsCount = previousPostsWithTimestamps.filter(p => p.username === username).length;
       const otherUsersPostsCount = previousPostsWithTimestamps.length - userPostsCount;
@@ -1711,6 +1811,9 @@ export async function createForumPost(
       forum.metadata.totalPosts = (forum.metadata.totalPosts || 0) + 1;
       forum.metadata.lastActivityAt = new Date();
       await forum.save();
+      
+      // Invalidate forum list cache since we updated a forum (added a post)
+      forumListCache.clear();
 
       console.log(`[FORUM POST] Successfully added post to forum ${forumId}`);
 
@@ -2217,15 +2320,27 @@ function isPostAlignedWithForumCategory(post: string, forumCategory: string | un
 /**
  * Determine genre from game title by checking game lists
  * Prioritizes single-player games first, then multiplayer games
+ * OPTIMIZED: Uses caching to avoid repeated lookups for the same game
  */
 function determineGenreFromGame(gameTitle: string): string {
   if (!gameTitle || gameTitle.trim().length === 0) {
     return 'adventure'; // Default fallback
   }
 
+  // Normalize game title for cache key (lowercase, trimmed)
+  const cacheKey = gameTitle.toLowerCase().trim();
+  
+  // Check cache first
+  const cachedGenre = genreLookupCache.get(cacheKey);
+  if (cachedGenre) {
+    return cachedGenre;
+  }
+
   try {
     const genre = getPrimaryGenreForGame(gameTitle, 'rpg');
     if (genre) {
+      // Cache the result for future lookups
+      genreLookupCache.set(cacheKey, genre, GENRE_LOOKUP_CACHE_TTL);
       // Keep the existing logging style
       console.log(`Genre determined: ${genre} for game: ${gameTitle}`);
       return genre;
@@ -2235,8 +2350,11 @@ function determineGenreFromGame(gameTitle: string): string {
   }
 
   // Default to 'rpg' for unknown games (most common genre in our lists)
+  const defaultGenre = 'rpg';
+  // Cache the default as well to avoid repeated lookups
+  genreLookupCache.set(cacheKey, defaultGenre, GENRE_LOOKUP_CACHE_TTL);
   console.warn(`Could not determine genre for game: ${gameTitle}, defaulting to 'rpg'`);
-  return 'rpg';
+  return defaultGenre;
 }
 
 /**
@@ -2252,37 +2370,51 @@ export async function respondToForumPost(
     await connectToMongoDB();
 
     // Get list of active forums directly from database
+    // OPTIMIZED: Use caching to avoid repeated database queries
+    const cacheKey = `forums:active:${username}`;
     let forums: any[] = [];
-    try {
-      const forumDocs = await Forum.find({
-        $or: [
-          { isPrivate: false },
-          { allowedUsers: username }
-        ],
-        'metadata.status': 'active'
-      })
-        .sort({ 'metadata.lastActivityAt': -1 })
-        .limit(100)
-        .lean();
+    
+    // Check cache first
+    const cachedForums = forumListCache.get(cacheKey);
+    if (cachedForums) {
+      forums = cachedForums;
+      console.log(`[POST REPLY] Using cached forums (${forums.length} forums)`);
+    } else {
+      try {
+        // OPTIMIZED: Use .select() to limit fields fetched (only need essential fields for forum selection)
+        const forumDocs = await Forum.find({
+          $or: [
+            { isPrivate: false },
+            { allowedUsers: username }
+          ],
+          'metadata.status': 'active'
+        })
+          .select('forumId gameTitle title category isPrivate allowedUsers createdBy posts metadata.totalPosts metadata.lastActivityAt metadata.viewCount metadata.status _id')
+          .sort({ 'metadata.lastActivityAt': -1 })
+          .limit(100)
+          .lean();
 
-      forums = forumDocs.map(forum => ({
-        ...forum,
-        metadata: {
-          totalPosts: forum.metadata?.totalPosts || 0,
-          lastActivityAt: forum.metadata?.lastActivityAt || new Date(),
-          viewCount: forum.metadata?.viewCount || 0,
-          status: forum.metadata?.status || 'active'
-        }
-      }));
+        forums = forumDocs.map(forum => ({
+          ...forum,
+          metadata: {
+            totalPosts: forum.metadata?.totalPosts || 0,
+            lastActivityAt: forum.metadata?.lastActivityAt || new Date(),
+            viewCount: forum.metadata?.viewCount || 0,
+            status: forum.metadata?.status || 'active'
+          }
+        }));
 
-      console.log(`[POST REPLY] Fetched ${forums.length} forums from database`);
-    } catch (error) {
-      console.error('[POST REPLY] Error fetching forums from database:', error);
-      return {
-        success: false,
-        message: 'Failed to fetch forums',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
+        // Cache the result
+        forumListCache.set(cacheKey, forums, FORUM_LIST_CACHE_TTL);
+        console.log(`[POST REPLY] Fetched ${forums.length} forums from database and cached`);
+      } catch (error) {
+        console.error('[POST REPLY] Error fetching forums from database:', error);
+        return {
+          success: false,
+          message: 'Failed to fetch forums',
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
     }
 
     // Filter to only forums with posts
@@ -2300,16 +2432,16 @@ export async function respondToForumPost(
 
     // Fetch full forum details with posts directly from database
     // Limit to first 10 forums to avoid too many database queries
+    // OPTIMIZED: Fetch all forums in parallel instead of sequentially
     const forumsToCheck = forumsWithPosts.slice(0, 10);
-    const forumsWithFullPosts: any[] = [];
-
-    for (const forum of forumsToCheck) {
+    
+    const forumFetchPromises = forumsToCheck.map(async (forum) => {
       try {
         const forumId = forum.forumId || forum._id;
         const forumDoc = await Forum.findOne({ forumId }).lean() as any;
 
         if (forumDoc && forumDoc.posts && Array.isArray(forumDoc.posts) && forumDoc.posts.length > 0) {
-          forumsWithFullPosts.push({
+          return {
             ...forumDoc,
             metadata: {
               totalPosts: forumDoc.metadata?.totalPosts || forumDoc.posts.length,
@@ -2317,13 +2449,18 @@ export async function respondToForumPost(
               viewCount: forumDoc.metadata?.viewCount || 0,
               status: forumDoc.metadata?.status || 'active'
             }
-          });
+          };
         }
+        return null;
       } catch (error) {
         console.error(`[POST REPLY] Error fetching forum details for ${forum.forumId}:`, error);
-        // Continue to next forum if this one fails
+        return null; // Return null on error, will be filtered out
       }
-    }
+    });
+
+    // Execute all forum fetches in parallel
+    const forumResults = await Promise.all(forumFetchPromises);
+    const forumsWithFullPosts = forumResults.filter((forum): forum is any => forum !== null);
 
     // If we don't have posts from database queries, try using posts from initial forums response
     if (forumsWithFullPosts.length === 0) {
@@ -2614,6 +2751,35 @@ export async function getExpertGamers(): Promise<string[]> {
 }
 
 /**
+ * Get both COMMON and EXPERT gamers in parallel
+ * OPTIMIZED: Fetches both in parallel instead of sequentially
+ * Returns object with both lists
+ */
+export async function getGamersParallel(): Promise<{ commonGamers: string[]; expertGamers: string[] }> {
+  try {
+    await connectToWingmanDB();
+    
+    // Fetch both in parallel
+    const [commonGamers, expertGamers] = await Promise.all([
+      User.find({ 'gamerProfile.type': 'common' })
+        .select('username')
+        .lean(),
+      User.find({ 'gamerProfile.type': 'expert' })
+        .select('username')
+        .lean()
+    ]);
+    
+    return {
+      commonGamers: commonGamers.map((user: any) => user.username),
+      expertGamers: expertGamers.map((user: any) => user.username)
+    };
+  } catch (error) {
+    console.error('[SERVICE] Error getting gamers in parallel:', error);
+    return { commonGamers: [], expertGamers: [] };
+  }
+}
+
+/**
  * Find the best EXPERT gamer to reply to a COMMON gamer's post
  * Uses the gamer matching utility for consistent matching logic
  * 
@@ -2690,8 +2856,15 @@ export async function createExpertGamerReply(
 /**
  * Get user preferences from database
  * Checks for gamerProfile first, then falls back to hardcoded preferences for original automated users
+ * OPTIMIZED: Uses caching to avoid repeated database queries
  */
 export async function getUserPreferences(username: string): Promise<UserPreferences | null> {
+  // Check cache first
+  const cached = userPreferencesCache.get(username);
+  if (cached) {
+    return cached;
+  }
+
   try {
     // Connect to database
     await connectToWingmanDB();
@@ -2718,7 +2891,7 @@ export async function getUserPreferences(username: string): Promise<UserPreferen
           ? 'multiplayer'
           : 'single-player'; // Default to single-player if mixed
 
-      return {
+      const preferences: UserPreferences = {
         genres: uniqueGenres,
         focus: focus as 'single-player' | 'multiplayer',
         gamerProfile: {
@@ -2744,28 +2917,38 @@ export async function getUserPreferences(username: string): Promise<UserPreferen
           )
         }
       };
+      
+      // Cache the result
+      userPreferencesCache.set(username, preferences, USER_PREFERENCES_CACHE_TTL);
+      return preferences;
     }
 
     // Fallback to hardcoded preferences for original automated users
+    let preferences: UserPreferences | null = null;
     if (username === 'MysteriousMrEnter') {
-      return {
+      preferences = {
         genres: ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer', 'Action', 'Horror', 'Stealth', 'Metroidvania'],
         focus: 'single-player'
       };
     } else if (username === 'WaywardJammer') {
-      return {
+      preferences = {
         genres: ['Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox', 'FPS', 'MOBA', 'Sports'],
         focus: 'multiplayer'
       };
     } else if (username === 'InterdimensionalHipster') {
       // InterdimensionalHipster can talk about both single-player and multiplayer games
-      return {
+      preferences = {
         genres: ['RPG', 'Adventure', 'Simulation', 'Puzzle', 'Platformer', 'Action', 'Horror', 'Stealth', 'Metroidvania', 'Racing', 'Battle Royale', 'Fighting', 'First-Person Shooter', 'Sandbox', 'FPS', 'MOBA', 'Sports'],
         focus: 'single-player' // Default focus, but can respond to both types
       };
     }
 
-    return null;
+    // Cache hardcoded preferences as well (they don't change)
+    if (preferences) {
+      userPreferencesCache.set(username, preferences, USER_PREFERENCES_CACHE_TTL);
+    }
+
+    return preferences;
   } catch (error) {
     console.error('Error getting user preferences:', error);
     return null;
