@@ -22,8 +22,23 @@ let cachedLegacyTitleToGenres: Map<string, Set<string>> | null = null;
 let cachedLegacySingle: Set<string> | null = null;
 let cachedLegacyMulti: Set<string> | null = null;
 
+/**
+ * Normalize game title for consistent comparison
+ * Handles Unicode diacritics (e.g., Ōkami → okami, Ragnarök → ragnarok)
+ * Uses Unicode normalization to decompose characters and remove diacritical marks
+ */
 function normalizeTitle(title: string): string {
-  return (title || '').toLowerCase().trim();
+  if (!title) return '';
+  
+  // Normalize to NFD (Normalization Form Decomposed) to separate base characters from diacritics
+  // Then remove combining diacritical marks (Unicode category Mn: Mark, nonspacing)
+  const normalized = title
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove combining diacritical marks
+    .toLowerCase()
+    .trim();
+  
+  return normalized;
 }
 
 function safeReadJson<T>(filePath: string): T | null {

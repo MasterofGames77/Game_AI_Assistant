@@ -29,6 +29,16 @@
       ]
     },
     {
+      "title": "A Plague Tale: Requiem",
+      "genres": [
+        "action-adventure",
+        "stealth"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
       "title": "Ace Attorney Investigations: Miles Edgeworth",
       "genres": [
         "visual novel"
@@ -146,6 +156,16 @@
       ]
     },
     {
+      "title": "Armored Core VI: Fires of Rubicon",
+      "genres": [
+        "vehicular combat"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
       "title": "Assassin's Creed: Odyssey",
       "genres": [
         "action role-playing"
@@ -192,6 +212,16 @@
       ]
     },
     {
+      "title": "Azure Striker Gunvolt",
+      "genres": [
+        "action",
+        "platformer"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
       "title": "Baba is You",
       "genres": [
         "puzzle"
@@ -230,7 +260,7 @@
       ]
     },
     {
-      "title": "Batman Arkham City",
+      "title": "Batman: Arkham City",
       "genres": [
         "action-adventure"
       ],
@@ -291,6 +321,25 @@
         "first-person shooter"
       ],
       "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Black Myth: Wukong",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Blaster Master Zero",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single",
         "multi"
       ]
     },
@@ -382,6 +431,16 @@
       ],
       "modes": [
         "single"
+      ]
+    },
+    {
+      "title": "Call of Duty: Modern Warfare II (2022)",
+      "genres": [
+        "first-person shooter"
+      ],
+      "modes": [
+        "single",
+        "multi"
       ]
     },
     {
@@ -495,6 +554,25 @@
       ],
       "modes": [
         "single"
+      ]
+    },
+    {
+      "title": "Control (Game)",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Counter-Strike 2",
+      "genres": [
+        "tactical",
+        "first-person shooter"
+      ],
+      "modes": [
+        "multi"
       ]
     },
     {
@@ -732,6 +810,16 @@
       ]
     },
     {
+      "title": "Diablo IV",
+      "genres": [
+        "action role-playing",
+        "hack and slash"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
       "title": "Diddy Kong Racing",
       "genres": [
         "racing"
@@ -844,6 +932,16 @@
       ]
     },
     {
+      "title": "Dragon Age: Inquisition",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
       "title": "Dragon Ball FighterZ",
       "genres": [
         "fighting"
@@ -851,6 +949,15 @@
       "modes": [
         "single",
         "multi"
+      ]
+    },
+    {
+      "title": "Dragon Quest III HD-2D Remake",
+      "genres": [
+        "rpg"
+      ],
+      "modes": [
+        "single"
       ]
     },
     {
@@ -1440,6 +1547,16 @@
       ]
     },
     {
+      "title": "Hi-Fi Rush",
+      "genres": [
+        "action",
+        "rhythm"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
       "title": "Hitman: Blood Money",
       "genres": [
         "stealth"
@@ -1539,6 +1656,15 @@
       ],
       "modes": [
         "single"
+      ]
+    },
+    {
+      "title": "It Takes Two (Game)",
+      "genres": [
+        "action"
+      ],
+      "modes": [
+        "multi"
       ]
     },
     {
@@ -1836,6 +1962,16 @@
       ]
     },
     {
+      "title": "Mega Man Zero 3",
+      "genres": [
+        "platformer",
+        "hack and slash"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
       "title": "Metal Gear Rising: Revengeance",
       "genres": [
         "action-adventure",
@@ -1869,6 +2005,24 @@
       "title": "Metal Gear Solid Delta: Snake Eater",
       "genres": [
         "stealth",
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Metroid Dread",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
+      "title": "Metroid Prime Remastered",
+      "genres": [
         "action-adventure"
       ],
       "modes": [
@@ -1920,6 +2074,35 @@
       "title": "MLB The Show 20",
       "genres": [
         "sports"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Mobile Legends: Bang Bang",
+      "genres": [
+        "multiplayer online battle arena"
+      ],
+      "modes": [
+        "multi"
+      ]
+    },
+    {
+      "title": "Monster Hunter Wilds",
+      "genres": [
+        "action role-playing"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Monster Hunter World",
+      "genres": [
+        "action role-playing"
       ],
       "modes": [
         "single",
@@ -1987,6 +2170,16 @@
       ]
     },
     {
+      "title": "Neon White",
+      "genres": [
+        "first-person shooter",
+        "puzzle-platformer"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
       "title": "New Pokémon Snap",
       "genres": [
         "photography"
@@ -2026,6 +2219,16 @@
       ]
     },
     {
+      "title": "Ninja Gaiden II",
+      "genres": [
+        "action-adventure",
+        "hack and slash"
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
       "title": "No Man's Sky",
       "genres": [
         "action-adventure",
@@ -2034,6 +2237,15 @@
       "modes": [
         "single",
         "multi"
+      ]
+    },
+    {
+      "title": "Ōkami HD",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
       ]
     },
     {
@@ -2472,6 +2684,16 @@
       ]
     },
     {
+      "title": "Return to Monkey Island",
+      "genres": [
+        "point and click",
+        "graphic adventure "
+      ],
+      "modes": [
+        "single"
+      ]
+    },
+    {
       "title": "Returnal",
       "genres": [
         "third-person shooter",
@@ -2582,7 +2804,7 @@
       ]
     },
     {
-      "title": "Rust (video game)",
+      "title": "Rust (Game)",
       "genres": [
         "survival"
       ],
@@ -2866,6 +3088,16 @@
       ],
       "modes": [
         "single",
+        "multi"
+      ]
+    },
+    {
+      "title": "Split Fiction",
+      "genres": [
+        "action-adventure",
+        "platformer"
+      ],
+      "modes": [
         "multi"
       ]
     },
@@ -3166,6 +3398,17 @@
       ]
     },
     {
+      "title": "Tekken 3",
+      "genres": [
+        "fighting",
+        "beat 'em up"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ]
+    },
+    {
       "title": "Tekken 8",
       "genres": [
         "fighting"
@@ -3446,6 +3689,16 @@
       ]
     },
     {
+      "title": "Tomb Raider (2013)",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single",
+        "multi"
+      ] 
+    },
+    {
       "title": "Tom Clancy's Rainbow Six Siege",
       "genres": [
         "tactical shooter"
@@ -3474,6 +3727,15 @@
       "modes": [
         "single",
         "multi"
+      ]
+    },
+    {
+      "title": "Tunic",
+      "genres": [
+        "action-adventure"
+      ],
+      "modes": [
+        "single"
       ]
     },
     {

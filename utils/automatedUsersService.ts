@@ -291,10 +291,21 @@ function getBaseUrl(): string {
 
 /**
  * Normalize game title for consistent comparison (case-insensitive, trimmed)
+ * Handles Unicode diacritics (e.g., Ōkami → okami, Ragnarök → ragnarok)
  * This ensures we can match game titles even if they have slight variations
  */
 function normalizeGameTitle(title: string): string {
-  return title.toLowerCase().trim();
+  if (!title) return '';
+  
+  // Normalize to NFD (Normalization Form Decomposed) to separate base characters from diacritics
+  // Then remove combining diacritical marks (Unicode category Mn: Mark, nonspacing)
+  const normalized = title
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove combining diacritical marks
+    .toLowerCase()
+    .trim();
+  
+  return normalized;
 }
 
 /**

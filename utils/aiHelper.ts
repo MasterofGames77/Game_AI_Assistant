@@ -224,13 +224,18 @@ async function fetchReleaseDateFromRAWG(gameTitle: string): Promise<Date | null>
 /**
  * Normalize game title for cache key to handle variations
  * Removes leading "the", normalizes whitespace, and standardizes formatting
+ * Handles Unicode diacritics (e.g., Ōkami → okami, Ragnarök → ragnarok)
  * This ensures "The Legend of Zelda: Breath of the Wild" and "Legend of Zelda: Breath of the Wild"
  * map to the same cache key
  */
 function normalizeCacheKey(gameTitle: string): string {
   if (!gameTitle) return '';
   
+  // Normalize to NFD (Normalization Form Decomposed) to separate base characters from diacritics
+  // Then remove combining diacritical marks (Unicode category Mn: Mark, nonspacing)
   let normalized = gameTitle
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove combining diacritical marks
     .toLowerCase()
     .trim();
   

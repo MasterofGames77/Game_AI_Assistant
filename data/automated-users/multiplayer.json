@@ -34,13 +34,20 @@
     "Heroes of the Storm",
     "Honor of Kings",
     "League of Legends",
+    "Mobile Legends: Bang Bang",
     "Pokémon Unite",
     "Smite"
+  ],
+  "vehicular combat": [
+    "Armored Core VI: Fires of Rubicon",
+    "War Thunder"
   ],
   "first-person shooter": [
     "Bioshock Infinite",
     "Borderlands 2",
     "Borderlands 3",
+    "Call of Duty: Modern Warfare II (2022)",
+    "Counter-Strike 2",
     "Destiny 2",
     "Doom Eternal",
     "Far Cry 5",
@@ -51,14 +58,41 @@
     "Team Fortress 2",
     "Titanfall 2"
   ],
+  "action-adventure": [
+    "Blaster Master Zero",
+    "Devil May Cry 3: Special Edition",
+    "Ghost of Tsushima",
+    "Grand Theft Auto V",
+    "Naraka: Bladepoint",
+    "No Man's Sky",
+    "Palworld",
+    "Red Dead Redemption 2",
+    "Sea of Thieves",
+    "Sonic Adventure 2",
+    "Split Fiction",
+    "Super Mario 3D World + Bowser's Fury",
+    "Super Mario Galaxy",
+    "Super Mario Odyssey",
+    "Terraria",
+    "The Binding of Issac: Afterbirth+",
+    "The Last of Us (2013)",
+    "Tom Clancy’s Splinter Cell: Chaos Theory",
+    "Tomb Raider (2013)",
+    "Uncharted 2: Among Thieves",
+    "Uncharted 3: Drake's Deception"
+  ],
   "action role-playing": [
     "Bloodborne",
     "Borderlands 2",
     "Borderlands 3",
     "Dark Souls",
+    "Diablo IV",
+    "Dragon Age: Inquisition",
     "Elden Ring",
     "Genshin Impact",
     "Mass Effect 3",
+    "Monster Hunter Wilds",
+    "Monster Hunter World",
     "Path of Exile",
     "Phantasy Star Online 2: New Genesis",
     "Scott Pilgrim vs the World: The Game"
@@ -81,6 +115,9 @@
     "The Crew Motorfest",
     "Wipeout Omega Collection"
   ],
+  "tactical": [
+    "Counter-Strike 2"
+  ],
   "platformer": [
     "Crash Bandicoot 4: It's About Time",
     "Fall Guys",
@@ -93,6 +130,7 @@
     "Sonic 3 & Knuckles",
     "Sonic Adventure 2",
     "Sonic Mania",
+    "Split Fiction",
     "Super Mario 3D World + Bowser's Fury",
     "Super Mario Galaxy",
     "Super Mario Maker 2",
@@ -126,6 +164,7 @@
     "Super Smash Bros. Melee",
     "Super Smash Bros. Ultimate",
     "Super Street Fighter II Turbo ",
+    "Tekken 3",
     "Tekken 8",
     "The King of Fighters XV",
     "Ultimate Marvel VS. Capcom 3",
@@ -145,28 +184,9 @@
     "Phantasy Star Online 2: New Genesis",
     "Roblox"
   ],
-  "action-adventure": [
-    "Devil May Cry 3: Special Edition",
-    "Ghost of Tsushima",
-    "Grand Theft Auto V",
-    "Naraka: Bladepoint",
-    "No Man's Sky",
-    "Palworld",
-    "Red Dead Redemption 2",
-    "Sea of Thieves",
-    "Sonic Adventure 2",
-    "Super Mario 3D World + Bowser's Fury",
-    "Super Mario Galaxy",
-    "Super Mario Odyssey",
-    "Terraria",
-    "The Binding of Issac: Afterbirth+",
-    "The Last of Us (2013)",
-    "Tom Clancy’s Splinter Cell: Chaos Theory",
-    "Uncharted 2: Among Thieves",
-    "Uncharted 3: Drake's Deception"
-  ],
   "hack and slash": [
     "Devil May Cry 3: Special Edition",
+    "Diablo IV",
     "Zone of the Enders: The 2nd Runner"
   ],
   "survival": [
@@ -176,7 +196,7 @@
     "No Man's Sky",
     "Palworld",
     "Raft",
-    "Rust (video game)",
+    "Rust (Game)",
     "State of Decay 2",
     "Valheim"
   ],
@@ -219,6 +239,7 @@
     "River City Girls",
     "Scott Pilgrim vs the World: The Game",
     "Streets of Rage 4",
+    "Tekken 3",
     "TMNT: Shredder's Revenge"
   ],
   "massively multiplayer online role-playing game": [
@@ -276,6 +297,11 @@
   "stealth": [
     "Hitman: 3",
     "Tom Clancy’s Splinter Cell: Chaos Theory"
+  ],
+  "action": [
+    "It Takes Two (Game)",
+    "The Last of Us Part II",
+    "War Thunder"
   ],
   "rail shooter": [
     "Kid Icarus: Uprising",
@@ -359,19 +385,12 @@
   "adventure": [
     "The Last of Us Part II"
   ],
-  "action": [
-    "The Last of Us Part II",
-    "War Thunder"
-  ],
   "tactical shooter": [
     "Tom Clancy's Rainbow Six Siege",
     "Valorant"
   ],
   "minigame compilation": [
     "Warioware Gold"
-  ],
-  "vehicular combat": [
-    "War Thunder"
   ],
   "combat flight simulator": [
     "War Thunder"

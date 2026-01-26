@@ -17,6 +17,7 @@
   "platformer": [
     "A Hat in Time",
     "Astro Bot",
+    "Azure Striker Gunvolt",
     "Banjo Kazooie",
     "Battletoads",
     "Celeste",
@@ -37,6 +38,7 @@
     "Mark of the Ninja",
     "Mega Man 9",
     "Mega Man X (1993)",
+    "Mega Man Zero 3",
     "Ori and the Blind Forest",
     "Ori and the Will of the Wisps",
     "Pac-Man World 2",
@@ -60,6 +62,85 @@
     "Super Mario Odyssey",
     "Super Mario World",
     "Super Meat Boy"
+  ],
+  "action-adventure": [
+    "A Plague Tale: Requiem",
+    "Alien Isolation",
+    "ARK: Survival Evolved",
+    "Banjo Kazooie",
+    "Batman: Arkham Asylum",
+    "Batman: Arkham City",
+    "Bayonetta 2",
+    "Blaster Master Zero",
+    "Conkur's Bad Fur Day",
+    "Control (Game)",
+    "Death Stranding",
+    "Death Stranding 2: On the Beach",
+    "Devil May Cry 3: Special Edition",
+    "Devil May Cry 5",
+    "Dishonored 2",
+    "Donkey Kong Bananza",
+    "Ghost of Tsushima",
+    "God of War (2018)",
+    "God of War Ragnarök",
+    "Grand Theft Auto V",
+    "Jak II",
+    "Like a Dragon: Ishin!",
+    "Marvel's Spider-Man",
+    "Marvel's Spider-Man: Miles Morales",
+    "Metal Gear Rising: Revengeance",
+    "Metal Gear Solid",
+    "Metal Gear Solid 2: Sons of Liberty",
+    "Metal Gear Solid Delta: Snake Eater",
+    "Metroid Dread",
+    "Metroid Prime Remastered",
+    "Ninja Gaiden II",
+    "No Man's Sky",
+    "Ōkami HD",
+    "Palworld",
+    "Prince of Persia: The Lost Crown",
+    "Red Dead Redemption 2",
+    "Sekiro: Shadows Die Twice",
+    "Sonic Adventure 2",
+    "Sonic Unleashed",
+    "Spyro Reignited Trilogy",
+    "Star Wars Jedi: Survivor",
+    "Subnautica",
+    "Super Mario 3D World + Bowser's Fury",
+    "Super Mario 64",
+    "Super Mario Galaxy",
+    "Super Mario Odyssey",
+    "Terraria",
+    "The Binding of Issac: Afterbirth+",
+    "The Chronicles of Riddick: Escape from Butcher Bay",
+    "The Last of Us (2013)",
+    "The Legend of Zelda: A Link to the Past",
+    "The Legend of Zelda: Breath of the Wild",
+    "The Legend of Zelda: Ocarina of Time",
+    "The Legend of Zelda: Tears of the Kingdom",
+    "Tom Clancy’s Splinter Cell: Chaos Theory",
+    "Tomb Raider (2013)",
+    "Tunic",
+    "Turnip Boy Commits Tax Evasion",
+    "Uncharted 2: Among Thieves",
+    "Uncharted 3: Drake's Deception",
+    "Yakuza (2005)"
+  ],
+  "stealth": [
+    "A Plague Tale: Requiem",
+    "Alien Isolation",
+    "Dishonored 2",
+    "Hitman: 3",
+    "Hitman: Blood Money",
+    "Mark of the Ninja",
+    "Metal Gear Solid",
+    "Metal Gear Solid 2: Sons of Liberty",
+    "Metal Gear Solid Delta: Snake Eater",
+    "Shadow Tactics: Blades of the Shogun",
+    "Tenchu: Stealth Assassins",
+    "The Chronicles of Riddick: Escape from Butcher Bay",
+    "Thief II: The Metal Age",
+    "Tom Clancy’s Splinter Cell: Chaos Theory"
   ],
   "visual novel": [
     "Ace Attorney Investigations: Miles Edgeworth",
@@ -88,75 +169,6 @@
   ],
   "real time strategy": [
     "Age of Empires II: Definitive Edition"
-  ],
-  "action-adventure": [
-    "Alien Isolation",
-    "ARK: Survival Evolved",
-    "Banjo Kazooie",
-    "Batman Arkham City",
-    "Batman: Arkham Asylum",
-    "Bayonetta 2",
-    "Conkur's Bad Fur Day",
-    "Death Stranding",
-    "Death Stranding 2: On the Beach",
-    "Devil May Cry 3: Special Edition",
-    "Devil May Cry 5",
-    "Dishonored 2",
-    "Donkey Kong Bananza",
-    "Ghost of Tsushima",
-    "God of War (2018)",
-    "God of War Ragnarök",
-    "Grand Theft Auto V",
-    "Jak II",
-    "Like a Dragon: Ishin!",
-    "Marvel's Spider-Man",
-    "Marvel's Spider-Man: Miles Morales",
-    "Metal Gear Rising: Revengeance",
-    "Metal Gear Solid",
-    "Metal Gear Solid 2: Sons of Liberty",
-    "Metal Gear Solid Delta: Snake Eater",
-    "No Man's Sky",
-    "Palworld",
-    "Prince of Persia: The Lost Crown",
-    "Red Dead Redemption 2",
-    "Sekiro: Shadows Die Twice",
-    "Sonic Adventure 2",
-    "Sonic Unleashed",
-    "Spyro Reignited Trilogy",
-    "Star Wars Jedi: Survivor",
-    "Subnautica",
-    "Super Mario 3D World + Bowser's Fury",
-    "Super Mario 64",
-    "Super Mario Galaxy",
-    "Super Mario Odyssey",
-    "Terraria",
-    "The Binding of Issac: Afterbirth+",
-    "The Chronicles of Riddick: Escape from Butcher Bay",
-    "The Last of Us (2013)",
-    "The Legend of Zelda: A Link to the Past",
-    "The Legend of Zelda: Breath of the Wild",
-    "The Legend of Zelda: Ocarina of Time",
-    "The Legend of Zelda: Tears of the Kingdom",
-    "Tom Clancy’s Splinter Cell: Chaos Theory",
-    "Turnip Boy Commits Tax Evasion",
-    "Uncharted 2: Among Thieves",
-    "Uncharted 3: Drake's Deception",
-    "Yakuza (2005)"
-  ],
-  "stealth": [
-    "Alien Isolation",
-    "Dishonored 2",
-    "Hitman: 3",
-    "Hitman: Blood Money",
-    "Mark of the Ninja",
-    "Metal Gear Solid",
-    "Metal Gear Solid 2: Sons of Liberty",
-    "Metal Gear Solid Delta: Snake Eater",
-    "Shadow Tactics: Blades of the Shogun",
-    "Tenchu: Stealth Assassins",
-    "The Chronicles of Riddick: Escape from Butcher Bay",
-    "Thief II: The Metal Age",
-    "Tom Clancy’s Splinter Cell: Chaos Theory"
   ],
   "social simulation": [
     "Animal Crossing: New Horizons",
@@ -227,9 +239,14 @@
     "The Long Dark",
     "Valheim"
   ],
+  "vehicular combat": [
+    "Armored Core VI: Fires of Rubicon",
+    "War Thunder"
+  ],
   "action role-playing": [
     "Assassin's Creed Valhalla",
     "Assassin's Creed: Odyssey",
+    "Black Myth: Wukong",
     "Bloodborne",
     "Bloodstained: Ritual of the Night",
     "Borderlands 2",
@@ -239,6 +256,7 @@
     "Castlevania: Symphony of the Night",
     "Cyberpunk 2077",
     "Dark Souls",
+    "Dragon Age: Inquisition",
     "Dust: An Elysian Tail",
     "Elden Ring",
     "Fallout 4",
@@ -252,6 +270,8 @@
     "Kingdom Hearts HD 2.5 ReMix",
     "Mass Effect 2",
     "Mass Effect 3",
+    "Monster Hunter Wilds",
+    "Monster Hunter World",
     "NieR: Automata",
     "Path of Exile",
     "Phantasy Star Online 2: New Genesis",
@@ -271,6 +291,14 @@
     "Roblox",
     "Terraria",
     "Valheim"
+  ],
+  "action": [
+    "Azure Striker Gunvolt",
+    "Hi-Fi Rush",
+    "Jet Set Radio",
+    "Sakura Wars (2019)",
+    "The Last of Us Part II",
+    "War Thunder"
   ],
   "roguelike": [
     "Balatro",
@@ -297,6 +325,7 @@
     "Chrono Trigger",
     "Clair Obscur: Expedition 33",
     "Disco Elysium",
+    "Dragon Quest III HD-2D Remake",
     "Dragon Quest V: Hand of the Heavenly Bride",
     "Dragon Quest XI S: Echoes of an Elusive Age - Definitive Edition",
     "Final Fantasy IX",
@@ -331,6 +360,7 @@
     "Sifu",
     "Sonic Unleashed",
     "Streets of Rage 4",
+    "Tekken 3",
     "TMNT: Shredder's Revenge",
     "Yakuza (2005)"
   ],
@@ -342,8 +372,10 @@
     "God of War (2018)",
     "God of War Ragnarök",
     "Like a Dragon: Ishin!",
+    "Mega Man Zero 3",
     "Metal Gear Rising: Revengeance",
     "NieR: Automata",
+    "Ninja Gaiden II",
     "Zone of the Enders: The 2nd Runner"
   ],
   "rhythm": [
@@ -354,6 +386,7 @@
     "Geometry Dash",
     "Guitar Hero 3: Legends of Rock",
     "Hatsune Miku: Colorful Stage",
+    "Hi-Fi Rush",
     "Parappa the Rapper",
     "Rhythm Doctor",
     "Rhythm Heaven",
@@ -372,6 +405,7 @@
   "first-person shooter": [
     "Borderlands 2",
     "Borderlands 3",
+    "Call of Duty: Modern Warfare II (2022)",
     "Deathloop",
     "Doom (2016)",
     "Doom Eternal",
@@ -380,6 +414,7 @@
     "Halo Infinite",
     "Left 4 Dead 2",
     "Left for Dead",
+    "Neon White",
     "Team Fortress 2",
     "Titanfall 2"
   ],
@@ -427,6 +462,7 @@
     "Super Smash Bros. Melee",
     "Super Smash Bros. Ultimate",
     "Super Street Fighter II Turbo ",
+    "Tekken 3",
     "Tekken 8",
     "The King of Fighters XV",
     "Ultimate Marvel VS. Capcom 3",
@@ -529,17 +565,15 @@
     "Into the Breach",
     "Sid Meier's Civilization VI"
   ],
-  "action": [
-    "Jet Set Radio",
-    "Sakura Wars (2019)",
-    "The Last of Us Part II",
-    "War Thunder"
-  ],
   "party": [
     "Mario Party Superstars"
   ],
   "flight simulation": [
     "Microsoft Flight Simulator"
+  ],
+  "puzzle-platformer": [
+    "Neon White",
+    "Portal 2"
   ],
   "photography": [
     "New Pokémon Snap"
@@ -554,8 +588,11 @@
     "Phantasy Star Online 2: New Genesis",
     "Roblox"
   ],
-  "puzzle-platformer": [
-    "Portal 2"
+  "point and click": [
+    "Return to Monkey Island"
+  ],
+  "graphic adventure ": [
+    "Return to Monkey Island"
   ],
   "bullet hell": [
     "Returnal"
@@ -620,9 +657,6 @@
   ],
   "minigame compilation": [
     "Warioware Gold"
-  ],
-  "vehicular combat": [
-    "War Thunder"
   ],
   "combat flight simulator": [
     "War Thunder"
