@@ -1,25 +1,8 @@
 // next.config.mjs
 
-import dotenv from 'dotenv';
-import path from 'path';
-
-// Load environment variables from .env.local file
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  env: {
-    NEXT_PUBLIC_TWITCH_CLIENT_ID: process.env.NEXT_PUBLIC_TWITCH_CLIENT_ID,
-    TWITCH_CLIENT_SECRET: process.env.TWITCH_CLIENT_SECRET,
-    TWITCH_REDIRECT_URI: process.env.TWITCH_REDIRECT_URI,
-    RAWG_API_KEY: process.env.RAWG_API_KEY,
-    MONGODB_URI: process.env.MONGODB_URI,
-    GOOGLE_CREDENTIALS: process.env.GOOGLE_CREDENTIALS,
-    DISCORD_APPLICATION_ID: process.env.DISCORD_APPLICATION_ID,
-    DISCORD_CLIENT_SECRET: process.env.DISCORD_CLIENT_SECRET,
-    DISCORD_REDIRECT_URI: process.env.DISCORD_REDIRECT_URI,
-  },
   // Security headers (fallback - middleware.ts is primary)
   // These are applied to static files and pages that middleware might miss
   // IMPORTANT: This is a fallback. Middleware.ts should be the primary source.
