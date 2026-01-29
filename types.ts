@@ -1,6 +1,6 @@
-import { Decimal128 } from 'mongoose';
+import type { Decimal128 } from 'mongoose';
 import { ReactNode } from "react";
-import { BrightCollectorKey } from './utils/brightData';
+import type { BrightCollectorKey } from './utils/brightData';
 
 export interface Achievement {
   name: string;
@@ -205,6 +205,12 @@ export interface VerificationResponse {
   };
 }
 
+export interface ForumFilters {
+  gameTitle?: string;
+  category?: string;
+  sort?: 'newest' | 'oldest' | 'mostPosts';
+}
+
 export interface ForumContextType {
   forums: Forum[];
   currentForum: Forum | null;
@@ -216,7 +222,7 @@ export interface ForumContextType {
     limit: number;
     pages: number;
   } | null;
-  fetchForums: (page: number, limit: number) => Promise<{ forums: Forum[]; pagination: { total: number; page: number; limit: number; pages: number } }>;
+  fetchForums: (page: number, limit: number, filters?: ForumFilters) => Promise<{ forums: Forum[]; pagination: { total: number; page: number; limit: number; pages: number } }>;
   createForum: (forumData: Partial<Forum>) => Promise<Forum | null>;
   deleteForum: (forumId: string) => Promise<void>;
   addPost: (

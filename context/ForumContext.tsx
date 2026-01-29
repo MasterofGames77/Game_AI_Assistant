@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback } from "react";
 import axios from "axios";
-import { Forum, ForumContextType } from "../types";
+import { Forum, ForumContextType, ForumFilters } from "../types";
 import { trackForumCreated } from "../utils/analytics";
 
 const ForumContext = createContext<ForumContextType | undefined>(undefined);
@@ -19,11 +19,15 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
     pages: number;
   } | null>(null);
 
-  const fetchForums = useCallback(async (page: number, limit: number) => {
+  const fetchForums = useCallback(async (page: number, limit: number, filters?: ForumFilters) => {
     try {
       setLoading(true);
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      if (filters?.gameTitle?.trim()) params.set("gameTitle", filters.gameTitle.trim());
+      if (filters?.category?.trim()) params.set("category", filters.category.trim());
+      if (filters?.sort) params.set("sort", filters.sort);
       const response = await axios.get(
-        `/api/getAllForums?page=${page}&limit=${limit}`,
+        `/api/getAllForums?${params.toString()}`,
         {
           headers: {
             username: localStorage.getItem("username") || "test-user",

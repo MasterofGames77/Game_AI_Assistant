@@ -2,6 +2,12 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import connectToMongoDB from '../../utils/mongodb';
 import Forum from '../../models/Forum';
 import { validateUserAuthentication } from '../../utils/validation';
+import { normalizeForumCategory } from '../../utils/forumCategory';
+
+/** Escape special regex characters in user input to avoid ReDoS and injection */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -29,6 +35,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
 
+    // Filter parameters (optional)
+    const gameTitleRaw = (req.query.gameTitle as string)?.trim();
+    const categoryRaw = (req.query.category as string)?.trim();
+    const sortParam = (req.query.sort as string)?.toLowerCase() || 'newest';
+
     // Build query conditions
     const baseConditions: Record<string, any> = {
       $or: [
@@ -38,11 +49,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       'metadata.status': 'active'
     };
 
+    if (gameTitleRaw) {
+      baseConditions.gameTitle = new RegExp(escapeRegex(gameTitleRaw), 'i');
+    }
+    if (categoryRaw) {
+      baseConditions.category = normalizeForumCategory(categoryRaw);
+    }
+
+    // Sort: newest (default), oldest, mostPosts
+    const sortOption: Record<string, 1 | -1> =
+      sortParam === 'oldest'
+        ? { 'metadata.lastActivityAt': 1 }
+        : sortParam === 'mostposts'
+          ? { 'metadata.totalPosts': -1, 'metadata.lastActivityAt': -1 }
+          : { 'metadata.lastActivityAt': -1 };
+
     // Find forums that are either public or private but accessible to the user
     const forums = await Forum.find(baseConditions)
-    .sort({ 'metadata.lastActivityAt': -1 })
-    .skip(skip)
-    .limit(limit);
+      .sort(sortOption)
+      .skip(skip)
+      .limit(limit);
 
     // Process forums to include metadata
     const processedForums = forums.map(forum => ({

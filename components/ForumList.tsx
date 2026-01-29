@@ -29,6 +29,10 @@ export default function ForumList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const forumsPerPage = 10;
+  // Filter state: cleared = default list (newest / recently updated first)
+  const [gameTitleFilter, setGameTitleFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "mostPosts">("newest");
 
   // Check Pro access on component mount
   useEffect(() => {
@@ -67,11 +71,18 @@ export default function ForumList() {
     checkProAccess();
   }, []);
 
-  const loadForums = async (page: number) => {
+  const getFilters = (): { gameTitle?: string; category?: string; sort: "newest" | "oldest" | "mostPosts" } => ({
+    ...(gameTitleFilter.trim() && { gameTitle: gameTitleFilter.trim() }),
+    ...(categoryFilter.trim() && { category: categoryFilter.trim() }),
+    sort: sortBy,
+  });
+
+  const loadForums = async (page: number, filtersOverride?: { sort?: "newest" | "oldest" | "mostPosts" }) => {
     try {
       setLoading(true);
       setError("");
-      await fetchForums(page, forumsPerPage);
+      const filters = { ...getFilters(), ...filtersOverride };
+      await fetchForums(page, forumsPerPage, filters);
     } catch (err: any) {
       setError(err.message || "Failed to load forums");
     } finally {
@@ -79,6 +90,28 @@ export default function ForumList() {
       setIsRefreshing(false);
     }
   };
+
+  const handleClearFilters = async () => {
+    setGameTitleFilter("");
+    setCategoryFilter("");
+    setSortBy("newest");
+    setCurrentPage(1);
+    try {
+      setLoading(true);
+      setError("");
+      await fetchForums(1, forumsPerPage, { sort: "newest" });
+    } catch (err: any) {
+      setError(err.message || "Failed to load forums");
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  const hasActiveFilters =
+    gameTitleFilter.trim() !== "" ||
+    categoryFilter.trim() !== "" ||
+    sortBy !== "newest";
 
   useEffect(() => {
     loadForums(currentPage);
@@ -132,8 +165,12 @@ export default function ForumList() {
   };
 
   const isLoading = loading || contextLoading || isRefreshing;
+  // Only collapse to "Loading forums..." on initial load (no data yet). When
+  // filtering/sorting/refreshing, keep the full layout so the page height
+  // doesn't change and scroll position is preserved.
+  const isInitialLoad = loading && !pagination && forums.length === 0;
 
-  if (loading && !isRefreshing) {
+  if (isInitialLoad) {
     return <div className="text-center">Loading forums...</div>;
   }
 
@@ -205,7 +242,105 @@ export default function ForumList() {
         </div>
       )}
 
+      {/* Filter and sort controls */}
+      <div className="bg-white p-4 rounded-lg shadow space-y-4">
+        <h3 className="text-sm font-semibold text-gray-700">Filter & Sort Forums</h3>
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex-1 min-w-[160px]">
+            <label htmlFor="forum-filter-game" className="block text-xs font-medium text-gray-500 mb-1">
+              Game title
+            </label>
+            <input
+              id="forum-filter-game"
+              type="text"
+              placeholder="e.g. Super Mario Galaxy"
+              value={gameTitleFilter}
+              onChange={(e) => {
+                setGameTitleFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") loadForums(1);
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600 dark:placeholder-gray-400"
+            />
+          </div>
+          <div className="flex-1 min-w-[160px]">
+            <label htmlFor="forum-filter-category" className="block text-xs font-medium text-gray-500 mb-1">
+              Category
+            </label>
+            <input
+              id="forum-filter-category"
+              type="text"
+              placeholder="e.g. Speedruns, Gameplay"
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") loadForums(1);
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600 dark:placeholder-gray-400"
+            />
+          </div>
+          <div className="min-w-[180px]">
+            <label htmlFor="forum-sort" className="block text-xs font-medium text-gray-500 mb-1">
+              Sort by
+            </label>
+            <select
+              id="forum-sort"
+              value={sortBy}
+              onChange={(e) => {
+                const value = e.target.value as "newest" | "oldest" | "mostPosts";
+                setSortBy(value);
+                setCurrentPage(1);
+                loadForums(1, { sort: value });
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600"
+            >
+              <option value="newest" className="bg-white text-gray-900 dark:bg-gray-700 dark:text-gray-100">
+                Newest / Recently updated
+              </option>
+              <option value="oldest" className="bg-white text-gray-900 dark:bg-gray-700 dark:text-gray-100">
+                Oldest first
+              </option>
+              <option value="mostPosts" className="bg-white text-gray-900 dark:bg-gray-700 dark:text-gray-100">
+                Most posts first
+              </option>
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => loadForums(1)}
+              disabled={isLoading}
+              className="px-4 py-2 rounded bg-gray-300 text-gray-700 hover:bg-gray-200 disabled:opacity-50 text-sm font-medium"
+            >
+              Apply
+            </button>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                disabled={isLoading}
+                className="px-4 py-2 rounded bg-amber-100 text-amber-800 hover:bg-amber-200 disabled:opacity-50 text-sm font-medium"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
       {showCreateForm && <CreateForum />}
+
+      {isLoading && (
+        <div className="flex items-center justify-center gap-2 py-2 text-sm text-gray-500">
+          <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-400 border-t-transparent" />
+          <span>Updating list…</span>
+        </div>
+      )}
 
       <div className="grid gap-4">
         {forums.map((forum: Forum) => {
