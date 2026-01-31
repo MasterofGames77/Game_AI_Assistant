@@ -569,6 +569,49 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
     [currentForum]
   );
 
+  const updateForumStatus = useCallback(
+    async (forumId: string, status: 'active' | 'archived') => {
+      try {
+        setLoading(true);
+        const response = await axios.post(
+          "/api/updateForumStatus",
+          {
+            forumId,
+            status,
+            username: localStorage.getItem("username"),
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${
+                localStorage.getItem("userId") || "test-user"
+              }`,
+            },
+          }
+        );
+        const updatedForum = response.data.forum;
+        if (updatedForum) {
+          setForums((prevForums) =>
+            prevForums.map((f) => (f.forumId === forumId ? updatedForum : f))
+          );
+          if (currentForum?.forumId === forumId) {
+            setCurrentForum(updatedForum);
+          }
+        }
+        return updatedForum ?? null;
+      } catch (err: any) {
+        setError(
+          err.response?.data?.error ||
+            err.message ||
+            "Failed to update forum status"
+        );
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [currentForum]
+  );
+
   const value = {
     forums,
     currentForum,
@@ -584,6 +627,7 @@ export function ForumProvider({ children }: { children: React.ReactNode }) {
     likePost,
     reactToPost,
     updateForumUsers,
+    updateForumStatus,
     setCurrentForum,
     setError,
   };

@@ -34,12 +34,14 @@ function ForumPage({ params }: { params: { forumId: string } }) {
     deletePost,
     likePost,
     reactToPost,
-    updateForumUsers,
+    updateForumStatus,
   } = useForum();
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [username, setUsername] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [statusActionLoading, setStatusActionLoading] = useState(false);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editMessage, setEditMessage] = useState("");
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
@@ -115,6 +117,52 @@ function ForumPage({ params }: { params: { forumId: string } }) {
 
     fetchForum();
   }, [params.forumId, setCurrentForum]);
+
+  // Check admin status for forum creator/admin actions (Archive / Restore)
+  useEffect(() => {
+    const checkAdmin = async () => {
+      const u = localStorage.getItem("username");
+      if (!u) {
+        setIsAdmin(false);
+        return;
+      }
+      try {
+        const res = await fetch(
+          `/api/feedback/admin/check?username=${encodeURIComponent(u)}`
+        );
+        const data = await res.json();
+        setIsAdmin(data.isAdmin === true);
+      } catch {
+        setIsAdmin(false);
+      }
+    };
+    checkAdmin();
+  }, [username]);
+
+  const isCreatorOrAdmin = Boolean(
+    username && currentForum && (currentForum.createdBy === username || isAdmin)
+  );
+  const isReadOnly = currentForum?.metadata?.status === "archived";
+
+  const handleForumStatusChange = async (newStatus: "active" | "archived") => {
+    if (!currentForum?.forumId || !updateForumStatus) return;
+    setStatusActionLoading(true);
+    try {
+      const updated = await updateForumStatus(currentForum.forumId, newStatus);
+      if (updated) setCurrentForum(updated);
+      toast.success(
+        newStatus === "active"
+          ? "Forum is now open for posts."
+          : "Forum is archived. No one can post until you restore it."
+      );
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to update status";
+      toast.error(msg);
+    } finally {
+      setStatusActionLoading(false);
+    }
+  };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -1165,17 +1213,62 @@ function ForumPage({ params }: { params: { forumId: string } }) {
 
       {/* Forum Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">{currentForum.title}</h1>
-        <div className="mb-2 text-gray-800 dark:text-gray-200">
-          <p>Game: {currentForum.gameTitle}</p>
-          <p>Category: {currentForum.category}</p>
-          <p>Status: {currentForum.metadata.status}</p>
-          <p>Total Posts: {currentForum.posts?.length || 0}</p>
-          <p>Views: {currentForum.metadata.viewCount}</p>
-          {currentForum.isPrivate && (
-            <p className="text-blue-600 font-semibold">🔒 Private Forum</p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">{currentForum.title}</h1>
+            <div className="mb-2 text-gray-800 dark:text-gray-200">
+              <p>Game: {currentForum.gameTitle}</p>
+              <p>Category: {currentForum.category}</p>
+              <p>Status: {currentForum.metadata.status}</p>
+              <p>Total Posts: {currentForum.posts?.length || 0}</p>
+              <p>Views: {currentForum.metadata.viewCount}</p>
+              {currentForum.isPrivate && (
+                <p className="text-blue-600 font-semibold">🔒 Private Forum</p>
+              )}
+            </div>
+          </div>
+          {/* Archive / Restore — creator or admin only */}
+          {isCreatorOrAdmin && (
+            <div className="flex flex-wrap gap-2">
+              {currentForum.metadata?.status === "archived" && (
+                <button
+                  type="button"
+                  onClick={() => handleForumStatusChange("active")}
+                  disabled={statusActionLoading}
+                  className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
+                >
+                  {statusActionLoading ? "Updating…" : "Restore forum"}
+                </button>
+              )}
+              {(currentForum.metadata?.status === "active" ||
+                currentForum.metadata?.status === "inactive") && (
+                <button
+                  type="button"
+                  onClick={() => handleForumStatusChange("archived")}
+                  disabled={statusActionLoading}
+                  className="px-4 py-2 rounded bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-50 text-sm font-medium"
+                  title="Close forum to new posts. Anyone can still read; only you or an admin can restore it."
+                >
+                  {statusActionLoading ? "Updating…" : "Archive Forum"}
+                </button>
+              )}
+            </div>
           )}
         </div>
+        {/* Read-only banner when archived */}
+        {isReadOnly && (
+          <div
+            className="mt-4 p-4 rounded-lg border bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200"
+            role="status"
+          >
+            <p className="font-medium">📁 This forum is archived.</p>
+            <p className="text-sm mt-1 opacity-90">
+              You can read all posts, but no one can add new posts or replies.
+              {isCreatorOrAdmin &&
+                " Only the forum creator or an admin can restore it to allow posting again — use the button above."}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* User Management for Private Forums */}
@@ -1196,7 +1289,11 @@ function ForumPage({ params }: { params: { forumId: string } }) {
       )}
 
       <div className="mb-6">
-        {username ? (
+        {isReadOnly ? (
+          <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 text-center">
+            This forum is archived. No new posts or replies.
+          </div>
+        ) : username ? (
           <form onSubmit={handlePostSubmit} className="space-y-4">
             <textarea
               value={message}
@@ -1789,12 +1886,14 @@ function ForumPage({ params }: { params: { forumId: string } }) {
                             );
                           })}
                         </div>
-                        <button
-                          onClick={() => handleStartReply(post._id)}
-                          className="text-green-500 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
-                        >
-                          Reply
-                        </button>
+                        {!isReadOnly && (
+                          <button
+                            onClick={() => handleStartReply(post._id)}
+                            className="text-green-500 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
+                          >
+                            Reply
+                          </button>
+                        )}
                         {post.createdBy ===
                           (localStorage.getItem("username") || "test-user") && (
                           <>

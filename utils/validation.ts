@@ -129,8 +129,9 @@ export const validateUserAccess = (forum: Forum, username: string) => {
     errors.push('You do not have access to this private forum');
   }
 
-  // Check forum status
-  if (forum.metadata.status !== 'active') {
+  // Check forum status (active and inactive forums allow posting; archived does not)
+  const postableStatuses = ['active', 'inactive'];
+  if (!postableStatuses.includes(forum.metadata?.status || 'active')) {
     errors.push('This forum is not active');
   }
 
@@ -143,7 +144,7 @@ export const validateUserAccess = (forum: Forum, username: string) => {
  * @returns Boolean indicating if the status is valid
  */
 export const validateForumStatus = (status: string) => {
-  const validStatuses = ['active', 'locked', 'archived'];
+  const validStatuses = ['active', 'inactive', 'archived'];
   return validStatuses.includes(status);
 };
 

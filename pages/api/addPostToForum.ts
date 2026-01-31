@@ -70,8 +70,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Check if forum is active
-    if (forum.metadata.status !== 'active') {
+    // Allow posting when forum is active or inactive (inactive = no new posts in 7 days; posting is still allowed and will set it back to active)
+    const postableStatuses = ['active', 'inactive'];
+    if (!postableStatuses.includes(forum.metadata?.status || 'active')) {
       return res.status(403).json({ error: 'Forum is not active' });
     }
 
@@ -228,7 +229,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         $push: { posts: newPost },
         $set: {
           'metadata.totalPosts': (forum.metadata.totalPosts || 0) + 1,
-          'metadata.lastActivityAt': new Date()
+          'metadata.lastActivityAt': new Date(),
+          'metadata.status': 'active' // Reactivate forum when a new post is added (even if it was inactive)
         }
       },
       {

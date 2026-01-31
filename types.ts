@@ -161,7 +161,8 @@ export interface ForumMetadata {
   totalPosts: number;
   lastActivityAt: Date;
   viewCount: number;
-  status: 'active' | 'archived' | 'locked';
+  /** active = recent posts; inactive = no post in 7+ days (posting still allowed); archived = closed, read-only; locked = no posting until unlocked */
+  status: 'active' | 'inactive' | 'archived' | 'locked';
 }
 
 export interface ForumPost {
@@ -239,6 +240,7 @@ export interface ForumContextType {
   likePost: (forumId: string, postId: string) => Promise<void>;
   reactToPost: (forumId: string, postId: string, reactionType: string) => Promise<void>;
   updateForumUsers: (forumId: string, allowedUsers: string[]) => Promise<boolean>;
+  updateForumStatus: (forumId: string, status: 'active' | 'archived') => Promise<Forum | null>;
   setCurrentForum: (forum: Forum | null) => void;
   setError: (error: string | null) => void;
 }

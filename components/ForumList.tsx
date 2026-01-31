@@ -378,7 +378,15 @@ export default function ForumList() {
                     <span className="mr-4">
                       Views: {forum.metadata?.viewCount || 0}
                     </span>
-                    <span>Status: {forum.metadata?.status || "active"}</span>
+                    <span
+                      title={
+                        (forum.metadata?.status || "active") === "inactive"
+                          ? "No new posts in 7+ days; you can still post to reactivate"
+                          : undefined
+                      }
+                    >
+                      Status: {forum.metadata?.status || "active"}
+                    </span>
                   </div>
                 </div>
                 {forum.createdBy === localStorage.getItem("username") && (

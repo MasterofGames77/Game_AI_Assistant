@@ -34,11 +34,9 @@ export const validateAdminAccess = (username: string | null | undefined) => {
 
   const adminUsername = getAdminUsername();
   
-  // Trim whitespace and compare
-  const trimmedUsername = username.trim();
-  const trimmedAdminUsername = adminUsername.trim();
-  
-  if (trimmedUsername !== trimmedAdminUsername) {
+  // Normalize: trim and collapse spaces
+  const normalized = (s: string) => s.trim().replace(/\s+/g, '').toLowerCase();
+  if (normalized(username) !== normalized(adminUsername)) {
     return {
       hasAccess: false,
       error: 'Access denied. Admin privileges required.'

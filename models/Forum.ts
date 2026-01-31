@@ -66,7 +66,7 @@ const TopicSchema = new mongoose.Schema({
     viewCount: { type: Number, default: 0 },
     status: { 
       type: String, 
-      enum: ['active', 'locked', 'archived'],
+      enum: ['active', 'archived'],
       default: 'active'
     }
   }
@@ -109,7 +109,7 @@ const ForumSchema = new mongoose.Schema({
     viewedBy: [{ type: String }],
     status: {
       type: String,
-      enum: ['active', 'archived', 'locked'],
+      enum: ['active', 'inactive', 'archived'],
       default: 'active'
     }
   }

@@ -3,6 +3,7 @@ import connectToMongoDB from '../../utils/mongodb';
 import Forum from '../../models/Forum';
 import { validateUserAuthentication } from '../../utils/validation';
 import { normalizeForumCategory } from '../../utils/forumCategory';
+import { getEffectiveForumStatus } from '../../utils/forumStatus';
 
 /** Escape special regex characters in user input to avoid ReDoS and injection */
 function escapeRegex(str: string): string {
@@ -40,13 +41,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const categoryRaw = (req.query.category as string)?.trim();
     const sortParam = (req.query.sort as string)?.toLowerCase() || 'newest';
 
-    // Build query conditions
+    // Build query conditions: list forums that are active or inactive (exclude archived)
     const baseConditions: Record<string, any> = {
       $or: [
         { isPrivate: false },
         { allowedUsers: username }
       ],
-      'metadata.status': 'active'
+      'metadata.status': { $in: ['active', 'inactive'] }
     };
 
     if (gameTitleRaw) {
@@ -70,14 +71,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .skip(skip)
       .limit(limit);
 
-    // Process forums to include metadata
+    // Process forums to include metadata; derive active/inactive from lastActivityAt (7-day rule)
     const processedForums = forums.map(forum => ({
       ...forum.toObject(),
       metadata: {
         totalPosts: forum.metadata.totalPosts || 0,
         lastActivityAt: forum.metadata.lastActivityAt || new Date(),
         viewCount: forum.metadata.viewCount || 0,
-        status: forum.metadata.status || 'active'
+        status: getEffectiveForumStatus({
+          status: forum.metadata.status,
+          lastActivityAt: forum.metadata.lastActivityAt
+        })
       }
     }));
 
